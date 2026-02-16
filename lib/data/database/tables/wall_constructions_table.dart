@@ -1,0 +1,12 @@
+import 'package:drift/drift.dart';
+
+/// Drift table definition for [WallConstruction] entities.
+class WallConstructions extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text().withLength(min: 1, max: 200)();
+  RealColumn get rsi => real().withDefault(const Constant(0.13))();
+  RealColumn get rse => real().withDefault(const Constant(0.04))();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
