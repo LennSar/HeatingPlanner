@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'core/theme/app_theme.dart';
-import 'ui/screens/project_list_screen.dart';
+import 'ui/screens/editor_screen.dart';
 
 /// Root widget for the HeatingPlanner application.
 ///
@@ -16,7 +16,8 @@ class HeatingPlannerApp extends StatelessWidget {
     return MaterialApp(
       title: 'HeatingPlanner',
       theme: AppTheme.light(),
-      home: const ProjectListScreen(),
+      // TODO: restore ProjectListScreen as home.
+      home: const EditorScreen(projectId: 'preview'),
       debugShowCheckedModeBanner: false,
     );
   }

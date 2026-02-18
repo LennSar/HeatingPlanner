@@ -7,6 +7,7 @@ import '../../platform/keyboard_shortcuts.dart';
 import '../canvas/canvas_controller.dart';
 import '../canvas/floor_plan_canvas.dart';
 import '../panels/properties_panel.dart';
+import '../providers/editor_state_provider.dart';
 
 /// Notifier for the active drawing tool.
 class SelectedToolNotifier extends Notifier<DrawingTool> {
@@ -310,9 +311,17 @@ class _StatusBar extends ConsumerWidget {
     final canvasState = ref.watch(canvasControllerProvider);
     final zoomPercent =
         (canvasState.zoom * 100).round();
+    final cursorPos = ref.watch(cursorPositionProvider);
+    final editorState = ref.watch(editorStateProvider);
+    final roomCount = editorState.rooms.length;
     final textTheme = Theme.of(context).textTheme;
     final colors = Theme.of(context)
         .extension<HeatingPlannerColors>()!;
+
+    final coordText = cursorPos != null
+        ? 'x: ${cursorPos.x.round()}, '
+            'y: ${cursorPos.y.round()}'
+        : 'x: -, y: -';
 
     return Container(
       height: 32,
@@ -335,9 +344,9 @@ class _StatusBar extends ConsumerWidget {
             ),
             const SizedBox(width: Spacing.lg),
 
-            // Coordinates placeholder
+            // Live coordinates
             Text(
-              'x: 0, y: 0',
+              coordText,
               style: textTheme.bodySmall?.copyWith(
                 fontFamily: 'monospace',
               ),
@@ -356,7 +365,8 @@ class _StatusBar extends ConsumerWidget {
             const SizedBox(width: Spacing.md),
 
             // Room count
-            Text('0 rooms', style: textTheme.bodySmall),
+            Text('$roomCount rooms',
+                style: textTheme.bodySmall),
             const SizedBox(width: Spacing.sm),
 
             // Panel toggle

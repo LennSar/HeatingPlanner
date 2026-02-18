@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/enums.dart';
 import '../ui/canvas/canvas_controller.dart';
+import '../ui/canvas/floor_plan_canvas.dart';
 import '../ui/screens/editor_screen.dart';
 
 // ----------------------------------------------------------
@@ -158,8 +159,8 @@ class EditorShortcuts extends ConsumerWidget {
           CancelIntent: CallbackAction<CancelIntent>(
             onInvoke: (_) {
               ref
-                  .read(selectedToolProvider.notifier)
-                  .select(DrawingTool.select);
+                  .read(toolCancelProvider.notifier)
+                  .cancel();
               return null;
             },
           ),

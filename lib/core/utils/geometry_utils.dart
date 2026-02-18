@@ -43,6 +43,32 @@ abstract final class GeometryUtils {
     return sqrt(dx * dx + dy * dy);
   }
 
+  /// Minimum distance from [point] to line segment [a]→[b].
+  ///
+  /// Uses perpendicular projection clamped to [0, 1].
+  static double distanceToSegment(
+    Point2D point,
+    Point2D a,
+    Point2D b,
+  ) {
+    final dx = b.x - a.x;
+    final dy = b.y - a.y;
+    final lengthSq = dx * dx + dy * dy;
+
+    if (lengthSq == 0) return distance(point, a);
+
+    // Project point onto line, clamped to segment.
+    var t = ((point.x - a.x) * dx + (point.y - a.y) * dy) /
+        lengthSq;
+    t = t.clamp(0.0, 1.0);
+
+    final proj = Point2D(
+      x: a.x + t * dx,
+      y: a.y + t * dy,
+    );
+    return distance(point, proj);
+  }
+
   /// Returns true if [point] lies inside [polygon] (ray-casting algorithm).
   static bool containsPoint(List<Point2D> polygon, Point2D point) {
     final n = polygon.length;

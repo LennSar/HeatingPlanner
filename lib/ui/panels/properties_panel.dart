@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../calculation/engines/geometry_engine.dart';
 import '../../core/theme/app_theme.dart';
+import '../providers/editor_state_provider.dart';
+import 'room_properties.dart';
 
 /// Represents a selected element on the canvas.
 @immutable
@@ -57,7 +60,6 @@ class PropertiesPanel extends ConsumerWidget {
     final selection = ref.watch(selectedElementProvider);
     final colors = Theme.of(context)
         .extension<HeatingPlannerColors>()!;
-    final textTheme = Theme.of(context).textTheme;
 
     return Container(
       decoration: BoxDecoration(
@@ -76,23 +78,32 @@ class PropertiesPanel extends ConsumerWidget {
         ],
       ),
       child: selection == null
-          ? _ProjectSummary(textTheme: textTheme)
-          : _ElementProperties(
-              selection: selection,
-              textTheme: textTheme,
-            ),
+          ? const _ProjectSummary()
+          : _ElementProperties(selection: selection),
     );
   }
 }
 
 /// Shows project-level summary when nothing is selected.
-class _ProjectSummary extends StatelessWidget {
-  const _ProjectSummary({required this.textTheme});
-
-  final TextTheme textTheme;
+class _ProjectSummary extends ConsumerWidget {
+  const _ProjectSummary();
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final textTheme = Theme.of(context).textTheme;
+    final editorState = ref.watch(editorStateProvider);
+    final roomCount = editorState.rooms.length;
+    final wallCount = editorState.walls.length;
+
+    // Compute total area from all rooms.
+    var totalAreaM2 = 0.0;
+    for (final room in editorState.rooms) {
+      if (room.polygon.length >= 3) {
+        totalAreaM2 +=
+            GeometryEngine.polygonAreaM2(room.polygon);
+      }
+    }
+
     return Padding(
       padding: const EdgeInsets.all(Spacing.md),
       child: Column(
@@ -108,8 +119,13 @@ class _ProjectSummary extends StatelessWidget {
             style: textTheme.headlineSmall,
           ),
           const SizedBox(height: Spacing.md),
-          _infoRow('Rooms', '0', textTheme),
-          _infoRow('Total Area', '0 m\u00B2', textTheme),
+          _infoRow('Rooms', '$roomCount', textTheme),
+          _infoRow('Walls', '$wallCount', textTheme),
+          _infoRow(
+            'Total Area',
+            '${totalAreaM2.toStringAsFixed(1)} m\u00B2',
+            textTheme,
+          ),
           _infoRow('Heat Demand', '0 W', textTheme),
           const SizedBox(height: Spacing.md),
           Text(
@@ -123,58 +139,99 @@ class _ProjectSummary extends StatelessWidget {
   }
 }
 
-/// Shows properties for the currently selected element.
-class _ElementProperties extends StatelessWidget {
-  const _ElementProperties({
-    required this.selection,
-    required this.textTheme,
-  });
+/// Routes to the correct property widget based on
+/// selection type.
+class _ElementProperties extends ConsumerWidget {
+  const _ElementProperties({required this.selection});
 
   final SelectedElement selection;
-  final TextTheme textTheme;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    return switch (selection.type) {
+      'room' => RoomProperties(roomId: selection.id),
+      'wall' => _WallInfo(wallId: selection.id),
+      _ => _GenericInfo(selection: selection),
+    };
+  }
+}
+
+/// Read-only wall info panel.
+class _WallInfo extends ConsumerWidget {
+  const _WallInfo({required this.wallId});
+
+  final String wallId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final textTheme = Theme.of(context).textTheme;
+    final editorState = ref.watch(editorStateProvider);
+    final wall = editorState.walls
+        .where((w) => w.id == wallId)
+        .firstOrNull;
+
+    if (wall == null) {
+      return Padding(
+        padding: const EdgeInsets.all(Spacing.md),
+        child: Text('Wall not found', style: textTheme.bodyMedium),
+      );
+    }
+
+    final lengthMm = GeometryEngine.distanceMm(
+      wall.startPoint,
+      wall.endPoint,
+    );
+
     return Padding(
       padding: const EdgeInsets.all(Spacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Properties',
-            style: textTheme.headlineMedium,
-          ),
+          Text('Properties', style: textTheme.headlineMedium),
           const SizedBox(height: Spacing.lg),
-          Text(
-            _typeLabel(selection.type),
-            style: textTheme.headlineSmall,
-          ),
+          Text('Wall Segment', style: textTheme.headlineSmall),
           const SizedBox(height: Spacing.md),
-          _infoRow('ID', selection.id, textTheme),
-          _infoRow('Type', selection.type, textTheme),
-          const Divider(height: Spacing.lg),
-          Text(
-            'Properties for this ${selection.type} '
-            'will appear here once data providers '
-            'are connected.',
-            style: textTheme.bodySmall,
+          _infoRow(
+            'Length',
+            '${lengthMm.round()} mm',
+            textTheme,
           ),
+          _infoRow('Type', wall.wallType.name, textTheme),
+          _infoRow(
+            'Orientation',
+            wall.orientation.name,
+            textTheme,
+          ),
+          if (wall.roomId.isNotEmpty)
+            _infoRow('Room ID', wall.roomId, textTheme),
         ],
       ),
     );
   }
+}
 
-  String _typeLabel(String type) {
-    return switch (type) {
-      'room' => 'Room',
-      'wall' => 'Wall Segment',
-      'window' => 'Window',
-      'door' => 'Door',
-      'zone' => 'Heating Zone',
-      'distributor' => 'Distributor',
-      'circuit' => 'Circuit',
-      _ => 'Element',
-    };
+/// Fallback for unsupported element types.
+class _GenericInfo extends StatelessWidget {
+  const _GenericInfo({required this.selection});
+
+  final SelectedElement selection;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    return Padding(
+      padding: const EdgeInsets.all(Spacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Properties', style: textTheme.headlineMedium),
+          const SizedBox(height: Spacing.lg),
+          Text(selection.type, style: textTheme.headlineSmall),
+          const SizedBox(height: Spacing.md),
+          _infoRow('ID', selection.id, textTheme),
+        ],
+      ),
+    );
   }
 }
 
@@ -191,10 +248,13 @@ Widget _infoRow(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: textTheme.bodyMedium),
-        Text(
-          value,
-          style: textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
+        Flexible(
+          child: Text(
+            value,
+            style: textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w600,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
       ],

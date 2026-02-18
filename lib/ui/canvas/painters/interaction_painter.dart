@@ -1,7 +1,13 @@
+import 'dart:math' show sqrt;
+import 'dart:ui' as ui;
+
 import 'package:flutter/material.dart';
 
-/// Draws transient interaction overlays: snap indicators,
-/// hover highlights, and in-progress drawing previews.
+import 'interaction_data.dart';
+
+/// Draws transient interaction overlays: ghost lines,
+/// snap indicators, hover crosshairs, and selection
+/// highlights.
 ///
 /// This painter is **not** wrapped in [RepaintBoundary]
 /// because it updates every frame during active interaction.
@@ -10,6 +16,7 @@ class InteractionPainter extends CustomPainter {
   const InteractionPainter({
     this.hoverPoint,
     this.selectionHighlightColor,
+    this.interactionData,
   });
 
   /// Current hover position in world coordinates, if any.
@@ -18,16 +25,47 @@ class InteractionPainter extends CustomPainter {
   /// Colour for selection/hover highlights.
   final Color? selectionHighlightColor;
 
+  /// Tool-produced interaction data (ghost line or
+  /// selection highlight).
+  final InteractionData? interactionData;
+
   @override
   void paint(Canvas canvas, Size size) {
+    // Draw crosshair at hover point.
+    _drawCrosshair(canvas);
+
+    // Draw tool-specific interaction data.
+    if (interactionData != null) {
+      switch (interactionData!) {
+        case GhostLineData(:final startPoint, :final currentPoint,
+              :final snapIndicator, :final snapType):
+          _drawGhostLine(
+            canvas,
+            Offset(startPoint.x, startPoint.y),
+            Offset(currentPoint.x, currentPoint.y),
+            snapIndicator != null
+                ? Offset(snapIndicator.x, snapIndicator.y)
+                : null,
+            snapType,
+          );
+        case SelectionHighlightData(:final selectedWalls,
+              :final selectedRoom):
+          _drawSelectionHighlight(
+            canvas,
+            selectedWalls,
+            selectedRoom,
+          );
+      }
+    }
+  }
+
+  void _drawCrosshair(Canvas canvas) {
     if (hoverPoint == null || selectionHighlightColor == null) {
       return;
     }
 
     final paint = Paint()
-      ..color = selectionHighlightColor!.withValues(
-        alpha: 0.3,
-      )
+      ..color = selectionHighlightColor!.withValues(alpha: 0.3)
       ..strokeWidth = 1.0;
 
     const len = 20.0;
@@ -43,8 +81,162 @@ class InteractionPainter extends CustomPainter {
     );
   }
 
+  void _drawGhostLine(
+    Canvas canvas,
+    Offset start,
+    Offset end,
+    Offset? snapIndicator,
+    String? snapType,
+  ) {
+    // Dashed ghost line.
+    final ghostPaint = Paint()
+      ..color = selectionHighlightColor ?? Colors.blue
+      ..strokeWidth = 4.0
+      ..style = PaintingStyle.stroke;
+
+    _drawDashedLine(canvas, start, end, ghostPaint, 30.0);
+
+    // Length text at midpoint.
+    final dx = end.dx - start.dx;
+    final dy = end.dy - start.dy;
+    final lengthMm = sqrt(dx * dx + dy * dy).round();
+    final text = '$lengthMm mm';
+
+    final builder = ui.ParagraphBuilder(
+      ui.ParagraphStyle(
+        textAlign: TextAlign.center,
+        fontSize: 70,
+      ),
+    )
+      ..pushStyle(ui.TextStyle(
+        color: selectionHighlightColor ?? Colors.blue,
+        fontSize: 70,
+      ))
+      ..addText(text);
+
+    final paragraph = builder.build()
+      ..layout(const ui.ParagraphConstraints(width: 500));
+
+    final mid = Offset(
+      (start.dx + end.dx) / 2 - paragraph.width / 2,
+      (start.dy + end.dy) / 2 - paragraph.height - 20,
+    );
+    canvas.drawParagraph(paragraph, mid);
+
+    // Snap indicator circle.
+    if (snapIndicator != null) {
+      final snapPaint = Paint()
+        ..color = snapType == 'endpoint'
+            ? Colors.orange
+            : (selectionHighlightColor ?? Colors.blue)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.0;
+
+      canvas.drawCircle(
+        snapIndicator,
+        snapType == 'endpoint' ? 30.0 : 15.0,
+        snapPaint,
+      );
+    }
+
+    // Start point indicator.
+    final startPaint = Paint()
+      ..color = selectionHighlightColor ?? Colors.blue
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(start, 8.0, startPaint);
+  }
+
+  void _drawDashedLine(
+    Canvas canvas,
+    Offset start,
+    Offset end,
+    Paint paint,
+    double dashLength,
+  ) {
+    final dx = end.dx - start.dx;
+    final dy = end.dy - start.dy;
+    final distance = sqrt(dx * dx + dy * dy);
+    if (distance < 1) return;
+
+    final unitDx = dx / distance;
+    final unitDy = dy / distance;
+    var drawn = 0.0;
+    var drawing = true;
+
+    while (drawn < distance) {
+      final segLen =
+          (drawn + dashLength > distance)
+              ? distance - drawn
+              : dashLength;
+      if (drawing) {
+        canvas.drawLine(
+          Offset(
+            start.dx + unitDx * drawn,
+            start.dy + unitDy * drawn,
+          ),
+          Offset(
+            start.dx + unitDx * (drawn + segLen),
+            start.dy + unitDy * (drawn + segLen),
+          ),
+          paint,
+        );
+      }
+      drawn += segLen;
+      drawing = !drawing;
+    }
+  }
+
+  void _drawSelectionHighlight(
+    Canvas canvas,
+    List<dynamic> selectedWalls,
+    dynamic selectedRoom,
+  ) {
+    final highlightPaint = Paint()
+      ..color = selectionHighlightColor ?? Colors.blue
+      ..strokeWidth = 6.0
+      ..style = PaintingStyle.stroke;
+
+    // Highlight selected walls.
+    for (final wall in selectedWalls) {
+      canvas.drawLine(
+        Offset(wall.startPoint.x as double,
+            wall.startPoint.y as double),
+        Offset(wall.endPoint.x as double,
+            wall.endPoint.y as double),
+        highlightPaint,
+      );
+    }
+
+    // Highlight selected room polygon.
+    if (selectedRoom != null &&
+        (selectedRoom.polygon as List).length >= 3) {
+      final polygon = selectedRoom.polygon as List;
+      final fillPaint = Paint()
+        ..color = (selectionHighlightColor ?? Colors.blue)
+            .withValues(alpha: 0.15)
+        ..style = PaintingStyle.fill;
+
+      final path = Path();
+      path.moveTo(
+        polygon[0].x as double,
+        polygon[0].y as double,
+      );
+      for (var i = 1; i < polygon.length; i++) {
+        path.lineTo(
+          polygon[i].x as double,
+          polygon[i].y as double,
+        );
+      }
+      path.close();
+
+      canvas.drawPath(path, fillPaint);
+      canvas.drawPath(path, highlightPaint);
+    }
+  }
+
   @override
   bool shouldRepaint(InteractionPainter oldDelegate) {
-    return oldDelegate.hoverPoint != hoverPoint;
+    return oldDelegate.hoverPoint != hoverPoint ||
+        oldDelegate.interactionData != interactionData;
   }
 }
