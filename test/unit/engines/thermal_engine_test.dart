@@ -440,7 +440,7 @@ void main() {
       );
 
       // Transmission loss through window
-      final windowArea = 1.5 * 1.4;
+      const windowArea = 1.5 * 1.4;
       final qWindow = ThermalEngine.transmissionLoss(
         uValue: 1.3,
         areaM2: windowArea,

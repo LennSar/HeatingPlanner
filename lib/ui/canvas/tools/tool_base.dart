@@ -39,6 +39,26 @@ abstract class CanvasTool {
   /// [worldPoint] is in millimetre coordinates.
   void onPointerMove(Point2D worldPoint);
 
+  /// Called when a pointer-down starts a drag.
+  ///
+  /// [worldPoint] is in millimetre coordinates.
+  /// [buttons] is the bitmask of pressed buttons.
+  void onPointerDown(Point2D worldPoint, int buttons) {}
+
+  /// Called each frame while a drag is in progress.
+  void onDragUpdate(Point2D worldPoint) {}
+
+  /// Called when the drag ends (pointer up).
+  void onDragEnd(Point2D worldPoint) {}
+
+  /// Called when the user right-clicks (or Ctrl+clicks).
+  ///
+  /// [worldPoint] is in millimetre coordinates.
+  void onSecondaryTap(Point2D worldPoint) {}
+
+  /// Called on Delete / Backspace key press.
+  void onDelete() {}
+
   /// Cancel the current operation (e.g. Escape pressed).
   void cancel();
 

@@ -1,4 +1,4 @@
-import 'dart:math' show pi, sqrt;
+import 'dart:math' show pi;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/calculation/engines/hydraulic_engine.dart';
@@ -87,17 +87,13 @@ void main() {
   group('HydraulicEngine.waterVolumeLitres', () {
     test('known diameter and length', () {
       // inner diam = 13mm = 0.013m, r = 0.0065m
-      // V = pi * 0.0065^2 * 80 * 1000
-      final expected =
-          pi * (0.013 / 2) * (0.013 / 2) * 80.0 * 1000.0 / 1e-6 *
-              1e-6; // recalc cleanly
       // V = pi * (0.0065)^2 * 80 * 1000 = pi * 4.225e-5 * 80000
       // = pi * 3.38 = 10.619 litres
       final v = HydraulicEngine.waterVolumeLitres(
         innerDiameterMm: 13.0,
         tubeLengthM: 80.0,
       );
-      final manual =
+      const manual =
           pi * (0.013 / 2.0) * (0.013 / 2.0) * 80.0 * 1000.0;
       expect(v, closeTo(manual, manual * 0.01));
     });
@@ -266,7 +262,7 @@ void main() {
         innerDiameterMm: 13.0,
       );
       // Must be between f_laminar(2300) and f_turbulent(5000)
-      final fLam = 64.0 / 2300.0;
+      const fLam = 64.0 / 2300.0;
       expect(f, greaterThanOrEqualTo(fLam * 0.5));
       expect(f, lessThan(fLam * 1.5));
     });
@@ -399,7 +395,7 @@ void main() {
         zetaValues: [1.0, 0.5, 2.0],
         velocityMs: 0.4,
       );
-      final dynP = 992.2 * 0.4 * 0.4 / 2.0;
+      const dynP = 992.2 * 0.4 * 0.4 / 2.0;
       expect(dp, closeTo(3.5 * dynP, 1.0));
     });
 

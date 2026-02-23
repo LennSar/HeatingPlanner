@@ -25,6 +25,7 @@ import 'painters/wall_painter.dart';
 import 'tools/editor_callbacks.dart';
 import 'tools/select_tool.dart';
 import 'tools/tool_base.dart';
+import 'tools/undo_redo_service.dart';
 import 'tools/wall_draw_tool.dart';
 
 /// Provider that signals tools to cancel (incremented on
@@ -41,6 +42,23 @@ class ToolCancelNotifier extends Notifier<int> {
 
   /// Signal all tools to cancel.
   void cancel() {
+    state = state + 1;
+  }
+}
+
+/// Provider that signals tools to delete the selection.
+final toolDeleteProvider =
+    NotifierProvider<ToolDeleteNotifier, int>(
+  ToolDeleteNotifier.new,
+);
+
+/// Notifier that increments a counter to signal delete.
+class ToolDeleteNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  /// Signal the active tool to delete.
+  void delete() {
     state = state + 1;
   }
 }
@@ -78,16 +96,17 @@ class _FloorPlanCanvasState
   /// Current interaction data from the active tool.
   InteractionData? _interactionData;
 
-  /// Previous cancel counter to detect new cancels.
-  int _lastCancelCount = 0;
+  /// Whether a drag is in progress.
+  bool _isDragging = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _initTools();
-  }
+  /// Whether tools have been initialised (deferred to first
+  /// build so ref is available).
+  bool _toolsInitialised = false;
 
-  void _initTools() {
+  void _ensureToolsInitialised() {
+    if (_toolsInitialised) return;
+    _toolsInitialised = true;
+
     void onChanged() {
       setState(() {
         _interactionData = _activeTool?.getInteractionData();
@@ -97,6 +116,7 @@ class _FloorPlanCanvasState
     _tools[DrawingTool.select] = SelectTool(
       callbacks: this,
       onStateChanged: onChanged,
+      undoRedo: ref.read(undoRedoProvider),
     );
     _tools[DrawingTool.drawWall] = WallDrawTool(
       callbacks: this,
@@ -114,6 +134,35 @@ class _FloorPlanCanvasState
   @override
   void commitWall(WallSegment wall) {
     ref.read(editorStateProvider.notifier).addWall(wall);
+  }
+
+  @override
+  void updateWall(WallSegment wall) {
+    ref.read(editorStateProvider.notifier).updateWall(wall);
+  }
+
+  @override
+  void removeWall(String wallId) {
+    ref.read(editorStateProvider.notifier).removeWall(wallId);
+  }
+
+  @override
+  void destroyRoom(String roomId) {
+    final notifier = ref.read(editorStateProvider.notifier);
+    notifier.clearRoomIdOnWalls(roomId);
+    notifier.removeRoom(roomId);
+  }
+
+  @override
+  void restoreRoom(Room room, List<String> wallIds) {
+    final notifier = ref.read(editorStateProvider.notifier);
+    notifier.addRoom(room);
+    notifier.assignWallsToRoom(wallIds, room.id);
+  }
+
+  @override
+  void updateRoom(Room room) {
+    ref.read(editorStateProvider.notifier).updateRoom(room);
   }
 
   @override
@@ -174,14 +223,30 @@ class _FloorPlanCanvasState
         polygon: polygon,
       );
 
-      ref.read(editorStateProvider.notifier).addRoom(room);
+      // addRoomFromDetection handles shared walls: it creates
+      // a mirror WallSegment for each wall that already
+      // belongs to another room, marks both copies as
+      // WallType.interior, and cross-references them via
+      // adjacentRoomId in a single atomic state update.
       ref
           .read(editorStateProvider.notifier)
-          .assignWallsToRoom(wallIds, roomId);
+          .addRoomFromDetection(room: room, wallIds: wallIds);
 
       // Auto-select the new room.
       selectElement('room', roomId);
     });
+  }
+
+  @override
+  void showToast(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   @override
@@ -192,10 +257,15 @@ class _FloorPlanCanvasState
   List<Room> get currentRooms =>
       ref.read(editorStateProvider).rooms;
 
+  @override
+  double get currentZoom =>
+      ref.read(canvasControllerProvider).zoom;
+
   // ---- Build ----
 
   @override
   Widget build(BuildContext context) {
+    _ensureToolsInitialised();
     final canvasState = ref.watch(canvasControllerProvider);
     final editorState = ref.watch(editorStateProvider);
     final colors = Theme.of(context)
@@ -206,12 +276,15 @@ class _FloorPlanCanvasState
     // Watch selected tool to react to tool switches.
     ref.watch(selectedToolProvider);
 
-    // Watch cancel signal.
-    final cancelCount = ref.watch(toolCancelProvider);
-    if (cancelCount != _lastCancelCount) {
-      _lastCancelCount = cancelCount;
+    // React to cancel/delete signals after the build frame
+    // completes. ref.listen fires its callback post-build,
+    // avoiding "modified provider during build" errors.
+    ref.listen<int>(toolCancelProvider, (_, __) {
       _activeTool?.cancel();
-    }
+    });
+    ref.listen<int>(toolDeleteProvider, (_, __) {
+      _activeTool?.onDelete();
+    });
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -234,14 +307,80 @@ class _FloorPlanCanvasState
               ctrl.zoomBy(delta, event.localPosition);
             }
           },
+          onPointerDown: (event) {
+            final worldOffset = _toWorld(
+              canvasState,
+              event.localPosition,
+            );
+            final worldPoint = Point2D(
+              x: worldOffset.dx,
+              y: worldOffset.dy,
+            );
+
+            // Forward secondary (right) clicks.
+            if (event.buttons & kSecondaryButton != 0) {
+              _activeTool?.onSecondaryTap(worldPoint);
+              return;
+            }
+
+            // Forward pointer-down for drag initiation.
+            _activeTool?.onPointerDown(
+              worldPoint,
+              event.buttons,
+            );
+          },
+          onPointerMove: (event) {
+            if (event.down) {
+              // Drag in progress.
+              final worldOffset = _toWorld(
+                canvasState,
+                event.localPosition,
+              );
+              final worldPoint = Point2D(
+                x: worldOffset.dx,
+                y: worldOffset.dy,
+              );
+              if (!_isDragging) {
+                _isDragging = true;
+              }
+              _activeTool?.onDragUpdate(worldPoint);
+
+              setState(() {
+                _hoverWorldPoint = worldOffset;
+                _interactionData =
+                    _activeTool?.getInteractionData();
+              });
+            }
+          },
+          onPointerUp: (event) {
+            if (_isDragging) {
+              final worldOffset = _toWorld(
+                canvasState,
+                event.localPosition,
+              );
+              final worldPoint = Point2D(
+                x: worldOffset.dx,
+                y: worldOffset.dy,
+              );
+              _activeTool?.onDragEnd(worldPoint);
+              _isDragging = false;
+
+              setState(() {
+                _interactionData =
+                    _activeTool?.getInteractionData();
+              });
+            }
+          },
           child: GestureDetector(
             onScaleStart: (details) {
+              if (_isDragging) return;
               _initialZoom = canvasState.zoom;
               ref
                   .read(canvasControllerProvider.notifier)
                   .onScaleStart(details.localFocalPoint);
             },
             onScaleUpdate: (details) {
+              if (_isDragging) return;
               ref
                   .read(canvasControllerProvider.notifier)
                   .onScaleUpdate(

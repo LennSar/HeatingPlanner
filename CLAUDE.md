@@ -50,3 +50,9 @@ Canonical directory tree is defined in `.claude/agent-architect.md` Section 4. P
 ## Key Naming Note
 
 The Dart class for windows is named `WindowElement` (file: `window_element.dart`) because `Window` conflicts with `dart:ui`.
+
+## Implementation Decisions
+
+See `DECISIONS.md` for architectural decisions made during implementation 
+that aren't captured in the agent spec files. Read this before making 
+changes to established patterns.

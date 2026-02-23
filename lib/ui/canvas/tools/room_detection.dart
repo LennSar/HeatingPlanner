@@ -95,14 +95,25 @@ abstract final class RoomDetection {
     if (result == null) return null;
 
     // Build polygon from path.
+    // result.path contains all intermediate nodes.
+    // result.closingWallId is the wall that connects the
+    // last path node back to newWall.startPoint.
     final polygon = <Point2D>[newWall.startPoint];
     final wallIds = <String>[newWall.id];
 
-    for (final node in result) {
+    for (final node in result.path) {
       polygon.add(node.point);
       if (node.wallId != newWall.id) {
         wallIds.add(node.wallId);
       }
+    }
+
+    // Add the closing wall — the edge that connects the
+    // last traversed node back to newWall.startPoint.
+    // Previously this was omitted, causing wallIds to be
+    // one entry short when building the room boundary.
+    if (result.closingWallId != newWall.id) {
+      wallIds.add(result.closingWallId);
     }
 
     // Minimum 3 vertices for a valid room.
@@ -113,7 +124,11 @@ abstract final class RoomDetection {
 
   /// DFS to find a path from current position back to
   /// [targetKey].
-  static List<_PathNode>? _dfs({
+  ///
+  /// Returns a [_DfsResult] containing the traversal path
+  /// and the ID of the wall that closes the cycle, or null
+  /// if no cycle is reachable.
+  static _DfsResult? _dfs({
     required Map<String, List<_AdjEntry>> adjacency,
     required String targetKey,
     required Set<String> visited,
@@ -132,8 +147,13 @@ abstract final class RoomDetection {
       if (neighbor.wallId == excludeWallId) continue;
 
       // Found the target — cycle complete.
+      // Record the closing wall ID so the caller can add it
+      // to wallIds (previously this edge was silently lost).
       if (neighbor.key == targetKey) {
-        return [...path];
+        return _DfsResult(
+          path: [...path],
+          closingWallId: neighbor.wallId,
+        );
       }
 
       // Don't revisit nodes.
@@ -163,6 +183,23 @@ abstract final class RoomDetection {
 
     return null;
   }
+}
+
+/// Result returned by the DFS traversal.
+class _DfsResult {
+  const _DfsResult({
+    required this.path,
+    required this.closingWallId,
+  });
+
+  /// Nodes traversed from endPoint up to (but not
+  /// including) the target.
+  final List<_PathNode> path;
+
+  /// ID of the wall that connects the last path node back
+  /// to the target (newWall.startPoint).  This was the
+  /// previously missing closing edge.
+  final String closingWallId;
 }
 
 class _AdjEntry {

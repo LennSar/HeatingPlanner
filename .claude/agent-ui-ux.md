@@ -286,7 +286,7 @@ At viewport width < 600dp:
 | Action | Target | Result |
 |--------|--------|--------|
 | Click on empty space | — | Deselect all |
-| Click on wall | Wall segment | Select wall, show wall properties |
+| Click on wall | Wall segment | Select wall, show wall properties and handles |
 | Click on room interior | Room | Select room, show room properties |
 | Click on window/door | Opening | Select opening, show opening properties |
 | Click on heating zone | Zone | Select zone, show zone properties |
@@ -296,12 +296,64 @@ At viewport width < 600dp:
 | Double-click on room | Room | Open room name/temp editor inline |
 | Shift+click | Any | Add to selection (multi-select) |
 | Drag on empty space | — | Marquee selection |
-| Drag on selected element | Element(s) | Move element(s) |
 
-**Delete behaviour:**
-- Press Delete/Backspace (desktop) or tap Delete button (tablet).
-- Single element: immediate delete with undo support.
-- Room: confirmation dialog ("Delete room '{name}' and all its contents? This removes walls, windows, doors, and heating zones.")
+#### 5.6.1 Wall Handles (Post-Placement Editing)
+
+When a wall segment is selected, three circular drag handles appear on the wall:
+
+| Handle | Position | Visual |
+|--------|----------|--------|
+| Start handle | Start endpoint of the wall | Filled circle (8px), primary colour |
+| Mid handle | Midpoint of the wall | Filled circle (8px), primary colour |
+| End handle | End endpoint of the wall | Filled circle (8px), primary colour |
+
+**Mid-handle drag — move entire wall:**
+1. Click and hold the mid handle → cursor changes to grab.
+2. Drag to move the entire wall (both endpoints translate by the same delta).
+3. Wall snaps to grid during drag (same grid snap as wall drawing).
+4. **If the wall belongs to a completed room:** connected walls stay attached. Their far endpoints remain fixed; their near endpoints follow the moving wall. Connected walls adjust length and orientation to maintain the connection. The room polygon updates in real time.
+5. Release to commit the new position.
+
+**Endpoint handle drag — change length and orientation:**
+1. Click and hold a start or end handle → cursor changes to crosshair.
+2. Drag to move that single endpoint. The opposite endpoint stays fixed.
+3. The wall pivots and stretches/shrinks around the fixed endpoint.
+4. Endpoint snaps to grid (same snap behaviour as wall drawing).
+5. **If the wall belongs to a completed room:** the connected wall at the dragged endpoint adjusts its length and orientation to stay connected. The room polygon updates in real time.
+6. Release to commit. Wall length validation applies (min 100mm). If the resulting wall is too short, revert to the pre-drag position and show a transient toast.
+
+**Endpoint handle right-click (Ctrl+click on Mac) — disconnect wall:**
+1. Right-click (or Ctrl+click on macOS) on a start or end handle that is connected to another wall.
+2. The wall is disconnected from the adjacent wall at that endpoint. The two walls no longer share the endpoint; each retains its own position.
+3. **If the wall was part of a completed room:** the room is destroyed immediately. All room data is removed:
+   - The `Room` entity is deleted.
+   - All `WallSegment.roomId` references to that room are cleared (set to empty).
+   - Windows and doors on the room's walls are preserved (they belong to the wall, not the room).
+   - Heating zones associated with the room are deleted.
+   - The properties panel updates to show the wall properties instead of the now-deleted room.
+4. No confirmation dialog — the disconnect is immediate with undo support.
+
+#### 5.6.2 Delete Behaviour
+
+**Trigger:** Press Delete/Backspace (desktop) or tap Delete button (tablet).
+
+**Wall deletion:**
+- The selected wall is removed immediately.
+- **If the wall was part of a completed room:** the room is destroyed. Cascade cleanup:
+  - The `Room` entity is deleted.
+  - All remaining walls that belonged to that room have their `roomId` cleared.
+  - Windows and doors on the deleted wall are also deleted (they lose their host wall).
+  - Windows and doors on the remaining walls are preserved.
+  - Heating zones associated with the room are deleted.
+  - No dead data may remain — all foreign key references to the deleted room or wall must be cleaned up.
+- Undo support: undoing the delete restores the wall, the room (if one was destroyed), and all cascade-deleted entities.
+
+**Room deletion:**
+- Confirmation dialog: "Delete room '{name}' and all its contents? This removes heating zones associated with this room."
+- On confirm: the `Room` entity is deleted. Walls are preserved but have their `roomId` cleared. Windows and doors on those walls are preserved. Heating zones are deleted.
+
+**Other element deletion:**
+- Single element (window, door, zone): immediate delete with undo support.
 - Distributor: confirmation dialog ("Delete distributor and all connected circuits?")
 
 ### 5.7 Wall Construction Editor (Modal)

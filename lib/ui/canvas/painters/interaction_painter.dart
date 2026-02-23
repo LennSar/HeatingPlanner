@@ -49,12 +49,14 @@ class InteractionPainter extends CustomPainter {
             snapType,
           );
         case SelectionHighlightData(:final selectedWalls,
-              :final selectedRoom):
+              :final selectedRoom, :final handles,
+              :final activeHandleIndex):
           _drawSelectionHighlight(
             canvas,
             selectedWalls,
             selectedRoom,
           );
+          _drawWallHandles(canvas, handles, activeHandleIndex);
       }
     }
   }
@@ -231,6 +233,37 @@ class InteractionPainter extends CustomPainter {
 
       canvas.drawPath(path, fillPaint);
       canvas.drawPath(path, highlightPaint);
+    }
+  }
+
+  void _drawWallHandles(
+    Canvas canvas,
+    List<dynamic> handles,
+    int? activeHandleIndex,
+  ) {
+    if (handles.isEmpty) return;
+
+    final color = selectionHighlightColor ?? Colors.blue;
+    const handleRadius = 30.0; // world-space radius (~8px at default zoom)
+
+    for (var i = 0; i < handles.length; i++) {
+      final h = handles[i];
+      final center = Offset(h.x as double, h.y as double);
+      final isActive = i == activeHandleIndex;
+
+      final fillPaint = Paint()
+        ..color = isActive
+            ? color
+            : color.withValues(alpha: 0.85)
+        ..style = PaintingStyle.fill;
+
+      final strokePaint = Paint()
+        ..color = Colors.white
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = isActive ? 4.0 : 2.0;
+
+      canvas.drawCircle(center, handleRadius, fillPaint);
+      canvas.drawCircle(center, handleRadius, strokePaint);
     }
   }
 

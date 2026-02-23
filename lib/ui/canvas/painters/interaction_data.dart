@@ -40,6 +40,8 @@ class SelectionHighlightData extends InteractionData {
   const SelectionHighlightData({
     this.selectedWalls = const [],
     this.selectedRoom,
+    this.handles = const [],
+    this.activeHandleIndex,
   });
 
   /// Walls currently selected / highlighted.
@@ -47,4 +49,23 @@ class SelectionHighlightData extends InteractionData {
 
   /// Room currently selected / highlighted.
   final Room? selectedRoom;
+
+  /// Drag handles on the selected wall (start, mid, end).
+  final List<Point2D> handles;
+
+  /// Index of the handle currently being dragged (0–2),
+  /// or null if not dragging.
+  final int? activeHandleIndex;
+}
+
+/// Which kind of handle is being dragged.
+enum DragHandleType {
+  /// Start endpoint handle.
+  start,
+
+  /// Midpoint handle (translates entire wall).
+  mid,
+
+  /// End endpoint handle.
+  end,
 }

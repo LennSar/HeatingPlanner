@@ -1,5 +1,3 @@
-import 'dart:math' show sqrt, pi;
-
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/calculation/engines/geometry_engine.dart';
 import 'package:heating_planner/data/models/point2d.dart';

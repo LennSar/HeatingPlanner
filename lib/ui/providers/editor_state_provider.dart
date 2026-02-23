@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../core/utils/id_generator.dart';
+import '../../data/models/enums.dart';
 import '../../data/models/point2d.dart';
 import '../../data/models/room.dart';
 import '../../data/models/wall_segment.dart';
@@ -44,11 +46,33 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
   }
 
+  /// Replace a wall with the same ID.
+  void updateWall(WallSegment wall) {
+    state = state.copyWith(
+      walls: state.walls
+          .map((w) => w.id == wall.id ? wall : w)
+          .toList(),
+    );
+  }
+
   /// Remove a wall by ID.
   void removeWall(String wallId) {
     state = state.copyWith(
       walls: state.walls
           .where((w) => w.id != wallId)
+          .toList(),
+    );
+  }
+
+  /// Clear roomId on all walls that reference [roomId].
+  void clearRoomIdOnWalls(String roomId) {
+    state = state.copyWith(
+      walls: state.walls
+          .map(
+            (w) => w.roomId == roomId
+                ? w.copyWith(roomId: '')
+                : w,
+          )
           .toList(),
     );
   }
@@ -91,6 +115,70 @@ class EditorStateNotifier extends Notifier<EditorState> {
       rooms: state.rooms
           .where((r) => r.id != roomId)
           .toList(),
+    );
+  }
+
+  /// Create a room from auto-detection results, handling
+  /// shared walls correctly.
+  ///
+  /// For each wall in [wallIds]:
+  /// - If the wall is unassigned (roomId empty), it is
+  ///   simply assigned to [room].
+  /// - If the wall already belongs to another room it is a
+  ///   *shared* wall.  A duplicate [WallSegment] is created
+  ///   at the same position for [room], both copies are
+  ///   marked [WallType.interior], and their [adjacentRoomId]
+  ///   fields are cross-referenced so that
+  ///   [ThermalEngine.interiorCorrectionFactor] can look up
+  ///   the neighbouring room temperature.
+  ///
+  /// All mutations are committed in a single state update.
+  void addRoomFromDetection({
+    required Room room,
+    required List<String> wallIds,
+  }) {
+    final updatedWalls = [...state.walls];
+
+    for (int i = 0; i < wallIds.length; i++) {
+      final wallId = wallIds[i];
+      final idx = updatedWalls.indexWhere((w) => w.id == wallId);
+      if (idx == -1) continue;
+
+      final wall = updatedWalls[idx];
+
+      if (wall.roomId.isEmpty) {
+        // Unassigned wall — claim it for the new room.
+        updatedWalls[idx] = wall.copyWith(roomId: room.id);
+      } else {
+        // Shared wall — belongs to a neighbour room.
+        // Keep the original wall; mark it interior and
+        // point it at the new room.
+        final neighbourRoomId = wall.roomId;
+        updatedWalls[idx] = wall.copyWith(
+          wallType: WallType.interior,
+          adjacentRoomId: room.id,
+        );
+
+        // Create a mirror segment for the new room.
+        // Start/end are swapped so the wall faces inward
+        // from the new room's perspective.
+        final mirror = WallSegment(
+          id: IdGenerator.newId(),
+          roomId: room.id,
+          startPoint: wall.endPoint,
+          endPoint: wall.startPoint,
+          wallType: WallType.interior,
+          constructionId: wall.constructionId,
+          adjacentRoomId: neighbourRoomId,
+          orientation: wall.orientation,
+        );
+        updatedWalls.add(mirror);
+      }
+    }
+
+    state = state.copyWith(
+      walls: updatedWalls,
+      rooms: [...state.rooms, room],
     );
   }
 

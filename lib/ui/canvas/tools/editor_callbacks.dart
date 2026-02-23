@@ -9,6 +9,21 @@ abstract class EditorCallbacks {
   /// Commit a new wall segment to the editor state.
   void commitWall(WallSegment wall);
 
+  /// Replace an existing wall segment (same ID).
+  void updateWall(WallSegment wall);
+
+  /// Remove a wall by ID.
+  void removeWall(String wallId);
+
+  /// Remove a room by ID and clear roomId on its walls.
+  void destroyRoom(String roomId);
+
+  /// Add a room back and reassign its walls (for undo).
+  void restoreRoom(Room room, List<String> wallIds);
+
+  /// Update a room (e.g. polygon change during drag).
+  void updateRoom(Room room);
+
   /// Update the selected element in the properties panel.
   void selectElement(String? type, String? id);
 
@@ -18,9 +33,16 @@ abstract class EditorCallbacks {
     List<String> wallIds,
   );
 
+  /// Show a transient toast message.
+  void showToast(String message);
+
   /// All wall segments currently in the editor.
   List<WallSegment> get currentWalls;
 
   /// All rooms currently in the editor.
   List<Room> get currentRooms;
+
+  /// The current canvas zoom level (for screen-space hit
+  /// testing of handles).
+  double get currentZoom;
 }

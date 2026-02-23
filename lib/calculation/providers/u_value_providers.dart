@@ -1,2 +1,6 @@
+// RULE: Never modify providers during widget build.
+// All mutations happen in response to user actions or via
+// ref.listen inside provider definitions.
+
 // TODO(hvac): implement uValueProvider(constructionId) using ThermalEngine.
 // Depends on layersProvider(constructionId) → WallConstruction.rsi/rse.

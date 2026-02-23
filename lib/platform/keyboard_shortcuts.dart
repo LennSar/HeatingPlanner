@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/models/enums.dart';
 import '../ui/canvas/canvas_controller.dart';
 import '../ui/canvas/floor_plan_canvas.dart';
+import '../ui/canvas/tools/undo_redo_service.dart';
 import '../ui/screens/editor_screen.dart';
 
 // ----------------------------------------------------------
@@ -140,19 +141,21 @@ class EditorShortcuts extends ConsumerWidget {
         actions: {
           UndoIntent: CallbackAction<UndoIntent>(
             onInvoke: (_) {
-              // TODO: wire to UndoRedoService.
+              ref.read(undoRedoProvider).undo();
               return null;
             },
           ),
           RedoIntent: CallbackAction<RedoIntent>(
             onInvoke: (_) {
-              // TODO: wire to UndoRedoService.
+              ref.read(undoRedoProvider).redo();
               return null;
             },
           ),
           DeleteIntent: CallbackAction<DeleteIntent>(
             onInvoke: (_) {
-              // TODO: delete selected element.
+              ref
+                  .read(toolDeleteProvider.notifier)
+                  .delete();
               return null;
             },
           ),

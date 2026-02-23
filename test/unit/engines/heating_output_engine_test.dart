@@ -1,4 +1,4 @@
-import 'dart:math' show pow, log;
+import 'dart:math' show pow;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/calculation/engines/heating_output_engine.dart';
