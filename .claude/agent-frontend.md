@@ -285,7 +285,23 @@ The active tool is determined by `ref.watch(selectedToolProvider)`. The canvas d
 
 ### 4.5 Snapping Implementation
 
-Implement snapping in a `SnapService` utility class consumed by all tools:
+Implement snapping in a `SnapService` utility class consumed by all tools.
+
+**CRITICAL: Grid snapping is always relative to the world-coordinate origin (0, 0), never relative to the viewport, pan offset, cursor position, or drag start position.** The grid is a fixed world-space lattice. A point snapped to a 10mm grid always lands on a coordinate where both x and y are exact multiples of 100. Zoom level and pan offset must not affect snap results.
+
+```dart
+/// Snap to the absolute world grid anchored at origin (0, 0).
+/// x_snapped = (point.x / spacing).round() * spacing
+/// y_snapped = (point.y / spacing).round() * spacing
+static Point2D snapToGrid(Point2D point, double gridSpacingMm) {
+  return Point2D(
+    x: (point.x / gridSpacingMm).roundToDouble() * gridSpacingMm,
+    y: (point.y / gridSpacingMm).roundToDouble() * gridSpacingMm,
+  );
+}
+```
+
+The grid painter must draw grid dots/lines at the same absolute world positions. Grid dots are always at `(n * spacing, m * spacing)` for integer n, m — regardless of pan or zoom state.
 
 ```dart
 class SnapService {
