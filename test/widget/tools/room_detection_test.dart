@@ -601,4 +601,275 @@ void main() {
       expect(q, equals(0.0));
     });
   });
+
+  // ── Group 4: commitWallWithSplit — wall splitting at draw time (ADR-003) ──
+  //
+  // The user draws room 1 (rectangle with walls a,b,c,d).  Room 2 is then
+  // drawn starting at the junction of walls c and d.  The third new wall of
+  // room 2 ends at an interior point of wall d.  commitWallWithSplit must
+  // split wall d at that junction point BEFORE room detection runs.
+  //
+  // Layout (all coordinates in mm):
+  //
+  //   jcd=(0,2000)  ← junction of wall_c & wall_d (existing endpoint)
+  //        |
+  //      d1 wall_d_before  (0,2000)→(0,1000)  — room-1, exterior after split
+  //        |
+  //   J=(0,1000)  ← new junction where wall_3 ends on wall_d's interior
+  //        |
+  //      d2 wall_d_after   (0,1000)→(0,0)    — room-1, exterior after split
+  //        |
+  //   A=(0,0)─────────────────B=(3000,0)
+  //
+  // Room 1 walls (assigned to 'big-room'):
+  //   wall_a: A(0,0)→B(3000,0)
+  //   wall_b: B(3000,0)→C(3000,2000)
+  //   wall_c: C(3000,2000)→jcd(0,2000)
+  //   wall_d: jcd(0,2000)→A(0,0)
+  //
+  // New walls drawn for room 2 (unassigned), committed via commitWallWithSplit:
+  //   wall_1: jcd(0,2000) → E(-1000,2000)
+  //   wall_2: E(-1000,2000) → J(-1000,1000)
+  //   wall_3: J(-1000,1000) → J_on_d(0,1000)  ← endpoint on wall_d interior
+  //
+  // After commitWallWithSplit(wall_3):
+  //   wall_d is split at (0,1000):
+  //     d1: (0,2000)→(0,1000)  roomId=big-room, exterior
+  //     d2: (0,1000)→(0,0)     roomId=big-room, exterior
+  //   wall_3 is added.
+  //
+  // Room detection then finds the cycle [wall_3, d1, wall_1, wall_2].
+  // addRoomFromDetection marks d1 as interior and creates a mirror for room-2.
+
+  group(
+      'EditorStateNotifier.commitWallWithSplit — '
+      'wall split at draw time (ADR-003)', () {
+    // Room 1 corners.
+    const ptA = Point2D(x: 0, y: 0);
+    const ptB = Point2D(x: 3000, y: 0);
+    const ptC = Point2D(x: 3000, y: 2000);
+    const ptJcd = Point2D(x: 0, y: 2000); // junction of c and d
+
+    // Junction point where wall_3 ends on wall_d's interior.
+    const ptJ = Point2D(x: 0, y: 1000);
+
+    // External corners of room 2.
+    const ptE = Point2D(x: -1000, y: 2000);
+    const ptF = Point2D(x: -1000, y: 1000);
+
+    // Room 1 walls (assigned).
+    const wallA = WallSegment(
+      id: 'wall-a',
+      roomId: 'big-room',
+      startPoint: ptA,
+      endPoint: ptB,
+    );
+    const wallB = WallSegment(
+      id: 'wall-b',
+      roomId: 'big-room',
+      startPoint: ptB,
+      endPoint: ptC,
+    );
+    const wallC = WallSegment(
+      id: 'wall-c',
+      roomId: 'big-room',
+      startPoint: ptC,
+      endPoint: ptJcd,
+    );
+    const wallD = WallSegment(
+      id: 'wall-d',
+      roomId: 'big-room',
+      startPoint: ptJcd,
+      endPoint: ptA,
+    );
+
+    // New walls for room 2 (unassigned).
+    const wall1 = WallSegment(
+      id: 'wall-1',
+      roomId: '',
+      startPoint: ptJcd,
+      endPoint: ptE,
+    );
+    const wall2 = WallSegment(
+      id: 'wall-2',
+      roomId: '',
+      startPoint: ptE,
+      endPoint: ptF,
+    );
+    // wall_3 ends at ptJ = (0,1000), which is on wall_d's interior.
+    const wall3 = WallSegment(
+      id: 'wall-3',
+      roomId: '',
+      startPoint: ptF,
+      endPoint: ptJ,
+    );
+
+    (ProviderContainer, EditorStateNotifier) makeContainer() {
+      final container = ProviderContainer();
+      final notifier = container.read(editorStateProvider.notifier);
+
+      notifier.addRoom(
+        const Room(
+          id: 'big-room',
+          floorId: 'floor-1',
+          name: 'Big Room',
+          targetTempC: 20.0,
+        ),
+      );
+      notifier.addWall(wallA);
+      notifier.addWall(wallB);
+      notifier.addWall(wallC);
+      notifier.addWall(wallD);
+
+      // Commit the first two walls of room 2 normally.
+      notifier.commitWallWithSplit(wall1);
+      notifier.commitWallWithSplit(wall2);
+
+      return (container, notifier);
+    }
+
+    test(
+        'WS-1: committing wall_3 splits wall_d at (0,1000) — '
+        'original wall_d is removed', () {
+      final (container, notifier) = makeContainer();
+      addTearDown(container.dispose);
+
+      notifier.commitWallWithSplit(wall3);
+
+      final walls = container.read(editorStateProvider).walls;
+      expect(
+        walls.any((w) => w.id == 'wall-d'),
+        isFalse,
+        reason: 'Original wall_d must be replaced by two split segments.',
+      );
+    });
+
+    test(
+        'WS-2: two split segments of wall_d are created for big-room', () {
+      final (container, notifier) = makeContainer();
+      addTearDown(container.dispose);
+
+      notifier.commitWallWithSplit(wall3);
+
+      final walls = container.read(editorStateProvider).walls;
+      final dPieces = walls
+          .where((w) =>
+              w.roomId == 'big-room' &&
+              (w.startPoint == ptJcd ||
+                  w.startPoint == ptJ ||
+                  w.endPoint == ptJ ||
+                  w.endPoint == ptA) &&
+              w.id != 'wall-c')
+          .toList();
+
+      expect(
+        dPieces,
+        hasLength(2),
+        reason: 'wall_d must be split into two segments at (0,1000).',
+      );
+    });
+
+    test(
+        'WS-3: first split piece spans jcd(0,2000)→J(0,1000) and is '
+        'exterior (not yet shared)', () {
+      final (container, notifier) = makeContainer();
+      addTearDown(container.dispose);
+
+      notifier.commitWallWithSplit(wall3);
+
+      final walls = container.read(editorStateProvider).walls;
+      final d1 = walls.firstWhere(
+        (w) =>
+            w.roomId == 'big-room' &&
+            w.startPoint == ptJcd &&
+            w.endPoint == ptJ,
+      );
+
+      expect(d1.wallType, equals(WallType.exterior));
+    });
+
+    test(
+        'WS-4: second split piece spans J(0,1000)→A(0,0) and is exterior',
+        () {
+      final (container, notifier) = makeContainer();
+      addTearDown(container.dispose);
+
+      notifier.commitWallWithSplit(wall3);
+
+      final walls = container.read(editorStateProvider).walls;
+      final d2 = walls.firstWhere(
+        (w) =>
+            w.roomId == 'big-room' &&
+            w.startPoint == ptJ &&
+            w.endPoint == ptA,
+      );
+
+      expect(d2.wallType, equals(WallType.exterior));
+    });
+
+    test(
+        'WS-5: wall_3 is added to state after the split', () {
+      final (container, notifier) = makeContainer();
+      addTearDown(container.dispose);
+
+      notifier.commitWallWithSplit(wall3);
+
+      final walls = container.read(editorStateProvider).walls;
+      expect(walls.any((w) => w.id == 'wall-3'), isTrue);
+    });
+
+    test(
+        'WS-6: committing wall_1 (endpoint at jcd = existing corner) '
+        'does not split wall_d', () {
+      // The endpoint of wall_1 is at jcd = startPoint of wall_d,
+      // which is NOT an interior point, so no split should occur.
+      final (container, notifier) = makeContainer();
+      addTearDown(container.dispose);
+
+      // wall_1 and wall_2 were already committed in makeContainer.
+      // Verify wall_d is still intact.
+      final walls = container.read(editorStateProvider).walls;
+      expect(
+        walls.any((w) => w.id == 'wall-d'),
+        isTrue,
+        reason: 'wall_d must not be split by wall_1 whose endpoint '
+            'is at wall_d\'s own startPoint (a corner, not interior).',
+      );
+    });
+
+    test(
+        'WS-7: unassigned walls are not split by new wall endpoints', () {
+      // If an unassigned wall happens to lie on the path of a new wall,
+      // it should not be split (only assigned walls are split).
+      final container = ProviderContainer();
+      addTearDown(container.dispose);
+      final notifier = container.read(editorStateProvider.notifier);
+
+      // Add an unassigned "dangling" wall at x=0, y=[0,2000].
+      const unassignedWall = WallSegment(
+        id: 'unassigned',
+        roomId: '',
+        startPoint: Point2D(x: 0, y: 0),
+        endPoint: Point2D(x: 0, y: 2000),
+      );
+      notifier.addWall(unassignedWall);
+
+      // Commit a wall whose endpoint (0,1000) is on the unassigned wall.
+      const newWall = WallSegment(
+        id: 'new-wall',
+        roomId: '',
+        startPoint: Point2D(x: -500, y: 1000),
+        endPoint: Point2D(x: 0, y: 1000),
+      );
+      notifier.commitWallWithSplit(newWall);
+
+      final walls = container.read(editorStateProvider).walls;
+      expect(
+        walls.any((w) => w.id == 'unassigned'),
+        isTrue,
+        reason: 'Unassigned walls must not be split.',
+      );
+      expect(walls, hasLength(2)); // unassigned + new-wall
+    });
+  });
 }

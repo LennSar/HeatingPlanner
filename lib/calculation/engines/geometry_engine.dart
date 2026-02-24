@@ -208,4 +208,40 @@ class GeometryEngine {
     if (nearest != null && minDist <= thresholdMm) return nearest;
     return null;
   }
+
+  /// Whether point [p] lies on segment [a]→[b] within [toleranceMm] mm.
+  ///
+  /// Uses a squared perpendicular-distance test (avoids sqrt) to check
+  /// collinearity, then confirms the projection parameter t ∈ [0, 1].
+  static bool isPointOnSegment(
+    Point2D p,
+    Point2D a,
+    Point2D b, {
+    double toleranceMm = 1.0,
+  }) {
+    final abx = b.x - a.x;
+    final aby = b.y - a.y;
+    final abLen2 = abx * abx + aby * aby;
+    if (abLen2 < 1e-9) return false; // degenerate segment
+    // Perpendicular distance² = cross² / abLen2.
+    // Compare as cross² ≤ tol² × abLen2 to avoid sqrt.
+    final cross = abx * (p.y - a.y) - aby * (p.x - a.x);
+    if (cross * cross > toleranceMm * toleranceMm * abLen2) return false;
+    // t = dot(AP, AB) / |AB|²; t ∈ [0, 1] means P is between A and B.
+    final t = ((p.x - a.x) * abx + (p.y - a.y) * aby) / abLen2;
+    const eps = 1e-6;
+    return t >= -eps && t <= 1.0 + eps;
+  }
+
+  /// Parametric position of [p] projected along segment [a]→[b].
+  ///
+  /// Returns 0.0 at [a], 1.0 at [b]. Values outside [0, 1] indicate
+  /// that [p]'s projection falls beyond the segment endpoints.
+  static double parameterAlongSegment(Point2D p, Point2D a, Point2D b) {
+    final abx = b.x - a.x;
+    final aby = b.y - a.y;
+    final len2 = abx * abx + aby * aby;
+    if (len2 < 1e-9) return 0.0;
+    return ((p.x - a.x) * abx + (p.y - a.y) * aby) / len2;
+  }
 }

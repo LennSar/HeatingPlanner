@@ -9,6 +9,10 @@ abstract class EditorCallbacks {
   /// Commit a new wall segment to the editor state.
   void commitWall(WallSegment wall);
 
+  /// Commit a new wall, splitting any existing room wall whose
+  /// interior contains either endpoint (ADR-003).
+  void commitWallWithSplit(WallSegment wall);
+
   /// Replace an existing wall segment (same ID).
   void updateWall(WallSegment wall);
 

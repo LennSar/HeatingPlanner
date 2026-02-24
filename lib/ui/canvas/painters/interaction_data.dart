@@ -29,7 +29,7 @@ class GhostLineData extends InteractionData {
   /// Position of the snap indicator, if snapping.
   final Point2D? snapIndicator;
 
-  /// Type of snap ('grid' or 'endpoint').
+  /// Type of snap ('endpoint', 'wallPoint', or 'grid').
   final String? snapType;
 }
 

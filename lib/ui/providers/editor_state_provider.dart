@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../calculation/engines/geometry_engine.dart';
 import '../../core/utils/id_generator.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/point2d.dart';
@@ -118,6 +119,63 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
   }
 
+  /// Commit a new wall, splitting any existing room-assigned wall
+  /// whose interior contains either of [wall]'s endpoints (ADR-003).
+  ///
+  /// When the user places the endpoint of a new wall on the interior
+  /// of an existing room wall, that host wall is split at the
+  /// junction point into two segments before the new wall is added.
+  /// This creates a new graph node that room detection can traverse,
+  /// enabling partial-wall shared-room scenarios without any
+  /// post-detection correction.
+  ///
+  /// Only walls with a non-empty [WallSegment.roomId] are split;
+  /// unassigned walls are left intact.
+  ///
+  /// All mutations are committed in a single state update.
+  void commitWallWithSplit(WallSegment wall) {
+    var walls = List<WallSegment>.from(state.walls);
+
+    // Check each endpoint of the new wall against existing assigned
+    // walls. At most one split per endpoint.
+    for (final pt in [wall.startPoint, wall.endPoint]) {
+      for (var i = 0; i < walls.length; i++) {
+        final host = walls[i];
+        if (host.roomId.isEmpty) continue;
+        if (!_isStrictlyInterior(pt, host)) continue;
+
+        // Split host at pt → before and after segments.
+        final before = WallSegment(
+          id: IdGenerator.newId(),
+          roomId: host.roomId,
+          startPoint: host.startPoint,
+          endPoint: pt,
+          wallType: host.wallType,
+          constructionId: host.constructionId,
+          adjacentRoomId: host.adjacentRoomId,
+          orientation: host.orientation,
+        );
+        final after = WallSegment(
+          id: IdGenerator.newId(),
+          roomId: host.roomId,
+          startPoint: pt,
+          endPoint: host.endPoint,
+          wallType: host.wallType,
+          constructionId: host.constructionId,
+          adjacentRoomId: host.adjacentRoomId,
+          orientation: host.orientation,
+        );
+
+        walls.removeAt(i);
+        walls.insertAll(i, [before, after]);
+        break; // Each endpoint splits at most one host wall.
+      }
+    }
+
+    walls.add(wall);
+    state = state.copyWith(walls: walls);
+  }
+
   /// Create a room from auto-detection results, handling
   /// shared walls correctly.
   ///
@@ -184,6 +242,19 @@ class EditorStateNotifier extends Notifier<EditorState> {
 
   /// Next suggested room number.
   int get nextRoomNumber => state.rooms.length + 1;
+
+  /// Whether [pt] lies strictly on the interior of [wall]'s segment
+  /// (not coinciding with either endpoint), within 1 mm tolerance.
+  static bool _isStrictlyInterior(Point2D pt, WallSegment wall) {
+    if (!GeometryEngine.isPointOnSegment(
+        pt, wall.startPoint, wall.endPoint)) {
+      return false;
+    }
+    final t = GeometryEngine.parameterAlongSegment(
+        pt, wall.startPoint, wall.endPoint);
+    const eps = 1e-4;
+    return t > eps && t < 1.0 - eps;
+  }
 }
 
 /// Provider for in-memory editor state.

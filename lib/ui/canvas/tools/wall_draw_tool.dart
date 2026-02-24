@@ -68,7 +68,7 @@ class WallDrawTool extends CanvasTool {
       endPoint: snapped,
     );
 
-    callbacks.commitWall(wall);
+    callbacks.commitWallWithSplit(wall);
 
     // Chain: use endpoint as next start.
     _startPoint = snapped;
@@ -116,9 +116,11 @@ class WallDrawTool extends CanvasTool {
     return GhostLineData(
       startPoint: _startPoint!,
       currentPoint: _currentSnapped!,
-      snapIndicator: _currentSnapType == SnapType.endpoint
-          ? _currentSnapped
-          : null,
+      snapIndicator:
+          (_currentSnapType == SnapType.endpoint ||
+                  _currentSnapType == SnapType.wallPoint)
+              ? _currentSnapped
+              : null,
       snapType: _currentSnapType?.name,
     );
   }

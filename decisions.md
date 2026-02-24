@@ -61,38 +61,55 @@ that over-estimates demand.
 
 ---
 
-## ADR-003 — Partial shared walls: only the overlapping segment counts
+## ADR-003 — Partial shared walls: split at wall-commit time
 
 **What.**
-When a smaller room is drawn adjacent to a larger room and only *part* of one
-of the larger room's walls forms the shared boundary, a new `WallSegment` is
-created for the **overlap portion only**. The larger room's original wall is
-split into up to three segments: the part before the overlap (exterior), the
-overlap (interior), and the part after the overlap (exterior). The smaller room
-gets a single mirror segment covering only the shared portion.
+When the user ends a new wall segment on the interior of an existing
+room-assigned wall, `EditorStateNotifier.commitWallWithSplit` splits that host
+wall at the junction point **immediately**, before room detection runs. The host
+wall is replaced by two segments (`before` and `after`) that share the junction
+point as an endpoint. The new wall is then added, and room detection sees the
+fully-split graph.
+
+`addRoomFromDetection` is unchanged: it handles only exact-match shared walls
+(ADR-001) — no sub-segment detection is needed there because the split already
+occurred at draw time.
 
 **Why.**
-Heat demand must use the actual shared area, not the full length of the
-original wall. Using the full wall would over-count the interior area and
-under-count the exterior area for the larger room, corrupting both rooms'
-`Q_T` figures. Splitting at the exact overlap endpoints is the only geometrically
-correct approach.
+Room detection (`RoomDetection.detectClosedRoom`) performs a DFS on wall
+endpoints. If wall `d` runs from corner `jcd` to corner `A`, a new wall whose
+endpoint lands at interior point `J` on `d` would leave the DFS with no node
+at `J` to traverse — the cycle cannot be found. Splitting `d` into `d1` and
+`d2` at `J` creates the missing graph node so the DFS can close the cycle
+through `J`.
+
+Splitting inside `addRoomFromDetection` (the first implementation) was
+incorrect because the detection itself requires the split to have already
+happened — a circular dependency.
 
 **Rule.**
-When `addRoomFromDetection` detects that a new room's detected wall is a
-*sub-segment* of an existing room's wall (both endpoints of the new wall lie on
-the existing wall but do not coincide with its endpoints), the implementation
-must:
-1. Split the original wall at the two intersection points, producing up to three
-   segments and replacing the original in state.
-2. Mark only the middle (overlapping) segment as `interior` on both sides.
-3. Store the mirror of the middle segment for the new room.
-4. Leave the flanking segments as `exterior` on the original room's side.
+1. `WallDrawTool` always calls `callbacks.commitWallWithSplit(wall)` (never
+   the plain `commitWall`).
+2. `EditorStateNotifier.commitWallWithSplit` scans all walls for any
+   room-assigned (`roomId` non-empty) wall whose interior strictly contains
+   either endpoint of the new wall (using `GeometryEngine.isPointOnSegment`
+   and `GeometryEngine.parameterAlongSegment` with `t ∈ (ε, 1−ε)`).
+3. Only one split per endpoint (the first matching host wall wins); at most two
+   splits per new wall (one per endpoint).
+4. Unassigned walls (`roomId` empty) are never split — they have no room
+   graph ownership yet.
+5. Flanking segments inherit all properties of the host wall
+   (`wallType`, `constructionId`, `adjacentRoomId`, `orientation`).
+6. All mutations (removals + insertions + new wall addition) happen in a single
+   `state = state.copyWith(walls: ...)` call so no intermediate state is
+   observable.
 
-> **Status:** The current implementation handles only the **exact-match** case
-> (shared wall endpoints coincide). Partial overlap is **not yet implemented**.
-> Until it is, the room detection algorithm requires that the user draw the
-> shared wall at exactly the same start/end points as the existing wall.
-> A `ValidationResult` with `WarningSeverity.warning` should be raised if the
-> detected wall for a new room is a strict sub-segment of an existing room's
-> wall, prompting the user to re-draw to the exact endpoints.
+A wall drawn across the open side can land on a second assigned wall, splitting
+it too, so both endpoints are checked independently. A single host wall can
+accumulate many junction nodes across successive room additions because each
+split piece remains individually splittable.
+
+> **Status:** Implemented in `EditorStateNotifier.commitWallWithSplit` and
+> `SnapService` (wall-interior snap, 150 mm threshold, grid-aligned where
+> possible). Cursor feedback via `SnapType.wallPoint` shown in
+> `WallDrawTool.getInteractionData`.

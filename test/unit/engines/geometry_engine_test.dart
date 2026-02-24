@@ -481,4 +481,152 @@ void main() {
       expect(result!.x, equals(20.0));
     });
   });
+
+  // ── isPointOnSegment tests ───────────────────────────────────────────
+
+  group('GeometryEngine.isPointOnSegment', () {
+    const a = Point2D(x: 0, y: 0);
+    const b = Point2D(x: 3000, y: 0);
+
+    test('midpoint lies on horizontal segment', () {
+      expect(
+        GeometryEngine.isPointOnSegment(
+          const Point2D(x: 1500, y: 0),
+          a,
+          b,
+        ),
+        isTrue,
+      );
+    });
+
+    test('start endpoint lies on segment', () {
+      expect(GeometryEngine.isPointOnSegment(a, a, b), isTrue);
+    });
+
+    test('end endpoint lies on segment', () {
+      expect(GeometryEngine.isPointOnSegment(b, a, b), isTrue);
+    });
+
+    test('point beyond end does not lie on segment', () {
+      expect(
+        GeometryEngine.isPointOnSegment(
+          const Point2D(x: 4000, y: 0),
+          a,
+          b,
+        ),
+        isFalse,
+      );
+    });
+
+    test('point before start does not lie on segment', () {
+      expect(
+        GeometryEngine.isPointOnSegment(
+          const Point2D(x: -100, y: 0),
+          a,
+          b,
+        ),
+        isFalse,
+      );
+    });
+
+    test('point within tolerance (0.5 mm off) is accepted', () {
+      expect(
+        GeometryEngine.isPointOnSegment(
+          const Point2D(x: 1500, y: 0.5),
+          a,
+          b,
+          toleranceMm: 1.0,
+        ),
+        isTrue,
+      );
+    });
+
+    test('point outside tolerance (2 mm off) is rejected', () {
+      expect(
+        GeometryEngine.isPointOnSegment(
+          const Point2D(x: 1500, y: 2),
+          a,
+          b,
+          toleranceMm: 1.0,
+        ),
+        isFalse,
+      );
+    });
+
+    test('point on diagonal segment', () {
+      expect(
+        GeometryEngine.isPointOnSegment(
+          const Point2D(x: 1000, y: 1000),
+          const Point2D(x: 0, y: 0),
+          const Point2D(x: 2000, y: 2000),
+        ),
+        isTrue,
+      );
+    });
+
+    test('degenerate segment (a == b) returns false', () {
+      expect(
+        GeometryEngine.isPointOnSegment(
+          const Point2D(x: 0, y: 0),
+          const Point2D(x: 0, y: 0),
+          const Point2D(x: 0, y: 0),
+        ),
+        isFalse,
+      );
+    });
+  });
+
+  // ── parameterAlongSegment tests ──────────────────────────────────────
+
+  group('GeometryEngine.parameterAlongSegment', () {
+    const a = Point2D(x: 0, y: 0);
+    const b = Point2D(x: 3000, y: 0);
+
+    test('start point returns 0.0', () {
+      expect(
+        GeometryEngine.parameterAlongSegment(a, a, b),
+        closeTo(0.0, 1e-9),
+      );
+    });
+
+    test('end point returns 1.0', () {
+      expect(
+        GeometryEngine.parameterAlongSegment(b, a, b),
+        closeTo(1.0, 1e-9),
+      );
+    });
+
+    test('midpoint returns 0.5', () {
+      expect(
+        GeometryEngine.parameterAlongSegment(
+          const Point2D(x: 1500, y: 0),
+          a,
+          b,
+        ),
+        closeTo(0.5, 1e-9),
+      );
+    });
+
+    test('one-third point returns 1/3', () {
+      expect(
+        GeometryEngine.parameterAlongSegment(
+          const Point2D(x: 1000, y: 0),
+          a,
+          b,
+        ),
+        closeTo(1.0 / 3.0, 1e-6),
+      );
+    });
+
+    test('degenerate segment returns 0.0', () {
+      expect(
+        GeometryEngine.parameterAlongSegment(
+          const Point2D(x: 500, y: 0),
+          const Point2D(x: 0, y: 0),
+          const Point2D(x: 0, y: 0),
+        ),
+        equals(0.0),
+      );
+    });
+  });
 }
