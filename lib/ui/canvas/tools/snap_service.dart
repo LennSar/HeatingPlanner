@@ -56,6 +56,28 @@ abstract final class SnapService {
   /// Default grid spacing in mm.
   static const double gridSpacingMm = 100.0;
 
+  /// Snap [point] to the nearest grid intersection anchored at
+  /// world origin (0, 0).
+  ///
+  /// Formula (mirrors [GridPainter] dot positions exactly):
+  /// ```
+  /// x_snapped = (point.x / spacingMm).round() * spacingMm
+  /// y_snapped = (point.y / spacingMm).round() * spacingMm
+  /// ```
+  ///
+  /// Pan offset, zoom level, and any drag state must NOT be passed
+  /// here — the result depends only on [point] and [spacingMm].
+  static Point2D snapToGrid(
+    Point2D point, [
+    double spacingMm = gridSpacingMm,
+  ]) {
+    if (spacingMm <= 0) return point;
+    return Point2D(
+      x: (point.x / spacingMm).round() * spacingMm,
+      y: (point.y / spacingMm).round() * spacingMm,
+    );
+  }
+
   /// Snap [rawPoint] to the nearest endpoint, wall interior, or
   /// grid intersection, in that priority order.
   static SnapResult snap(
@@ -84,11 +106,10 @@ abstract final class SnapService {
     }
 
     // 3. Grid snap (fallback).
-    final gridSnap = GeometryEngine.snapToGrid(
-      rawPoint,
-      gridSpacingMm,
+    return SnapResult(
+      point: snapToGrid(rawPoint),
+      type: SnapType.grid,
     );
-    return SnapResult(point: gridSnap, type: SnapType.grid);
   }
 
   /// Snap [rawPoint] to the nearest grid-aligned point that lies on
@@ -124,7 +145,7 @@ abstract final class SnapService {
     if (best == null) return null;
 
     // Try grid-aligning the result and confirm it still lies on a wall.
-    final gridPt = GeometryEngine.snapToGrid(best, gridSpacingMm);
+    final gridPt = snapToGrid(best);
     for (final wall in walls) {
       if (GeometryEngine.isPointOnSegment(
           gridPt, wall.startPoint, wall.endPoint)) {

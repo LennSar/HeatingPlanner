@@ -34,21 +34,25 @@ class GridPainter extends CustomPainter {
       ..strokeWidth = 3.0
       ..strokeCap = StrokeCap.round;
 
-    // Snap the visible rect to grid boundaries.
-    final startX =
-        (visibleRect.left / gridSpacingMm).floor() *
-            gridSpacingMm;
-    final startY =
-        (visibleRect.top / gridSpacingMm).floor() *
-            gridSpacingMm;
-    final endX = visibleRect.right;
-    final endY = visibleRect.bottom;
+    // Compute integer grid indices that cover the visible rect.
+    // Each dot position is n * gridSpacingMm (exact integer multiple),
+    // anchored to world origin (0, 0) — identical to SnapService.snapToGrid.
+    // Using index-based multiplication avoids floating-point drift that
+    // can occur with repeated += addition.
+    final nStart =
+        (visibleRect.left / gridSpacingMm).floor().toInt();
+    final nEnd =
+        (visibleRect.right / gridSpacingMm).ceil().toInt();
+    final mStart =
+        (visibleRect.top / gridSpacingMm).floor().toInt();
+    final mEnd =
+        (visibleRect.bottom / gridSpacingMm).ceil().toInt();
 
     // Collect dots for efficient rendering.
     final points = <ui.Offset>[];
-    for (var x = startX; x <= endX; x += gridSpacingMm) {
-      for (var y = startY; y <= endY; y += gridSpacingMm) {
-        points.add(Offset(x, y));
+    for (var n = nStart; n <= nEnd; n++) {
+      for (var m = mStart; m <= mEnd; m++) {
+        points.add(Offset(n * gridSpacingMm, m * gridSpacingMm));
       }
     }
 

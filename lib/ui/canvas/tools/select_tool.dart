@@ -135,7 +135,24 @@ class SelectTool extends CanvasTool {
   void onDragUpdate(Point2D worldPoint) {
     if (_dragHandle == null || _dragStartWall == null) return;
 
-    final snap = SnapService.snap(worldPoint, callbacks.currentWalls);
+    // Exclude the dragged wall AND every connected wall from the snap
+    // computation.  Connected walls are moved in lock-step with the
+    // dragged endpoint by _adjustConnectedWallAtEndpoint, so their
+    // co-dragged endpoints exhibit the same self-snap problem as the
+    // primary wall.  Worse, as soon as the connected wall's shared
+    // endpoint moves while its other endpoint stays fixed, the wall
+    // becomes diagonal.  _snapToWallInterior then fires for that
+    // diagonal interior and falls back to a raw (non-grid) nearest
+    // point when the grid-snapped version is off the diagonal — the
+    // exact source of the ~2 mm length error reported by the user.
+    final excludedIds = {
+      _dragStartWall!.id,
+      ..._dragStartConnected.map((w) => w.id),
+    };
+    final snapWalls = callbacks.currentWalls
+        .where((w) => !excludedIds.contains(w.id))
+        .toList();
+    final snap = SnapService.snap(worldPoint, snapWalls);
 
     switch (_dragHandle!) {
       case DragHandleType.mid:
