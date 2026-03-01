@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/engines/geometry_engine.dart';
+import '../../calculation/engines/thermal_engine.dart';
 import '../../core/theme/app_theme.dart';
 import '../providers/editor_state_provider.dart';
 import 'room_properties.dart';
+import 'wall_construction_editor.dart';
 
 /// Represents a selected element on the canvas.
 @immutable
@@ -156,7 +158,7 @@ class _ElementProperties extends ConsumerWidget {
   }
 }
 
-/// Read-only wall info panel.
+/// Wall info panel with construction editor access.
 class _WallInfo extends ConsumerWidget {
   const _WallInfo({required this.wallId});
 
@@ -173,7 +175,10 @@ class _WallInfo extends ConsumerWidget {
     if (wall == null) {
       return Padding(
         padding: const EdgeInsets.all(Spacing.md),
-        child: Text('Wall not found', style: textTheme.bodyMedium),
+        child: Text(
+          'Wall not found',
+          style: textTheme.bodyMedium,
+        ),
       );
     }
 
@@ -181,6 +186,32 @@ class _WallInfo extends ConsumerWidget {
       wall.startPoint,
       wall.endPoint,
     );
+
+    // Look up construction and compute U-value inline.
+    final construction = wall.constructionId != null
+        ? editorState.constructions
+            .where((c) => c.id == wall.constructionId)
+            .firstOrNull
+        : null;
+
+    String uValueText = '\u2014';
+    if (construction != null) {
+      final layers = editorState.materialLayers
+          .where((l) => l.constructionId == construction.id)
+          .toList()
+        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      final u = ThermalEngine.uValue(
+        layerThicknessesMm:
+            layers.map((l) => l.thicknessMm).toList(),
+        layerLambdas:
+            layers.map((l) => l.thermalConductivity).toList(),
+        rsi: construction.rsi,
+        rse: construction.rse,
+      );
+      if (!u.isNaN) {
+        uValueText = '${u.toStringAsFixed(3)} W/(m\u00B2K)';
+      }
+    }
 
     return Padding(
       padding: const EdgeInsets.all(Spacing.md),
@@ -202,8 +233,29 @@ class _WallInfo extends ConsumerWidget {
             wall.orientation.name,
             textTheme,
           ),
-          if (wall.roomId.isNotEmpty)
-            _infoRow('Room ID', wall.roomId, textTheme),
+          _infoRow('U-Value', uValueText, textTheme),
+          if (construction != null)
+            _infoRow(
+              'Construction',
+              construction.name,
+              textTheme,
+            ),
+          const SizedBox(height: Spacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              icon: const Icon(Icons.layers_outlined, size: 16),
+              label: Text(
+                construction == null
+                    ? 'Add Construction'
+                    : 'Edit Construction',
+              ),
+              onPressed: () => showWallConstructionEditor(
+                context,
+                wall,
+              ),
+            ),
+          ),
         ],
       ),
     );

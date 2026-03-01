@@ -9,7 +9,9 @@ import '../../core/utils/id_generator.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/point2d.dart';
 import '../../data/models/room.dart';
+import '../../data/models/door.dart';
 import '../../data/models/wall_segment.dart';
+import '../../data/models/window_element.dart';
 import '../panels/properties_panel.dart';
 import '../providers/editor_state_provider.dart';
 import '../screens/editor_screen.dart';
@@ -23,10 +25,12 @@ import 'painters/opening_painter.dart';
 import 'painters/pipe_route_painter.dart';
 import 'painters/wall_painter.dart';
 import 'tools/editor_callbacks.dart';
+import 'tools/door_place_tool.dart';
 import 'tools/select_tool.dart';
 import 'tools/tool_base.dart';
 import 'tools/undo_redo_service.dart';
 import 'tools/wall_draw_tool.dart';
+import 'tools/window_place_tool.dart';
 
 /// Provider that signals tools to cancel (incremented on
 /// Escape). Tools check this to know when cancel is pressed.
@@ -113,14 +117,26 @@ class _FloorPlanCanvasState
       });
     }
 
+    final undoRedo = ref.read(undoRedoProvider);
     _tools[DrawingTool.select] = SelectTool(
       callbacks: this,
       onStateChanged: onChanged,
-      undoRedo: ref.read(undoRedoProvider),
+      undoRedo: undoRedo,
     );
     _tools[DrawingTool.drawWall] = WallDrawTool(
       callbacks: this,
       onStateChanged: onChanged,
+      undoRedo: undoRedo,
+    );
+    _tools[DrawingTool.placeWindow] = WindowPlaceTool(
+      callbacks: this,
+      onStateChanged: onChanged,
+      undoRedo: undoRedo,
+    );
+    _tools[DrawingTool.placeDoor] = DoorPlaceTool(
+      callbacks: this,
+      onStateChanged: onChanged,
+      undoRedo: undoRedo,
     );
   }
 
@@ -168,6 +184,57 @@ class _FloorPlanCanvasState
   @override
   void updateRoom(Room room) {
     ref.read(editorStateProvider.notifier).updateRoom(room);
+  }
+
+  @override
+  void replaceAllWalls(List<WallSegment> walls) {
+    ref
+        .read(editorStateProvider.notifier)
+        .replaceAllWalls(walls);
+  }
+
+  @override
+  void replaceAllWallsAndRooms(
+    List<WallSegment> walls,
+    List<Room> rooms,
+  ) {
+    ref
+        .read(editorStateProvider.notifier)
+        .replaceAllWallsAndRooms(walls, rooms);
+  }
+
+  // ---- Windows ----
+
+  @override
+  void commitWindow(WindowElement window) {
+    ref.read(editorStateProvider.notifier).addWindow(window);
+  }
+
+  @override
+  void updateWindow(WindowElement window) {
+    ref.read(editorStateProvider.notifier).updateWindow(window);
+  }
+
+  @override
+  void removeWindow(String windowId) {
+    ref.read(editorStateProvider.notifier).removeWindow(windowId);
+  }
+
+  // ---- Doors ----
+
+  @override
+  void commitDoor(Door door) {
+    ref.read(editorStateProvider.notifier).addDoor(door);
+  }
+
+  @override
+  void updateDoor(Door door) {
+    ref.read(editorStateProvider.notifier).updateDoor(door);
+  }
+
+  @override
+  void removeDoor(String doorId) {
+    ref.read(editorStateProvider.notifier).removeDoor(doorId);
   }
 
   @override
@@ -228,6 +295,9 @@ class _FloorPlanCanvasState
         polygon: polygon,
       );
 
+      // Snapshot state before mutation for undo.
+      final oldState = ref.read(editorStateProvider);
+
       // addRoomFromDetection handles shared walls: it creates
       // a mirror WallSegment for each wall that already
       // belongs to another room, marks both copies as
@@ -236,6 +306,21 @@ class _FloorPlanCanvasState
       ref
           .read(editorStateProvider.notifier)
           .addRoomFromDetection(room: room, wallIds: wallIds);
+
+      // Snapshot state after mutation for redo.
+      final newState = ref.read(editorStateProvider);
+
+      // Register as undoable command. execute() is a no-op
+      // on first call (state is already newState).
+      ref.read(undoRedoProvider).execute(
+        _CreateRoomCommand(
+          callbacks: this,
+          oldWalls: oldState.walls,
+          oldRooms: oldState.rooms,
+          newWalls: newState.walls,
+          newRooms: newState.rooms,
+        ),
+      );
 
       // Auto-select the new room.
       selectElement('room', roomId);
@@ -261,6 +346,14 @@ class _FloorPlanCanvasState
   @override
   List<Room> get currentRooms =>
       ref.read(editorStateProvider).rooms;
+
+  @override
+  List<WindowElement> get currentWindows =>
+      ref.read(editorStateProvider).windows;
+
+  @override
+  List<Door> get currentDoors =>
+      ref.read(editorStateProvider).doors;
 
   @override
   double get currentZoom =>
@@ -460,6 +553,8 @@ class _FloorPlanCanvasState
                       onSurface: onSurface,
                       hoverWorldPoint: _hoverWorldPoint,
                       walls: editorState.walls,
+                      windows: editorState.windows,
+                      doors: editorState.doors,
                       interactionData: _interactionData,
                     ),
                   ),
@@ -525,6 +620,8 @@ class _CanvasCompositePainter extends CustomPainter {
     required this.colors,
     required this.onSurface,
     required this.walls,
+    required this.windows,
+    required this.doors,
     this.hoverWorldPoint,
     this.interactionData,
   });
@@ -536,6 +633,8 @@ class _CanvasCompositePainter extends CustomPainter {
   final Color onSurface;
   final Offset? hoverWorldPoint;
   final List<WallSegment> walls;
+  final List<WindowElement> windows;
+  final List<Door> doors;
   final InteractionData? interactionData;
 
   @override
@@ -568,6 +667,9 @@ class _CanvasCompositePainter extends CustomPainter {
     OpeningPainter(
       windowFill: colors.windowFill,
       doorFill: colors.doorFill,
+      walls: walls,
+      windows: windows,
+      doors: doors,
     ).paint(canvas, size);
 
     // Layer 5: Pipe routes
@@ -594,4 +696,42 @@ class _CanvasCompositePainter extends CustomPainter {
   bool shouldRepaint(_CanvasCompositePainter oldDelegate) {
     return true; // Interaction layer changes frequently.
   }
+}
+
+// ================================================================
+// Command classes
+// ================================================================
+
+/// Command: create a room from auto-detection dialog.
+///
+/// Captures the full walls+rooms state before and after
+/// [addRoomFromDetection] so the operation can be reversed.
+/// On first execution via [UndoRedoService.execute] the state
+/// is already at [newWalls]/[newRooms], so [execute] is a no-op
+/// in practice; it only matters for redo.
+class _CreateRoomCommand extends Command {
+  _CreateRoomCommand({
+    required this.callbacks,
+    required this.oldWalls,
+    required this.oldRooms,
+    required this.newWalls,
+    required this.newRooms,
+  });
+
+  final EditorCallbacks callbacks;
+  final List<WallSegment> oldWalls;
+  final List<Room> oldRooms;
+  final List<WallSegment> newWalls;
+  final List<Room> newRooms;
+
+  @override
+  String get label => 'Create room';
+
+  @override
+  void execute() =>
+      callbacks.replaceAllWallsAndRooms(newWalls, newRooms);
+
+  @override
+  void undo() =>
+      callbacks.replaceAllWallsAndRooms(oldWalls, oldRooms);
 }

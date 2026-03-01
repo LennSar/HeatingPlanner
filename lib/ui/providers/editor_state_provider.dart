@@ -3,10 +3,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/engines/geometry_engine.dart';
 import '../../core/utils/id_generator.dart';
+import '../../data/models/door.dart';
 import '../../data/models/enums.dart';
+import '../../data/models/material_layer.dart';
 import '../../data/models/point2d.dart';
 import '../../data/models/room.dart';
+import '../../data/models/wall_construction.dart';
 import '../../data/models/wall_segment.dart';
+import '../../data/models/window_element.dart';
 
 /// In-memory state for the editor canvas.
 @immutable
@@ -15,6 +19,10 @@ class EditorState {
   const EditorState({
     this.walls = const [],
     this.rooms = const [],
+    this.windows = const [],
+    this.doors = const [],
+    this.constructions = const [],
+    this.materialLayers = const [],
   });
 
   /// All wall segments on the current floor.
@@ -23,22 +31,45 @@ class EditorState {
   /// All rooms on the current floor.
   final List<Room> rooms;
 
+  /// All window elements placed on wall segments.
+  final List<WindowElement> windows;
+
+  /// All door elements placed on wall segments.
+  final List<Door> doors;
+
+  /// All wall constructions on the current floor.
+  final List<WallConstruction> constructions;
+
+  /// All material layers belonging to constructions.
+  final List<MaterialLayer> materialLayers;
+
   /// Returns a copy with updated fields.
   EditorState copyWith({
     List<WallSegment>? walls,
     List<Room>? rooms,
+    List<WindowElement>? windows,
+    List<Door>? doors,
+    List<WallConstruction>? constructions,
+    List<MaterialLayer>? materialLayers,
   }) {
     return EditorState(
       walls: walls ?? this.walls,
       rooms: rooms ?? this.rooms,
+      windows: windows ?? this.windows,
+      doors: doors ?? this.doors,
+      constructions: constructions ?? this.constructions,
+      materialLayers: materialLayers ?? this.materialLayers,
     );
   }
 }
 
-/// Manages in-memory wall and room state.
+/// Manages in-memory wall, room, opening, and construction
+/// state for the editor canvas.
 class EditorStateNotifier extends Notifier<EditorState> {
   @override
   EditorState build() => const EditorState();
+
+  // ---- Walls ----
 
   /// Add a wall segment.
   void addWall(WallSegment wall) {
@@ -94,6 +125,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
   }
 
+  // ---- Rooms ----
+
   /// Add a room.
   void addRoom(Room room) {
     state = state.copyWith(
@@ -119,32 +152,199 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
   }
 
-  /// Commit a new wall, splitting any existing room-assigned wall
-  /// whose interior contains either of [wall]'s endpoints (ADR-003).
+  // ---- Walls batch operations ----
+
+  /// Replace the entire wall list in one state update.
   ///
-  /// When the user places the endpoint of a new wall on the interior
-  /// of an existing room wall, that host wall is split at the
-  /// junction point into two segments before the new wall is added.
-  /// This creates a new graph node that room detection can traverse,
-  /// enabling partial-wall shared-room scenarios without any
-  /// post-detection correction.
+  /// Used by undo/redo commands to restore a prior snapshot.
+  void replaceAllWalls(List<WallSegment> walls) {
+    state = state.copyWith(walls: walls);
+  }
+
+  /// Replace walls and rooms in one atomic state update.
   ///
-  /// Only walls with a non-empty [WallSegment.roomId] are split;
-  /// unassigned walls are left intact.
+  /// Used by undo/redo commands that affect both walls
+  /// and room membership simultaneously.
+  void replaceAllWallsAndRooms(
+    List<WallSegment> walls,
+    List<Room> rooms,
+  ) {
+    state = state.copyWith(walls: walls, rooms: rooms);
+  }
+
+  // ---- Windows ----
+
+  /// Add a window element.
+  void addWindow(WindowElement window) {
+    state = state.copyWith(
+      windows: [...state.windows, window],
+    );
+  }
+
+  /// Replace a window with the same ID.
+  void updateWindow(WindowElement window) {
+    state = state.copyWith(
+      windows: state.windows
+          .map((w) => w.id == window.id ? window : w)
+          .toList(),
+    );
+  }
+
+  /// Remove a window by ID.
+  void removeWindow(String windowId) {
+    state = state.copyWith(
+      windows: state.windows
+          .where((w) => w.id != windowId)
+          .toList(),
+    );
+  }
+
+  /// Remove all windows on a given wall segment.
+  void removeWindowsOnWall(String wallId) {
+    state = state.copyWith(
+      windows: state.windows
+          .where((w) => w.wallSegmentId != wallId)
+          .toList(),
+    );
+  }
+
+  // ---- Doors ----
+
+  /// Add a door element.
+  void addDoor(Door door) {
+    state = state.copyWith(
+      doors: [...state.doors, door],
+    );
+  }
+
+  /// Replace a door with the same ID.
+  void updateDoor(Door door) {
+    state = state.copyWith(
+      doors: state.doors
+          .map((d) => d.id == door.id ? door : d)
+          .toList(),
+    );
+  }
+
+  /// Remove a door by ID.
+  void removeDoor(String doorId) {
+    state = state.copyWith(
+      doors: state.doors
+          .where((d) => d.id != doorId)
+          .toList(),
+    );
+  }
+
+  /// Remove all doors on a given wall segment.
+  void removeDoorsOnWall(String wallId) {
+    state = state.copyWith(
+      doors: state.doors
+          .where((d) => d.wallSegmentId != wallId)
+          .toList(),
+    );
+  }
+
+  // ---- Constructions ----
+
+  /// Add a wall construction.
+  void addConstruction(WallConstruction construction) {
+    state = state.copyWith(
+      constructions: [
+        ...state.constructions,
+        construction,
+      ],
+    );
+  }
+
+  /// Replace a construction with the same ID.
+  void updateConstruction(WallConstruction construction) {
+    state = state.copyWith(
+      constructions: state.constructions
+          .map(
+            (c) => c.id == construction.id
+                ? construction
+                : c,
+          )
+          .toList(),
+    );
+  }
+
+  /// Remove a construction by ID (and its layers).
+  void removeConstruction(String constructionId) {
+    state = state.copyWith(
+      constructions: state.constructions
+          .where((c) => c.id != constructionId)
+          .toList(),
+      materialLayers: state.materialLayers
+          .where(
+            (l) => l.constructionId != constructionId,
+          )
+          .toList(),
+    );
+  }
+
+  // ---- Material layers ----
+
+  /// Add a material layer.
+  void addMaterialLayer(MaterialLayer layer) {
+    state = state.copyWith(
+      materialLayers: [...state.materialLayers, layer],
+    );
+  }
+
+  /// Replace a material layer with the same ID.
+  void updateMaterialLayer(MaterialLayer layer) {
+    state = state.copyWith(
+      materialLayers: state.materialLayers
+          .map((l) => l.id == layer.id ? layer : l)
+          .toList(),
+    );
+  }
+
+  /// Remove a material layer by ID.
+  void removeMaterialLayer(String layerId) {
+    state = state.copyWith(
+      materialLayers: state.materialLayers
+          .where((l) => l.id != layerId)
+          .toList(),
+    );
+  }
+
+  /// Replace all layers for a construction atomically.
+  ///
+  /// Used when saving the wall construction editor so that
+  /// the full before/after state can be snapshotted for undo.
+  void replaceLayersForConstruction(
+    String constructionId,
+    List<MaterialLayer> newLayers,
+  ) {
+    final retained = state.materialLayers
+        .where((l) => l.constructionId != constructionId)
+        .toList();
+    state = state.copyWith(
+      materialLayers: [...retained, ...newLayers],
+    );
+  }
+
+  // ---- Composite mutations ----
+
+  /// Commit a new wall, splitting any existing room-assigned
+  /// wall whose interior contains either of [wall]'s
+  /// endpoints (ADR-003).
+  ///
+  /// Only walls with a non-empty [WallSegment.roomId] are
+  /// split; unassigned walls are left intact.
   ///
   /// All mutations are committed in a single state update.
   void commitWallWithSplit(WallSegment wall) {
     var walls = List<WallSegment>.from(state.walls);
 
-    // Check each endpoint of the new wall against existing assigned
-    // walls. At most one split per endpoint.
     for (final pt in [wall.startPoint, wall.endPoint]) {
       for (var i = 0; i < walls.length; i++) {
         final host = walls[i];
         if (host.roomId.isEmpty) continue;
         if (!_isStrictlyInterior(pt, host)) continue;
 
-        // Split host at pt → before and after segments.
         final before = WallSegment(
           id: IdGenerator.newId(),
           roomId: host.roomId,
@@ -168,7 +368,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
 
         walls.removeAt(i);
         walls.insertAll(i, [before, after]);
-        break; // Each endpoint splits at most one host wall.
+        break;
       }
     }
 
@@ -177,18 +377,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
   }
 
   /// Create a room from auto-detection results, handling
-  /// shared walls correctly.
-  ///
-  /// For each wall in [wallIds]:
-  /// - If the wall is unassigned (roomId empty), it is
-  ///   simply assigned to [room].
-  /// - If the wall already belongs to another room it is a
-  ///   *shared* wall.  A duplicate [WallSegment] is created
-  ///   at the same position for [room], both copies are
-  ///   marked [WallType.interior], and their [adjacentRoomId]
-  ///   fields are cross-referenced so that
-  ///   [ThermalEngine.interiorCorrectionFactor] can look up
-  ///   the neighbouring room temperature.
+  /// shared walls correctly (ADR-001).
   ///
   /// All mutations are committed in a single state update.
   void addRoomFromDetection({
@@ -199,27 +388,21 @@ class EditorStateNotifier extends Notifier<EditorState> {
 
     for (int i = 0; i < wallIds.length; i++) {
       final wallId = wallIds[i];
-      final idx = updatedWalls.indexWhere((w) => w.id == wallId);
+      final idx =
+          updatedWalls.indexWhere((w) => w.id == wallId);
       if (idx == -1) continue;
 
       final wall = updatedWalls[idx];
 
       if (wall.roomId.isEmpty) {
-        // Unassigned wall — claim it for the new room.
         updatedWalls[idx] = wall.copyWith(roomId: room.id);
       } else {
-        // Shared wall — belongs to a neighbour room.
-        // Keep the original wall; mark it interior and
-        // point it at the new room.
         final neighbourRoomId = wall.roomId;
         updatedWalls[idx] = wall.copyWith(
           wallType: WallType.interior,
           adjacentRoomId: room.id,
         );
 
-        // Create a mirror segment for the new room.
-        // Start/end are swapped so the wall faces inward
-        // from the new room's perspective.
         final mirror = WallSegment(
           id: IdGenerator.newId(),
           roomId: room.id,
@@ -243,9 +426,13 @@ class EditorStateNotifier extends Notifier<EditorState> {
   /// Next suggested room number.
   int get nextRoomNumber => state.rooms.length + 1;
 
-  /// Whether [pt] lies strictly on the interior of [wall]'s segment
-  /// (not coinciding with either endpoint), within 1 mm tolerance.
-  static bool _isStrictlyInterior(Point2D pt, WallSegment wall) {
+  /// Whether [pt] lies strictly on the interior of [wall]'s
+  /// segment (not coinciding with either endpoint),
+  /// within 1 mm tolerance.
+  static bool _isStrictlyInterior(
+    Point2D pt,
+    WallSegment wall,
+  ) {
     if (!GeometryEngine.isPointOnSegment(
         pt, wall.startPoint, wall.endPoint)) {
       return false;

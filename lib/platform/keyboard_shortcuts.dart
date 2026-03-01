@@ -82,6 +82,10 @@ final Map<ShortcutActivator, Intent> editorShortcuts = {
     control: true,
     shift: true,
   ): const RedoIntent(),
+  const SingleActivator(
+    LogicalKeyboardKey.keyY,
+    control: true,
+  ): const RedoIntent(),
   const SingleActivator(LogicalKeyboardKey.delete):
       const DeleteIntent(),
   const SingleActivator(LogicalKeyboardKey.backspace):

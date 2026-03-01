@@ -5,9 +5,11 @@ import '../../../core/utils/id_generator.dart';
 import '../../../data/models/point2d.dart';
 import '../../../data/models/wall_segment.dart';
 import '../painters/interaction_data.dart';
+import 'editor_callbacks.dart';
 import 'room_detection.dart';
 import 'snap_service.dart';
 import 'tool_base.dart';
+import 'undo_redo_service.dart';
 
 /// Tool for drawing wall segments by click-click.
 ///
@@ -19,7 +21,11 @@ class WallDrawTool extends CanvasTool {
   WallDrawTool({
     required super.callbacks,
     required super.onStateChanged,
+    required this.undoRedo,
   });
+
+  /// Shared undo/redo service.
+  final UndoRedoService undoRedo;
 
   /// Fixed start point of the current wall being drawn.
   Point2D? _startPoint;
@@ -68,7 +74,19 @@ class WallDrawTool extends CanvasTool {
       endPoint: snapped,
     );
 
+    // Snapshot walls before commit for undo.
+    final oldWalls = callbacks.currentWalls.toList();
     callbacks.commitWallWithSplit(wall);
+    // Snapshot walls after commit for redo.
+    final newWalls = callbacks.currentWalls.toList();
+
+    // Register as undoable command. execute() is a no-op on
+    // first call because state is already at newWalls.
+    undoRedo.execute(_CreateWallCommand(
+      callbacks: callbacks,
+      oldWalls: oldWalls,
+      newWalls: newWalls,
+    ));
 
     // Chain: use endpoint as next start.
     _startPoint = snapped;
@@ -124,4 +142,34 @@ class WallDrawTool extends CanvasTool {
       snapType: _currentSnapType?.name,
     );
   }
+}
+
+// ================================================================
+// Command classes
+// ================================================================
+
+/// Command: draw a new wall segment (with optional host-wall split).
+///
+/// Stores the full wall list before and after [commitWallWithSplit]
+/// so the entire operation — new wall plus any split fragments —
+/// can be reversed as one atomic undo step.
+class _CreateWallCommand extends Command {
+  _CreateWallCommand({
+    required this.callbacks,
+    required this.oldWalls,
+    required this.newWalls,
+  });
+
+  final EditorCallbacks callbacks;
+  final List<WallSegment> oldWalls;
+  final List<WallSegment> newWalls;
+
+  @override
+  String get label => 'Draw wall';
+
+  @override
+  void execute() => callbacks.replaceAllWalls(newWalls);
+
+  @override
+  void undo() => callbacks.replaceAllWalls(oldWalls);
 }

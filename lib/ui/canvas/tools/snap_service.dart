@@ -157,6 +157,64 @@ abstract final class SnapService {
     return best;
   }
 
+
+  /// Default wall-hover threshold for opening placement (mm).
+  ///
+  /// Wider than [wallSnapThresholdMm] so the user can hover
+  /// slightly off the wall and still see a highlight.
+  static const double wallHoverThresholdMm = 300.0;
+
+  /// Find the [WallSegment] nearest to [point] within
+  /// [thresholdMm] perpendicular distance.
+  ///
+  /// Returns null if no wall is within range.
+  static WallSegment? nearestWall(
+    Point2D point,
+    List<WallSegment> walls, {
+    double thresholdMm = wallHoverThresholdMm,
+  }) {
+    WallSegment? best;
+    double bestDist = thresholdMm;
+
+    for (final wall in walls) {
+      final nearest = _nearestPointOnSegment(
+        point,
+        wall.startPoint,
+        wall.endPoint,
+      );
+      final dist = GeometryEngine.distanceMm(point, nearest);
+      if (dist < bestDist) {
+        bestDist = dist;
+        best = wall;
+      }
+    }
+    return best;
+  }
+
+  /// Project [point] onto [wall] and return the distance in
+  /// mm from the wall's start point.
+  ///
+  /// The result is clamped to [0, wallLength].
+  static double positionOnWallMm(
+    Point2D point,
+    WallSegment wall,
+  ) {
+    final abx = wall.endPoint.x - wall.startPoint.x;
+    final aby = wall.endPoint.y - wall.startPoint.y;
+    final len2 = abx * abx + aby * aby;
+    if (len2 < 1e-9) return 0.0;
+    final t =
+        ((point.x - wall.startPoint.x) * abx +
+                (point.y - wall.startPoint.y) * aby) /
+            len2;
+    final tc = t.clamp(0.0, 1.0);
+    return tc *
+        GeometryEngine.distanceMm(
+          wall.startPoint,
+          wall.endPoint,
+        );
+  }
+
   /// Nearest point on segment [a]→[b] to [p], clamped to segment
   /// bounds.
   static Point2D _nearestPointOnSegment(

@@ -69,3 +69,37 @@ enum DragHandleType {
   /// End endpoint handle.
   end,
 }
+
+/// Highlight data for window/door placement hover state.
+///
+/// Shown while the user hovers the window or door tool
+/// over a wall segment to indicate where the opening
+/// will be placed.
+@immutable
+class WallHighlightData extends InteractionData {
+  /// Creates [WallHighlightData].
+  const WallHighlightData({
+    required this.wallStart,
+    required this.wallEnd,
+    this.previewPositionMm,
+    this.previewWidthMm = 1200.0,
+    this.isWindow = true,
+  });
+
+  /// Start of the highlighted wall (world mm).
+  final Point2D wallStart;
+
+  /// End of the highlighted wall (world mm).
+  final Point2D wallEnd;
+
+  /// Position of the preview opening along the wall
+  /// (mm from wall start). Null = no specific preview.
+  final double? previewPositionMm;
+
+  /// Width of the preview opening in mm.
+  final double previewWidthMm;
+
+  /// True for window preview; false for door preview.
+  final bool isWindow;
+}
+
