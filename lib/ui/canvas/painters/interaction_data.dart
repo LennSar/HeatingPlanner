@@ -103,3 +103,45 @@ class WallHighlightData extends InteractionData {
   final bool isWindow;
 }
 
+/// Highlight data for a selected window or door element.
+///
+/// Produced by [SelectTool] when a window or door is
+/// selected. Conveys the opening's rectangle geometry and
+/// drag handle positions (left edge, move, right edge).
+@immutable
+class OpeningSelectionData extends InteractionData {
+  /// Creates [OpeningSelectionData].
+  const OpeningSelectionData({
+    required this.wallStart,
+    required this.wallEnd,
+    required this.positionOnWallMm,
+    required this.widthMm,
+    required this.isWindow,
+    required this.handles,
+    this.activeHandleIndex,
+  });
+
+  /// Start of the parent wall (world mm).
+  final Point2D wallStart;
+
+  /// End of the parent wall (world mm).
+  final Point2D wallEnd;
+
+  /// Distance from wall start to the opening's left edge (mm).
+  final double positionOnWallMm;
+
+  /// Width of the opening (mm).
+  final double widthMm;
+
+  /// True for window; false for door.
+  final bool isWindow;
+
+  /// Handle positions: [0] = left edge, [1] = mid/move,
+  /// [2] = right edge. All on the wall centre-line (world mm).
+  final List<Point2D> handles;
+
+  /// Index of the handle currently being dragged (0–2),
+  /// or null if not dragging.
+  final int? activeHandleIndex;
+}
+

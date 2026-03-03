@@ -5,42 +5,16 @@ import '../../calculation/engines/geometry_engine.dart';
 import '../../calculation/engines/thermal_engine.dart';
 import '../../core/theme/app_theme.dart';
 import '../providers/editor_state_provider.dart';
+import '../providers/selection_provider.dart';
+import 'opening_properties.dart';
 import 'room_properties.dart';
 import 'wall_construction_editor.dart';
 
-/// Represents a selected element on the canvas.
-@immutable
-class SelectedElement {
-  /// Creates a [SelectedElement].
-  const SelectedElement({
-    required this.type,
-    required this.id,
-  });
-
-  /// Element type (e.g. 'room', 'wall', 'window').
-  final String type;
-
-  /// Element ID.
-  final String id;
-}
-
-/// Notifier for the currently selected element.
-class SelectedElementNotifier
-    extends Notifier<SelectedElement?> {
-  @override
-  SelectedElement? build() => null;
-
-  /// Set the selected element.
-  void select(SelectedElement? element) {
-    state = element;
-  }
-}
-
-/// Provider tracking the currently selected element.
-final selectedElementProvider = NotifierProvider<
-    SelectedElementNotifier, SelectedElement?>(
-  SelectedElementNotifier.new,
-);
+export '../providers/selection_provider.dart'
+    show
+        SelectedElement,
+        SelectedElementNotifier,
+        selectedElementProvider;
 
 /// Context-sensitive properties panel (right side, 280px).
 ///
@@ -97,7 +71,6 @@ class _ProjectSummary extends ConsumerWidget {
     final roomCount = editorState.rooms.length;
     final wallCount = editorState.walls.length;
 
-    // Compute total area from all rooms.
     var totalAreaM2 = 0.0;
     for (final room in editorState.rooms) {
       if (room.polygon.length >= 3) {
@@ -153,6 +126,9 @@ class _ElementProperties extends ConsumerWidget {
     return switch (selection.type) {
       'room' => RoomProperties(roomId: selection.id),
       'wall' => _WallInfo(wallId: selection.id),
+      'window' =>
+        WindowProperties(windowId: selection.id),
+      'door' => DoorProperties(doorId: selection.id),
       _ => _GenericInfo(selection: selection),
     };
   }
@@ -187,7 +163,6 @@ class _WallInfo extends ConsumerWidget {
       wall.endPoint,
     );
 
-    // Look up construction and compute U-value inline.
     final construction = wall.constructionId != null
         ? editorState.constructions
             .where((c) => c.id == wall.constructionId)
@@ -209,7 +184,8 @@ class _WallInfo extends ConsumerWidget {
         rse: construction.rse,
       );
       if (!u.isNaN) {
-        uValueText = '${u.toStringAsFixed(3)} W/(m\u00B2K)';
+        uValueText =
+            '${u.toStringAsFixed(3)} W/(m\u00B2K)';
       }
     }
 
@@ -244,7 +220,8 @@ class _WallInfo extends ConsumerWidget {
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
-              icon: const Icon(Icons.layers_outlined, size: 16),
+              icon: const Icon(Icons.layers_outlined,
+                  size: 16),
               label: Text(
                 construction == null
                     ? 'Add Construction'

@@ -72,6 +72,24 @@ class InteractionPainter extends CustomPainter {
             previewWidthMm,
             isWindow,
           );
+        case OpeningSelectionData(
+              :final wallStart,
+              :final wallEnd,
+              :final positionOnWallMm,
+              :final widthMm,
+              :final isWindow,
+              :final handles,
+              :final activeHandleIndex,
+            ):
+          _drawOpeningSelection(
+            canvas,
+            Offset(wallStart.x, wallStart.y),
+            Offset(wallEnd.x, wallEnd.y),
+            positionOnWallMm,
+            widthMm,
+            isWindow,
+          );
+          _drawWallHandles(canvas, handles, activeHandleIndex);
       }
     }
   }
@@ -338,6 +356,51 @@ class InteractionPainter extends CustomPainter {
 
     canvas.drawPath(path, fillPaint);
     canvas.drawPath(path, strokePaint2);
+  }
+
+  void _drawOpeningSelection(
+    Canvas canvas,
+    Offset wallStart,
+    Offset wallEnd,
+    double positionOnWallMm,
+    double widthMm,
+    bool isWindow,
+  ) {
+    final dx = wallEnd.dx - wallStart.dx;
+    final dy = wallEnd.dy - wallStart.dy;
+    final len = sqrt(dx * dx + dy * dy);
+    if (len < 1) return;
+
+    final ux = dx / len;
+    final uy = dy / len;
+    const halfThick = 100.0; // half of 200 mm wall thickness
+
+    final px = -uy * halfThick;
+    final py = ux * halfThick;
+
+    final x0 = wallStart.dx + ux * positionOnWallMm;
+    final y0 = wallStart.dy + uy * positionOnWallMm;
+    final x1 = wallStart.dx + ux * (positionOnWallMm + widthMm);
+    final y1 = wallStart.dy + uy * (positionOnWallMm + widthMm);
+
+    final path = Path()
+      ..moveTo(x0 + px, y0 + py)
+      ..lineTo(x1 + px, y1 + py)
+      ..lineTo(x1 - px, y1 - py)
+      ..lineTo(x0 - px, y0 - py)
+      ..close();
+
+    final fillPaint = Paint()
+      ..color = (selectionHighlightColor ?? Colors.blue)
+          .withValues(alpha: 0.25)
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(path, fillPaint);
+
+    final strokePaint = Paint()
+      ..color = selectionHighlightColor ?? Colors.blue
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 6.0;
+    canvas.drawPath(path, strokePaint);
   }
 
   @override
