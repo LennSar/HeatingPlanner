@@ -132,6 +132,7 @@ class HeatingPlannerColors extends ThemeExtension<HeatingPlannerColors> {
   final Color zoneGreen;
   final Color zoneYellow;
   final Color zoneRed;
+  final Color zoneGrey;
   final Color supplyPipe;
   final Color returnPipe;
   final Color gridLine;
@@ -227,7 +228,13 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas> {
 - Show dimension text (length in mm) alongside each wall, rotated to match wall angle.
 
 **Heating zone painter specifics:**
-- Fill zone polygon with semi-transparent colour (green/yellow/red per adequacy).
+- Fill zone polygon with semi-transparent colour determined by the priority-ordered state machine (ADR-004):
+  1. Unconnected → `zoneRed` hatched (outline + diagonal lines, 30% opacity)
+  2. No demand data → `zoneGrey` (30% opacity fill)
+  3. Output < 90% demand → `zoneRed` (30% opacity fill)
+  4. Output 90–99% demand → `zoneYellow` (30% opacity fill)
+  5. Output ≥ 100% demand → `zoneGreen` (30% opacity fill)
+- The zone state enum is provided by the Architect's provider; the painter only maps enum → colour.
 - Draw tube routing preview: generate meander/spiral/bifilar/counterflow line paths based on zone polygon, spacing, and border distance.
 - Meander pattern: parallel lines alternating direction, connected at ends.
 - Spiral pattern: concentric inward path.

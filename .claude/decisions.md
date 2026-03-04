@@ -113,3 +113,29 @@ split piece remains individually splittable.
 > `SnapService` (wall-interior snap, 150 mm threshold, grid-aligned where
 > possible). Cursor feedback via `SnapType.wallPoint` shown in
 > `WallDrawTool.getInteractionData`.
+
+---
+
+## ADR-004 — Heating zone colour is a priority-ordered state machine
+
+**What.**
+A heating zone's display colour is determined by evaluating conditions in strict
+priority order: (1) unconnected → red hatched, (2) no demand data → grey,
+(3) output < 90% demand → red solid, (4) output 90–99% → yellow,
+(5) output ≥ 100% → green. The first matching condition wins.
+
+**Why.**
+Multiple conditions can be true simultaneously (e.g. a zone could be unconnected
+*and* have insufficient output). Without a defined priority, different code paths
+could assign conflicting colours. The "unconnected" state takes highest priority
+because it represents a structural incompleteness that makes output values
+meaningless. The "no demand data" state is second because the adequacy comparison
+cannot be evaluated without it, but the zone's own heat output can still be
+displayed.
+
+**Rule.**
+Zone colour evaluation must follow the priority chain exactly. Never evaluate
+output-vs-demand when the zone is unconnected or demand data is missing. The
+Frontend Developer implements the colour mapping; the Architect defines the
+provider that returns the zone's state enum; the HVAC agent has no role here —
+this is a UI state concern, not a thermal calculation.
