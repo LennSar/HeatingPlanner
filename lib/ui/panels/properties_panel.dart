@@ -37,25 +37,41 @@ class PropertiesPanel extends ConsumerWidget {
     final colors = Theme.of(context)
         .extension<HeatingPlannerColors>()!;
 
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context)
-            .colorScheme
-            .surfaceContainerHighest,
-        border: Border(
-          left: BorderSide(color: colors.gridLine),
-        ),
-        boxShadow: const [
-          BoxShadow(
-            color: Colors.black12,
-            blurRadius: 4,
-            offset: Offset(-1, 0),
+    // Wrap with a Focus that absorbs key events whenever a
+    // text field inside the panel has keyboard focus.  This
+    // prevents events (Backspace, Delete, tool-switch keys,
+    // etc.) from propagating up to the canvas Shortcuts
+    // handler while the user is editing a property field.
+    return Focus(
+      onKeyEvent: (node, event) {
+        final primary = FocusManager.instance.primaryFocus;
+        if (primary?.context
+                ?.findAncestorWidgetOfExactType<EditableText>() !=
+            null) {
+          return KeyEventResult.skipRemainingHandlers;
+        }
+        return KeyEventResult.ignored;
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context)
+              .colorScheme
+              .surfaceContainerHighest,
+          border: Border(
+            left: BorderSide(color: colors.gridLine),
           ),
-        ],
+          boxShadow: const [
+            BoxShadow(
+              color: Colors.black12,
+              blurRadius: 4,
+              offset: Offset(-1, 0),
+            ),
+          ],
+        ),
+        child: selection == null
+            ? const _ProjectSummary()
+            : _ElementProperties(selection: selection),
       ),
-      child: selection == null
-          ? const _ProjectSummary()
-          : _ElementProperties(selection: selection),
     );
   }
 }

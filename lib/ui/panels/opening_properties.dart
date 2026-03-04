@@ -37,8 +37,10 @@ class _WindowPropertiesState
   late TextEditingController _sillCtrl;
   late TextEditingController _uValueCtrl;
 
-  /// ID tracked to reset controllers on element change.
-  String? _lastWindowId;
+  late FocusNode _widthFocus;
+  late FocusNode _heightFocus;
+  late FocusNode _sillFocus;
+  late FocusNode _uValueFocus;
 
   @override
   void initState() {
@@ -47,6 +49,10 @@ class _WindowPropertiesState
     _heightCtrl = TextEditingController();
     _sillCtrl = TextEditingController();
     _uValueCtrl = TextEditingController();
+    _widthFocus = FocusNode();
+    _heightFocus = FocusNode();
+    _sillFocus = FocusNode();
+    _uValueFocus = FocusNode();
   }
 
   @override
@@ -55,16 +61,33 @@ class _WindowPropertiesState
     _heightCtrl.dispose();
     _sillCtrl.dispose();
     _uValueCtrl.dispose();
+    _widthFocus.dispose();
+    _heightFocus.dispose();
+    _sillFocus.dispose();
+    _uValueFocus.dispose();
     super.dispose();
   }
 
+  /// Syncs each controller from the model, skipping any field
+  /// that currently has focus so in-progress edits are not
+  /// overwritten.
   void _syncControllers(WindowElement w) {
-    if (_lastWindowId == widget.windowId) return;
-    _lastWindowId = widget.windowId;
-    _widthCtrl.text = w.widthMm.toString();
-    _heightCtrl.text = w.heightMm.toString();
-    _sillCtrl.text = w.sillHeightMm.toString();
-    _uValueCtrl.text = w.uValue.toStringAsFixed(2);
+    if (!_widthFocus.hasFocus) {
+      final s = w.widthMm.toString();
+      if (_widthCtrl.text != s) _widthCtrl.text = s;
+    }
+    if (!_heightFocus.hasFocus) {
+      final s = w.heightMm.toString();
+      if (_heightCtrl.text != s) _heightCtrl.text = s;
+    }
+    if (!_sillFocus.hasFocus) {
+      final s = w.sillHeightMm.toString();
+      if (_sillCtrl.text != s) _sillCtrl.text = s;
+    }
+    if (!_uValueFocus.hasFocus) {
+      final s = w.uValue.toStringAsFixed(2);
+      if (_uValueCtrl.text != s) _uValueCtrl.text = s;
+    }
   }
 
   @override
@@ -138,6 +161,7 @@ class _WindowPropertiesState
             label: 'Width',
             unit: 'mm',
             controller: _widthCtrl,
+            focusNode: _widthFocus,
             onSubmit: (v) {
               final parsed = int.tryParse(v);
               if (parsed != null &&
@@ -155,6 +179,7 @@ class _WindowPropertiesState
             label: 'Height',
             unit: 'mm',
             controller: _heightCtrl,
+            focusNode: _heightFocus,
             onSubmit: (v) {
               final parsed = int.tryParse(v);
               if (parsed != null &&
@@ -172,6 +197,7 @@ class _WindowPropertiesState
             label: 'Sill Height',
             unit: 'mm',
             controller: _sillCtrl,
+            focusNode: _sillFocus,
             onSubmit: (v) {
               final parsed = int.tryParse(v);
               if (parsed != null &&
@@ -190,6 +216,7 @@ class _WindowPropertiesState
             label: 'U-Value',
             unit: 'W/(m²K)',
             controller: _uValueCtrl,
+            focusNode: _uValueFocus,
             isDecimal: true,
             onSubmit: (v) {
               final parsed = double.tryParse(v);
@@ -277,7 +304,10 @@ class _DoorPropertiesState
   late TextEditingController _sillCtrl;
   late TextEditingController _uValueCtrl;
 
-  String? _lastDoorId;
+  late FocusNode _widthFocus;
+  late FocusNode _heightFocus;
+  late FocusNode _sillFocus;
+  late FocusNode _uValueFocus;
 
   @override
   void initState() {
@@ -286,6 +316,10 @@ class _DoorPropertiesState
     _heightCtrl = TextEditingController();
     _sillCtrl = TextEditingController();
     _uValueCtrl = TextEditingController();
+    _widthFocus = FocusNode();
+    _heightFocus = FocusNode();
+    _sillFocus = FocusNode();
+    _uValueFocus = FocusNode();
   }
 
   @override
@@ -294,16 +328,33 @@ class _DoorPropertiesState
     _heightCtrl.dispose();
     _sillCtrl.dispose();
     _uValueCtrl.dispose();
+    _widthFocus.dispose();
+    _heightFocus.dispose();
+    _sillFocus.dispose();
+    _uValueFocus.dispose();
     super.dispose();
   }
 
+  /// Syncs each controller from the model, skipping any field
+  /// that currently has focus so in-progress edits are not
+  /// overwritten.
   void _syncControllers(Door d) {
-    if (_lastDoorId == widget.doorId) return;
-    _lastDoorId = widget.doorId;
-    _widthCtrl.text = d.widthMm.toString();
-    _heightCtrl.text = d.heightMm.toString();
-    _sillCtrl.text = d.sillHeightMm.toString();
-    _uValueCtrl.text = d.uValue.toStringAsFixed(2);
+    if (!_widthFocus.hasFocus) {
+      final s = d.widthMm.toString();
+      if (_widthCtrl.text != s) _widthCtrl.text = s;
+    }
+    if (!_heightFocus.hasFocus) {
+      final s = d.heightMm.toString();
+      if (_heightCtrl.text != s) _heightCtrl.text = s;
+    }
+    if (!_sillFocus.hasFocus) {
+      final s = d.sillHeightMm.toString();
+      if (_sillCtrl.text != s) _sillCtrl.text = s;
+    }
+    if (!_uValueFocus.hasFocus) {
+      final s = d.uValue.toStringAsFixed(2);
+      if (_uValueCtrl.text != s) _uValueCtrl.text = s;
+    }
   }
 
   @override
@@ -377,6 +428,7 @@ class _DoorPropertiesState
             label: 'Width',
             unit: 'mm',
             controller: _widthCtrl,
+            focusNode: _widthFocus,
             onSubmit: (v) {
               final parsed = int.tryParse(v);
               if (parsed != null &&
@@ -393,6 +445,7 @@ class _DoorPropertiesState
             label: 'Height',
             unit: 'mm',
             controller: _heightCtrl,
+            focusNode: _heightFocus,
             onSubmit: (v) {
               final parsed = int.tryParse(v);
               if (parsed != null &&
@@ -410,6 +463,7 @@ class _DoorPropertiesState
             label: 'Sill Height',
             unit: 'mm',
             controller: _sillCtrl,
+            focusNode: _sillFocus,
             onSubmit: (v) {
               final parsed = int.tryParse(v);
               if (parsed != null &&
@@ -428,6 +482,7 @@ class _DoorPropertiesState
             label: 'U-Value',
             unit: 'W/(m²K)',
             controller: _uValueCtrl,
+            focusNode: _uValueFocus,
             isDecimal: true,
             onSubmit: (v) {
               final parsed = double.tryParse(v);
@@ -496,6 +551,7 @@ class _NumericField extends StatelessWidget {
     required this.controller,
     required this.onSubmit,
     this.isDecimal = false,
+    this.focusNode,
   });
 
   final String label;
@@ -503,6 +559,7 @@ class _NumericField extends StatelessWidget {
   final TextEditingController controller;
   final void Function(String) onSubmit;
   final bool isDecimal;
+  final FocusNode? focusNode;
 
   @override
   Widget build(BuildContext context) {
@@ -519,6 +576,7 @@ class _NumericField extends StatelessWidget {
           ),
           Expanded(
             child: TextField(
+              focusNode: focusNode,
               controller: controller,
               textAlign: TextAlign.end,
               keyboardType: isDecimal

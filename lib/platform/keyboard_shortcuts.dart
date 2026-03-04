@@ -137,6 +137,22 @@ class EditorShortcuts extends ConsumerWidget {
   /// The editor screen subtree.
   final Widget child;
 
+  /// Returns true when a text-editing widget currently has
+  /// keyboard focus. Used to prevent canvas shortcuts from
+  /// firing while the user is typing in a properties field.
+  ///
+  /// Checks for an [EditableText] ancestor of the focused
+  /// node's context, because Flutter's [TextField] attaches
+  /// the [FocusNode] to an internal [Focus] widget *inside*
+  /// [EditableText] — so `context.widget` is `Focus`, not
+  /// `EditableText`.
+  static bool _isTextFieldFocused() {
+    final focus = FocusManager.instance.primaryFocus;
+    return focus?.context
+            ?.findAncestorWidgetOfExactType<EditableText>() !=
+        null;
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Shortcuts(
@@ -145,18 +161,21 @@ class EditorShortcuts extends ConsumerWidget {
         actions: {
           UndoIntent: CallbackAction<UndoIntent>(
             onInvoke: (_) {
+              if (_isTextFieldFocused()) return null;
               ref.read(undoRedoProvider).undo();
               return null;
             },
           ),
           RedoIntent: CallbackAction<RedoIntent>(
             onInvoke: (_) {
+              if (_isTextFieldFocused()) return null;
               ref.read(undoRedoProvider).redo();
               return null;
             },
           ),
           DeleteIntent: CallbackAction<DeleteIntent>(
             onInvoke: (_) {
+              if (_isTextFieldFocused()) return null;
               ref
                   .read(toolDeleteProvider.notifier)
                   .delete();
@@ -165,6 +184,7 @@ class EditorShortcuts extends ConsumerWidget {
           ),
           CancelIntent: CallbackAction<CancelIntent>(
             onInvoke: (_) {
+              if (_isTextFieldFocused()) return null;
               ref
                   .read(toolCancelProvider.notifier)
                   .cancel();
@@ -174,6 +194,7 @@ class EditorShortcuts extends ConsumerWidget {
           SwitchToolIntent:
               CallbackAction<SwitchToolIntent>(
             onInvoke: (intent) {
+              if (_isTextFieldFocused()) return null;
               ref
                   .read(selectedToolProvider.notifier)
                   .select(intent.tool);
@@ -182,6 +203,7 @@ class EditorShortcuts extends ConsumerWidget {
           ),
           ZoomInIntent: CallbackAction<ZoomInIntent>(
             onInvoke: (_) {
+              if (_isTextFieldFocused()) return null;
               final ctrl = ref.read(
                 canvasControllerProvider.notifier,
               );
@@ -191,6 +213,7 @@ class EditorShortcuts extends ConsumerWidget {
           ),
           ZoomOutIntent: CallbackAction<ZoomOutIntent>(
             onInvoke: (_) {
+              if (_isTextFieldFocused()) return null;
               final ctrl = ref.read(
                 canvasControllerProvider.notifier,
               );
@@ -200,6 +223,7 @@ class EditorShortcuts extends ConsumerWidget {
           ),
           ZoomToFitIntent: CallbackAction<ZoomToFitIntent>(
             onInvoke: (_) {
+              if (_isTextFieldFocused()) return null;
               ref
                   .read(
                     canvasControllerProvider.notifier,
