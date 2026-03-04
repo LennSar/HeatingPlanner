@@ -135,6 +135,12 @@ class CanvasController extends Notifier<CanvasState> {
     state = CanvasState.initial;
   }
 
+  /// Set zoom and pan in one call (used for initial view
+  /// sizing based on canvas dimensions).
+  void setInitialView(double zoom, Offset panOffset) {
+    state = CanvasState(zoom: zoom, panOffset: panOffset);
+  }
+
   /// Zoom percentage for display (e.g. "125%").
   int get zoomPercent => (state.zoom * 100).round();
 }

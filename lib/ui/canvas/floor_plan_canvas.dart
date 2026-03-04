@@ -94,6 +94,13 @@ class _FloorPlanCanvasState
 
   double _initialZoom = 1.0;
 
+  /// Whether the canvas zoom has been initialised from the
+  /// actual widget size. Set on the first [LayoutBuilder]
+  /// callback so the initial view always shows ≥12 m in the
+  /// smallest dimension (comfortably accommodating a 10 m
+  /// wall), with the world origin centred on screen.
+  bool _viewInitialized = false;
+
   /// Cached tool instances.
   final Map<DrawingTool, CanvasTool> _tools = {};
 
@@ -390,6 +397,30 @@ class _FloorPlanCanvasState
           constraints.maxWidth,
           constraints.maxHeight,
         );
+
+        // On first layout, set zoom so ≥12 m is visible in
+        // the smallest dimension (guarantees a 10 m wall fits
+        // without manual zoom-out), and centre the origin.
+        if (!_viewInitialized &&
+            viewSize.width > 0 &&
+            viewSize.height > 0) {
+          _viewInitialized = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            final smallest = viewSize.shortestSide;
+            final zoom = (smallest / 12000.0).clamp(
+              CanvasState.minZoom,
+              CanvasState.maxZoom,
+            );
+            final pan = Offset(
+              viewSize.width / 2,
+              viewSize.height / 2,
+            );
+            ref
+                .read(canvasControllerProvider.notifier)
+                .setInitialView(zoom, pan);
+          });
+        }
+
         final visibleRect = _computeVisibleRect(
           canvasState,
           viewSize,
