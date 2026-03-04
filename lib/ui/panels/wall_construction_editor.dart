@@ -306,7 +306,7 @@ class _WallConstructionDialogState
       ),
       child: ConstrainedBox(
         constraints: const BoxConstraints(
-          maxWidth: 580,
+          maxWidth: 660,
           maxHeight: 700,
         ),
         child: Padding(
@@ -393,6 +393,7 @@ class _WallConstructionDialogState
               SizedBox(
                 height: 220,
                 child: ReorderableListView.builder(
+                  buildDefaultDragHandles: false,
                   itemCount: _layers.length,
                   onReorder: _onReorder,
                   footer: Padding(
@@ -548,9 +549,12 @@ class _LayerRowState extends State<_LayerRow> {
       child: Row(
         children: [
           // Drag handle.
-          ReorderableDragStartListener(
-            index: widget.index,
-            child: const Icon(Icons.drag_handle, size: 20),
+          MouseRegion(
+            cursor: SystemMouseCursors.resizeUpDown,
+            child: ReorderableDragStartListener(
+              index: widget.index,
+              child: const Icon(Icons.drag_handle, size: 20),
+            ),
           ),
           const SizedBox(width: Spacing.sm),
 
