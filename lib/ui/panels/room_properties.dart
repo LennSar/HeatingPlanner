@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/engines/geometry_engine.dart';
 import '../../calculation/engines/thermal_engine.dart';
+import '../../calculation/providers/heat_demand_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/room.dart';
 import '../canvas/tools/undo_redo_service.dart';
@@ -11,7 +12,9 @@ import '../providers/editor_state_provider.dart';
 /// Editable properties panel for a selected room.
 ///
 /// Shows room name (editable), target temperature slider,
-/// and computed area.
+/// and computed geometry + heat demand values.
+/// Watches [roomHeatDemandProvider] for the total; shows
+/// "—" whenever the value is unavailable (NaN).
 class RoomProperties extends ConsumerStatefulWidget {
   /// Creates [RoomProperties] for [roomId].
   const RoomProperties({required this.roomId, super.key});
@@ -77,6 +80,19 @@ class _RoomPropertiesState
         ? GeometryEngine.polygonAreaM2(room.polygon)
         : 0.0;
 
+    const ceilingHeightMm = 2600.0;
+    final volumeM3 = areaM2 > 0
+        ? ThermalEngine.roomVolumeM3(
+            floorAreaM2: areaM2,
+            ceilingHeightMm: ceilingHeightMm,
+          )
+        : double.nan;
+
+    // Provider-backed total heat demand (NaN while repository
+    // stubs are unconnected; will auto-update when wired).
+    final totalDemandW =
+        ref.watch(roomHeatDemandProvider(widget.roomId));
+
     final wallCount = editorState.walls
         .where((w) => w.roomId == widget.roomId)
         .length;
@@ -129,13 +145,9 @@ class _RoomPropertiesState
             divisions: 30,
             label: '${room.targetTempC.toStringAsFixed(1)} \u00B0C',
             onChangeStart: (_) {
-              // Capture the room state before the drag begins.
               _roomAtSliderStart = room;
             },
             onChanged: (value) {
-              // Live preview — update state directly without
-              // pushing a command (intermediate positions are
-              // not individually undoable).
               ref
                   .read(editorStateProvider.notifier)
                   .updateRoom(
@@ -143,7 +155,6 @@ class _RoomPropertiesState
                   );
             },
             onChangeEnd: (value) {
-              // Push one undo command for the whole drag.
               final start = _roomAtSliderStart;
               _roomAtSliderStart = null;
               if (start != null &&
@@ -166,8 +177,17 @@ class _RoomPropertiesState
 
           // Read-only geometry.
           _readOnlyRow(
-            'Area',
-            '${areaM2.toStringAsFixed(2)} m\u00B2',
+            'Floor Area',
+            areaM2 > 0
+                ? '${areaM2.toStringAsFixed(2)} m\u00B2'
+                : '\u2014',
+            textTheme,
+          ),
+          _readOnlyRow(
+            'Room Volume',
+            !volumeM3.isNaN
+                ? '${volumeM3.toStringAsFixed(1)} m\u00B3'
+                : '\u2014',
             textTheme,
           ),
           _readOnlyRow(
@@ -182,7 +202,7 @@ class _RoomPropertiesState
           ),
           const Divider(height: Spacing.lg),
 
-          // Heat demand breakdown.
+          // Heat demand breakdown (inline, from editorState).
           Text(
             'Heat Demand',
             style: textTheme.headlineSmall,
@@ -193,6 +213,7 @@ class _RoomPropertiesState
             ref,
             room,
             areaM2,
+            totalDemandW,
             textTheme,
           ),
         ],
@@ -202,26 +223,28 @@ class _RoomPropertiesState
 
   /// Computes and returns heat demand display rows.
   ///
-  /// Uses default design outdoor temperature -12°C and
-  /// ceiling height 2600 mm per EN 12831 reference case.
+  /// [totalDemandW] comes from [roomHeatDemandProvider].
+  /// When it is [double.nan] the total and specific heat
+  /// demand rows show "—". The transmission and ventilation
+  /// breakdown is computed inline from [editorStateProvider]
+  /// (no separate providers exist for these components yet).
   List<Widget> _heatDemandRows(
     BuildContext context,
     WidgetRef ref,
-    dynamic room,
+    Room room,
     double areaM2,
+    double totalDemandW,
     TextTheme textTheme,
   ) {
     const tOutdoor = -12.0;
     const ceilingHeightMm = 2600.0;
-    final tIndoor = (room.targetTempC as double);
+    final tIndoor = room.targetTempC;
 
     final editorState = ref.read(editorStateProvider);
     final roomWalls = editorState.walls
         .where((w) => w.roomId == room.id)
         .toList();
 
-    // Sum transmission losses across all walls that have
-    // a construction assigned.
     var qTransmission = 0.0;
     var hasAnyConstruction = false;
 
@@ -247,16 +270,33 @@ class _RoomPropertiesState
         rse: construction.rse,
       );
       if (u.isNaN) continue;
+      hasAnyConstruction = true;
 
       final wallLengthMm = GeometryEngine.distanceMm(
         wall.startPoint,
         wall.endPoint,
       );
-      final areaM2Wall =
-          wallLengthMm * ceilingHeightMm / 1e6;
 
-      // Correction factor: 1.0 for exterior walls,
-      // interior correction for walls shared with another room.
+      final wallWindows = editorState.windows
+          .where((w) => w.wallSegmentId == wall.id)
+          .toList();
+      final wallDoors = editorState.doors
+          .where((d) => d.wallSegmentId == wall.id)
+          .toList();
+
+      final openings = <({int widthMm, int heightMm})>[
+        for (final w in wallWindows)
+          (widthMm: w.widthMm, heightMm: w.heightMm),
+        for (final d in wallDoors)
+          (widthMm: d.widthMm, heightMm: d.heightMm),
+      ];
+
+      final netAreaM2 = ThermalEngine.netWallAreaM2(
+        wallLengthMm: wallLengthMm,
+        wallHeightMm: ceilingHeightMm,
+        openings: openings,
+      );
+
       double corrF = 1.0;
       if (wall.adjacentRoomId != null &&
           wall.adjacentRoomId!.isNotEmpty) {
@@ -272,33 +312,62 @@ class _RoomPropertiesState
         if (corrF.isNaN) corrF = 0.0;
       }
 
-      final loss = ThermalEngine.transmissionLoss(
-        uValue: u,
-        areaM2: areaM2Wall,
-        correctionF: corrF,
-        tIndoorC: tIndoor,
-        tOutdoorC: tOutdoor,
-      );
-      if (!loss.isNaN) {
-        qTransmission += loss;
-        hasAnyConstruction = true;
+      if (!netAreaM2.isNaN && netAreaM2 > 0) {
+        final loss = ThermalEngine.transmissionLoss(
+          uValue: u,
+          areaM2: netAreaM2,
+          correctionF: corrF,
+          tIndoorC: tIndoor,
+          tOutdoorC: tOutdoor,
+        );
+        if (!loss.isNaN) qTransmission += loss;
+      }
+
+      for (final w in wallWindows) {
+        final q = ThermalEngine.transmissionLoss(
+          uValue: w.uValue,
+          areaM2: w.widthMm * w.heightMm / 1e6,
+          correctionF: corrF,
+          tIndoorC: tIndoor,
+          tOutdoorC: tOutdoor,
+        );
+        if (!q.isNaN) qTransmission += q;
+      }
+
+      for (final d in wallDoors) {
+        final q = ThermalEngine.transmissionLoss(
+          uValue: d.uValue,
+          areaM2: d.widthMm * d.heightMm / 1e6,
+          correctionF: corrF,
+          tIndoorC: tIndoor,
+          tOutdoorC: tOutdoor,
+        );
+        if (!q.isNaN) qTransmission += q;
       }
     }
 
-    // Ventilation loss.
     final volumeM3 = ThermalEngine.roomVolumeM3(
       floorAreaM2: areaM2,
       ceilingHeightMm: ceilingHeightMm,
     );
     final qVent = ThermalEngine.ventilationLoss(
       roomVolumeM3: volumeM3,
-      airChangeRate: room.airChangeRate as double,
+      airChangeRate: room.airChangeRate,
       tIndoorC: tIndoor,
       tOutdoorC: tOutdoor,
     );
 
-    final qTotal = (hasAnyConstruction ? qTransmission : 0.0) +
-        (qVent.isNaN ? 0.0 : qVent);
+    // Specific heat demand: use provider total if available,
+    // fall back to inline total.
+    final inlineTotal =
+        (hasAnyConstruction ? qTransmission : 0.0) +
+            (qVent.isNaN ? 0.0 : qVent);
+    final effectiveTotal =
+        totalDemandW.isNaN ? inlineTotal : totalDemandW;
+    final specificW =
+        (areaM2 > 0 && effectiveTotal > 0)
+            ? effectiveTotal / areaM2
+            : double.nan;
 
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -327,6 +396,7 @@ class _RoomPropertiesState
           textTheme,
         ),
       const SizedBox(height: Spacing.xs),
+      // Total: bold, from provider when available.
       Padding(
         padding: const EdgeInsets.symmetric(
           vertical: Spacing.xs,
@@ -335,13 +405,15 @@ class _RoomPropertiesState
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Text(
-              'Total Q',
+              'Total Heat Demand',
               style: textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.w600,
               ),
             ),
             Text(
-              '${qTotal.round()} W',
+              totalDemandW.isNaN
+                  ? '\u2014'
+                  : '${totalDemandW.round()} W',
               style: textTheme.bodyLarge?.copyWith(
                 fontWeight: FontWeight.bold,
                 color: colorScheme.primary,
@@ -349,6 +421,14 @@ class _RoomPropertiesState
             ),
           ],
         ),
+      ),
+      // Specific heat demand (W/m²).
+      _readOnlyRow(
+        'Specific Heat Demand',
+        specificW.isNaN
+            ? '\u2014'
+            : '${specificW.toStringAsFixed(1)} W/m\u00B2',
+        textTheme,
       ),
     ];
   }
@@ -383,9 +463,6 @@ Widget _readOnlyRow(
 // ================================================================
 
 /// Command: update a room property (name, temperature, etc.).
-///
-/// [update] is the notifier method — captured once so the
-/// command does not need to hold a [WidgetRef].
 class _UpdateRoomCommand extends Command {
   _UpdateRoomCommand({
     required this.oldRoom,

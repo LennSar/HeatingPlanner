@@ -466,3 +466,23 @@ final cursorPositionProvider =
     NotifierProvider<CursorPositionNotifier, Point2D?>(
   CursorPositionNotifier.new,
 );
+
+/// Stores the ID of the project currently open in the editor.
+///
+/// Set by [EditorScreen] on creation so that project-scoped
+/// providers (e.g. [buildingHeatDemandProvider]) can be
+/// parameterised without threading the ID through every widget.
+/// Empty string when no project is open.
+class CurrentProjectIdNotifier extends Notifier<String> {
+  @override
+  String build() => '';
+
+  /// Update the active project ID.
+  void set(String id) => state = id;
+}
+
+/// Provider for the active project ID.
+final currentProjectIdProvider =
+    NotifierProvider<CurrentProjectIdNotifier, String>(
+  CurrentProjectIdNotifier.new,
+);

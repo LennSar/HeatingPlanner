@@ -47,6 +47,19 @@ class _EditorScreenState
   bool _propertiesPanelVisible = true;
 
   @override
+  void initState() {
+    super.initState();
+    // Defer the provider mutation to after the first frame so
+    // that it does not fire while the widget tree is still
+    // building (which Riverpod disallows).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      ref
+          .read(currentProjectIdProvider.notifier)
+          .set(widget.projectId);
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
     final isTablet = width < 600;

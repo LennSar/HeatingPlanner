@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/engines/geometry_engine.dart';
 import '../../calculation/engines/thermal_engine.dart';
+import '../../calculation/providers/heat_demand_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../providers/editor_state_provider.dart';
 import '../providers/selection_provider.dart';
@@ -95,6 +96,16 @@ class _ProjectSummary extends ConsumerWidget {
       }
     }
 
+    final projectId =
+        ref.watch(currentProjectIdProvider);
+    final buildingDemandW = projectId.isNotEmpty
+        ? ref.watch(buildingHeatDemandProvider(projectId))
+        : double.nan;
+
+    final demandText = buildingDemandW.isNaN
+        ? '\u2014'
+        : '${buildingDemandW.round()} W';
+
     return Padding(
       padding: const EdgeInsets.all(Spacing.md),
       child: Column(
@@ -117,7 +128,7 @@ class _ProjectSummary extends ConsumerWidget {
             '${totalAreaM2.toStringAsFixed(1)} m\u00B2',
             textTheme,
           ),
-          _infoRow('Heat Demand', '0 W', textTheme),
+          _infoRow('Total Heat Demand', demandText, textTheme),
           const SizedBox(height: Spacing.md),
           Text(
             'Select an element on the canvas to see '
