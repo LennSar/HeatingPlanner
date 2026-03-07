@@ -38,7 +38,18 @@ abstract final class RoomDetection {
   /// Detect a closed room after [newWall] is added to
   /// [allWalls] (which must already include [newWall]).
   ///
-  /// Returns null if no closed polygon is found.
+  /// Uses BFS to find the **minimum-hop** cycle that
+  /// contains [newWall], which corresponds to the smallest
+  /// enclosed polygon.  Returns null if no closed polygon
+  /// with ≥ 3 vertices is found.
+  ///
+  /// A depth-first search is not used here because the DFS
+  /// returns the first cycle it encounters in adjacency-list
+  /// order, which can be the large room-1 polygon when a
+  /// shorter cycle also exists (e.g. after an ADR-003 split
+  /// where the new wall ends at a corner of the split host
+  /// wall).  BFS guarantees the shortest path is returned
+  /// regardless of adjacency ordering.
   static DetectedRoom? detectClosedRoom(
     List<WallSegment> allWalls,
     WallSegment newWall,
@@ -67,36 +78,26 @@ abstract final class RoomDetection {
           ));
     }
 
-    // Try to find a cycle starting from newWall's endpoint
-    // back to newWall's startpoint.
     final startKey = _pointKey(newWall.startPoint);
     final endKey = _pointKey(newWall.endPoint);
 
-    // DFS from endPoint trying to reach startPoint,
-    // without re-using the newWall itself.
-    final visited = <String>{endKey};
-    final path = <_PathNode>[
-      _PathNode(
-        key: endKey,
-        point: newWall.endPoint,
-        wallId: newWall.id,
-      ),
-    ];
-
-    final result = _dfs(
+    // BFS from endPoint trying to reach startPoint,
+    // without re-using newWall itself.
+    final result = _bfs(
       adjacency: adjacency,
+      bfsStartKey: endKey,
+      bfsStartPoint: newWall.endPoint,
       targetKey: startKey,
-      visited: visited,
-      path: path,
       excludeWallId: newWall.id,
-      maxDepth: allWalls.length,
+      maxNodes: allWalls.length,
     );
 
     if (result == null) return null;
 
     // Build polygon from path.
-    // result.path contains all intermediate nodes.
-    // result.closingWallId is the wall that connects the
+    // result.path[0] is the BFS start node (newWall.endPoint);
+    // subsequent nodes are the intermediate hops.
+    // result.closingWallId is the edge that connects the
     // last path node back to newWall.startPoint.
     final polygon = <Point2D>[newWall.startPoint];
     final wallIds = <String>[newWall.id];
@@ -108,10 +109,6 @@ abstract final class RoomDetection {
       }
     }
 
-    // Add the closing wall — the edge that connects the
-    // last traversed node back to newWall.startPoint.
-    // Previously this was omitted, causing wallIds to be
-    // one entry short when building the room boundary.
     if (result.closingWallId != newWall.id) {
       wallIds.add(result.closingWallId);
     }
@@ -122,84 +119,148 @@ abstract final class RoomDetection {
     return DetectedRoom(polygon: polygon, wallIds: wallIds);
   }
 
-  /// DFS to find a path from current position back to
-  /// [targetKey].
+  /// BFS to find the shortest path (minimum hops) from
+  /// [bfsStartKey] to [targetKey], excluding any edge with
+  /// [excludeWallId].
   ///
-  /// Returns a [_DfsResult] containing the traversal path
-  /// and the ID of the wall that closes the cycle, or null
-  /// if no cycle is reachable.
-  static _DfsResult? _dfs({
+  /// Returns a [_CycleResult] whose [_CycleResult.path]
+  /// lists nodes from [bfsStartKey] to the node immediately
+  /// before [targetKey], and whose
+  /// [_CycleResult.closingWallId] is the wall that connects
+  /// the last path node back to [targetKey].
+  ///
+  /// Returns null when no such path exists or when the node
+  /// count exceeds [maxNodes].
+  static _CycleResult? _bfs({
     required Map<String, List<_AdjEntry>> adjacency,
+    required String bfsStartKey,
+    required Point2D bfsStartPoint,
     required String targetKey,
-    required Set<String> visited,
-    required List<_PathNode> path,
     required String excludeWallId,
-    required int maxDepth,
+    required int maxNodes,
   }) {
-    if (path.length > maxDepth) return null;
+    // cameFrom[nodeKey] records how BFS reached that node.
+    final cameFrom = <String, _BfsEdge>{};
+    final queue = <String>[];
 
-    final currentKey = path.last.key;
-    final neighbors = adjacency[currentKey];
-    if (neighbors == null) return null;
+    cameFrom[bfsStartKey] = _BfsEdge(
+      parentKey: null,
+      wallId: excludeWallId, // placeholder — skipped by caller
+      point: bfsStartPoint,
+    );
+    queue.add(bfsStartKey);
 
-    for (final neighbor in neighbors) {
-      // Don't traverse the new wall again.
-      if (neighbor.wallId == excludeWallId) continue;
+    var head = 0;
+    while (head < queue.length) {
+      // Guard against pathological graphs.
+      if (head > maxNodes) break;
 
-      // Found the target — cycle complete.
-      // Record the closing wall ID so the caller can add it
-      // to wallIds (previously this edge was silently lost).
-      if (neighbor.key == targetKey) {
-        return _DfsResult(
-          path: [...path],
-          closingWallId: neighbor.wallId,
+      final currentKey = queue[head++];
+      final neighbors = adjacency[currentKey];
+      if (neighbors == null) continue;
+
+      for (final neighbor in neighbors) {
+        // Never traverse the new wall again.
+        if (neighbor.wallId == excludeWallId) continue;
+
+        // Found the target — shortest path located.
+        if (neighbor.key == targetKey) {
+          return _CycleResult(
+            path: _reconstructPath(
+              cameFrom: cameFrom,
+              fromKey: currentKey,
+              startKey: bfsStartKey,
+              startPoint: bfsStartPoint,
+              placeholderWallId: excludeWallId,
+            ),
+            closingWallId: neighbor.wallId,
+          );
+        }
+
+        // Each node is visited at most once.
+        if (cameFrom.containsKey(neighbor.key)) continue;
+
+        cameFrom[neighbor.key] = _BfsEdge(
+          parentKey: currentKey,
+          wallId: neighbor.wallId,
+          point: neighbor.point,
         );
+        queue.add(neighbor.key);
       }
-
-      // Don't revisit nodes.
-      if (visited.contains(neighbor.key)) continue;
-
-      visited.add(neighbor.key);
-      path.add(_PathNode(
-        key: neighbor.key,
-        point: neighbor.point,
-        wallId: neighbor.wallId,
-      ));
-
-      final result = _dfs(
-        adjacency: adjacency,
-        targetKey: targetKey,
-        visited: visited,
-        path: path,
-        excludeWallId: excludeWallId,
-        maxDepth: maxDepth,
-      );
-
-      if (result != null) return result;
-
-      path.removeLast();
-      visited.remove(neighbor.key);
     }
 
     return null;
   }
+
+  /// Walk the [cameFrom] map from [fromKey] back to
+  /// [startKey] and return the path in forward order
+  /// (startKey → … → fromKey).
+  static List<_PathNode> _reconstructPath({
+    required Map<String, _BfsEdge> cameFrom,
+    required String fromKey,
+    required String startKey,
+    required Point2D startPoint,
+    required String placeholderWallId,
+  }) {
+    final reversed = <_PathNode>[];
+    var key = fromKey;
+
+    while (key != startKey) {
+      final edge = cameFrom[key]!;
+      reversed.add(_PathNode(
+        key: key,
+        point: edge.point,
+        wallId: edge.wallId,
+      ));
+      key = edge.parentKey!;
+    }
+
+    // Append the start node (wallId skipped by the caller
+    // because it equals excludeWallId / newWall.id).
+    reversed.add(_PathNode(
+      key: startKey,
+      point: startPoint,
+      wallId: placeholderWallId,
+    ));
+
+    return reversed.reversed.toList();
+  }
 }
 
-/// Result returned by the DFS traversal.
-class _DfsResult {
-  const _DfsResult({
+/// Result returned by the BFS traversal.
+class _CycleResult {
+  const _CycleResult({
     required this.path,
     required this.closingWallId,
   });
 
-  /// Nodes traversed from endPoint up to (but not
-  /// including) the target.
+  /// Nodes from the BFS start up to (but not including)
+  /// the target.  The first node's wallId equals the
+  /// excluded new-wall ID and is skipped by the caller.
   final List<_PathNode> path;
 
   /// ID of the wall that connects the last path node back
-  /// to the target (newWall.startPoint).  This was the
-  /// previously missing closing edge.
+  /// to the target (newWall.startPoint).
   final String closingWallId;
+}
+
+/// BFS book-keeping: how a node was reached.
+class _BfsEdge {
+  const _BfsEdge({
+    required this.parentKey,
+    required this.wallId,
+    required this.point,
+  });
+
+  /// Key of the node from which this node was reached,
+  /// or null for the BFS start node.
+  final String? parentKey;
+
+  /// Wall used to reach this node from its parent.
+  final String wallId;
+
+  /// World coordinates of this node.
+  final Point2D point;
 }
 
 class _AdjEntry {
