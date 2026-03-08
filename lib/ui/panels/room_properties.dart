@@ -9,10 +9,31 @@ import '../../data/models/room.dart';
 import '../canvas/tools/undo_redo_service.dart';
 import '../providers/editor_state_provider.dart';
 
+/// Air change rate presets (h⁻¹) per agent-hvac.md §4.
+const Map<String, double> _kAirChangePresets = {
+  'Standard room': 0.5,
+  'Kitchen': 1.0,
+  'Bathroom': 1.5,
+  'Utility room': 2.0,
+  'Server room': 3.0,
+};
+
+const _kCustomKey = 'Custom';
+
+/// Returns the preset label whose value matches [acr], or
+/// [_kCustomKey] when no preset matches (within 0.001 tolerance).
+String _presetKeyFor(double acr) {
+  for (final e in _kAirChangePresets.entries) {
+    if ((e.value - acr).abs() < 0.001) return e.key;
+  }
+  return _kCustomKey;
+}
+
 /// Editable properties panel for a selected room.
 ///
 /// Shows room name (editable), target temperature slider,
-/// and computed geometry + heat demand values.
+/// air change rate dropdown (with custom numeric entry), and
+/// computed geometry + heat demand values.
 /// Watches [roomHeatDemandProvider] for the total; shows
 /// "—" whenever the value is unavailable (NaN).
 class RoomProperties extends ConsumerStatefulWidget {
@@ -30,6 +51,20 @@ class RoomProperties extends ConsumerStatefulWidget {
 class _RoomPropertiesState
     extends ConsumerState<RoomProperties> {
   late TextEditingController _nameController;
+
+  /// Controller for the free-entry ACR text field shown when
+  /// the user selects the "Custom" dropdown option.
+  late TextEditingController _acrController;
+
+  /// Currently selected dropdown label. Derived from the room
+  /// model on first load of each room; kept in sync with
+  /// external changes (undo/redo) via [ref.listen].
+  String _selectedAcrKey = _kCustomKey;
+
+  /// Last room ID that was synced into [_selectedAcrKey] /
+  /// [_acrController]. Used to detect room selection changes.
+  String? _lastSyncedAcrRoomId;
+
   String? _lastRoomId;
 
   /// Snapshot of the room taken when the temperature slider
@@ -40,11 +75,13 @@ class _RoomPropertiesState
   void initState() {
     super.initState();
     _nameController = TextEditingController();
+    _acrController = TextEditingController();
   }
 
   @override
   void dispose() {
     _nameController.dispose();
+    _acrController.dispose();
     super.dispose();
   }
 
@@ -56,10 +93,61 @@ class _RoomPropertiesState
     }
   }
 
+  /// Syncs [_selectedAcrKey] and [_acrController] from the model
+  /// when the selected room changes. Called from [build] before
+  /// the dropdown is rendered — safe because no setState is needed
+  /// (the values are read later in the same build call).
+  void _syncAcrOnRoomChange(String roomId, double acr) {
+    if (_lastSyncedAcrRoomId == roomId) return;
+    _lastSyncedAcrRoomId = roomId;
+    _selectedAcrKey = _presetKeyFor(acr);
+    _acrController.text = _selectedAcrKey == _kCustomKey
+        ? acr.toStringAsFixed(1)
+        : '';
+  }
+
+  /// Commits an air change rate update via the undo/redo stack.
+  void _commitAcr(Room room, double newAcr) {
+    if ((newAcr - room.airChangeRate).abs() < 0.001) return;
+    ref.read(undoRedoProvider).execute(
+          _UpdateRoomCommand(
+            oldRoom: room,
+            newRoom: room.copyWith(airChangeRate: newAcr),
+            update:
+                ref.read(editorStateProvider.notifier).updateRoom,
+          ),
+        );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final editorState = ref.watch(editorStateProvider);
+
+    // Keep dropdown in sync when ACR changes externally (undo/redo).
+    // Must be called before any early return so the listener is always
+    // registered in the same position.
+    ref.listen<EditorState>(editorStateProvider, (prev, next) {
+      if (!mounted) return;
+      final prevAcr = prev?.rooms
+          .where((r) => r.id == widget.roomId)
+          .firstOrNull
+          ?.airChangeRate;
+      final nextRoom = next.rooms
+          .where((r) => r.id == widget.roomId)
+          .firstOrNull;
+      if (nextRoom == null || prevAcr == nextRoom.airChangeRate) {
+        return;
+      }
+      final key = _presetKeyFor(nextRoom.airChangeRate);
+      setState(() {
+        _selectedAcrKey = key;
+        _acrController.text = key == _kCustomKey
+            ? nextRoom.airChangeRate.toStringAsFixed(1)
+            : '';
+      });
+    });
+
     final room = editorState.rooms
         .where((r) => r.id == widget.roomId)
         .firstOrNull;
@@ -75,6 +163,7 @@ class _RoomPropertiesState
     }
 
     _syncController(room.name);
+    _syncAcrOnRoomChange(widget.roomId, room.airChangeRate);
 
     final areaM2 = room.polygon.length >= 3
         ? GeometryEngine.polygonAreaM2(room.polygon)
@@ -173,6 +262,38 @@ class _RoomPropertiesState
               }
             },
           ),
+
+          // Air change rate — preset dropdown + optional custom input.
+          const SizedBox(height: Spacing.xs),
+          _AcrField(
+            selectedKey: _selectedAcrKey,
+            customController: _acrController,
+            onPresetSelected: (key) {
+              final newAcr = _kAirChangePresets[key]!;
+              setState(() => _selectedAcrKey = key);
+              _commitAcr(room, newAcr);
+            },
+            onCustomSelected: () {
+              setState(() {
+                _selectedAcrKey = _kCustomKey;
+                _acrController.text =
+                    room.airChangeRate.toStringAsFixed(1);
+              });
+            },
+            onCustomSubmitted: (raw) {
+              final parsed = double.tryParse(raw);
+              if (parsed != null &&
+                  parsed >= 0.1 &&
+                  parsed <= 5.0) {
+                _commitAcr(room, parsed);
+              } else {
+                // Reset to current value on invalid input.
+                _acrController.text =
+                    room.airChangeRate.toStringAsFixed(1);
+              }
+            },
+          ),
+
           const Divider(height: Spacing.lg),
 
           // Read-only geometry.
@@ -193,11 +314,6 @@ class _RoomPropertiesState
           _readOnlyRow(
             'Walls',
             '$wallCount',
-            textTheme,
-          ),
-          _readOnlyRow(
-            'Air Change Rate',
-            '${room.airChangeRate} h\u207B\u00B9',
             textTheme,
           ),
           const Divider(height: Spacing.lg),
@@ -434,6 +550,110 @@ class _RoomPropertiesState
   }
 }
 
+// ================================================================
+// Air change rate field
+// ================================================================
+
+/// Dropdown for selecting an air change rate preset, with an
+/// optional free-entry text field revealed when 'Custom' is chosen.
+///
+/// All state and callbacks are owned by the parent widget so this
+/// can remain a simple [StatelessWidget].
+class _AcrField extends StatelessWidget {
+  const _AcrField({
+    required this.selectedKey,
+    required this.customController,
+    required this.onPresetSelected,
+    required this.onCustomSelected,
+    required this.onCustomSubmitted,
+  });
+
+  /// Currently active dropdown label (one of [_kAirChangePresets]
+  /// keys or [_kCustomKey]).
+  final String selectedKey;
+
+  /// Controller for the free-entry text field (only visible when
+  /// [selectedKey] == [_kCustomKey]).
+  final TextEditingController customController;
+
+  /// Fired when the user picks a named preset. Provides the preset
+  /// label; the caller maps it to its numeric value.
+  final void Function(String key) onPresetSelected;
+
+  /// Fired when the user picks 'Custom' from the dropdown.
+  final VoidCallback onCustomSelected;
+
+  /// Fired when the user submits the custom numeric text field.
+  final void Function(String raw) onCustomSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    final items = [
+      ..._kAirChangePresets.entries.map(
+        (e) => DropdownMenuItem<String>(
+          value: e.key,
+          child: Text(
+            '${e.key} \u2014 ${e.value} h\u207B\u00B9',
+            style: textTheme.bodyMedium,
+          ),
+        ),
+      ),
+      DropdownMenuItem<String>(
+        value: _kCustomKey,
+        child: Text('Custom', style: textTheme.bodyMedium),
+      ),
+    ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Air Change Rate', style: textTheme.bodyMedium),
+        const SizedBox(height: Spacing.xs),
+        InputDecorator(
+          decoration: const InputDecoration(isDense: true),
+          child: DropdownButton<String>(
+            value: selectedKey,
+            isDense: true,
+            isExpanded: true,
+            underline: const SizedBox.shrink(),
+            items: items,
+            onChanged: (key) {
+              if (key == null) return;
+              if (key == _kCustomKey) {
+                onCustomSelected();
+              } else {
+                onPresetSelected(key);
+              }
+            },
+          ),
+        ),
+        if (selectedKey == _kCustomKey) ...[
+          const SizedBox(height: Spacing.xs),
+          TextField(
+            controller: customController,
+            keyboardType: const TextInputType.numberWithOptions(
+              decimal: true,
+            ),
+            decoration: const InputDecoration(
+              labelText: 'Rate',
+              suffixText: 'h\u207B\u00B9',
+              helperText: '0.1 – 5.0',
+              isDense: true,
+            ),
+            onSubmitted: onCustomSubmitted,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// ================================================================
+// Shared helpers
+// ================================================================
+
 Widget _readOnlyRow(
   String label,
   String value,
@@ -462,7 +682,7 @@ Widget _readOnlyRow(
 // Command classes
 // ================================================================
 
-/// Command: update a room property (name, temperature, etc.).
+/// Command: update a room property (name, temperature, ACR, etc.).
 class _UpdateRoomCommand extends Command {
   _UpdateRoomCommand({
     required this.oldRoom,
