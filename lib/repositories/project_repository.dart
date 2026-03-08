@@ -14,11 +14,3 @@ final projectProvider =
     StreamProvider.family<Project?, String>((ref, projectId) async* {
   yield null;
 });
-
-/// Outdoor design temperature (°C) used in heat-demand calculations.
-///
-/// Override in the enclosing [ProviderScope] with the active project's
-/// [Project.designOutdoorTempC] when a project is loaded.
-///
-/// Default: −12 °C (matches [Project.designOutdoorTempC] default).
-final designOutdoorTempCProvider = Provider<double>((ref) => -12.0);

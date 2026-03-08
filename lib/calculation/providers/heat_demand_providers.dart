@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/enums.dart';
 import '../../repositories/building_repository.dart';
-import '../../repositories/project_repository.dart';
+import 'project_settings_provider.dart';
 import '../engines/geometry_engine.dart';
 import '../engines/thermal_engine.dart';
 import 'u_value_providers.dart';

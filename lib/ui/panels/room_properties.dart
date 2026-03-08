@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../calculation/engines/geometry_engine.dart';
 import '../../calculation/engines/thermal_engine.dart';
 import '../../calculation/providers/heat_demand_providers.dart';
+import '../../calculation/providers/project_settings_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/room.dart';
 import '../canvas/tools/undo_redo_service.dart';
@@ -177,6 +178,12 @@ class _RoomPropertiesState
           )
         : double.nan;
 
+    // Watch outdoor temp directly so this widget rebuilds when
+    // the project setting changes, even while roomProvider is
+    // a stub (the provider chain's early-return prevents the
+    // indirect dependency from being established).
+    final tOutdoor = ref.watch(designOutdoorTempCProvider);
+
     // Provider-backed total heat demand (NaN while repository
     // stubs are unconnected; will auto-update when wired).
     final totalDemandW =
@@ -330,6 +337,7 @@ class _RoomPropertiesState
             room,
             areaM2,
             totalDemandW,
+            tOutdoor,
             textTheme,
           ),
         ],
@@ -350,9 +358,9 @@ class _RoomPropertiesState
     Room room,
     double areaM2,
     double totalDemandW,
+    double tOutdoor,
     TextTheme textTheme,
   ) {
-    const tOutdoor = -12.0;
     const ceilingHeightMm = 2600.0;
     final tIndoor = room.targetTempC;
 

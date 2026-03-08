@@ -6,6 +6,7 @@ import '../../data/models/enums.dart';
 import '../../platform/keyboard_shortcuts.dart';
 import '../canvas/canvas_controller.dart';
 import '../canvas/floor_plan_canvas.dart';
+import '../dialogs/project_settings_dialog.dart';
 import '../panels/properties_panel.dart';
 import '../providers/editor_state_provider.dart';
 
@@ -279,13 +280,37 @@ class _Toolbar extends StatelessWidget {
               color: Colors.transparent,
               child: InkWell(
                 onTap: () {
-                  // TODO: toggle performance dashboard.
+                  // TODO(frontend): toggle performance dashboard.
                 },
                 child: SizedBox(
                   width: toolbarWidth,
                   height: toolbarWidth,
                   child: Icon(
                     Icons.bar_chart,
+                    size: isCompact ? 20 : 22,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Project settings
+          Tooltip(
+            message: 'Project Settings',
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => showProjectSettingsDialog(
+                  context,
+                ),
+                child: SizedBox(
+                  width: toolbarWidth,
+                  height: toolbarWidth,
+                  child: Icon(
+                    Icons.tune,
                     size: isCompact ? 20 : 22,
                     color: Theme.of(context)
                         .colorScheme
