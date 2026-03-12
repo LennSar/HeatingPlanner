@@ -103,6 +103,48 @@ class WallHighlightData extends InteractionData {
   final bool isWindow;
 }
 
+/// Ghost polygon data produced while drawing a heating zone.
+///
+/// Emitted by [ZoneDrawTool] each frame so [InteractionPainter]
+/// can render the in-progress polygon, the ghost edge to the
+/// cursor, vertex dots, the close-indicator ring, and (when
+/// applicable) the red validation-error overlay.
+@immutable
+class ZoneDrawData extends InteractionData {
+  /// Creates [ZoneDrawData].
+  const ZoneDrawData({
+    required this.vertices,
+    this.currentPoint,
+    this.hasValidationError = false,
+  });
+
+  /// Committed polygon vertices so far (world mm).
+  final List<Point2D> vertices;
+
+  /// Current cursor position for the ghost edge (world mm).
+  /// Null while the cursor is outside the canvas.
+  final Point2D? currentPoint;
+
+  /// True when the most recent close attempt failed because one
+  /// or more vertices lay outside the parent room — triggers the
+  /// red warning overlay.
+  final bool hasValidationError;
+}
+
+/// Highlight data for a selected heating zone.
+///
+/// Produced by [SelectTool] when a heating zone is selected.
+/// Conveys the zone polygon so [InteractionPainter] can draw
+/// the selection outline and fill.
+@immutable
+class ZoneSelectionData extends InteractionData {
+  /// Creates [ZoneSelectionData].
+  const ZoneSelectionData({required this.polygon});
+
+  /// Zone polygon vertices (world mm).
+  final List<Point2D> polygon;
+}
+
 /// Highlight data for a selected window or door element.
 ///
 /// Produced by [SelectTool] when a window or door is

@@ -1,4 +1,5 @@
 import '../../../data/models/door.dart';
+import '../../../data/models/heating_zone.dart';
 import '../../../data/models/point2d.dart';
 import '../../../data/models/room.dart';
 import '../../../data/models/wall_segment.dart';
@@ -65,6 +66,26 @@ abstract class EditorCallbacks {
   /// Remove a door by ID.
   void removeDoor(String doorId);
 
+  // ---- Zones ----
+
+  /// Commit a new heating zone to the editor state.
+  void commitZone(HeatingZone zone);
+
+  /// Remove a heating zone by ID.
+  void removeZone(String zoneId);
+
+  // ---- Default IDs ----
+
+  /// ID of the first available tube type (from seeded data).
+  ///
+  /// Used by [ZoneDrawTool] when creating a zone with defaults.
+  String get defaultTubeTypeId;
+
+  /// ID of the first available flooring material (from seeded data).
+  ///
+  /// Used by [ZoneDrawTool] when creating a zone with defaults.
+  String get defaultFlooringMaterialId;
+
   // ---- Selection / UI ----
 
   /// Update the selected element in the properties panel.
@@ -92,6 +113,9 @@ abstract class EditorCallbacks {
 
   /// All doors currently in the editor.
   List<Door> get currentDoors;
+
+  /// All heating zones currently in the editor.
+  List<HeatingZone> get currentZones;
 
   /// The current canvas zoom level (for screen-space
   /// hit testing of handles).

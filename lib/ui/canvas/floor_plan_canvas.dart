@@ -24,6 +24,7 @@ import 'painters/interaction_painter.dart';
 import 'painters/opening_painter.dart';
 import 'painters/pipe_route_painter.dart';
 import 'painters/wall_painter.dart';
+import '../../data/models/heating_zone.dart';
 import 'tools/editor_callbacks.dart';
 import 'tools/door_place_tool.dart';
 import 'tools/select_tool.dart';
@@ -31,6 +32,7 @@ import 'tools/tool_base.dart';
 import 'tools/undo_redo_service.dart';
 import 'tools/wall_draw_tool.dart';
 import 'tools/window_place_tool.dart';
+import 'tools/zone_draw_tool.dart';
 
 /// Provider that signals tools to cancel (incremented on
 /// Escape). Tools check this to know when cancel is pressed.
@@ -145,6 +147,10 @@ class _FloorPlanCanvasState
       onStateChanged: onChanged,
       undoRedo: undoRedo,
     );
+    _tools[DrawingTool.drawZone] = ZoneDrawTool(
+      callbacks: this,
+      onStateChanged: onChanged,
+    );
   }
 
   CanvasTool? get _activeTool {
@@ -243,6 +249,34 @@ class _FloorPlanCanvasState
   void removeDoor(String doorId) {
     ref.read(editorStateProvider.notifier).removeDoor(doorId);
   }
+
+  // ---- Zones ----
+
+  @override
+  void commitZone(HeatingZone zone) {
+    ref.read(editorStateProvider.notifier).addZone(zone);
+  }
+
+  @override
+  void removeZone(String zoneId) {
+    ref.read(editorStateProvider.notifier).removeZone(zoneId);
+  }
+
+  // ---- Default IDs (from seeded data in HeatingDao.seedDefaults) ----
+
+  /// First available tube type ID (PE-Xa 16×2, seeded default).
+  static const _defaultTubeTypeId =
+      '10000000-0000-4000-8000-000000000001';
+
+  /// First available flooring material ID (Ceramic tile, seeded default).
+  static const _defaultFlooringMaterialId =
+      '20000000-0000-4000-8000-000000000001';
+
+  @override
+  String get defaultTubeTypeId => _defaultTubeTypeId;
+
+  @override
+  String get defaultFlooringMaterialId => _defaultFlooringMaterialId;
 
   @override
   void selectElement(String? type, String? id) {
@@ -361,6 +395,10 @@ class _FloorPlanCanvasState
   @override
   List<Door> get currentDoors =>
       ref.read(editorStateProvider).doors;
+
+  @override
+  List<HeatingZone> get currentZones =>
+      ref.read(editorStateProvider).zones;
 
   @override
   double get currentZoom =>
@@ -586,6 +624,7 @@ class _FloorPlanCanvasState
                       walls: editorState.walls,
                       windows: editorState.windows,
                       doors: editorState.doors,
+                      zones: editorState.zones,
                       interactionData: _interactionData,
                     ),
                   ),
@@ -653,6 +692,7 @@ class _CanvasCompositePainter extends CustomPainter {
     required this.walls,
     required this.windows,
     required this.doors,
+    required this.zones,
     this.hoverWorldPoint,
     this.interactionData,
   });
@@ -666,6 +706,7 @@ class _CanvasCompositePainter extends CustomPainter {
   final List<WallSegment> walls;
   final List<WindowElement> windows;
   final List<Door> doors;
+  final List<HeatingZone> zones;
   final InteractionData? interactionData;
 
   @override
@@ -685,6 +726,8 @@ class _CanvasCompositePainter extends CustomPainter {
       zoneGreen: colors.zoneGreen,
       zoneYellow: colors.zoneYellow,
       zoneRed: colors.zoneRed,
+      supplyPipe: colors.supplyPipe,
+      zones: zones,
     ).paint(canvas, size);
 
     // Layer 3: Walls

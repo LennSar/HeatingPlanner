@@ -5,6 +5,7 @@ import '../../calculation/engines/geometry_engine.dart';
 import '../../core/utils/id_generator.dart';
 import '../../data/models/door.dart';
 import '../../data/models/enums.dart';
+import '../../data/models/heating_zone.dart';
 import '../../data/models/material_layer.dart';
 import '../../data/models/point2d.dart';
 import '../../data/models/room.dart';
@@ -21,6 +22,7 @@ class EditorState {
     this.rooms = const [],
     this.windows = const [],
     this.doors = const [],
+    this.zones = const [],
     this.constructions = const [],
     this.materialLayers = const [],
   });
@@ -37,6 +39,13 @@ class EditorState {
   /// All door elements placed on wall segments.
   final List<Door> doors;
 
+  /// All heating zones on the current floor (in-memory state).
+  ///
+  /// Zones are added here when drawn with [ZoneDrawTool] so that
+  /// [HeatingZonePainter] can render them immediately. They are
+  /// also persisted to the database via the heating repository.
+  final List<HeatingZone> zones;
+
   /// All wall constructions on the current floor.
   final List<WallConstruction> constructions;
 
@@ -49,6 +58,7 @@ class EditorState {
     List<Room>? rooms,
     List<WindowElement>? windows,
     List<Door>? doors,
+    List<HeatingZone>? zones,
     List<WallConstruction>? constructions,
     List<MaterialLayer>? materialLayers,
   }) {
@@ -57,6 +67,7 @@ class EditorState {
       rooms: rooms ?? this.rooms,
       windows: windows ?? this.windows,
       doors: doors ?? this.doors,
+      zones: zones ?? this.zones,
       constructions: constructions ?? this.constructions,
       materialLayers: materialLayers ?? this.materialLayers,
     );
@@ -240,6 +251,24 @@ class EditorStateNotifier extends Notifier<EditorState> {
     state = state.copyWith(
       doors: state.doors
           .where((d) => d.wallSegmentId != wallId)
+          .toList(),
+    );
+  }
+
+  // ---- Zones ----
+
+  /// Add a heating zone.
+  void addZone(HeatingZone zone) {
+    state = state.copyWith(
+      zones: [...state.zones, zone],
+    );
+  }
+
+  /// Remove a heating zone by ID.
+  void removeZone(String zoneId) {
+    state = state.copyWith(
+      zones: state.zones
+          .where((z) => z.id != zoneId)
           .toList(),
     );
   }

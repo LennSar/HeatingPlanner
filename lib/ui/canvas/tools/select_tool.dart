@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart';
 import '../../../calculation/engines/geometry_engine.dart';
 import '../../../core/utils/geometry_utils.dart';
 import '../../../data/models/door.dart';
+import '../../../data/models/heating_zone.dart';
 import '../../../data/models/point2d.dart';
 import '../../../data/models/room.dart';
 import '../../../data/models/wall_segment.dart';
@@ -12,6 +13,9 @@ import 'editor_callbacks.dart';
 import 'snap_service.dart';
 import 'tool_base.dart';
 import 'undo_redo_service.dart';
+
+/// A hit-test result item: the element type and its ID.
+typedef _HitItem = ({String type, String id});
 
 /// Tool for selecting walls, rooms, windows, and doors by
 /// clicking, and editing them via drag handles.
@@ -39,6 +43,9 @@ class SelectTool extends CanvasTool {
   /// Hit-test threshold for walls (half wall thickness).
   static const double _wallHitThresholdMm = 100.0;
 
+  /// Cycle-click threshold in screen pixels (ADR-005).
+  static const double _cycleThresholdPx = 5.0;
+
   /// Handle hit radius in screen pixels.
   static const double _handleHitRadiusPx = 10.0;
 
@@ -51,6 +58,17 @@ class SelectTool extends CanvasTool {
   /// Minimum opening width (mm).
   static const double _minOpeningWidthMm = 300.0;
 
+  // -- Click-cycling state (ADR-005) --
+
+  /// World position of the most recent tap.
+  Point2D? _lastClickPosition;
+
+  /// Hit stack built on the most recent fresh click.
+  List<_HitItem> _lastHitStack = const [];
+
+  /// Current index within [_lastHitStack].
+  int _cycleIndex = 0;
+
   // -- Wall selection state --
 
   /// Currently selected wall, if any.
@@ -58,6 +76,9 @@ class SelectTool extends CanvasTool {
 
   /// Currently selected room, if any.
   Room? _selectedRoom;
+
+  /// Currently selected heating zone, if any.
+  HeatingZone? _selectedZone;
 
   // -- Wall drag state --
 
@@ -110,49 +131,38 @@ class SelectTool extends CanvasTool {
       return;
     }
 
-    // 1. Hit-test windows (rendered on top of walls).
-    final window = _hitTestWindow(worldPoint);
-    if (window != null) {
+    final cycleMm =
+        _cycleThresholdPx / callbacks.currentZoom;
+    final isSamePos = _lastClickPosition != null &&
+        GeometryEngine.distanceMm(
+              worldPoint,
+              _lastClickPosition!,
+            ) <=
+            cycleMm;
+
+    if (isSamePos && _lastHitStack.isNotEmpty) {
+      // Cycle to the next element in the hit stack.
+      _cycleIndex =
+          (_cycleIndex + 1) % _lastHitStack.length;
+      final item = _lastHitStack[_cycleIndex];
+      if (_itemStillExists(item)) {
+        _clearAllSelections();
+        _selectByHitItem(item);
+      }
+    } else {
+      // Fresh click — build new hit stack.
+      final stack = _buildHitStack(worldPoint);
+      _lastClickPosition = worldPoint;
+      _lastHitStack = stack;
+      _cycleIndex = 0;
       _clearAllSelections();
-      _selectedWindow = window;
-      callbacks.selectElement('window', window.id);
-      onStateChanged();
-      return;
+      if (stack.isEmpty) {
+        callbacks.selectElement(null, null);
+      } else {
+        _selectByHitItem(stack.first);
+      }
     }
 
-    // 2. Hit-test doors.
-    final door = _hitTestDoor(worldPoint);
-    if (door != null) {
-      _clearAllSelections();
-      _selectedDoor = door;
-      callbacks.selectElement('door', door.id);
-      onStateChanged();
-      return;
-    }
-
-    // 3. Hit-test walls.
-    final wall = _hitTestWall(worldPoint);
-    if (wall != null) {
-      _clearAllSelections();
-      _selectedWall = wall;
-      callbacks.selectElement('wall', wall.id);
-      onStateChanged();
-      return;
-    }
-
-    // 4. Hit-test rooms.
-    final room = _hitTestRoom(worldPoint);
-    if (room != null) {
-      _clearAllSelections();
-      _selectedRoom = room;
-      callbacks.selectElement('room', room.id);
-      onStateChanged();
-      return;
-    }
-
-    // Nothing hit — deselect all.
-    _clearAllSelections();
-    callbacks.selectElement(null, null);
     onStateChanged();
   }
 
@@ -351,6 +361,8 @@ class SelectTool extends CanvasTool {
       _deleteSelectedWindow();
     } else if (_selectedDoor != null) {
       _deleteSelectedDoor();
+    } else if (_selectedZone != null) {
+      _deleteSelectedZone();
     } else if (_selectedWall != null) {
       _deleteSelectedWall();
     } else if (_selectedRoom != null) {
@@ -398,9 +410,14 @@ class SelectTool extends CanvasTool {
 
   @override
   InteractionData? getInteractionData() {
-    // Opening selection takes priority over wall selection.
+    // Opening selection takes priority over everything.
     if (_selectedWindow != null || _selectedDoor != null) {
       return _buildOpeningSelectionData();
+    }
+
+    // Zone selection.
+    if (_selectedZone != null) {
+      return ZoneSelectionData(polygon: _selectedZone!.polygon);
     }
 
     if (_selectedWall == null && _selectedRoom == null) {
@@ -787,6 +804,18 @@ class SelectTool extends CanvasTool {
     onStateChanged();
   }
 
+  void _deleteSelectedZone() {
+    final zone = _selectedZone!;
+    undoRedo.execute(_DeleteZoneCommand(
+      zone: zone,
+      remove: callbacks.removeZone,
+      add: callbacks.commitZone,
+    ));
+    _selectedZone = null;
+    callbacks.selectElement(null, null);
+    onStateChanged();
+  }
+
   // ================================================================
   // Selection clear helper
   // ================================================================
@@ -796,6 +825,7 @@ class SelectTool extends CanvasTool {
     _selectedRoom = null;
     _selectedWindow = null;
     _selectedDoor = null;
+    _selectedZone = null;
   }
 
   // ================================================================
@@ -1136,6 +1166,135 @@ class SelectTool extends CanvasTool {
         wall;
   }
 
+  // ================================================================
+  // Click-cycling helpers (ADR-005)
+  // ================================================================
+
+  /// Builds an ordered hit stack for [point] (ADR-005).
+  ///
+  /// Priority: openings → zones (smallest-area-first) →
+  /// walls (nearest-first) → rooms (smallest-area-first).
+  List<_HitItem> _buildHitStack(Point2D point) {
+    final items = <_HitItem>[];
+
+    // 1. Windows.
+    final window = _hitTestWindow(point);
+    if (window != null) {
+      items.add((type: 'window', id: window.id));
+    }
+
+    // 2. Doors.
+    final door = _hitTestDoor(point);
+    if (door != null) {
+      items.add((type: 'door', id: door.id));
+    }
+
+    // 3. Heating zones (smallest area first).
+    final zones = callbacks.currentZones
+        .where(
+          (z) =>
+              z.polygon.length >= 3 &&
+              GeometryUtils.containsPoint(z.polygon, point),
+        )
+        .toList()
+      ..sort(
+        (a, b) => GeometryUtils.area(a.polygon)
+            .compareTo(GeometryUtils.area(b.polygon)),
+      );
+    for (final z in zones) {
+      items.add((type: 'zone', id: z.id));
+    }
+
+    // 4. Walls (nearest first).
+    final wall = _hitTestWall(point);
+    if (wall != null) {
+      items.add((type: 'wall', id: wall.id));
+    }
+
+    // 5. Rooms (smallest area first).
+    final rooms = callbacks.currentRooms
+        .where(
+          (r) =>
+              r.polygon.length >= 3 &&
+              GeometryUtils.containsPoint(r.polygon, point),
+        )
+        .toList()
+      ..sort(
+        (a, b) => GeometryUtils.area(a.polygon)
+            .compareTo(GeometryUtils.area(b.polygon)),
+      );
+    for (final r in rooms) {
+      items.add((type: 'room', id: r.id));
+    }
+
+    return items;
+  }
+
+  /// Select the element described by [item] and notify the
+  /// properties panel.
+  void _selectByHitItem(_HitItem item) {
+    switch (item.type) {
+      case 'window':
+        final w = callbacks.currentWindows
+            .where((x) => x.id == item.id)
+            .firstOrNull;
+        if (w != null) {
+          _selectedWindow = w;
+          callbacks.selectElement('window', w.id);
+        }
+      case 'door':
+        final d = callbacks.currentDoors
+            .where((x) => x.id == item.id)
+            .firstOrNull;
+        if (d != null) {
+          _selectedDoor = d;
+          callbacks.selectElement('door', d.id);
+        }
+      case 'zone':
+        final z = callbacks.currentZones
+            .where((x) => x.id == item.id)
+            .firstOrNull;
+        if (z != null) {
+          _selectedZone = z;
+          callbacks.selectElement('zone', z.id);
+        }
+      case 'wall':
+        final w = callbacks.currentWalls
+            .where((x) => x.id == item.id)
+            .firstOrNull;
+        if (w != null) {
+          _selectedWall = w;
+          callbacks.selectElement('wall', w.id);
+        }
+      case 'room':
+        final r = callbacks.currentRooms
+            .where((x) => x.id == item.id)
+            .firstOrNull;
+        if (r != null) {
+          _selectedRoom = r;
+          callbacks.selectElement('room', r.id);
+        }
+    }
+  }
+
+  /// Returns true if the element described by [item] still
+  /// exists in the current editor state.
+  bool _itemStillExists(_HitItem item) {
+    return switch (item.type) {
+      'window' =>
+        callbacks.currentWindows.any((x) => x.id == item.id),
+      'door' =>
+        callbacks.currentDoors.any((x) => x.id == item.id),
+      'zone' =>
+        callbacks.currentZones.any((x) => x.id == item.id),
+      'wall' =>
+        callbacks.currentWalls.any((x) => x.id == item.id),
+      'room' =>
+        callbacks.currentRooms.any((x) => x.id == item.id),
+      _ => false,
+    };
+  }
+
   WallSegment? _hitTestWall(Point2D point) {
     WallSegment? nearest;
     var minDist = double.infinity;
@@ -1156,15 +1315,6 @@ class SelectTool extends CanvasTool {
     return null;
   }
 
-  Room? _hitTestRoom(Point2D point) {
-    for (final room in callbacks.currentRooms) {
-      if (room.polygon.length >= 3 &&
-          GeometryUtils.containsPoint(room.polygon, point)) {
-        return room;
-      }
-    }
-    return null;
-  }
 }
 
 // ================================================================
@@ -1395,4 +1545,26 @@ class _DeleteDoorCommand extends Command {
 
   @override
   void undo() => add(door);
+}
+
+/// Command: delete a heating zone.
+class _DeleteZoneCommand extends Command {
+  _DeleteZoneCommand({
+    required this.zone,
+    required this.remove,
+    required this.add,
+  });
+
+  final HeatingZone zone;
+  final void Function(String) remove;
+  final void Function(HeatingZone) add;
+
+  @override
+  String get label => 'Delete zone';
+
+  @override
+  void execute() => remove(zone.id);
+
+  @override
+  void undo() => add(zone);
 }

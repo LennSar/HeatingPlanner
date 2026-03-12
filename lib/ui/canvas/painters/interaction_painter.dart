@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import '../../../data/models/point2d.dart';
 import 'interaction_data.dart';
 
 /// Draws transient interaction overlays: ghost lines,
@@ -90,7 +91,161 @@ class InteractionPainter extends CustomPainter {
             isWindow,
           );
           _drawWallHandles(canvas, handles, activeHandleIndex);
+        case ZoneDrawData(
+              :final vertices,
+              :final currentPoint,
+              :final hasValidationError,
+            ):
+          _drawZoneGhost(
+            canvas,
+            vertices,
+            currentPoint,
+            hasValidationError,
+          );
+        case ZoneSelectionData(:final polygon):
+          _drawZoneSelectionHighlight(canvas, polygon);
       }
+    }
+  }
+
+  /// Draws a selection highlight for a committed heating zone.
+  void _drawZoneSelectionHighlight(
+    Canvas canvas,
+    List<Point2D> polygon,
+  ) {
+    if (polygon.length < 3) return;
+
+    final path = Path()
+      ..moveTo(polygon.first.x, polygon.first.y);
+    for (var i = 1; i < polygon.length; i++) {
+      path.lineTo(polygon[i].x, polygon[i].y);
+    }
+    path.close();
+
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = (selectionHighlightColor ?? Colors.blue)
+            .withValues(alpha: 0.20)
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = selectionHighlightColor ?? Colors.blue
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 5.0,
+    );
+  }
+
+  /// Draws the in-progress zone polygon ghost.
+  ///
+  /// Renders:
+  ///  - semi-transparent filled polygon (committed vertices +
+  ///    cursor position to preview the next edge)
+  ///  - solid edges between committed vertices
+  ///  - dashed ghost edge from the last vertex to the cursor
+  ///  - vertex dots (world-space radius 12 mm)
+  ///  - close-indicator ring around the first vertex when ≥3
+  ///    vertices are committed (signals where to click to close)
+  ///  - red error overlay when [hasValidationError] is true
+  void _drawZoneGhost(
+    Canvas canvas,
+    List<Point2D> vertices,
+    Point2D? currentPoint,
+    bool hasValidationError,
+  ) {
+    if (vertices.isEmpty) return;
+
+    final pts =
+        vertices.map((v) => Offset(v.x, v.y)).toList();
+    final color = hasValidationError
+        ? Colors.red
+        : (selectionHighlightColor ?? Colors.blue);
+
+    // ── Ghost polygon fill ──────────────────────────────────
+    if (pts.length >= 2) {
+      final ghostPath = Path()
+        ..moveTo(pts.first.dx, pts.first.dy);
+      for (var i = 1; i < pts.length; i++) {
+        ghostPath.lineTo(pts[i].dx, pts[i].dy);
+      }
+      if (currentPoint != null) {
+        ghostPath.lineTo(currentPoint.x, currentPoint.y);
+      }
+      ghostPath.close();
+
+      canvas.drawPath(
+        ghostPath,
+        Paint()
+          ..color = color.withValues(alpha: 0.12)
+          ..style = PaintingStyle.fill,
+      );
+      canvas.drawPath(
+        ghostPath,
+        Paint()
+          ..color = color.withValues(alpha: 0.6)
+          ..strokeWidth = 3.0
+          ..style = PaintingStyle.stroke,
+      );
+    }
+
+    // ── Dashed ghost edge: last vertex → cursor ─────────────
+    if (currentPoint != null) {
+      _drawDashedLine(
+        canvas,
+        pts.last,
+        Offset(currentPoint.x, currentPoint.y),
+        Paint()
+          ..color = color.withValues(alpha: 0.45)
+          ..strokeWidth = 3.0
+          ..style = PaintingStyle.stroke,
+        30.0,
+      );
+    }
+
+    // ── Vertex dots ─────────────────────────────────────────
+    final dotPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    for (final pt in pts) {
+      canvas.drawCircle(pt, 12.0, dotPaint);
+    }
+
+    // ── Close-indicator ring around the first vertex ─────────
+    if (pts.length >= 3) {
+      canvas.drawCircle(
+        pts.first,
+        40.0,
+        Paint()
+          ..color = color
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3.0,
+      );
+    }
+
+    // ── Red error overlay ────────────────────────────────────
+    if (hasValidationError && pts.length >= 3) {
+      final errPath = Path()
+        ..moveTo(pts.first.dx, pts.first.dy);
+      for (var i = 1; i < pts.length; i++) {
+        errPath.lineTo(pts[i].dx, pts[i].dy);
+      }
+      errPath.close();
+
+      canvas.drawPath(
+        errPath,
+        Paint()
+          ..color = Colors.red.withValues(alpha: 0.25)
+          ..style = PaintingStyle.fill,
+      );
+      canvas.drawPath(
+        errPath,
+        Paint()
+          ..color = Colors.red
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 5.0,
+      );
     }
   }
 

@@ -139,3 +139,38 @@ output-vs-demand when the zone is unconnected or demand data is missing. The
 Frontend Developer implements the colour mapping; the Architect defines the
 provider that returns the zone's state enum; the HVAC agent has no role here —
 this is a UI state concern, not a thermal calculation.
+
+---
+
+## ADR-005 — Click-cycling for overlapping element selection
+
+**What.**
+When the user clicks a canvas position that contains multiple overlapping
+elements, the first click selects the topmost/smallest element. A subsequent
+click within 5 screen pixels of the previous click cycles to the next element
+in the hit-test stack. Repeated clicks keep cycling (wrapping around). A click
+at a different position resets the cycle.
+
+Hit-test priority order (first match on fresh click; all matches cycled on
+repeat clicks):
+
+1. **Windows** — rendered on top, hit-tested by opening rectangle.
+2. **Doors** — same as windows.
+3. **Heating zones** — sorted smallest-area-first when multiple zones overlap.
+4. **Walls** — nearest to the click point first (within 100 mm threshold).
+5. **Rooms** — sorted smallest-area-first when multiple rooms nest.
+
+**Why.**
+Openings are the smallest and most easily occluded targets, so they always win
+on first click. Zones are drawn inside rooms and visually overlap them, so zones
+must take priority over rooms. Walls can cross zone boundaries, so walls are
+checked before rooms but after zones. Smallest-area-first for zones and rooms
+ensures the most-specific (innermost) element is selected first.
+
+The 5 px threshold is converted to world-space mm at the current zoom level
+(`5.0 / currentZoom`) and compared with `GeometryEngine.distanceMm`.
+
+**Rule.**
+`SelectTool._buildHitStack` must follow this priority order exactly. The cycle
+index wraps with modulo so the user can return to the first element. Zones
+always precede rooms in the cycle sequence — never interleave them.
