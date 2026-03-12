@@ -142,35 +142,39 @@ this is a UI state concern, not a thermal calculation.
 
 ---
 
-## ADR-005 — Click-cycling for overlapping element selection
+## ADR-006 — Heating zones may span adjacent rooms through doorways
 
 **What.**
-When the user clicks a canvas position that contains multiple overlapping
-elements, the first click selects the topmost/smallest element. A subsequent
-click within 5 screen pixels of the previous click cycles to the next element
-in the hit-test stack. Repeated clicks keep cycling (wrapping around). A click
-at a different position resets the cycle.
+A heating zone polygon is allowed to extend from its primary room into an
+adjacent room, provided the rooms share a wall that contains a door. The zone
+retains a single `roomId` (the primary room) but its polygon vertices may lie
+inside the adjacent room.
 
-Hit-test priority order (first match on fresh click; all matches cycled on
-repeat clicks):
-
-1. **Windows** — rendered on top, hit-tested by opening rectangle.
-2. **Doors** — same as windows.
-3. **Heating zones** — sorted smallest-area-first when multiple zones overlap.
-4. **Walls** — nearest to the click point first (within 100 mm threshold).
-5. **Rooms** — sorted smallest-area-first when multiple rooms nest.
+Heat output attribution is split by area proportion: the zone's total output
+(EN 1264) is calculated twice, once per room, using each room's own target
+temperature for ΔT. The output attributed to each room equals
+`specificOutput(T_room_i) × areaInRoom_i`. The demand-vs-output comparison in
+each room's heat balance uses only the portion attributed to that room.
 
 **Why.**
-Openings are the smallest and most easily occluded targets, so they always win
-on first click. Zones are drawn inside rooms and visually overlap them, so zones
-must take priority over rooms. Walls can cross zone boundaries, so walls are
-checked before rooms but after zones. Smallest-area-first for zones and rooms
-ensures the most-specific (innermost) element is selected first.
-
-The 5 px threshold is converted to world-space mm at the current zoom level
-(`5.0 / currentZoom`) and compared with `GeometryEngine.distanceMm`.
+In practice, tubes sometimes run through doorways between adjacent rooms to
+achieve optimal zone sizes or to serve open-plan areas. EN 1264 does not
+address this case — it assumes one zone = one room temperature. When both rooms
+share the same target temperature, area-proportional splitting is physically
+accurate because ΔT is uniform. When temperatures differ, the split is an
+approximation (the true output distribution depends on tube path and flow
+direction), but it is the same approach used by commercial design tools.
 
 **Rule.**
-`SelectTool._buildHitStack` must follow this priority order exactly. The cycle
-index wraps with modulo so the user can return to the first element. Zones
-always precede rooms in the cycle sequence — never interleave them.
+1. Polygon validation relaxes from "all vertices inside primary room" to "all
+   vertices inside primary room OR inside a room that shares a door-connected
+   wall with the primary room."
+2. The zone's `roomId` remains a single FK to the primary room (the room where
+   drawing started). The data model does not change.
+3. `zoneHeatOutputProvider` must compute output per room portion separately,
+   using each room's target temperature.
+4. When a zone spans rooms with different target temperatures, a validation
+   result with `WarningSeverity.warning` is emitted: "Zone crosses rooms with
+   different target temperatures — output estimate is approximate. Consider
+   separate zones for accurate room-by-room control."
+5. When both rooms share the same target temperature, no warning is emitted.

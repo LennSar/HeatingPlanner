@@ -49,7 +49,6 @@ You do **not** own any source files directly. Your specifications are implemente
 | `zoneGreen` | #4CAF50 | Heating zone — sufficient output (30% opacity fill) |
 | `zoneYellow` | #FFC107 | Heating zone — marginal output (30% opacity fill) |
 | `zoneRed` | #F44336 | Heating zone — insufficient output (30% opacity fill) |
-| `zoneGrey` | #9E9E9E | Heating zone — no demand data available (30% opacity fill) |
 | `supplyPipe` | #EF4444 | Supply pipe routing line |
 | `returnPipe` | #3B82F6 | Return pipe routing line |
 | `selectionHighlight` | #2E86C1 | Selected element outline (2px, 50% opacity fill) |
@@ -252,19 +251,9 @@ At viewport width < 600dp:
 4. To close the polygon: click near the first vertex (within 15px) or double-click.
 5. On close: zone is created. Properties panel shows zone settings: tube spacing (slider 50-400mm), tube type (dropdown), flooring material (dropdown), layout pattern (radio: meander/spiral/bifilar/counterflow).
 6. Tube preview updates in real time as settings change.
-7. Zone fill colour is determined by a priority-ordered state machine (see ADR-004 in `DECISIONS.md`):
+7. Zone is filled with semi-transparent colour based on heat output adequacy (green/yellow/red — see Section 3.1).
 
-| Priority | State | Colour | Condition |
-|----------|-------|--------|-----------|
-| 1 (highest) | Unconnected | Red hatched (outline + diagonal lines, 30% opacity) | No assigned circuit / distributor connection |
-| 2 | No demand data | `zoneGrey` (30% opacity fill) | Room heat demand unavailable (e.g. wall constructions incomplete) |
-| 3 | Insufficient | `zoneRed` (30% opacity fill) | Heat output < 90% of room heat demand |
-| 4 | Marginal | `zoneYellow` (30% opacity fill) | Heat output ≥ 90% but < 100% of room heat demand |
-| 5 (lowest) | Sufficient | `zoneGreen` (30% opacity fill) | Heat output ≥ 100% of room heat demand |
-
-When heat demand data is unavailable (state 2), the properties panel still displays the zone's own calculated heat output (W and W/m²) based on EN 1264, using configured supply/return temperatures, tube spacing, and flooring material.
-
-**Validation:** If any vertex is outside the parent room, show a red warning overlay and prevent zone creation.
+**Validation:** All vertices must be inside the primary room OR inside an adjacent room that shares a door-connected wall with the primary room (see ADR-006 in `DECISIONS.md`). If a vertex is outside all valid rooms, show a red warning overlay and reject that vertex. The primary room is the room where the first vertex was placed.
 
 ### 5.4 Distributor Placement
 
