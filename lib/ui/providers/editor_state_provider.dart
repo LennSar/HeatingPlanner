@@ -496,6 +496,27 @@ final cursorPositionProvider =
   CursorPositionNotifier.new,
 );
 
+/// Notifier for a transient status-bar hint produced by the
+/// active tool.
+class ToolStatusHintNotifier extends Notifier<String?> {
+  @override
+  String? build() => null;
+
+  /// Set (or clear) the hint message.
+  void set(String? hint) => state = hint;
+}
+
+/// Transient status-bar hint produced by the active tool.
+///
+/// A non-null value is shown in the status bar as a contextual
+/// hint (e.g. "Move cursor inside a room to place zone vertices").
+/// Reset to null when the cursor leaves the canvas or the tool
+/// changes.
+final toolStatusHintProvider =
+    NotifierProvider<ToolStatusHintNotifier, String?>(
+  ToolStatusHintNotifier.new,
+);
+
 /// Stores the ID of the project currently open in the editor.
 ///
 /// Set by [EditorScreen] on creation so that project-scoped

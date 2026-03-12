@@ -95,12 +95,14 @@ class InteractionPainter extends CustomPainter {
               :final vertices,
               :final currentPoint,
               :final hasValidationError,
+              :final cursorOutsideValidArea,
             ):
           _drawZoneGhost(
             canvas,
             vertices,
             currentPoint,
             hasValidationError,
+            cursorOutsideValidArea,
           );
         case ZoneSelectionData(:final polygon):
           _drawZoneSelectionHighlight(canvas, polygon);
@@ -138,9 +140,38 @@ class InteractionPainter extends CustomPainter {
     );
   }
 
+  /// Draws a red prohibition circle (⊘) at [point] to signal that
+  /// the cursor is outside all valid zone placement areas.
+  void _drawProhibitionIndicator(Canvas canvas, Point2D point) {
+    // Radius doubled to 80 mm; centre floated above the cursor
+    // so the indicator is not obscured by the pointer glyph.
+    const double radius = 80.0; // world-space mm
+    const double gap = 20.0; // gap between cursor and circle bottom
+    final cx = point.x;
+    // Subtract so the bottom edge of the circle sits `gap` mm
+    // above the cursor tip (y increases downward in canvas space).
+    final cy = point.y - radius - gap;
+
+    final paint = Paint()
+      ..color = Colors.red
+      ..strokeWidth = 6.0
+      ..style = PaintingStyle.stroke;
+
+    canvas.drawCircle(Offset(cx, cy), radius, paint);
+
+    // Diagonal bar at 45° (top-left → bottom-right).
+    const double d = radius * 0.707; // radius / sqrt(2)
+    canvas.drawLine(
+      Offset(cx - d, cy - d),
+      Offset(cx + d, cy + d),
+      paint,
+    );
+  }
+
   /// Draws the in-progress zone polygon ghost.
   ///
   /// Renders:
+  ///  - prohibition indicator when [cursorOutsideValidArea] is true
   ///  - semi-transparent filled polygon (committed vertices +
   ///    cursor position to preview the next edge)
   ///  - solid edges between committed vertices
@@ -154,7 +185,13 @@ class InteractionPainter extends CustomPainter {
     List<Point2D> vertices,
     Point2D? currentPoint,
     bool hasValidationError,
+    bool cursorOutsideValidArea,
   ) {
+    // Prohibition indicator when cursor is outside valid area.
+    if (cursorOutsideValidArea && currentPoint != null) {
+      _drawProhibitionIndicator(canvas, currentPoint);
+    }
+
     if (vertices.isEmpty) return;
 
     final pts =

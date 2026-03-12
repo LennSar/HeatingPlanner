@@ -108,7 +108,9 @@ class WallHighlightData extends InteractionData {
 /// Emitted by [ZoneDrawTool] each frame so [InteractionPainter]
 /// can render the in-progress polygon, the ghost edge to the
 /// cursor, vertex dots, the close-indicator ring, and (when
-/// applicable) the red validation-error overlay.
+/// applicable) the red validation-error overlay or the
+/// prohibition indicator when the cursor is outside all valid
+/// placement areas.
 @immutable
 class ZoneDrawData extends InteractionData {
   /// Creates [ZoneDrawData].
@@ -116,6 +118,7 @@ class ZoneDrawData extends InteractionData {
     required this.vertices,
     this.currentPoint,
     this.hasValidationError = false,
+    this.cursorOutsideValidArea = false,
   });
 
   /// Committed polygon vertices so far (world mm).
@@ -129,6 +132,11 @@ class ZoneDrawData extends InteractionData {
   /// or more vertices lay outside the parent room — triggers the
   /// red warning overlay.
   final bool hasValidationError;
+
+  /// True when the cursor is outside all valid placement areas
+  /// (no room, or outside primary room and its door-adjacent
+  /// neighbours). Triggers the red prohibition indicator.
+  final bool cursorOutsideValidArea;
 }
 
 /// Highlight data for a selected heating zone.

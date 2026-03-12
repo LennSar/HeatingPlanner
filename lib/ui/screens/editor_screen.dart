@@ -352,6 +352,7 @@ class _StatusBar extends ConsumerWidget {
     final cursorPos = ref.watch(cursorPositionProvider);
     final editorState = ref.watch(editorStateProvider);
     final roomCount = editorState.rooms.length;
+    final toolHint = ref.watch(toolStatusHintProvider);
     final textTheme = Theme.of(context).textTheme;
     final colors = Theme.of(context)
         .extension<HeatingPlannerColors>()!;
@@ -389,6 +390,23 @@ class _StatusBar extends ConsumerWidget {
                 fontFamily: 'monospace',
               ),
             ),
+
+            // Tool hint (e.g. zone draw outside room)
+            if (toolHint != null) ...[
+              const SizedBox(width: Spacing.lg),
+              Icon(
+                Icons.info_outline,
+                size: 14,
+                color: colors.zoneRed,
+              ),
+              const SizedBox(width: Spacing.xs),
+              Text(
+                toolHint,
+                style: textTheme.bodySmall?.copyWith(
+                  color: colors.zoneRed,
+                ),
+              ),
+            ],
 
             const Spacer(),
 

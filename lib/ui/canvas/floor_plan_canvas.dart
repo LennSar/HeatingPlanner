@@ -595,16 +595,31 @@ class _FloorPlanCanvasState
                 // Notify active tool.
                 _activeTool?.onPointerMove(worldPoint);
 
+                final idata = _activeTool?.getInteractionData();
+
+                // Surface zone-draw hint to the status bar.
+                final hint =
+                    (idata is ZoneDrawData &&
+                            idata.cursorOutsideValidArea)
+                        ? 'Move cursor inside a room to place '
+                            'zone vertices'
+                        : null;
+                ref
+                    .read(toolStatusHintProvider.notifier)
+                    .set(hint);
+
                 setState(() {
                   _hoverWorldPoint = worldOffset;
-                  _interactionData =
-                      _activeTool?.getInteractionData();
+                  _interactionData = idata;
                 });
               },
               onExit: (_) {
                 ref
                     .read(cursorPositionProvider.notifier)
                     .update(null);
+                ref
+                    .read(toolStatusHintProvider.notifier)
+                    .set(null);
                 setState(() => _hoverWorldPoint = null);
               },
               child: Container(
