@@ -129,6 +129,8 @@ class InteractionPainter extends CustomPainter {
             widthMm,
           );
           _drawWallHandles(canvas, handles, activeHandleIndex);
+        case WallZoneNoHoverData(:final cursorPosition):
+          _drawProhibitionIndicator(canvas, cursorPosition);
         case WallZoneHoverData(:final wallStart, :final wallEnd):
           _drawWallZoneHover(
             canvas,

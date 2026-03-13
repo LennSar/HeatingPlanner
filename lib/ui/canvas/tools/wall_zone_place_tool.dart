@@ -39,15 +39,20 @@ class WallZonePlaceTool extends CanvasTool {
   static const double _hitThresholdMm = 200.0;
 
   WallSegment? _hoveredWall;
+  Point2D? _current;
 
   @override
   String get name => 'Place Wall Zone';
 
   @override
   void onPointerMove(Point2D worldPoint) {
+    _current = worldPoint;
     final wall = _nearestWall(worldPoint);
     if (wall?.id != _hoveredWall?.id) {
       _hoveredWall = wall;
+      onStateChanged();
+    } else if (wall == null) {
+      // Cursor moved but still no wall — repaint to update indicator position.
       onStateChanged();
     }
   }
@@ -88,12 +93,16 @@ class WallZonePlaceTool extends CanvasTool {
   @override
   void cancel() {
     _hoveredWall = null;
+    _current = null;
     onStateChanged();
   }
 
   @override
   InteractionData? getInteractionData() {
-    if (_hoveredWall == null) return null;
+    if (_hoveredWall == null) {
+      if (_current == null) return null;
+      return WallZoneNoHoverData(cursorPosition: _current!);
+    }
     return WallZoneHoverData(
       wallStart: _hoveredWall!.startPoint,
       wallEnd: _hoveredWall!.endPoint,

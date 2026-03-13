@@ -203,6 +203,21 @@ class WallZoneSelectionData extends InteractionData {
   final int? activeHandleIndex;
 }
 
+/// Cursor data for the wall zone placement tool when not over a valid wall.
+///
+/// Produced by [WallZonePlaceTool] when the cursor is not within
+/// hit-distance of any room-assigned wall segment. The
+/// [InteractionPainter] draws the red prohibition indicator near
+/// the cursor to signal that clicking has no effect.
+@immutable
+class WallZoneNoHoverData extends InteractionData {
+  /// Creates [WallZoneNoHoverData].
+  const WallZoneNoHoverData({required this.cursorPosition});
+
+  /// Current cursor position (world mm).
+  final Point2D cursorPosition;
+}
+
 /// Hover highlight for the wall zone placement tool.
 ///
 /// Produced by [WallZonePlaceTool] when the cursor is within
