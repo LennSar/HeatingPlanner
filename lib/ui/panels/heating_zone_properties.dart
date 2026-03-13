@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/engines/geometry_engine.dart';
+import '../../calculation/providers/project_settings_provider.dart';
 import '../../calculation/providers/tube_length_providers.dart';
 import '../../core/constants/validation_limits.dart';
 import '../../core/theme/app_theme.dart';
@@ -71,9 +72,13 @@ class _HeatingZonePropertiesState
 
   /// Syncs text controllers from the model when the zone or its
   /// parameter values change externally (undo/redo).
-  void _syncControllers(HeatingZone zone, int wallLengthMm) {
+  void _syncControllers(
+    HeatingZone zone,
+    int wallLengthMm,
+    int defaultHeightMm,
+  ) {
     final heightStr =
-        (zone.heightMm ?? maxRoomHeightMm).toString();
+        (zone.heightMm ?? defaultHeightMm).toString();
     final widthStr =
         (zone.widthMm ?? wallLengthMm).toString();
     if (_lastSyncedZoneId == zone.id &&
@@ -112,6 +117,7 @@ class _HeatingZonePropertiesState
     final colorScheme = Theme.of(context).colorScheme;
 
     final editorState = ref.watch(editorStateProvider);
+    final floorHeightMm = ref.watch(floorHeightMmProvider);
     final zone = editorState.zones
         .where((z) => z.id == widget.zoneId)
         .firstOrNull;
@@ -167,7 +173,8 @@ class _HeatingZonePropertiesState
       }
       if (prevZ == null || prevZ.heightMm != z.heightMm) {
         _heightController.text =
-            (z.heightMm ?? maxRoomHeightMm).toString();
+            (z.heightMm ?? ref.read(floorHeightMmProvider))
+                .toString();
       }
       if (prevZ == null || prevZ.widthMm != z.widthMm) {
         // widthMm null means full wall — display resolved value.
@@ -181,7 +188,7 @@ class _HeatingZonePropertiesState
       }
     });
 
-    _syncControllers(zone, wallLengthMm);
+    _syncControllers(zone, wallLengthMm, floorHeightMm);
 
     // For wall zones, display the heated wall surface area:
     //   zoneWidth × heightMm / 1e6  (m²).
@@ -189,7 +196,7 @@ class _HeatingZonePropertiesState
     final double areaM2;
     if (isWallZone) {
       final heightMm =
-          (zone.heightMm ?? maxRoomHeightMm).toDouble();
+          (zone.heightMm ?? floorHeightMm).toDouble();
       areaM2 = effectiveWidthMm * heightMm / 1e6;
     } else if (zone.polygon.length >= 3) {
       areaM2 = GeometryEngine.polygonAreaM2(zone.polygon);
@@ -288,11 +295,11 @@ class _HeatingZonePropertiesState
           if (isWallZone) ...[
             Text(
               'Height: '
-              '${zone.heightMm ?? maxRoomHeightMm}\u202Fmm',
+              '${zone.heightMm ?? floorHeightMm}\u202Fmm',
               style: textTheme.bodyMedium,
             ),
             Slider(
-              value: (zone.heightMm ?? maxRoomHeightMm)
+              value: (zone.heightMm ?? floorHeightMm)
                   .toDouble()
                   .clamp(
                     minWallZoneHeightMm.toDouble(),
@@ -303,7 +310,7 @@ class _HeatingZonePropertiesState
               divisions: (maxRoomHeightMm - minWallZoneHeightMm) ~/
                   10,
               label:
-                  '${zone.heightMm ?? maxRoomHeightMm}\u202Fmm',
+                  '${zone.heightMm ?? floorHeightMm}\u202Fmm',
               onChangeStart: (_) => _zoneAtSliderStart = zone,
               onChanged: (value) {
                 final mm = value.round();
@@ -317,7 +324,7 @@ class _HeatingZonePropertiesState
                 _zoneAtSliderStart = null;
                 if (start == null) return;
                 final mm = value.round();
-                final prev = start.heightMm ?? maxRoomHeightMm;
+                final prev = start.heightMm ?? floorHeightMm;
                 if (prev != mm) {
                   _commit(
                     start,
@@ -334,7 +341,7 @@ class _HeatingZonePropertiesState
               helperText:
                   '$minWallZoneHeightMm\u2013$maxRoomHeightMm mm',
               onSubmitted: (mm) {
-                final prev = zone.heightMm ?? maxRoomHeightMm;
+                final prev = zone.heightMm ?? floorHeightMm;
                 if (prev == mm) return;
                 _commit(zone, zone.copyWith(heightMm: mm));
               },

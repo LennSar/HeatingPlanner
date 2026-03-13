@@ -3,16 +3,18 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// In-memory project-level settings that drive heat-demand calculations.
 ///
-/// Acts as the authoritative source for [designOutdoorTempCProvider] and
-/// [defaultIndoorTempCProvider] while the database repository is a stub.
+/// Acts as the authoritative source for [designOutdoorTempCProvider],
+/// [defaultIndoorTempCProvider], and [floorHeightMmProvider] while the
+/// database repository is a stub.
 /// When the project repository is wired (Phase ≥ 2) this notifier will be
 /// initialised from the persisted [Project] and changes will be saved back.
 @immutable
 class ProjectSettings {
-  /// Creates a [ProjectSettings] with the given temperature values.
+  /// Creates a [ProjectSettings] with the given values.
   const ProjectSettings({
     this.designOutdoorTempC = -12.0,
     this.defaultIndoorTempC = 20.0,
+    this.floorHeightMm = 2600,
   });
 
   /// Outdoor design temperature (°C). Valid range: −50 to +10.
@@ -21,16 +23,21 @@ class ProjectSettings {
   /// Default indoor temperature applied to new rooms (°C). Range: 15 to 30.
   final double defaultIndoorTempC;
 
+  /// Default floor-to-ceiling height in mm. Range: 2000 to 6000.
+  final int floorHeightMm;
+
   /// Returns a copy with updated fields.
   ProjectSettings copyWith({
     double? designOutdoorTempC,
     double? defaultIndoorTempC,
+    int? floorHeightMm,
   }) {
     return ProjectSettings(
       designOutdoorTempC:
           designOutdoorTempC ?? this.designOutdoorTempC,
       defaultIndoorTempC:
           defaultIndoorTempC ?? this.defaultIndoorTempC,
+      floorHeightMm: floorHeightMm ?? this.floorHeightMm,
     );
   }
 }
@@ -52,6 +59,13 @@ class ProjectSettingsNotifier
   void setDefaultIndoorTempC(double value) {
     state = state.copyWith(
       defaultIndoorTempC: value.clamp(15.0, 30.0),
+    );
+  }
+
+  /// Set the default floor height (clamped to 2000…6000 mm).
+  void setFloorHeightMm(int value) {
+    state = state.copyWith(
+      floorHeightMm: value.clamp(2000, 6000),
     );
   }
 }
@@ -79,4 +93,13 @@ final designOutdoorTempCProvider = Provider<double>(
 final defaultIndoorTempCProvider = Provider<double>(
   (ref) =>
       ref.watch(projectSettingsProvider).defaultIndoorTempC,
+);
+
+/// Default floor-to-ceiling height (mm).
+///
+/// Derived from [projectSettingsProvider]. Used as the default
+/// [HeatingZone.heightMm] for wall heating zones and for the
+/// project summary panel.
+final floorHeightMmProvider = Provider<int>(
+  (ref) => ref.watch(projectSettingsProvider).floorHeightMm,
 );

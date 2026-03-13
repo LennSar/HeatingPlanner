@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/providers/project_settings_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../providers/editor_state_provider.dart';
 
 /// Opens the project settings dialog as a modal.
 ///
@@ -40,6 +41,7 @@ class _ProjectSettingsDialogState
     extends ConsumerState<ProjectSettingsDialog> {
   late TextEditingController _outdoorController;
   late TextEditingController _indoorController;
+  late TextEditingController _heightController;
 
   @override
   void initState() {
@@ -51,12 +53,16 @@ class _ProjectSettingsDialogState
     _indoorController = TextEditingController(
       text: settings.defaultIndoorTempC.toStringAsFixed(1),
     );
+    _heightController = TextEditingController(
+      text: settings.floorHeightMm.toString(),
+    );
   }
 
   @override
   void dispose() {
     _outdoorController.dispose();
     _indoorController.dispose();
+    _heightController.dispose();
     super.dispose();
   }
 
@@ -98,6 +104,29 @@ class _ProjectSettingsDialogState
     }
   }
 
+  void _applyHeight(String raw) {
+    final parsed = int.tryParse(raw);
+    if (parsed == null) {
+      _heightController.text = ref
+          .read(projectSettingsProvider)
+          .floorHeightMm
+          .toString();
+      return;
+    }
+    final oldHeight =
+        ref.read(projectSettingsProvider).floorHeightMm;
+    final clamped = parsed.clamp(2000, 6000);
+    ref
+        .read(projectSettingsProvider.notifier)
+        .setFloorHeightMm(clamped);
+    if (clamped != parsed) {
+      _heightController.text = clamped.toString();
+    }
+    ref
+        .read(editorStateProvider.notifier)
+        .updateWallZoneHeightsForFloor(oldHeight, clamped);
+  }
+
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(projectSettingsProvider);
@@ -110,6 +139,7 @@ class _ProjectSettingsDialogState
         settings.designOutdoorTempC.toStringAsFixed(1);
     final indoorText =
         settings.defaultIndoorTempC.toStringAsFixed(1);
+    final heightText = settings.floorHeightMm.toString();
     if (_outdoorController.text != outdoorText &&
         !_outdoorController.selection.isValid) {
       _outdoorController.text = outdoorText;
@@ -117,6 +147,10 @@ class _ProjectSettingsDialogState
     if (_indoorController.text != indoorText &&
         !_indoorController.selection.isValid) {
       _indoorController.text = indoorText;
+    }
+    if (_heightController.text != heightText &&
+        !_heightController.selection.isValid) {
+      _heightController.text = heightText;
     }
 
     return Dialog(
@@ -219,6 +253,45 @@ class _ProjectSettingsDialogState
               ),
 
               const SizedBox(height: Spacing.lg),
+              const Divider(),
+              const SizedBox(height: Spacing.md),
+
+              // ── Default room height ─────────────────────────
+              Text(
+                'Default Room Height',
+                style: textTheme.headlineSmall,
+              ),
+              const SizedBox(height: Spacing.xs),
+              Text(
+                'Used as the default height for wall heating zones.',
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: Spacing.sm),
+              _HeightRow(
+                controller: _heightController,
+                sliderValue: settings.floorHeightMm,
+                onSliderChanged: (v) {
+                  final oldHeight = ref
+                      .read(projectSettingsProvider)
+                      .floorHeightMm;
+                  ref
+                      .read(projectSettingsProvider.notifier)
+                      .setFloorHeightMm(v);
+                  _heightController.text = v.toString();
+                  ref
+                      .read(editorStateProvider.notifier)
+                      .updateWallZoneHeightsForFloor(
+                        oldHeight,
+                        v,
+                      );
+                },
+                onFieldSubmitted: _applyHeight,
+                rangeLabel: '2000 to 6000 mm',
+              ),
+
+              const SizedBox(height: Spacing.lg),
 
               // Close button
               Align(
@@ -298,6 +371,79 @@ class _TempRow extends StatelessWidget {
                 ],
                 decoration: const InputDecoration(
                   suffixText: '\u00B0C',
+                  isDense: true,
+                  contentPadding: EdgeInsets.symmetric(
+                    horizontal: Spacing.sm,
+                    vertical: Spacing.sm,
+                  ),
+                ),
+                style: textTheme.bodyMedium,
+                onSubmitted: onFieldSubmitted,
+              ),
+            ),
+          ],
+        ),
+        Padding(
+          padding: const EdgeInsets.only(left: Spacing.md),
+          child: Text(
+            rangeLabel,
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// A slider + numeric text field row for an integer millimetre value.
+class _HeightRow extends StatelessWidget {
+  const _HeightRow({
+    required this.controller,
+    required this.sliderValue,
+    required this.onSliderChanged,
+    required this.onFieldSubmitted,
+    required this.rangeLabel,
+  });
+
+  final TextEditingController controller;
+  final int sliderValue;
+  final ValueChanged<int> onSliderChanged;
+  final ValueChanged<String> onFieldSubmitted;
+  final String rangeLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Slider(
+                value: sliderValue.toDouble(),
+                min: 2000,
+                max: 6000,
+                divisions: 40,
+                label: '$sliderValue mm',
+                onChanged: (v) => onSliderChanged(v.round()),
+              ),
+            ),
+            const SizedBox(width: Spacing.sm),
+            SizedBox(
+              width: 80,
+              child: TextField(
+                controller: controller,
+                keyboardType: TextInputType.number,
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                ],
+                decoration: const InputDecoration(
+                  suffixText: 'mm',
                   isDense: true,
                   contentPadding: EdgeInsets.symmetric(
                     horizontal: Spacing.sm,

@@ -273,6 +273,29 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
   }
 
+  /// Updates wall heating zones whose [HeatingZone.heightMm] equals
+  /// [oldHeightMm] to [newHeightMm].
+  ///
+  /// Called when the project's default floor height changes so that
+  /// zones that were not manually adjusted follow the new value.
+  /// Zones with a different [heightMm] (manually adjusted) are left
+  /// unchanged.
+  void updateWallZoneHeightsForFloor(
+    int oldHeightMm,
+    int newHeightMm,
+  ) {
+    if (oldHeightMm == newHeightMm) return;
+    state = state.copyWith(
+      zones: state.zones.map((z) {
+        if (z.zoneType == ZoneType.wallHeating &&
+            z.heightMm == oldHeightMm) {
+          return z.copyWith(heightMm: newHeightMm);
+        }
+        return z;
+      }).toList(),
+    );
+  }
+
   /// Remove a heating zone by ID.
   void removeZone(String zoneId) {
     state = state.copyWith(
