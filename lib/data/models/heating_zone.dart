@@ -42,6 +42,19 @@ abstract class HeatingZone with _$HeatingZone {
 
     /// UUID of the assigned [HeatingCircuit]; null until connected.
     String? circuitId,
+
+    /// UUID of the host [WallSegment].
+    ///
+    /// Required when [zoneType] is [ZoneType.wallHeating]; null for
+    /// [ZoneType.floorHeating].
+    String? wallSegmentId,
+
+    /// Height of the wall heating zone in millimetres.
+    ///
+    /// Required when [zoneType] is [ZoneType.wallHeating]. Must be in
+    /// the range 300 to the parent floor's [Floor.heightMm].
+    /// Defaults to the floor's [Floor.heightMm] when not set.
+    int? heightMm,
   }) = _HeatingZone;
 
   factory HeatingZone.fromJson(Map<String, dynamic> json) =>

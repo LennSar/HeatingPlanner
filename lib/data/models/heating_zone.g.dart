@@ -25,6 +25,8 @@ _HeatingZone _$HeatingZoneFromJson(Map<String, dynamic> json) => _HeatingZone(
       $enumDecodeNullable(_$LayoutPatternEnumMap, json['layoutPattern']) ??
       LayoutPattern.meander,
   circuitId: json['circuitId'] as String?,
+  wallSegmentId: json['wallSegmentId'] as String?,
+  heightMm: (json['heightMm'] as num?)?.toInt(),
 );
 
 Map<String, dynamic> _$HeatingZoneToJson(_HeatingZone instance) =>
@@ -39,6 +41,8 @@ Map<String, dynamic> _$HeatingZoneToJson(_HeatingZone instance) =>
       'borderDistanceMm': instance.borderDistanceMm,
       'layoutPattern': _$LayoutPatternEnumMap[instance.layoutPattern]!,
       'circuitId': instance.circuitId,
+      'wallSegmentId': instance.wallSegmentId,
+      'heightMm': instance.heightMm,
     };
 
 const _$ZoneTypeEnumMap = {

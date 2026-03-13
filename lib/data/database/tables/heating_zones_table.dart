@@ -3,6 +3,7 @@ import 'package:drift/drift.dart';
 import 'flooring_materials_table.dart';
 import 'rooms_table.dart';
 import 'tube_types_table.dart';
+import 'wall_segments_table.dart';
 
 /// Drift table definition for [HeatingZone] entities.
 class HeatingZones extends Table {
@@ -24,6 +25,14 @@ class HeatingZones extends Table {
   TextColumn get layoutPattern =>
       text().withDefault(const Constant('meander'))();
   TextColumn get circuitId => text().nullable()();
+
+  /// UUID of the host [WallSegment]; null for floor-heating zones.
+  TextColumn get wallSegmentId => text()
+      .nullable()
+      .references(WallSegments, #id, onDelete: KeyAction.setNull)();
+
+  /// Height of the wall heating zone in mm; null for floor-heating zones.
+  IntColumn get heightMm => integer().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

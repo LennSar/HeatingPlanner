@@ -65,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -74,7 +74,13 @@ class AppDatabase extends _$AppDatabase {
           await heatingDao.seedDefaults();
         },
         onUpgrade: (m, from, to) async {
-          // Add migration steps here when schemaVersion is incremented.
+          if (from < 2) {
+            await m.addColumn(
+              heatingZones,
+              heatingZones.wallSegmentId,
+            );
+            await m.addColumn(heatingZones, heatingZones.heightMm);
+          }
         },
       );
 }

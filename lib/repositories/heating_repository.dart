@@ -155,6 +155,8 @@ HeatingZone _zoneFromRow($db.HeatingZone row) {
     borderDistanceMm: row.borderDistanceMm,
     layoutPattern: LayoutPattern.values.byName(row.layoutPattern),
     circuitId: row.circuitId,
+    wallSegmentId: row.wallSegmentId,
+    heightMm: row.heightMm,
   );
 }
 
@@ -222,6 +224,8 @@ $db.HeatingZonesCompanion _zoneToCompanion(HeatingZone zone) {
     borderDistanceMm: Value(zone.borderDistanceMm),
     layoutPattern: Value(zone.layoutPattern.name),
     circuitId: Value(zone.circuitId),
+    wallSegmentId: Value(zone.wallSegmentId),
+    heightMm: Value(zone.heightMm),
   );
 }
 

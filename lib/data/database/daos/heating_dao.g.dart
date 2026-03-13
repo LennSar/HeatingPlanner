@@ -10,6 +10,9 @@ mixin _$HeatingDaoMixin on DatabaseAccessor<AppDatabase> {
   $TubeTypesTable get tubeTypes => attachedDatabase.tubeTypes;
   $FlooringMaterialsTable get flooringMaterials =>
       attachedDatabase.flooringMaterials;
+  $WallConstructionsTable get wallConstructions =>
+      attachedDatabase.wallConstructions;
+  $WallSegmentsTable get wallSegments => attachedDatabase.wallSegments;
   $HeatingZonesTable get heatingZones => attachedDatabase.heatingZones;
   $DistributorsTable get distributors => attachedDatabase.distributors;
   $HeatingCircuitsTable get heatingCircuits => attachedDatabase.heatingCircuits;
@@ -32,6 +35,13 @@ class HeatingDaoManager {
         _db.attachedDatabase,
         _db.flooringMaterials,
       );
+  $$WallConstructionsTableTableManager get wallConstructions =>
+      $$WallConstructionsTableTableManager(
+        _db.attachedDatabase,
+        _db.wallConstructions,
+      );
+  $$WallSegmentsTableTableManager get wallSegments =>
+      $$WallSegmentsTableTableManager(_db.attachedDatabase, _db.wallSegments);
   $$HeatingZonesTableTableManager get heatingZones =>
       $$HeatingZonesTableTableManager(_db.attachedDatabase, _db.heatingZones);
   $$DistributorsTableTableManager get distributors =>

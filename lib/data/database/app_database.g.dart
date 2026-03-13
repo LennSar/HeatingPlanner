@@ -5130,6 +5130,31 @@ class $HeatingZonesTable extends HeatingZones
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _wallSegmentIdMeta = const VerificationMeta(
+    'wallSegmentId',
+  );
+  @override
+  late final GeneratedColumn<String> wallSegmentId = GeneratedColumn<String>(
+    'wall_segment_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES wall_segments (id) ON DELETE SET NULL',
+    ),
+  );
+  static const VerificationMeta _heightMmMeta = const VerificationMeta(
+    'heightMm',
+  );
+  @override
+  late final GeneratedColumn<int> heightMm = GeneratedColumn<int>(
+    'height_mm',
+    aliasedName,
+    true,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -5142,6 +5167,8 @@ class $HeatingZonesTable extends HeatingZones
     borderDistanceMm,
     layoutPattern,
     circuitId,
+    wallSegmentId,
+    heightMm,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -5238,6 +5265,21 @@ class $HeatingZonesTable extends HeatingZones
         circuitId.isAcceptableOrUnknown(data['circuit_id']!, _circuitIdMeta),
       );
     }
+    if (data.containsKey('wall_segment_id')) {
+      context.handle(
+        _wallSegmentIdMeta,
+        wallSegmentId.isAcceptableOrUnknown(
+          data['wall_segment_id']!,
+          _wallSegmentIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('height_mm')) {
+      context.handle(
+        _heightMmMeta,
+        heightMm.isAcceptableOrUnknown(data['height_mm']!, _heightMmMeta),
+      );
+    }
     return context;
   }
 
@@ -5287,6 +5329,14 @@ class $HeatingZonesTable extends HeatingZones
         DriftSqlType.string,
         data['${effectivePrefix}circuit_id'],
       ),
+      wallSegmentId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}wall_segment_id'],
+      ),
+      heightMm: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}height_mm'],
+      ),
     );
   }
 
@@ -5309,6 +5359,12 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
   final int borderDistanceMm;
   final String layoutPattern;
   final String? circuitId;
+
+  /// UUID of the host [WallSegment]; null for floor-heating zones.
+  final String? wallSegmentId;
+
+  /// Height of the wall heating zone in mm; null for floor-heating zones.
+  final int? heightMm;
   const HeatingZone({
     required this.id,
     required this.roomId,
@@ -5320,6 +5376,8 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
     required this.borderDistanceMm,
     required this.layoutPattern,
     this.circuitId,
+    this.wallSegmentId,
+    this.heightMm,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -5335,6 +5393,12 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
     map['layout_pattern'] = Variable<String>(layoutPattern);
     if (!nullToAbsent || circuitId != null) {
       map['circuit_id'] = Variable<String>(circuitId);
+    }
+    if (!nullToAbsent || wallSegmentId != null) {
+      map['wall_segment_id'] = Variable<String>(wallSegmentId);
+    }
+    if (!nullToAbsent || heightMm != null) {
+      map['height_mm'] = Variable<int>(heightMm);
     }
     return map;
   }
@@ -5353,6 +5417,12 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
       circuitId: circuitId == null && nullToAbsent
           ? const Value.absent()
           : Value(circuitId),
+      wallSegmentId: wallSegmentId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(wallSegmentId),
+      heightMm: heightMm == null && nullToAbsent
+          ? const Value.absent()
+          : Value(heightMm),
     );
   }
 
@@ -5374,6 +5444,8 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
       borderDistanceMm: serializer.fromJson<int>(json['borderDistanceMm']),
       layoutPattern: serializer.fromJson<String>(json['layoutPattern']),
       circuitId: serializer.fromJson<String?>(json['circuitId']),
+      wallSegmentId: serializer.fromJson<String?>(json['wallSegmentId']),
+      heightMm: serializer.fromJson<int?>(json['heightMm']),
     );
   }
   @override
@@ -5390,6 +5462,8 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
       'borderDistanceMm': serializer.toJson<int>(borderDistanceMm),
       'layoutPattern': serializer.toJson<String>(layoutPattern),
       'circuitId': serializer.toJson<String?>(circuitId),
+      'wallSegmentId': serializer.toJson<String?>(wallSegmentId),
+      'heightMm': serializer.toJson<int?>(heightMm),
     };
   }
 
@@ -5404,6 +5478,8 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
     int? borderDistanceMm,
     String? layoutPattern,
     Value<String?> circuitId = const Value.absent(),
+    Value<String?> wallSegmentId = const Value.absent(),
+    Value<int?> heightMm = const Value.absent(),
   }) => HeatingZone(
     id: id ?? this.id,
     roomId: roomId ?? this.roomId,
@@ -5415,6 +5491,10 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
     borderDistanceMm: borderDistanceMm ?? this.borderDistanceMm,
     layoutPattern: layoutPattern ?? this.layoutPattern,
     circuitId: circuitId.present ? circuitId.value : this.circuitId,
+    wallSegmentId: wallSegmentId.present
+        ? wallSegmentId.value
+        : this.wallSegmentId,
+    heightMm: heightMm.present ? heightMm.value : this.heightMm,
   );
   HeatingZone copyWithCompanion(HeatingZonesCompanion data) {
     return HeatingZone(
@@ -5440,6 +5520,10 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
           ? data.layoutPattern.value
           : this.layoutPattern,
       circuitId: data.circuitId.present ? data.circuitId.value : this.circuitId,
+      wallSegmentId: data.wallSegmentId.present
+          ? data.wallSegmentId.value
+          : this.wallSegmentId,
+      heightMm: data.heightMm.present ? data.heightMm.value : this.heightMm,
     );
   }
 
@@ -5455,7 +5539,9 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
           ..write('flooringMaterialId: $flooringMaterialId, ')
           ..write('borderDistanceMm: $borderDistanceMm, ')
           ..write('layoutPattern: $layoutPattern, ')
-          ..write('circuitId: $circuitId')
+          ..write('circuitId: $circuitId, ')
+          ..write('wallSegmentId: $wallSegmentId, ')
+          ..write('heightMm: $heightMm')
           ..write(')'))
         .toString();
   }
@@ -5472,6 +5558,8 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
     borderDistanceMm,
     layoutPattern,
     circuitId,
+    wallSegmentId,
+    heightMm,
   );
   @override
   bool operator ==(Object other) =>
@@ -5486,7 +5574,9 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
           other.flooringMaterialId == this.flooringMaterialId &&
           other.borderDistanceMm == this.borderDistanceMm &&
           other.layoutPattern == this.layoutPattern &&
-          other.circuitId == this.circuitId);
+          other.circuitId == this.circuitId &&
+          other.wallSegmentId == this.wallSegmentId &&
+          other.heightMm == this.heightMm);
 }
 
 class HeatingZonesCompanion extends UpdateCompanion<HeatingZone> {
@@ -5500,6 +5590,8 @@ class HeatingZonesCompanion extends UpdateCompanion<HeatingZone> {
   final Value<int> borderDistanceMm;
   final Value<String> layoutPattern;
   final Value<String?> circuitId;
+  final Value<String?> wallSegmentId;
+  final Value<int?> heightMm;
   final Value<int> rowid;
   const HeatingZonesCompanion({
     this.id = const Value.absent(),
@@ -5512,6 +5604,8 @@ class HeatingZonesCompanion extends UpdateCompanion<HeatingZone> {
     this.borderDistanceMm = const Value.absent(),
     this.layoutPattern = const Value.absent(),
     this.circuitId = const Value.absent(),
+    this.wallSegmentId = const Value.absent(),
+    this.heightMm = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   HeatingZonesCompanion.insert({
@@ -5525,6 +5619,8 @@ class HeatingZonesCompanion extends UpdateCompanion<HeatingZone> {
     this.borderDistanceMm = const Value.absent(),
     this.layoutPattern = const Value.absent(),
     this.circuitId = const Value.absent(),
+    this.wallSegmentId = const Value.absent(),
+    this.heightMm = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        roomId = Value(roomId),
@@ -5541,6 +5637,8 @@ class HeatingZonesCompanion extends UpdateCompanion<HeatingZone> {
     Expression<int>? borderDistanceMm,
     Expression<String>? layoutPattern,
     Expression<String>? circuitId,
+    Expression<String>? wallSegmentId,
+    Expression<int>? heightMm,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -5555,6 +5653,8 @@ class HeatingZonesCompanion extends UpdateCompanion<HeatingZone> {
       if (borderDistanceMm != null) 'border_distance_mm': borderDistanceMm,
       if (layoutPattern != null) 'layout_pattern': layoutPattern,
       if (circuitId != null) 'circuit_id': circuitId,
+      if (wallSegmentId != null) 'wall_segment_id': wallSegmentId,
+      if (heightMm != null) 'height_mm': heightMm,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -5570,6 +5670,8 @@ class HeatingZonesCompanion extends UpdateCompanion<HeatingZone> {
     Value<int>? borderDistanceMm,
     Value<String>? layoutPattern,
     Value<String?>? circuitId,
+    Value<String?>? wallSegmentId,
+    Value<int?>? heightMm,
     Value<int>? rowid,
   }) {
     return HeatingZonesCompanion(
@@ -5583,6 +5685,8 @@ class HeatingZonesCompanion extends UpdateCompanion<HeatingZone> {
       borderDistanceMm: borderDistanceMm ?? this.borderDistanceMm,
       layoutPattern: layoutPattern ?? this.layoutPattern,
       circuitId: circuitId ?? this.circuitId,
+      wallSegmentId: wallSegmentId ?? this.wallSegmentId,
+      heightMm: heightMm ?? this.heightMm,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -5620,6 +5724,12 @@ class HeatingZonesCompanion extends UpdateCompanion<HeatingZone> {
     if (circuitId.present) {
       map['circuit_id'] = Variable<String>(circuitId.value);
     }
+    if (wallSegmentId.present) {
+      map['wall_segment_id'] = Variable<String>(wallSegmentId.value);
+    }
+    if (heightMm.present) {
+      map['height_mm'] = Variable<int>(heightMm.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -5639,6 +5749,8 @@ class HeatingZonesCompanion extends UpdateCompanion<HeatingZone> {
           ..write('borderDistanceMm: $borderDistanceMm, ')
           ..write('layoutPattern: $layoutPattern, ')
           ..write('circuitId: $circuitId, ')
+          ..write('wallSegmentId: $wallSegmentId, ')
+          ..write('heightMm: $heightMm, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6802,6 +6914,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         limitUpdateKind: UpdateKind.delete,
       ),
       result: [TableUpdate('heating_zones', kind: UpdateKind.delete)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'wall_segments',
+        limitUpdateKind: UpdateKind.delete,
+      ),
+      result: [TableUpdate('heating_zones', kind: UpdateKind.update)],
     ),
     WritePropagation(
       on: TableUpdateQuery.onTableName(
@@ -8831,6 +8950,27 @@ final class $$WallSegmentsTableReferences
       manager.$state.copyWith(prefetchedData: cache),
     );
   }
+
+  static MultiTypedResultKey<$HeatingZonesTable, List<HeatingZone>>
+  _heatingZonesRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
+    db.heatingZones,
+    aliasName: $_aliasNameGenerator(
+      db.wallSegments.id,
+      db.heatingZones.wallSegmentId,
+    ),
+  );
+
+  $$HeatingZonesTableProcessedTableManager get heatingZonesRefs {
+    final manager = $$HeatingZonesTableTableManager(
+      $_db,
+      $_db.heatingZones,
+    ).filter((f) => f.wallSegmentId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_heatingZonesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
 }
 
 class $$WallSegmentsTableFilterComposer
@@ -8977,6 +9117,31 @@ class $$WallSegmentsTableFilterComposer
           }) => $$DoorsTableFilterComposer(
             $db: $db,
             $table: $db.doors,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+
+  Expression<bool> heatingZonesRefs(
+    Expression<bool> Function($$HeatingZonesTableFilterComposer f) f,
+  ) {
+    final $$HeatingZonesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.heatingZones,
+      getReferencedColumn: (t) => t.wallSegmentId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$HeatingZonesTableFilterComposer(
+            $db: $db,
+            $table: $db.heatingZones,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -9240,6 +9405,31 @@ class $$WallSegmentsTableAnnotationComposer
     );
     return f(composer);
   }
+
+  Expression<T> heatingZonesRefs<T extends Object>(
+    Expression<T> Function($$HeatingZonesTableAnnotationComposer a) f,
+  ) {
+    final $$HeatingZonesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.heatingZones,
+      getReferencedColumn: (t) => t.wallSegmentId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$HeatingZonesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.heatingZones,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
 }
 
 class $$WallSegmentsTableTableManager
@@ -9261,6 +9451,7 @@ class $$WallSegmentsTableTableManager
             bool adjacentRoomId,
             bool windowsRefs,
             bool doorsRefs,
+            bool heatingZonesRefs,
           })
         > {
   $$WallSegmentsTableTableManager(_$AppDatabase db, $WallSegmentsTable table)
@@ -9333,12 +9524,14 @@ class $$WallSegmentsTableTableManager
                 adjacentRoomId = false,
                 windowsRefs = false,
                 doorsRefs = false,
+                heatingZonesRefs = false,
               }) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
                     if (windowsRefs) db.windows,
                     if (doorsRefs) db.doors,
+                    if (heatingZonesRefs) db.heatingZones,
                   ],
                   addJoins:
                       <
@@ -9448,6 +9641,27 @@ class $$WallSegmentsTableTableManager
                               ),
                           typedResults: items,
                         ),
+                      if (heatingZonesRefs)
+                        await $_getPrefetchedData<
+                          WallSegment,
+                          $WallSegmentsTable,
+                          HeatingZone
+                        >(
+                          currentTable: table,
+                          referencedTable: $$WallSegmentsTableReferences
+                              ._heatingZonesRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$WallSegmentsTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).heatingZonesRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.wallSegmentId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
                     ];
                   },
                 );
@@ -9474,6 +9688,7 @@ typedef $$WallSegmentsTableProcessedTableManager =
         bool adjacentRoomId,
         bool windowsRefs,
         bool doorsRefs,
+        bool heatingZonesRefs,
       })
     >;
 typedef $$WindowsTableCreateCompanionBuilder =
@@ -11747,6 +11962,8 @@ typedef $$HeatingZonesTableCreateCompanionBuilder =
       Value<int> borderDistanceMm,
       Value<String> layoutPattern,
       Value<String?> circuitId,
+      Value<String?> wallSegmentId,
+      Value<int?> heightMm,
       Value<int> rowid,
     });
 typedef $$HeatingZonesTableUpdateCompanionBuilder =
@@ -11761,6 +11978,8 @@ typedef $$HeatingZonesTableUpdateCompanionBuilder =
       Value<int> borderDistanceMm,
       Value<String> layoutPattern,
       Value<String?> circuitId,
+      Value<String?> wallSegmentId,
+      Value<int?> heightMm,
       Value<int> rowid,
     });
 
@@ -11821,6 +12040,25 @@ final class $$HeatingZonesTableReferences
       $_db.flooringMaterials,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_flooringMaterialIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $WallSegmentsTable _wallSegmentIdTable(_$AppDatabase db) =>
+      db.wallSegments.createAlias(
+        $_aliasNameGenerator(db.heatingZones.wallSegmentId, db.wallSegments.id),
+      );
+
+  $$WallSegmentsTableProcessedTableManager? get wallSegmentId {
+    final $_column = $_itemColumn<String>('wall_segment_id');
+    if ($_column == null) return null;
+    final manager = $$WallSegmentsTableTableManager(
+      $_db,
+      $_db.wallSegments,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_wallSegmentIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
@@ -11895,6 +12133,11 @@ class $$HeatingZonesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get heightMm => $composableBuilder(
+    column: $table.heightMm,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$RoomsTableFilterComposer get roomId {
     final $$RoomsTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -11955,6 +12198,29 @@ class $$HeatingZonesTableFilterComposer
           }) => $$FlooringMaterialsTableFilterComposer(
             $db: $db,
             $table: $db.flooringMaterials,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$WallSegmentsTableFilterComposer get wallSegmentId {
+    final $$WallSegmentsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.wallSegmentId,
+      referencedTable: $db.wallSegments,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WallSegmentsTableFilterComposer(
+            $db: $db,
+            $table: $db.wallSegments,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -12034,6 +12300,11 @@ class $$HeatingZonesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get heightMm => $composableBuilder(
+    column: $table.heightMm,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$RoomsTableOrderingComposer get roomId {
     final $$RoomsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -12102,6 +12373,29 @@ class $$HeatingZonesTableOrderingComposer
     );
     return composer;
   }
+
+  $$WallSegmentsTableOrderingComposer get wallSegmentId {
+    final $$WallSegmentsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.wallSegmentId,
+      referencedTable: $db.wallSegments,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WallSegmentsTableOrderingComposer(
+            $db: $db,
+            $table: $db.wallSegments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$HeatingZonesTableAnnotationComposer
@@ -12141,6 +12435,9 @@ class $$HeatingZonesTableAnnotationComposer
 
   GeneratedColumn<String> get circuitId =>
       $composableBuilder(column: $table.circuitId, builder: (column) => column);
+
+  GeneratedColumn<int> get heightMm =>
+      $composableBuilder(column: $table.heightMm, builder: (column) => column);
 
   $$RoomsTableAnnotationComposer get roomId {
     final $$RoomsTableAnnotationComposer composer = $composerBuilder(
@@ -12212,6 +12509,29 @@ class $$HeatingZonesTableAnnotationComposer
     return composer;
   }
 
+  $$WallSegmentsTableAnnotationComposer get wallSegmentId {
+    final $$WallSegmentsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.wallSegmentId,
+      referencedTable: $db.wallSegments,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WallSegmentsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.wallSegments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
   Expression<T> heatingCircuitsRefs<T extends Object>(
     Expression<T> Function($$HeatingCircuitsTableAnnotationComposer a) f,
   ) {
@@ -12255,6 +12575,7 @@ class $$HeatingZonesTableTableManager
             bool roomId,
             bool tubeTypeId,
             bool flooringMaterialId,
+            bool wallSegmentId,
             bool heatingCircuitsRefs,
           })
         > {
@@ -12281,6 +12602,8 @@ class $$HeatingZonesTableTableManager
                 Value<int> borderDistanceMm = const Value.absent(),
                 Value<String> layoutPattern = const Value.absent(),
                 Value<String?> circuitId = const Value.absent(),
+                Value<String?> wallSegmentId = const Value.absent(),
+                Value<int?> heightMm = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => HeatingZonesCompanion(
                 id: id,
@@ -12293,6 +12616,8 @@ class $$HeatingZonesTableTableManager
                 borderDistanceMm: borderDistanceMm,
                 layoutPattern: layoutPattern,
                 circuitId: circuitId,
+                wallSegmentId: wallSegmentId,
+                heightMm: heightMm,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -12307,6 +12632,8 @@ class $$HeatingZonesTableTableManager
                 Value<int> borderDistanceMm = const Value.absent(),
                 Value<String> layoutPattern = const Value.absent(),
                 Value<String?> circuitId = const Value.absent(),
+                Value<String?> wallSegmentId = const Value.absent(),
+                Value<int?> heightMm = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => HeatingZonesCompanion.insert(
                 id: id,
@@ -12319,6 +12646,8 @@ class $$HeatingZonesTableTableManager
                 borderDistanceMm: borderDistanceMm,
                 layoutPattern: layoutPattern,
                 circuitId: circuitId,
+                wallSegmentId: wallSegmentId,
+                heightMm: heightMm,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -12334,6 +12663,7 @@ class $$HeatingZonesTableTableManager
                 roomId = false,
                 tubeTypeId = false,
                 flooringMaterialId = false,
+                wallSegmentId = false,
                 heatingCircuitsRefs = false,
               }) {
                 return PrefetchHooks(
@@ -12402,6 +12732,21 @@ class $$HeatingZonesTableTableManager
                                   )
                                   as T;
                         }
+                        if (wallSegmentId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.wallSegmentId,
+                                    referencedTable:
+                                        $$HeatingZonesTableReferences
+                                            ._wallSegmentIdTable(db),
+                                    referencedColumn:
+                                        $$HeatingZonesTableReferences
+                                            ._wallSegmentIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
 
                         return state;
                       },
@@ -12452,6 +12797,7 @@ typedef $$HeatingZonesTableProcessedTableManager =
         bool roomId,
         bool tubeTypeId,
         bool flooringMaterialId,
+        bool wallSegmentId,
         bool heatingCircuitsRefs,
       })
     >;
