@@ -14,13 +14,31 @@ class HydraulicEngine {
 
   /// Tube length within a heating zone (m).
   ///
-  /// L_zone ≈ A_zone / (spacing / 1000)
+  /// Effective area = A_zone − perimeter_m × border_m
+  /// L_zone ≈ A_effective / (spacing / 1000)
+  ///
+  /// The border strip approximation removes a strip of width
+  /// [borderDistanceMm] around the polygon perimeter.  This is
+  /// exact for rectangles and an accepted approximation for convex
+  /// polygons; it may overestimate the strip for concave shapes.
+  ///
+  /// Returns [double.nan] when inputs are invalid or [tubeSpacingMm]
+  /// is zero; returns 0.0 when the effective area is non-positive
+  /// (zone too small for the chosen spacing/border combination).
   static double zoneTubeLength({
     required double zoneAreaM2,
+    required double perimeterM,
     required int tubeSpacingMm,
+    required int borderDistanceMm,
   }) {
-    if (zoneAreaM2 <= 0 || tubeSpacingMm <= 0) return double.nan;
-    return zoneAreaM2 / (tubeSpacingMm / 1000.0);
+    if (zoneAreaM2 <= 0 || perimeterM < 0 ||
+        tubeSpacingMm <= 0 || borderDistanceMm < 0) {
+      return double.nan;
+    }
+    final borderM = borderDistanceMm / 1000.0;
+    final effectiveAreaM2 = zoneAreaM2 - perimeterM * borderM;
+    if (effectiveAreaM2 <= 0) return 0.0;
+    return effectiveAreaM2 / (tubeSpacingMm / 1000.0);
   }
 
   /// Total tube length including supply and return runs (m).

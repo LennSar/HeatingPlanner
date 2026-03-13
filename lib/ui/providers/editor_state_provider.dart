@@ -264,6 +264,15 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
   }
 
+  /// Replace a heating zone with the same ID.
+  void updateZone(HeatingZone zone) {
+    state = state.copyWith(
+      zones: state.zones
+          .map((z) => z.id == zone.id ? zone : z)
+          .toList(),
+    );
+  }
+
   /// Remove a heating zone by ID.
   void removeZone(String zoneId) {
     state = state.copyWith(

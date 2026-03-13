@@ -8,19 +8,47 @@ void main() {
   // ── zoneTubeLength tests ──────────────────────────────────────────────
 
   group('HydraulicEngine.zoneTubeLength', () {
-    test('standard zone: 15 m2, 150mm spacing', () {
-      // L = 15 / 0.15 = 100 m
+    test('no border: 15 m2, 150mm spacing → 100 m', () {
+      // A_eff = 15.0 − 16.0 × 0.0 = 15.0
+      // L = 15.0 / 0.15 = 100 m
       final l = HydraulicEngine.zoneTubeLength(
         zoneAreaM2: 15.0,
+        perimeterM: 16.0,
         tubeSpacingMm: 150,
+        borderDistanceMm: 0,
       );
       expect(l, closeTo(100.0, 0.1));
+    });
+
+    test('with border: 15 m2, perimeter 16 m, 100mm border, 150mm spacing', () {
+      // A_eff = 15.0 − 16.0 × 0.1 = 15.0 − 1.6 = 13.4
+      // L = 13.4 / 0.15 ≈ 89.3 m
+      final l = HydraulicEngine.zoneTubeLength(
+        zoneAreaM2: 15.0,
+        perimeterM: 16.0,
+        tubeSpacingMm: 150,
+        borderDistanceMm: 100,
+      );
+      expect(l, closeTo(89.3, 0.5));
+    });
+
+    test('border larger than zone returns 0.0', () {
+      // A_eff = 1.0 − 10.0 × 0.3 = 1.0 − 3.0 < 0 → 0.0
+      final l = HydraulicEngine.zoneTubeLength(
+        zoneAreaM2: 1.0,
+        perimeterM: 10.0,
+        tubeSpacingMm: 150,
+        borderDistanceMm: 300,
+      );
+      expect(l, equals(0.0));
     });
 
     test('zero area returns NaN', () {
       final l = HydraulicEngine.zoneTubeLength(
         zoneAreaM2: 0.0,
+        perimeterM: 16.0,
         tubeSpacingMm: 150,
+        borderDistanceMm: 0,
       );
       expect(l.isNaN, isTrue);
     });
@@ -28,7 +56,9 @@ void main() {
     test('zero spacing returns NaN', () {
       final l = HydraulicEngine.zoneTubeLength(
         zoneAreaM2: 15.0,
+        perimeterM: 16.0,
         tubeSpacingMm: 0,
+        borderDistanceMm: 0,
       );
       expect(l.isNaN, isTrue);
     });
@@ -36,7 +66,9 @@ void main() {
     test('negative area returns NaN', () {
       final l = HydraulicEngine.zoneTubeLength(
         zoneAreaM2: -5.0,
+        perimeterM: 16.0,
         tubeSpacingMm: 150,
+        borderDistanceMm: 0,
       );
       expect(l.isNaN, isTrue);
     });
