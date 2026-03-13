@@ -71,6 +71,9 @@ abstract class EditorCallbacks {
   /// Commit a new heating zone to the editor state.
   void commitZone(HeatingZone zone);
 
+  /// Replace an existing heating zone (same ID).
+  void updateZone(HeatingZone zone);
+
   /// Remove a heating zone by ID.
   void removeZone(String zoneId);
 

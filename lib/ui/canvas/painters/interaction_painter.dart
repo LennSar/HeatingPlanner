@@ -104,8 +104,15 @@ class InteractionPainter extends CustomPainter {
             hasValidationError,
             cursorOutsideValidArea,
           );
-        case ZoneSelectionData(:final polygon):
+        case ZoneSelectionData(
+              :final polygon,
+              :final handles,
+              :final activeHandleIndex,
+            ):
           _drawZoneSelectionHighlight(canvas, polygon);
+          if (handles.isNotEmpty) {
+            _drawWallHandles(canvas, handles, activeHandleIndex);
+          }
       }
     }
   }

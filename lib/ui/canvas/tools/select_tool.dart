@@ -58,6 +58,12 @@ class SelectTool extends CanvasTool {
   /// Minimum opening width (mm).
   static const double _minOpeningWidthMm = 300.0;
 
+  /// Zone drag threshold in screen pixels.
+  ///
+  /// Movement below this threshold is treated as a click (cycles
+  /// selection per ADR-005) rather than initiating a drag.
+  static const double _zoneDragThresholdPx = 5.0;
+
   // -- Click-cycling state (ADR-005) --
 
   /// World position of the most recent tap.
@@ -114,6 +120,34 @@ class SelectTool extends CanvasTool {
   /// Snapshot of the selected door at opening drag start.
   Door? _dragStartDoor;
 
+  // -- Zone drag state --
+
+  /// Index of the zone polygon vertex being dragged.
+  /// Null while the zone body (all vertices together) is being dragged.
+  int? _zoneHandleDragIndex;
+
+  /// True once the pointer has moved beyond [_zoneDragThresholdPx],
+  /// activating the actual zone drag.
+  bool _zoneDragActive = false;
+
+  /// World point where the pointer went down on the zone
+  /// (anchor for threshold check and body-drag delta).
+  Point2D? _zoneDragAnchorPoint;
+
+  /// Zone snapshot captured at the start of a zone drag (for revert/undo).
+  HeatingZone? _zoneAtDragStart;
+
+  // -- Deferred-tap state (zone pointer-down suppresses onTap) --
+
+  /// Arguments of the tap that was suppressed because the pointer went
+  /// down on a selected zone.  Executed on [onPointerUp] if no drag
+  /// occurred, discarded if a drag exceeded the threshold.
+  ({Point2D point, PointerDeviceKind kind})? _deferredTap;
+
+  /// Set in [onPointerDown] when the pointer lands on a selected zone.
+  /// Cleared in the immediately-following [onTap] call.
+  bool _zonePointerOnZone = false;
+
   @override
   String get name => 'Select';
 
@@ -126,11 +160,28 @@ class SelectTool extends CanvasTool {
     Point2D worldPoint,
     PointerDeviceKind deviceKind,
   ) {
-    // Ignore taps during any drag.
+    // Ignore taps during active wall / opening drags.
     if (_dragHandle != null || _openingDragHandle != null) {
       return;
     }
 
+    // Pointer went down on a selected zone — defer the tap until
+    // onPointerUp so the 5 px drag threshold can be evaluated.
+    // (onPointerDown fires before onTap due to Listener vs
+    //  GestureDetector ordering, so the flag is already set here.)
+    if (_zonePointerOnZone) {
+      _deferredTap = (point: worldPoint, kind: deviceKind);
+      _zonePointerOnZone = false;
+      return;
+    }
+
+    _doTap(worldPoint, deviceKind);
+    onStateChanged();
+  }
+
+  /// Core tap/cycling logic, extracted so it can be called both
+  /// from [onTap] and from deferred-tap execution paths.
+  void _doTap(Point2D worldPoint, PointerDeviceKind deviceKind) {
     final cycleMm =
         _cycleThresholdPx / callbacks.currentZoom;
     final isSamePos = _lastClickPosition != null &&
@@ -162,8 +213,6 @@ class SelectTool extends CanvasTool {
         _selectByHitItem(stack.first);
       }
     }
-
-    onStateChanged();
   }
 
   // ================================================================
@@ -215,6 +264,39 @@ class SelectTool extends CanvasTool {
       return;
     }
 
+    // Zone handle / fill hit-test (when a zone is selected).
+    if (_selectedZone != null) {
+      final handleIdx = _hitTestZoneHandle(worldPoint);
+      if (handleIdx != null) {
+        // Vertex handle hit — start potential vertex drag.
+        _zoneHandleDragIndex = handleIdx;
+        _zoneDragAnchorPoint = worldPoint;
+        _zoneAtDragStart = callbacks.currentZones
+                .where((z) => z.id == _selectedZone!.id)
+                .firstOrNull ??
+            _selectedZone;
+        _zonePointerOnZone = true;
+        onStateChanged();
+        return;
+      }
+      final zone = callbacks.currentZones
+              .where((z) => z.id == _selectedZone!.id)
+              .firstOrNull ??
+          _selectedZone!;
+      if (zone.polygon.length >= 3 &&
+          GeometryUtils.containsPoint(zone.polygon, worldPoint)) {
+        // Zone fill hit — start potential body drag.
+        _zoneHandleDragIndex = null;
+        _zoneDragAnchorPoint = worldPoint;
+        _zoneAtDragStart = zone;
+        _zonePointerOnZone = true;
+        onStateChanged();
+        return;
+      }
+      // Click outside selected zone — fall through to allow
+      // wall-handle hit-test or tap-based cycling.
+    }
+
     // Wall handle hit-test.
     if (_selectedWall == null) return;
     final handleType = _hitTestHandle(worldPoint);
@@ -239,6 +321,27 @@ class SelectTool extends CanvasTool {
 
   @override
   void onDragUpdate(Point2D worldPoint) {
+    // Zone drag (vertex or body).
+    if (_zoneDragAnchorPoint != null) {
+      if (!_zoneDragActive) {
+        final thresholdMm =
+            _zoneDragThresholdPx / callbacks.currentZoom;
+        if (GeometryEngine.distanceMm(
+              worldPoint,
+              _zoneDragAnchorPoint!,
+            ) >=
+            thresholdMm) {
+          _zoneDragActive = true;
+          _deferredTap = null; // discard — this is definitely a drag
+        }
+      }
+      if (_zoneDragActive) {
+        _applyZoneDrag(worldPoint);
+        onStateChanged();
+      }
+      return;
+    }
+
     // Opening drag.
     if (_openingDragHandle != null) {
       _applyOpeningDrag(worldPoint);
@@ -276,6 +379,25 @@ class SelectTool extends CanvasTool {
 
   @override
   void onDragEnd(Point2D worldPoint) {
+    // Zone drag end.
+    if (_zoneDragAnchorPoint != null) {
+      if (_zoneDragActive) {
+        _commitZoneDrag();
+      } else if (_deferredTap != null) {
+        // Pointer moved but stayed under the 5 px threshold —
+        // treat as a click and execute the deferred tap.
+        final tap = _deferredTap!;
+        _deferredTap = null;
+        _clearZoneDragState();
+        _doTap(tap.point, tap.kind);
+        onStateChanged();
+        return;
+      }
+      _clearZoneDragState();
+      onStateChanged();
+      return;
+    }
+
     // Opening drag end.
     if (_openingDragHandle != null) {
       _commitOpeningDrag();
@@ -376,7 +498,32 @@ class SelectTool extends CanvasTool {
   }
 
   @override
+  void onPointerUp(Point2D worldPoint) {
+    // Execute the deferred zone tap (pure click, no movement).
+    if (_deferredTap != null) {
+      final tap = _deferredTap!;
+      _deferredTap = null;
+      _clearZoneDragState();
+      _doTap(tap.point, tap.kind);
+      onStateChanged();
+    } else {
+      _clearZoneDragState();
+    }
+  }
+
+  @override
   void cancel() {
+    // Revert zone drag.
+    if (_zoneDragAnchorPoint != null) {
+      if (_zoneAtDragStart != null) {
+        callbacks.updateZone(_zoneAtDragStart!);
+        _selectedZone = _zoneAtDragStart;
+      }
+      _clearZoneDragState();
+      onStateChanged();
+      return;
+    }
+
     // Revert opening drag.
     if (_openingDragHandle != null) {
       if (_dragStartWindow != null) {
@@ -415,9 +562,18 @@ class SelectTool extends CanvasTool {
       return _buildOpeningSelectionData();
     }
 
-    // Zone selection.
+    // Zone selection (with vertex drag handles).
     if (_selectedZone != null) {
-      return ZoneSelectionData(polygon: _selectedZone!.polygon);
+      final zone = callbacks.currentZones
+              .where((z) => z.id == _selectedZone!.id)
+              .firstOrNull ??
+          _selectedZone!;
+      return ZoneSelectionData(
+        polygon: zone.polygon,
+        handles: zone.polygon,
+        activeHandleIndex:
+            _zoneDragActive ? _zoneHandleDragIndex : null,
+      );
     }
 
     if (_selectedWall == null && _selectedRoom == null) {
@@ -451,6 +607,136 @@ class SelectTool extends CanvasTool {
       selectedRoom: _selectedRoom,
       handles: handles,
       activeHandleIndex: activeIdx,
+    );
+  }
+
+  // ================================================================
+  // Zone editing helpers
+  // ================================================================
+
+  /// Returns the polygon vertex index under [worldPoint], or null.
+  int? _hitTestZoneHandle(Point2D worldPoint) {
+    if (_selectedZone == null) return null;
+    final zone = callbacks.currentZones
+            .where((z) => z.id == _selectedZone!.id)
+            .firstOrNull ??
+        _selectedZone!;
+    final zoom = callbacks.currentZoom;
+    final thresholdMm =
+        zoom > 0 ? _handleHitRadiusPx / zoom : _handleRadiusMm;
+    for (var i = 0; i < zone.polygon.length; i++) {
+      if (GeometryEngine.distanceMm(worldPoint, zone.polygon[i]) <=
+          thresholdMm) {
+        return i;
+      }
+    }
+    return null;
+  }
+
+  /// Apply the in-progress zone drag without committing an undo entry.
+  void _applyZoneDrag(Point2D worldPoint) {
+    final zone = _zoneAtDragStart!;
+    if (_zoneHandleDragIndex != null) {
+      // Vertex drag: snap vertex to grid and move it.
+      final snapped = SnapService.snapToGrid(worldPoint);
+      final newPolygon = List<Point2D>.from(zone.polygon);
+      newPolygon[_zoneHandleDragIndex!] = snapped;
+      final newZone = zone.copyWith(polygon: newPolygon);
+      callbacks.updateZone(newZone);
+      _selectedZone = newZone;
+    } else {
+      // Body drag: translate all vertices by the delta from the anchor.
+      final anchor = _zoneDragAnchorPoint!;
+      final dx = worldPoint.x - anchor.x;
+      final dy = worldPoint.y - anchor.y;
+      final newPolygon = zone.polygon
+          .map((v) => Point2D(x: v.x + dx, y: v.y + dy))
+          .toList();
+      final newZone = zone.copyWith(polygon: newPolygon);
+      callbacks.updateZone(newZone);
+      _selectedZone = newZone;
+    }
+  }
+
+  /// Validate the final drag position and commit an undo entry if valid;
+  /// revert to [_zoneAtDragStart] and show a toast if invalid.
+  void _commitZoneDrag() {
+    if (_zoneAtDragStart == null) return;
+    final zone = callbacks.currentZones
+        .where((z) => z.id == _zoneAtDragStart!.id)
+        .firstOrNull;
+    if (zone == null) return;
+
+    // Validate all vertices remain within valid rooms (ADR-006).
+    final allValid =
+        zone.polygon.every((v) => _isZonePointValid(v, zone));
+    if (!allValid) {
+      callbacks.updateZone(_zoneAtDragStart!);
+      _selectedZone = _zoneAtDragStart;
+      callbacks.showToast('Zone must stay within valid rooms');
+      return;
+    }
+
+    final oldZone = _zoneAtDragStart!;
+    if (oldZone != zone) {
+      undoRedo.execute(_MoveZoneCommand(
+        oldZone: oldZone,
+        newZone: zone,
+        update: callbacks.updateZone,
+        label: _zoneHandleDragIndex != null
+            ? 'Move zone vertex'
+            : 'Move zone',
+      ));
+    }
+    _selectedZone = zone;
+  }
+
+  void _clearZoneDragState() {
+    _zoneHandleDragIndex = null;
+    _zoneDragActive = false;
+    _zoneDragAnchorPoint = null;
+    _zoneAtDragStart = null;
+    _deferredTap = null;
+    _zonePointerOnZone = false;
+  }
+
+  /// Valid rooms for a zone drag: primary room + door-adjacent rooms (ADR-006).
+  List<Room> _validRoomsForZone(HeatingZone zone) {
+    final primaryRoom = callbacks.currentRooms
+        .where((r) => r.id == zone.roomId)
+        .firstOrNull;
+    if (primaryRoom == null) return [];
+
+    final result = <Room>[primaryRoom];
+
+    final primaryWallIds = callbacks.currentWalls
+        .where((w) => w.roomId == zone.roomId)
+        .map((w) => w.id)
+        .toSet();
+
+    final doorWallIds = callbacks.currentDoors
+        .where((d) => primaryWallIds.contains(d.wallSegmentId))
+        .map((d) => d.wallSegmentId)
+        .toSet();
+
+    final adjacentRoomIds = callbacks.currentWalls
+        .where(
+          (w) => doorWallIds.contains(w.id) && w.adjacentRoomId != null,
+        )
+        .map((w) => w.adjacentRoomId!)
+        .toSet();
+
+    result.addAll(
+      callbacks.currentRooms.where((r) => adjacentRoomIds.contains(r.id)),
+    );
+    return result;
+  }
+
+  bool _isZonePointValid(Point2D point, HeatingZone zone) {
+    return _validRoomsForZone(zone).any(
+      (r) =>
+          r.polygon.length >= 3 &&
+          GeometryEngine.isPointInPolygon(point, r.polygon),
     );
   }
 
@@ -1567,4 +1853,27 @@ class _DeleteZoneCommand extends Command {
 
   @override
   void undo() => add(zone);
+}
+
+/// Command: move a zone polygon (vertex drag or body drag).
+class _MoveZoneCommand extends Command {
+  _MoveZoneCommand({
+    required this.oldZone,
+    required this.newZone,
+    required this.update,
+    required this.label,
+  });
+
+  final HeatingZone oldZone;
+  final HeatingZone newZone;
+  final void Function(HeatingZone) update;
+
+  @override
+  final String label;
+
+  @override
+  void execute() => update(newZone);
+
+  @override
+  void undo() => update(oldZone);
 }

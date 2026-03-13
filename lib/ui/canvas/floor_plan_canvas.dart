@@ -258,6 +258,11 @@ class _FloorPlanCanvasState
   }
 
   @override
+  void updateZone(HeatingZone zone) {
+    ref.read(editorStateProvider.notifier).updateZone(zone);
+  }
+
+  @override
   void removeZone(String zoneId) {
     ref.read(editorStateProvider.notifier).removeZone(zoneId);
   }
@@ -520,23 +525,26 @@ class _FloorPlanCanvasState
             }
           },
           onPointerUp: (event) {
+            final worldOffset = _toWorld(
+              canvasState,
+              event.localPosition,
+            );
+            final worldPoint = Point2D(
+              x: worldOffset.dx,
+              y: worldOffset.dy,
+            );
             if (_isDragging) {
-              final worldOffset = _toWorld(
-                canvasState,
-                event.localPosition,
-              );
-              final worldPoint = Point2D(
-                x: worldOffset.dx,
-                y: worldOffset.dy,
-              );
               _activeTool?.onDragEnd(worldPoint);
               _isDragging = false;
-
-              setState(() {
-                _interactionData =
-                    _activeTool?.getInteractionData();
-              });
+            } else {
+              // Non-drag pointer-up: let tools execute deferred
+              // actions (e.g. zone body drag threshold not reached).
+              _activeTool?.onPointerUp(worldPoint);
             }
+            setState(() {
+              _interactionData =
+                  _activeTool?.getInteractionData();
+            });
           },
           child: GestureDetector(
             onScaleStart: (details) {

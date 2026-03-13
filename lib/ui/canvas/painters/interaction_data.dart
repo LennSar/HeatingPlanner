@@ -142,15 +142,28 @@ class ZoneDrawData extends InteractionData {
 /// Highlight data for a selected heating zone.
 ///
 /// Produced by [SelectTool] when a heating zone is selected.
-/// Conveys the zone polygon so [InteractionPainter] can draw
-/// the selection outline and fill.
+/// Conveys the zone polygon, vertex drag handles, and the
+/// currently-active handle index so [InteractionPainter] can
+/// draw the selection outline, fill, and editing handles.
 @immutable
 class ZoneSelectionData extends InteractionData {
   /// Creates [ZoneSelectionData].
-  const ZoneSelectionData({required this.polygon});
+  const ZoneSelectionData({
+    required this.polygon,
+    this.handles = const [],
+    this.activeHandleIndex,
+  });
 
   /// Zone polygon vertices (world mm).
   final List<Point2D> polygon;
+
+  /// Handle positions (one per polygon vertex, world mm).
+  /// Empty when no editing handles should be shown.
+  final List<Point2D> handles;
+
+  /// Index within [handles] of the handle currently being
+  /// dragged, or null if no handle is active.
+  final int? activeHandleIndex;
 }
 
 /// Highlight data for a selected window or door element.

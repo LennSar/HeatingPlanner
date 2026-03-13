@@ -59,6 +59,14 @@ abstract class CanvasTool {
   /// Called on Delete / Backspace key press.
   void onDelete() {}
 
+  /// Called when the pointer is released without a drag having occurred.
+  ///
+  /// Only fired when [onDragEnd] is NOT fired (i.e. `_isDragging == false`
+  /// in the canvas). Tools that need to distinguish pure clicks from
+  /// click-hold-drags (e.g. zone body drag with a 5 px threshold) use this
+  /// to execute deferred tap actions.
+  void onPointerUp(Point2D worldPoint) {}
+
   /// Cancel the current operation (e.g. Escape pressed).
   void cancel();
 
