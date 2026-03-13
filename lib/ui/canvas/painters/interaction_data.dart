@@ -166,6 +166,43 @@ class ZoneSelectionData extends InteractionData {
   final int? activeHandleIndex;
 }
 
+/// Selection data for a selected wall heating zone.
+///
+/// Produced by [SelectTool] when a [ZoneType.wallHeating] zone is
+/// selected. Conveys the parent wall geometry, zone position/width,
+/// and three drag handle positions (left edge, centre, right edge)
+/// so [InteractionPainter] can draw the selection band and handles.
+@immutable
+class WallZoneSelectionData extends InteractionData {
+  /// Creates [WallZoneSelectionData].
+  const WallZoneSelectionData({
+    required this.wallStart,
+    required this.wallEnd,
+    required this.positionOnWallMm,
+    required this.widthMm,
+    required this.handles,
+    this.activeHandleIndex,
+  });
+
+  /// Start endpoint of the parent wall (world mm).
+  final Point2D wallStart;
+
+  /// End endpoint of the parent wall (world mm).
+  final Point2D wallEnd;
+
+  /// Distance from wall start to the zone's left edge (mm).
+  final double positionOnWallMm;
+
+  /// Width of the zone along the wall (mm).
+  final double widthMm;
+
+  /// Handle positions: [0] = left edge, [1] = centre, [2] = right edge.
+  final List<Point2D> handles;
+
+  /// Index of the handle currently being dragged (0–2), or null.
+  final int? activeHandleIndex;
+}
+
 /// Hover highlight for the wall zone placement tool.
 ///
 /// Produced by [WallZonePlaceTool] when the cursor is within

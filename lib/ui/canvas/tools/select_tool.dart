@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart';
 import '../../../calculation/engines/geometry_engine.dart';
 import '../../../core/utils/geometry_utils.dart';
 import '../../../data/models/door.dart';
+import '../../../data/models/enums.dart';
 import '../../../data/models/heating_zone.dart';
 import '../../../data/models/point2d.dart';
 import '../../../data/models/room.dart';
@@ -119,6 +120,21 @@ class SelectTool extends CanvasTool {
 
   /// Snapshot of the selected door at opening drag start.
   Door? _dragStartDoor;
+
+  // -- Wall zone drag state (opening-style, for ZoneType.wallHeating) --
+
+  /// Which of the three wall-zone handles is being dragged.
+  DragHandleType? _wallZoneDragHandle;
+
+  /// positionOnWallMm at the start of a wall-zone drag.
+  double _wallZoneDragStartPos = 0.0;
+
+  /// widthMm at the start of a wall-zone drag.
+  int _wallZoneDragStartWidth = 0;
+
+  /// The wall the zone is currently attached to during drag.
+  /// May change when the zone jumps to a neighbour wall.
+  WallSegment? _wallZoneDragWall;
 
   // -- Zone drag state --
 
@@ -266,32 +282,75 @@ class SelectTool extends CanvasTool {
 
     // Zone handle / fill hit-test (when a zone is selected).
     if (_selectedZone != null) {
-      final handleIdx = _hitTestZoneHandle(worldPoint);
-      if (handleIdx != null) {
-        // Vertex handle hit — start potential vertex drag.
-        _zoneHandleDragIndex = handleIdx;
-        _zoneDragAnchorPoint = worldPoint;
-        _zoneAtDragStart = callbacks.currentZones
-                .where((z) => z.id == _selectedZone!.id)
-                .firstOrNull ??
-            _selectedZone;
-        _zonePointerOnZone = true;
-        onStateChanged();
-        return;
-      }
       final zone = callbacks.currentZones
               .where((z) => z.id == _selectedZone!.id)
               .firstOrNull ??
           _selectedZone!;
-      if (zone.polygon.length >= 3 &&
-          GeometryUtils.containsPoint(zone.polygon, worldPoint)) {
-        // Zone fill hit — start potential body drag.
-        _zoneHandleDragIndex = null;
-        _zoneDragAnchorPoint = worldPoint;
-        _zoneAtDragStart = zone;
-        _zonePointerOnZone = true;
-        onStateChanged();
-        return;
+
+      if (zone.zoneType == ZoneType.wallHeating &&
+          zone.wallSegmentId != null) {
+        // ── Wall zone: opening-style handles ────────────────
+        final wall = callbacks.currentWalls
+            .where((w) => w.id == zone.wallSegmentId)
+            .firstOrNull;
+        if (wall != null) {
+          final wallLen = GeometryEngine.distanceMm(
+            wall.startPoint,
+            wall.endPoint,
+          );
+          final pos = zone.positionOnWallMm ?? 0.0;
+          final width =
+              zone.widthMm?.toDouble() ?? wallLen;
+          final handles = _openingHandles(wall, pos, width);
+
+          final zoom = callbacks.currentZoom;
+          final thresholdMm = zoom > 0
+              ? _handleHitRadiusPx / zoom
+              : _handleRadiusMm;
+
+          for (var i = 0; i < handles.length; i++) {
+            if (GeometryEngine.distanceMm(
+                  worldPoint,
+                  handles[i],
+                ) <=
+                thresholdMm) {
+              _wallZoneDragHandle = DragHandleType.values[i];
+              _wallZoneDragStartPos = pos;
+              _wallZoneDragStartWidth = width.round();
+              _wallZoneDragWall = wall;
+              _zoneAtDragStart = zone;
+              onStateChanged();
+              return;
+            }
+          }
+        }
+        // Click on zone body — defer tap, no body drag for wall zones.
+        if (zone.polygon.length >= 3 &&
+            GeometryUtils.containsPoint(zone.polygon, worldPoint)) {
+          _zonePointerOnZone = true;
+          onStateChanged();
+          return;
+        }
+      } else {
+        // ── Floor zone: polygon vertex / body drag ───────────
+        final handleIdx = _hitTestZoneHandle(worldPoint);
+        if (handleIdx != null) {
+          _zoneHandleDragIndex = handleIdx;
+          _zoneDragAnchorPoint = worldPoint;
+          _zoneAtDragStart = zone;
+          _zonePointerOnZone = true;
+          onStateChanged();
+          return;
+        }
+        if (zone.polygon.length >= 3 &&
+            GeometryUtils.containsPoint(zone.polygon, worldPoint)) {
+          _zoneHandleDragIndex = null;
+          _zoneDragAnchorPoint = worldPoint;
+          _zoneAtDragStart = zone;
+          _zonePointerOnZone = true;
+          onStateChanged();
+          return;
+        }
       }
       // Click outside selected zone — fall through to allow
       // wall-handle hit-test or tap-based cycling.
@@ -321,6 +380,13 @@ class SelectTool extends CanvasTool {
 
   @override
   void onDragUpdate(Point2D worldPoint) {
+    // Wall zone handle drag.
+    if (_wallZoneDragHandle != null) {
+      _applyWallZoneDrag(worldPoint);
+      onStateChanged();
+      return;
+    }
+
     // Zone drag (vertex or body).
     if (_zoneDragAnchorPoint != null) {
       if (!_zoneDragActive) {
@@ -379,6 +445,14 @@ class SelectTool extends CanvasTool {
 
   @override
   void onDragEnd(Point2D worldPoint) {
+    // Wall zone handle drag end.
+    if (_wallZoneDragHandle != null) {
+      _commitWallZoneDrag();
+      _clearWallZoneDragState();
+      onStateChanged();
+      return;
+    }
+
     // Zone drag end.
     if (_zoneDragAnchorPoint != null) {
       if (_zoneDragActive) {
@@ -513,6 +587,17 @@ class SelectTool extends CanvasTool {
 
   @override
   void cancel() {
+    // Revert wall zone drag.
+    if (_wallZoneDragHandle != null) {
+      if (_zoneAtDragStart != null) {
+        callbacks.updateZone(_zoneAtDragStart!);
+        _selectedZone = _zoneAtDragStart;
+      }
+      _clearWallZoneDragState();
+      onStateChanged();
+      return;
+    }
+
     // Revert zone drag.
     if (_zoneDragAnchorPoint != null) {
       if (_zoneAtDragStart != null) {
@@ -562,12 +647,20 @@ class SelectTool extends CanvasTool {
       return _buildOpeningSelectionData();
     }
 
-    // Zone selection (with vertex drag handles).
+    // Zone selection.
     if (_selectedZone != null) {
       final zone = callbacks.currentZones
               .where((z) => z.id == _selectedZone!.id)
               .firstOrNull ??
           _selectedZone!;
+
+      // Wall zones get opening-style selection handles.
+      if (zone.zoneType == ZoneType.wallHeating &&
+          zone.wallSegmentId != null) {
+        return _buildWallZoneSelectionData(zone);
+      }
+
+      // Floor zones get polygon vertex handles.
       return ZoneSelectionData(
         polygon: zone.polygon,
         handles: zone.polygon,
@@ -738,6 +831,203 @@ class SelectTool extends CanvasTool {
           r.polygon.length >= 3 &&
           GeometryEngine.isPointInPolygon(point, r.polygon),
     );
+  }
+
+  // ================================================================
+  // Wall zone helper methods
+  // ================================================================
+
+  /// Builds [WallZoneSelectionData] for the currently selected wall zone.
+  WallZoneSelectionData? _buildWallZoneSelectionData(
+    HeatingZone zone,
+  ) {
+    // During drag the current wall may differ from zone.wallSegmentId.
+    final wall = (_wallZoneDragHandle != null ? _wallZoneDragWall : null) ??
+        callbacks.currentWalls
+            .where((w) => w.id == zone.wallSegmentId)
+            .firstOrNull;
+    if (wall == null) return null;
+
+    final wallLen =
+        GeometryEngine.distanceMm(wall.startPoint, wall.endPoint);
+    final pos = zone.positionOnWallMm ?? 0.0;
+    final width = zone.widthMm?.toDouble() ?? wallLen;
+
+    return WallZoneSelectionData(
+      wallStart: wall.startPoint,
+      wallEnd: wall.endPoint,
+      positionOnWallMm: pos,
+      widthMm: width,
+      handles: _openingHandles(wall, pos, width),
+      activeHandleIndex: _wallZoneDragHandle?.index,
+    );
+  }
+
+  /// Apply a live wall-zone drag update without creating an undo command.
+  ///
+  /// For the centre handle, if the cursor projects outside the current
+  /// wall's extent the zone jumps to the nearest in-room wall.
+  void _applyWallZoneDrag(Point2D worldPoint) {
+    var wall = _wallZoneDragWall;
+    if (wall == null || _zoneAtDragStart == null) return;
+
+    final startWidth = _wallZoneDragStartWidth.toDouble();
+    var wallLen =
+        GeometryEngine.distanceMm(wall.startPoint, wall.endPoint);
+
+    switch (_wallZoneDragHandle!) {
+      case DragHandleType.mid:
+        final proj = SnapService.positionOnWallMm(worldPoint, wall);
+        // Jump to nearest room wall when cursor leaves current wall.
+        if (proj < 0 || proj > wallLen) {
+          final nearest = _nearestRoomWall(
+            worldPoint,
+            excludeId: wall.id,
+            roomId: _zoneAtDragStart!.roomId,
+          );
+          if (nearest != null) {
+            wall = nearest;
+            _wallZoneDragWall = wall;
+            wallLen = GeometryEngine.distanceMm(
+              wall.startPoint,
+              wall.endPoint,
+            );
+          }
+        }
+        final rawPos =
+            SnapService.positionOnWallMm(worldPoint, wall) -
+                startWidth / 2;
+        final snappedPos = _snapAlongWall(rawPos);
+        final newPos = snappedPos.clamp(
+          0.0,
+          (wallLen - startWidth).clamp(0.0, double.infinity),
+        );
+        _applyWallZoneUpdate(wall, newPos, _wallZoneDragStartWidth);
+
+      case DragHandleType.start:
+        final rightEdge = _wallZoneDragStartPos + startWidth;
+        final proj = SnapService.positionOnWallMm(worldPoint, wall);
+        final maxLeft = rightEdge - _minOpeningWidthMm;
+        final newLeft =
+            _snapAlongWall(proj).clamp(0.0, maxLeft);
+        final newWidth = (rightEdge - newLeft).round();
+        _applyWallZoneUpdate(wall, newLeft, newWidth);
+
+      case DragHandleType.end:
+        final leftEdge = _wallZoneDragStartPos;
+        final proj = SnapService.positionOnWallMm(worldPoint, wall);
+        final minRight = leftEdge + _minOpeningWidthMm;
+        final newRight =
+            _snapAlongWall(proj).clamp(minRight, wallLen);
+        final newWidth = (newRight - leftEdge).round();
+        _applyWallZoneUpdate(wall, leftEdge, newWidth);
+    }
+  }
+
+  /// Update provider state for the selected wall zone.
+  void _applyWallZoneUpdate(
+    WallSegment wall,
+    double posOnWall,
+    int widthMm,
+  ) {
+    if (_zoneAtDragStart == null) return;
+    final polygon = _deriveWallZonePolygon(wall, posOnWall, widthMm.toDouble());
+    final updated = _zoneAtDragStart!.copyWith(
+      wallSegmentId: wall.id,
+      positionOnWallMm: posOnWall,
+      widthMm: widthMm,
+      polygon: polygon,
+    );
+    callbacks.updateZone(updated);
+    _selectedZone = updated;
+  }
+
+  /// Push an undo command after a wall-zone drag finishes.
+  void _commitWallZoneDrag() {
+    if (_zoneAtDragStart == null) return;
+    final current = callbacks.currentZones
+        .where((z) => z.id == _zoneAtDragStart!.id)
+        .firstOrNull;
+    if (current != null && current != _zoneAtDragStart) {
+      undoRedo.execute(_UpdateWallZoneCommand(
+        oldZone: _zoneAtDragStart!,
+        newZone: current,
+        update: callbacks.updateZone,
+        label: _wallZoneDragHandle == DragHandleType.mid
+            ? 'Move wall zone'
+            : 'Resize wall zone',
+      ));
+    }
+    _selectedZone = current ?? _zoneAtDragStart;
+  }
+
+  void _clearWallZoneDragState() {
+    _wallZoneDragHandle = null;
+    _wallZoneDragWall = null;
+    _zoneAtDragStart = null;
+  }
+
+  /// Derive a 4-vertex band polygon for [wall] between [positionMm]
+  /// and [positionMm] + [widthMm], matching the 200 mm visual thickness.
+  static List<Point2D> _deriveWallZonePolygon(
+    WallSegment wall,
+    double positionMm,
+    double widthMm,
+  ) {
+    const halfThickness = 100.0;
+    final dx = wall.endPoint.x - wall.startPoint.x;
+    final dy = wall.endPoint.y - wall.startPoint.y;
+    final len =
+        GeometryEngine.distanceMm(wall.startPoint, wall.endPoint);
+    if (len < 1) {
+      return [
+        wall.startPoint,
+        wall.endPoint,
+        wall.endPoint,
+        wall.startPoint,
+      ];
+    }
+
+    final ux = dx / len;
+    final uy = dy / len;
+    final px = -uy * halfThickness;
+    final py = ux * halfThickness;
+
+    final sx = wall.startPoint.x + ux * positionMm;
+    final sy = wall.startPoint.y + uy * positionMm;
+    final ex = wall.startPoint.x + ux * (positionMm + widthMm);
+    final ey = wall.startPoint.y + uy * (positionMm + widthMm);
+
+    return [
+      Point2D(x: sx - px, y: sy - py),
+      Point2D(x: ex - px, y: ey - py),
+      Point2D(x: ex + px, y: ey + py),
+      Point2D(x: sx + px, y: sy + py),
+    ];
+  }
+
+  /// Nearest wall in [roomId] to [point], excluding [excludeId].
+  WallSegment? _nearestRoomWall(
+    Point2D point, {
+    required String excludeId,
+    required String roomId,
+  }) {
+    WallSegment? nearest;
+    var minDist = double.infinity;
+    for (final wall in callbacks.currentWalls) {
+      if (wall.id == excludeId) continue;
+      if (wall.roomId != roomId) continue;
+      final dist = GeometryUtils.distanceToSegment(
+        point,
+        wall.startPoint,
+        wall.endPoint,
+      );
+      if (dist < minDist) {
+        minDist = dist;
+        nearest = wall;
+      }
+    }
+    return nearest;
   }
 
   // ================================================================
@@ -1853,6 +2143,29 @@ class _DeleteZoneCommand extends Command {
 
   @override
   void undo() => add(zone);
+}
+
+/// Command: move or resize a wall heating zone.
+class _UpdateWallZoneCommand extends Command {
+  _UpdateWallZoneCommand({
+    required this.oldZone,
+    required this.newZone,
+    required this.update,
+    required this.label,
+  });
+
+  final HeatingZone oldZone;
+  final HeatingZone newZone;
+  final void Function(HeatingZone) update;
+
+  @override
+  final String label;
+
+  @override
+  void execute() => update(newZone);
+
+  @override
+  void undo() => update(oldZone);
 }
 
 /// Command: move a zone polygon (vertex drag or body drag).

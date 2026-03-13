@@ -157,6 +157,8 @@ HeatingZone _zoneFromRow($db.HeatingZone row) {
     circuitId: row.circuitId,
     wallSegmentId: row.wallSegmentId,
     heightMm: row.heightMm,
+    positionOnWallMm: row.positionOnWallMm,
+    widthMm: row.widthMm,
   );
 }
 
@@ -226,6 +228,8 @@ $db.HeatingZonesCompanion _zoneToCompanion(HeatingZone zone) {
     circuitId: Value(zone.circuitId),
     wallSegmentId: Value(zone.wallSegmentId),
     heightMm: Value(zone.heightMm),
+    positionOnWallMm: Value(zone.positionOnWallMm),
+    widthMm: Value(zone.widthMm),
   );
 }
 

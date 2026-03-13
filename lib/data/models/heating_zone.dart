@@ -55,6 +55,18 @@ abstract class HeatingZone with _$HeatingZone {
     /// the range 300 to the parent floor's [Floor.heightMm].
     /// Defaults to the floor's [Floor.heightMm] when not set.
     int? heightMm,
+
+    /// Offset from the wall start endpoint to the zone's left edge (mm).
+    ///
+    /// Null for [ZoneType.floorHeating]. For wall zones, defaults to 0.0
+    /// (zone starts at the wall start). Range: 0 to wallLength − [widthMm].
+    double? positionOnWallMm,
+
+    /// Length of the zone along the wall in millimetres.
+    ///
+    /// Null for [ZoneType.floorHeating]. For wall zones, null means
+    /// the zone spans the full wall length. Range: 50 to wallLength.
+    int? widthMm,
   }) = _HeatingZone;
 
   factory HeatingZone.fromJson(Map<String, dynamic> json) =>

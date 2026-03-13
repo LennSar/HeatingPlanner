@@ -34,6 +34,12 @@ class HeatingZones extends Table {
   /// Height of the wall heating zone in mm; null for floor-heating zones.
   IntColumn get heightMm => integer().nullable()();
 
+  /// Offset from wall start to zone left edge in mm; null for floor zones.
+  RealColumn get positionOnWallMm => real().nullable()();
+
+  /// Length of the zone along the wall in mm; null means full wall length.
+  IntColumn get widthMm => integer().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

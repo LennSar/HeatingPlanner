@@ -39,10 +39,11 @@ class HeatingZoneProperties extends ConsumerStatefulWidget {
 
 class _HeatingZonePropertiesState
     extends ConsumerState<HeatingZoneProperties> {
-  // Text controllers for numeric text inputs (spacing, border, height).
+  // Text controllers for numeric text inputs (spacing, border, height, width).
   late TextEditingController _spacingController;
   late TextEditingController _borderController;
   late TextEditingController _heightController;
+  late TextEditingController _widthController;
 
   /// Snapshot taken when a slider drag starts for undo grouping.
   HeatingZone? _zoneAtSliderStart;
@@ -56,6 +57,7 @@ class _HeatingZonePropertiesState
     _spacingController = TextEditingController();
     _borderController = TextEditingController();
     _heightController = TextEditingController();
+    _widthController = TextEditingController();
   }
 
   @override
@@ -63,26 +65,31 @@ class _HeatingZonePropertiesState
     _spacingController.dispose();
     _borderController.dispose();
     _heightController.dispose();
+    _widthController.dispose();
     super.dispose();
   }
 
   /// Syncs text controllers from the model when the zone or its
   /// parameter values change externally (undo/redo).
-  void _syncControllers(HeatingZone zone) {
+  void _syncControllers(HeatingZone zone, int wallLengthMm) {
     final heightStr =
         (zone.heightMm ?? maxRoomHeightMm).toString();
+    final widthStr =
+        (zone.widthMm ?? wallLengthMm).toString();
     if (_lastSyncedZoneId == zone.id &&
         _spacingController.text ==
             zone.tubeSpacingMm.toString() &&
         _borderController.text ==
             zone.borderDistanceMm.toString() &&
-        _heightController.text == heightStr) {
+        _heightController.text == heightStr &&
+        _widthController.text == widthStr) {
       return;
     }
     _lastSyncedZoneId = zone.id;
     _spacingController.text = zone.tubeSpacingMm.toString();
     _borderController.text = zone.borderDistanceMm.toString();
     _heightController.text = heightStr;
+    _widthController.text = widthStr;
   }
 
   /// Commits a zone update via the undo stack.
@@ -104,31 +111,6 @@ class _HeatingZonePropertiesState
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
 
-    // Keep text controllers in sync with external changes (undo/redo).
-    ref.listen<EditorState>(editorStateProvider, (prev, next) {
-      if (!mounted) return;
-      final zone = next.zones
-          .where((z) => z.id == widget.zoneId)
-          .firstOrNull;
-      if (zone == null) return;
-      final prevZone = prev?.zones
-          .where((z) => z.id == widget.zoneId)
-          .firstOrNull;
-      if (prevZone == null ||
-          prevZone.tubeSpacingMm != zone.tubeSpacingMm) {
-        _spacingController.text = zone.tubeSpacingMm.toString();
-      }
-      if (prevZone == null ||
-          prevZone.borderDistanceMm != zone.borderDistanceMm) {
-        _borderController.text = zone.borderDistanceMm.toString();
-      }
-      if (prevZone == null ||
-          prevZone.heightMm != zone.heightMm) {
-        _heightController.text =
-            (zone.heightMm ?? maxRoomHeightMm).toString();
-      }
-    });
-
     final editorState = ref.watch(editorStateProvider);
     final zone = editorState.zones
         .where((z) => z.id == widget.zoneId)
@@ -144,21 +126,71 @@ class _HeatingZonePropertiesState
       );
     }
 
-    _syncControllers(zone);
+    // Resolve the parent wall (for wall zones) to get the wall length,
+    // which is needed for the widthMm slider max and area calculation.
+    final isWallZone = zone.zoneType == ZoneType.wallHeating;
+    final parentWall = isWallZone && zone.wallSegmentId != null
+        ? editorState.walls
+            .where((w) => w.id == zone.wallSegmentId)
+            .firstOrNull
+        : null;
+    final wallLengthMm = parentWall != null
+        ? GeometryEngine.distanceMm(
+            parentWall.startPoint,
+            parentWall.endPoint,
+          ).round()
+        : (zone.polygon.length >= 2
+            ? GeometryEngine.distanceMm(
+                zone.polygon[0],
+                zone.polygon[1],
+              ).round()
+            : maxOpeningWidthMm);
+    final effectiveWidthMm = zone.widthMm ?? wallLengthMm;
+
+    // Keep text controllers in sync with external changes (undo/redo).
+    ref.listen<EditorState>(editorStateProvider, (prev, next) {
+      if (!mounted) return;
+      final z = next.zones
+          .where((z) => z.id == widget.zoneId)
+          .firstOrNull;
+      if (z == null) return;
+      final prevZ = prev?.zones
+          .where((z) => z.id == widget.zoneId)
+          .firstOrNull;
+      if (prevZ == null ||
+          prevZ.tubeSpacingMm != z.tubeSpacingMm) {
+        _spacingController.text = z.tubeSpacingMm.toString();
+      }
+      if (prevZ == null ||
+          prevZ.borderDistanceMm != z.borderDistanceMm) {
+        _borderController.text = z.borderDistanceMm.toString();
+      }
+      if (prevZ == null || prevZ.heightMm != z.heightMm) {
+        _heightController.text =
+            (z.heightMm ?? maxRoomHeightMm).toString();
+      }
+      if (prevZ == null || prevZ.widthMm != z.widthMm) {
+        // widthMm null means full wall — display resolved value.
+        final wLen = parentWall != null
+            ? GeometryEngine.distanceMm(
+                parentWall.startPoint,
+                parentWall.endPoint,
+              ).round()
+            : wallLengthMm;
+        _widthController.text = (z.widthMm ?? wLen).toString();
+      }
+    });
+
+    _syncControllers(zone, wallLengthMm);
 
     // For wall zones, display the heated wall surface area:
-    //   wallLength × heightMm / 1e6  (m²).
+    //   zoneWidth × heightMm / 1e6  (m²).
     // For floor zones, use the polygon area (shoelace formula).
     final double areaM2;
-    final isWallZone = zone.zoneType == ZoneType.wallHeating;
-    if (isWallZone && zone.polygon.length >= 2) {
-      final wallLengthMm = GeometryEngine.distanceMm(
-        zone.polygon[0],
-        zone.polygon[1],
-      );
+    if (isWallZone) {
       final heightMm =
           (zone.heightMm ?? maxRoomHeightMm).toDouble();
-      areaM2 = wallLengthMm * heightMm / 1e6;
+      areaM2 = effectiveWidthMm * heightMm / 1e6;
     } else if (zone.polygon.length >= 3) {
       areaM2 = GeometryEngine.polygonAreaM2(zone.polygon);
     } else {
@@ -305,6 +337,61 @@ class _HeatingZonePropertiesState
                 final prev = zone.heightMm ?? maxRoomHeightMm;
                 if (prev == mm) return;
                 _commit(zone, zone.copyWith(heightMm: mm));
+              },
+            ),
+            const SizedBox(height: Spacing.md),
+
+            // ── Width along wall ──────────────────────────────────
+            Text(
+              'Width: $effectiveWidthMm\u202Fmm',
+              style: textTheme.bodyMedium,
+            ),
+            Slider(
+              value: effectiveWidthMm
+                  .toDouble()
+                  .clamp(
+                    minOpeningWidthMm.toDouble(),
+                    wallLengthMm.toDouble(),
+                  ),
+              min: minOpeningWidthMm.toDouble(),
+              max: wallLengthMm.toDouble().clamp(
+                    minOpeningWidthMm.toDouble(),
+                    double.infinity,
+                  ),
+              divisions: wallLengthMm > minOpeningWidthMm
+                  ? (wallLengthMm - minOpeningWidthMm) ~/ 100
+                  : 1,
+              label: '$effectiveWidthMm\u202Fmm',
+              onChangeStart: (_) => _zoneAtSliderStart = zone,
+              onChanged: (value) {
+                final mm = value.round();
+                _widthController.text = mm.toString();
+                ref
+                    .read(editorStateProvider.notifier)
+                    .updateZone(zone.copyWith(widthMm: mm));
+              },
+              onChangeEnd: (value) {
+                final start = _zoneAtSliderStart;
+                _zoneAtSliderStart = null;
+                if (start == null) return;
+                final mm = value.round();
+                final prev = start.widthMm ?? wallLengthMm;
+                if (prev != mm) {
+                  _commit(start, start.copyWith(widthMm: mm));
+                }
+              },
+            ),
+            _NumericMmField(
+              controller: _widthController,
+              min: minOpeningWidthMm,
+              max: wallLengthMm,
+              suffix: 'mm',
+              helperText:
+                  '$minOpeningWidthMm\u2013$wallLengthMm mm',
+              onSubmitted: (mm) {
+                final prev = zone.widthMm ?? wallLengthMm;
+                if (prev == mm) return;
+                _commit(zone, zone.copyWith(widthMm: mm));
               },
             ),
             const SizedBox(height: Spacing.md),

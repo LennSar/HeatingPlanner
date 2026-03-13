@@ -113,6 +113,22 @@ class InteractionPainter extends CustomPainter {
           if (handles.isNotEmpty) {
             _drawWallHandles(canvas, handles, activeHandleIndex);
           }
+        case WallZoneSelectionData(
+              :final wallStart,
+              :final wallEnd,
+              :final positionOnWallMm,
+              :final widthMm,
+              :final handles,
+              :final activeHandleIndex,
+            ):
+          _drawWallZoneSelection(
+            canvas,
+            Offset(wallStart.x, wallStart.y),
+            Offset(wallEnd.x, wallEnd.y),
+            positionOnWallMm,
+            widthMm,
+          );
+          _drawWallHandles(canvas, handles, activeHandleIndex);
         case WallZoneHoverData(:final wallStart, :final wallEnd):
           _drawWallZoneHover(
             canvas,
@@ -121,6 +137,56 @@ class InteractionPainter extends CustomPainter {
           );
       }
     }
+  }
+
+  /// Draws the selection band and outline for a selected wall heating zone.
+  ///
+  /// Renders the zone as an amber rectangle of 200 mm thickness along
+  /// the wall between [positionOnWallMm] and [positionOnWallMm] + [widthMm].
+  void _drawWallZoneSelection(
+    Canvas canvas,
+    Offset wallStart,
+    Offset wallEnd,
+    double positionOnWallMm,
+    double widthMm,
+  ) {
+    final dx = wallEnd.dx - wallStart.dx;
+    final dy = wallEnd.dy - wallStart.dy;
+    final len = sqrt(dx * dx + dy * dy);
+    if (len < 1) return;
+
+    final ux = dx / len;
+    final uy = dy / len;
+    const halfThick = 100.0;
+    final px = -uy * halfThick;
+    final py = ux * halfThick;
+
+    final x0 = wallStart.dx + ux * positionOnWallMm;
+    final y0 = wallStart.dy + uy * positionOnWallMm;
+    final x1 = wallStart.dx + ux * (positionOnWallMm + widthMm);
+    final y1 = wallStart.dy + uy * (positionOnWallMm + widthMm);
+
+    final path = Path()
+      ..moveTo(x0 + px, y0 + py)
+      ..lineTo(x1 + px, y1 + py)
+      ..lineTo(x1 - px, y1 - py)
+      ..lineTo(x0 - px, y0 - py)
+      ..close();
+
+    const amber = Color(0xFFFFA726);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = amber.withValues(alpha: 0.25)
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = amber
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 6.0,
+    );
   }
 
   /// Highlights a wall segment in amber to indicate it can receive

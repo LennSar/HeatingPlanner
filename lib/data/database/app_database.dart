@@ -65,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -80,6 +80,13 @@ class AppDatabase extends _$AppDatabase {
               heatingZones.wallSegmentId,
             );
             await m.addColumn(heatingZones, heatingZones.heightMm);
+          }
+          if (from < 3) {
+            await m.addColumn(
+              heatingZones,
+              heatingZones.positionOnWallMm,
+            );
+            await m.addColumn(heatingZones, heatingZones.widthMm);
           }
         },
       );
