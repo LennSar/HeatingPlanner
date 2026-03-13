@@ -184,6 +184,7 @@ FlooringMaterial _flooringMaterialFromRow(
     id: row.id,
     name: row.name,
     thermalResistance: row.thermalResistance,
+    surfaceType: SurfaceType.values.byName(row.surfaceType),
   );
 }
 
@@ -255,6 +256,7 @@ $db.FlooringMaterialsCompanion _flooringMaterialToCompanion(
     id: Value(material.id),
     name: Value(material.name),
     thermalResistance: Value(material.thermalResistance),
+    surfaceType: Value(material.surfaceType.name),
   );
 }
 

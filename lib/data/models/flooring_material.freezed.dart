@@ -18,7 +18,8 @@ mixin _$FlooringMaterial {
 /// UUID v4 primary key.
  String get id;/// Display name (1–200 chars).
  String get name;/// Total thermal resistance of the covering in m²·K/W.
- double get thermalResistance;
+ double get thermalResistance;/// Which zone surface this material is applicable to.
+ SurfaceType get surfaceType;
 /// Create a copy of FlooringMaterial
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -31,16 +32,16 @@ $FlooringMaterialCopyWith<FlooringMaterial> get copyWith => _$FlooringMaterialCo
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is FlooringMaterial&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.thermalResistance, thermalResistance) || other.thermalResistance == thermalResistance));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is FlooringMaterial&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.thermalResistance, thermalResistance) || other.thermalResistance == thermalResistance)&&(identical(other.surfaceType, surfaceType) || other.surfaceType == surfaceType));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,thermalResistance);
+int get hashCode => Object.hash(runtimeType,id,name,thermalResistance,surfaceType);
 
 @override
 String toString() {
-  return 'FlooringMaterial(id: $id, name: $name, thermalResistance: $thermalResistance)';
+  return 'FlooringMaterial(id: $id, name: $name, thermalResistance: $thermalResistance, surfaceType: $surfaceType)';
 }
 
 
@@ -51,7 +52,7 @@ abstract mixin class $FlooringMaterialCopyWith<$Res>  {
   factory $FlooringMaterialCopyWith(FlooringMaterial value, $Res Function(FlooringMaterial) _then) = _$FlooringMaterialCopyWithImpl;
 @useResult
 $Res call({
- String id, String name, double thermalResistance
+ String id, String name, double thermalResistance, SurfaceType surfaceType
 });
 
 
@@ -68,12 +69,13 @@ class _$FlooringMaterialCopyWithImpl<$Res>
 
 /// Create a copy of FlooringMaterial
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? thermalResistance = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? thermalResistance = null,Object? surfaceType = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,thermalResistance: null == thermalResistance ? _self.thermalResistance : thermalResistance // ignore: cast_nullable_to_non_nullable
-as double,
+as double,surfaceType: null == surfaceType ? _self.surfaceType : surfaceType // ignore: cast_nullable_to_non_nullable
+as SurfaceType,
   ));
 }
 
@@ -158,10 +160,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  double thermalResistance)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  double thermalResistance,  SurfaceType surfaceType)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _FlooringMaterial() when $default != null:
-return $default(_that.id,_that.name,_that.thermalResistance);case _:
+return $default(_that.id,_that.name,_that.thermalResistance,_that.surfaceType);case _:
   return orElse();
 
 }
@@ -179,10 +181,10 @@ return $default(_that.id,_that.name,_that.thermalResistance);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  double thermalResistance)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  double thermalResistance,  SurfaceType surfaceType)  $default,) {final _that = this;
 switch (_that) {
 case _FlooringMaterial():
-return $default(_that.id,_that.name,_that.thermalResistance);case _:
+return $default(_that.id,_that.name,_that.thermalResistance,_that.surfaceType);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -199,10 +201,10 @@ return $default(_that.id,_that.name,_that.thermalResistance);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  double thermalResistance)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  double thermalResistance,  SurfaceType surfaceType)?  $default,) {final _that = this;
 switch (_that) {
 case _FlooringMaterial() when $default != null:
-return $default(_that.id,_that.name,_that.thermalResistance);case _:
+return $default(_that.id,_that.name,_that.thermalResistance,_that.surfaceType);case _:
   return null;
 
 }
@@ -214,7 +216,7 @@ return $default(_that.id,_that.name,_that.thermalResistance);case _:
 @JsonSerializable()
 
 class _FlooringMaterial implements FlooringMaterial {
-  const _FlooringMaterial({required this.id, required this.name, required this.thermalResistance});
+  const _FlooringMaterial({required this.id, required this.name, required this.thermalResistance, this.surfaceType = SurfaceType.floor});
   factory _FlooringMaterial.fromJson(Map<String, dynamic> json) => _$FlooringMaterialFromJson(json);
 
 /// UUID v4 primary key.
@@ -223,6 +225,8 @@ class _FlooringMaterial implements FlooringMaterial {
 @override final  String name;
 /// Total thermal resistance of the covering in m²·K/W.
 @override final  double thermalResistance;
+/// Which zone surface this material is applicable to.
+@override@JsonKey() final  SurfaceType surfaceType;
 
 /// Create a copy of FlooringMaterial
 /// with the given fields replaced by the non-null parameter values.
@@ -237,16 +241,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _FlooringMaterial&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.thermalResistance, thermalResistance) || other.thermalResistance == thermalResistance));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _FlooringMaterial&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.thermalResistance, thermalResistance) || other.thermalResistance == thermalResistance)&&(identical(other.surfaceType, surfaceType) || other.surfaceType == surfaceType));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,thermalResistance);
+int get hashCode => Object.hash(runtimeType,id,name,thermalResistance,surfaceType);
 
 @override
 String toString() {
-  return 'FlooringMaterial(id: $id, name: $name, thermalResistance: $thermalResistance)';
+  return 'FlooringMaterial(id: $id, name: $name, thermalResistance: $thermalResistance, surfaceType: $surfaceType)';
 }
 
 
@@ -257,7 +261,7 @@ abstract mixin class _$FlooringMaterialCopyWith<$Res> implements $FlooringMateri
   factory _$FlooringMaterialCopyWith(_FlooringMaterial value, $Res Function(_FlooringMaterial) _then) = __$FlooringMaterialCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String name, double thermalResistance
+ String id, String name, double thermalResistance, SurfaceType surfaceType
 });
 
 
@@ -274,12 +278,13 @@ class __$FlooringMaterialCopyWithImpl<$Res>
 
 /// Create a copy of FlooringMaterial
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? thermalResistance = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? thermalResistance = null,Object? surfaceType = null,}) {
   return _then(_FlooringMaterial(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,thermalResistance: null == thermalResistance ? _self.thermalResistance : thermalResistance // ignore: cast_nullable_to_non_nullable
-as double,
+as double,surfaceType: null == surfaceType ? _self.surfaceType : surfaceType // ignore: cast_nullable_to_non_nullable
+as SurfaceType,
   ));
 }
 

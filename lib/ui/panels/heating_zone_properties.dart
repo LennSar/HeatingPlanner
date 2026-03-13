@@ -40,11 +40,10 @@ class HeatingZoneProperties extends ConsumerStatefulWidget {
 
 class _HeatingZonePropertiesState
     extends ConsumerState<HeatingZoneProperties> {
-  // Text controllers for numeric text inputs (spacing, border, height, width).
+  // Text controllers for numeric text inputs (spacing, border, height).
   late TextEditingController _spacingController;
   late TextEditingController _borderController;
   late TextEditingController _heightController;
-  late TextEditingController _widthController;
 
   /// Snapshot taken when a slider drag starts for undo grouping.
   HeatingZone? _zoneAtSliderStart;
@@ -58,7 +57,6 @@ class _HeatingZonePropertiesState
     _spacingController = TextEditingController();
     _borderController = TextEditingController();
     _heightController = TextEditingController();
-    _widthController = TextEditingController();
   }
 
   @override
@@ -66,35 +64,26 @@ class _HeatingZonePropertiesState
     _spacingController.dispose();
     _borderController.dispose();
     _heightController.dispose();
-    _widthController.dispose();
     super.dispose();
   }
 
   /// Syncs text controllers from the model when the zone or its
   /// parameter values change externally (undo/redo).
-  void _syncControllers(
-    HeatingZone zone,
-    int wallLengthMm,
-    int defaultHeightMm,
-  ) {
+  void _syncControllers(HeatingZone zone, int defaultHeightMm) {
     final heightStr =
         (zone.heightMm ?? defaultHeightMm).toString();
-    final widthStr =
-        (zone.widthMm ?? wallLengthMm).toString();
     if (_lastSyncedZoneId == zone.id &&
         _spacingController.text ==
             zone.tubeSpacingMm.toString() &&
         _borderController.text ==
             zone.borderDistanceMm.toString() &&
-        _heightController.text == heightStr &&
-        _widthController.text == widthStr) {
+        _heightController.text == heightStr) {
       return;
     }
     _lastSyncedZoneId = zone.id;
     _spacingController.text = zone.tubeSpacingMm.toString();
     _borderController.text = zone.borderDistanceMm.toString();
     _heightController.text = heightStr;
-    _widthController.text = widthStr;
   }
 
   /// Commits a zone update via the undo stack.
@@ -132,8 +121,8 @@ class _HeatingZonePropertiesState
       );
     }
 
-    // Resolve the parent wall (for wall zones) to get the wall length,
-    // which is needed for the widthMm slider max and area calculation.
+    // Resolve the parent wall (for wall zones) to get the wall length
+    // for the effective width display and area calculation.
     final isWallZone = zone.zoneType == ZoneType.wallHeating;
     final parentWall = isWallZone && zone.wallSegmentId != null
         ? editorState.walls
@@ -176,19 +165,9 @@ class _HeatingZonePropertiesState
             (z.heightMm ?? ref.read(floorHeightMmProvider))
                 .toString();
       }
-      if (prevZ == null || prevZ.widthMm != z.widthMm) {
-        // widthMm null means full wall — display resolved value.
-        final wLen = parentWall != null
-            ? GeometryEngine.distanceMm(
-                parentWall.startPoint,
-                parentWall.endPoint,
-              ).round()
-            : wallLengthMm;
-        _widthController.text = (z.widthMm ?? wLen).toString();
-      }
     });
 
-    _syncControllers(zone, wallLengthMm, floorHeightMm);
+    _syncControllers(zone, floorHeightMm);
 
     // For wall zones, display the heated wall surface area:
     //   zoneWidth × heightMm / 1e6  (m²).
@@ -216,36 +195,6 @@ class _HeatingZonePropertiesState
           const SizedBox(height: Spacing.lg),
           Text('Heating Zone', style: textTheme.headlineSmall),
           const SizedBox(height: Spacing.md),
-
-          // ── Zone type toggle ─────────────────────────────────────
-          Text('Zone Type', style: textTheme.bodyMedium),
-          const SizedBox(height: Spacing.xs),
-          SegmentedButton<ZoneType>(
-            segments: const [
-              ButtonSegment(
-                value: ZoneType.floorHeating,
-                label: Text('Floor'),
-                icon: Icon(Icons.horizontal_rule, size: 16),
-              ),
-              ButtonSegment(
-                value: ZoneType.wallHeating,
-                label: Text('Wall'),
-                icon: Icon(Icons.vertical_align_center, size: 16),
-              ),
-            ],
-            selected: {zone.zoneType},
-            onSelectionChanged: (set) {
-              final newType = set.first;
-              if (newType == zone.zoneType) return;
-              _commit(zone, zone.copyWith(zoneType: newType));
-            },
-            style: const ButtonStyle(
-              visualDensity: VisualDensity.compact,
-              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-            ),
-          ),
-
-          const Divider(height: Spacing.lg),
 
           // ── Tube spacing ─────────────────────────────────────────
           Text(
@@ -348,58 +297,11 @@ class _HeatingZonePropertiesState
             ),
             const SizedBox(height: Spacing.md),
 
-            // ── Width along wall ──────────────────────────────────
-            Text(
-              'Width: $effectiveWidthMm\u202Fmm',
-              style: textTheme.bodyMedium,
-            ),
-            Slider(
-              value: effectiveWidthMm
-                  .toDouble()
-                  .clamp(
-                    minOpeningWidthMm.toDouble(),
-                    wallLengthMm.toDouble(),
-                  ),
-              min: minOpeningWidthMm.toDouble(),
-              max: wallLengthMm.toDouble().clamp(
-                    minOpeningWidthMm.toDouble(),
-                    double.infinity,
-                  ),
-              divisions: wallLengthMm > minOpeningWidthMm
-                  ? (wallLengthMm - minOpeningWidthMm) ~/ 100
-                  : 1,
-              label: '$effectiveWidthMm\u202Fmm',
-              onChangeStart: (_) => _zoneAtSliderStart = zone,
-              onChanged: (value) {
-                final mm = value.round();
-                _widthController.text = mm.toString();
-                ref
-                    .read(editorStateProvider.notifier)
-                    .updateZone(zone.copyWith(widthMm: mm));
-              },
-              onChangeEnd: (value) {
-                final start = _zoneAtSliderStart;
-                _zoneAtSliderStart = null;
-                if (start == null) return;
-                final mm = value.round();
-                final prev = start.widthMm ?? wallLengthMm;
-                if (prev != mm) {
-                  _commit(start, start.copyWith(widthMm: mm));
-                }
-              },
-            ),
-            _NumericMmField(
-              controller: _widthController,
-              min: minOpeningWidthMm,
-              max: wallLengthMm,
-              suffix: 'mm',
-              helperText:
-                  '$minOpeningWidthMm\u2013$wallLengthMm mm',
-              onSubmitted: (mm) {
-                final prev = zone.widthMm ?? wallLengthMm;
-                if (prev == mm) return;
-                _commit(zone, zone.copyWith(widthMm: mm));
-              },
+            // ── Width along wall (read-only) ──────────────────────
+            _readOnlyRow(
+              'Width',
+              '$effectiveWidthMm\u202Fmm',
+              textTheme,
             ),
             const SizedBox(height: Spacing.md),
           ],
@@ -515,21 +417,34 @@ class _HeatingZonePropertiesState
 
           const SizedBox(height: Spacing.md),
 
-          // ── Flooring material dropdown ───────────────────────────
-          Text('Flooring Material', style: textTheme.bodyMedium),
+          // ── Surface material dropdown ────────────────────────────
+          Text(
+            isWallZone ? 'Surface Material' : 'Flooring Material',
+            style: textTheme.bodyMedium,
+          ),
           const SizedBox(height: Spacing.xs),
           flooringAsync.when(
-            data: (materials) => _FlooringMaterialDropdown(
-              materials: materials,
-              selectedId: zone.flooringMaterialId,
-              onChanged: (id) {
-                if (id == zone.flooringMaterialId) return;
-                _commit(
-                  zone,
-                  zone.copyWith(flooringMaterialId: id),
-                );
-              },
-            ),
+            data: (allMaterials) {
+              final filtered = allMaterials.where((m) {
+                if (isWallZone) {
+                  return m.surfaceType == SurfaceType.wall ||
+                      m.surfaceType == SurfaceType.both;
+                }
+                return m.surfaceType == SurfaceType.floor ||
+                    m.surfaceType == SurfaceType.both;
+              }).toList();
+              return _FlooringMaterialDropdown(
+                materials: filtered,
+                selectedId: zone.flooringMaterialId,
+                onChanged: (id) {
+                  if (id == zone.flooringMaterialId) return;
+                  _commit(
+                    zone,
+                    zone.copyWith(flooringMaterialId: id),
+                  );
+                },
+              );
+            },
             loading: () => const LinearProgressIndicator(),
             error: (e, _) => Text(
               'Error loading flooring materials',

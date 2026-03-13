@@ -4771,8 +4771,25 @@ class $FlooringMaterialsTable extends FlooringMaterials
         type: DriftSqlType.double,
         requiredDuringInsert: true,
       );
+  static const VerificationMeta _surfaceTypeMeta = const VerificationMeta(
+    'surfaceType',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, name, thermalResistance];
+  late final GeneratedColumn<String> surfaceType = GeneratedColumn<String>(
+    'surface_type',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('floor'),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    thermalResistance,
+    surfaceType,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -4809,6 +4826,15 @@ class $FlooringMaterialsTable extends FlooringMaterials
     } else if (isInserting) {
       context.missing(_thermalResistanceMeta);
     }
+    if (data.containsKey('surface_type')) {
+      context.handle(
+        _surfaceTypeMeta,
+        surfaceType.isAcceptableOrUnknown(
+          data['surface_type']!,
+          _surfaceTypeMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -4830,6 +4856,10 @@ class $FlooringMaterialsTable extends FlooringMaterials
         DriftSqlType.double,
         data['${effectivePrefix}thermal_resistance'],
       )!,
+      surfaceType: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}surface_type'],
+      )!,
     );
   }
 
@@ -4844,10 +4874,14 @@ class FlooringMaterial extends DataClass
   final String id;
   final String name;
   final double thermalResistance;
+
+  /// Serialised [SurfaceType] name; defaults to 'floor' for existing rows.
+  final String surfaceType;
   const FlooringMaterial({
     required this.id,
     required this.name,
     required this.thermalResistance,
+    required this.surfaceType,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -4855,6 +4889,7 @@ class FlooringMaterial extends DataClass
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
     map['thermal_resistance'] = Variable<double>(thermalResistance);
+    map['surface_type'] = Variable<String>(surfaceType);
     return map;
   }
 
@@ -4863,6 +4898,7 @@ class FlooringMaterial extends DataClass
       id: Value(id),
       name: Value(name),
       thermalResistance: Value(thermalResistance),
+      surfaceType: Value(surfaceType),
     );
   }
 
@@ -4875,6 +4911,7 @@ class FlooringMaterial extends DataClass
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       thermalResistance: serializer.fromJson<double>(json['thermalResistance']),
+      surfaceType: serializer.fromJson<String>(json['surfaceType']),
     );
   }
   @override
@@ -4884,6 +4921,7 @@ class FlooringMaterial extends DataClass
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'thermalResistance': serializer.toJson<double>(thermalResistance),
+      'surfaceType': serializer.toJson<String>(surfaceType),
     };
   }
 
@@ -4891,10 +4929,12 @@ class FlooringMaterial extends DataClass
     String? id,
     String? name,
     double? thermalResistance,
+    String? surfaceType,
   }) => FlooringMaterial(
     id: id ?? this.id,
     name: name ?? this.name,
     thermalResistance: thermalResistance ?? this.thermalResistance,
+    surfaceType: surfaceType ?? this.surfaceType,
   );
   FlooringMaterial copyWithCompanion(FlooringMaterialsCompanion data) {
     return FlooringMaterial(
@@ -4903,6 +4943,9 @@ class FlooringMaterial extends DataClass
       thermalResistance: data.thermalResistance.present
           ? data.thermalResistance.value
           : this.thermalResistance,
+      surfaceType: data.surfaceType.present
+          ? data.surfaceType.value
+          : this.surfaceType,
     );
   }
 
@@ -4911,37 +4954,42 @@ class FlooringMaterial extends DataClass
     return (StringBuffer('FlooringMaterial(')
           ..write('id: $id, ')
           ..write('name: $name, ')
-          ..write('thermalResistance: $thermalResistance')
+          ..write('thermalResistance: $thermalResistance, ')
+          ..write('surfaceType: $surfaceType')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, thermalResistance);
+  int get hashCode => Object.hash(id, name, thermalResistance, surfaceType);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is FlooringMaterial &&
           other.id == this.id &&
           other.name == this.name &&
-          other.thermalResistance == this.thermalResistance);
+          other.thermalResistance == this.thermalResistance &&
+          other.surfaceType == this.surfaceType);
 }
 
 class FlooringMaterialsCompanion extends UpdateCompanion<FlooringMaterial> {
   final Value<String> id;
   final Value<String> name;
   final Value<double> thermalResistance;
+  final Value<String> surfaceType;
   final Value<int> rowid;
   const FlooringMaterialsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.thermalResistance = const Value.absent(),
+    this.surfaceType = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   FlooringMaterialsCompanion.insert({
     required String id,
     required String name,
     required double thermalResistance,
+    this.surfaceType = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name),
@@ -4950,12 +4998,14 @@ class FlooringMaterialsCompanion extends UpdateCompanion<FlooringMaterial> {
     Expression<String>? id,
     Expression<String>? name,
     Expression<double>? thermalResistance,
+    Expression<String>? surfaceType,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (thermalResistance != null) 'thermal_resistance': thermalResistance,
+      if (surfaceType != null) 'surface_type': surfaceType,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4964,12 +5014,14 @@ class FlooringMaterialsCompanion extends UpdateCompanion<FlooringMaterial> {
     Value<String>? id,
     Value<String>? name,
     Value<double>? thermalResistance,
+    Value<String>? surfaceType,
     Value<int>? rowid,
   }) {
     return FlooringMaterialsCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
       thermalResistance: thermalResistance ?? this.thermalResistance,
+      surfaceType: surfaceType ?? this.surfaceType,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4986,6 +5038,9 @@ class FlooringMaterialsCompanion extends UpdateCompanion<FlooringMaterial> {
     if (thermalResistance.present) {
       map['thermal_resistance'] = Variable<double>(thermalResistance.value);
     }
+    if (surfaceType.present) {
+      map['surface_type'] = Variable<String>(surfaceType.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4998,6 +5053,7 @@ class FlooringMaterialsCompanion extends UpdateCompanion<FlooringMaterial> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('thermalResistance: $thermalResistance, ')
+          ..write('surfaceType: $surfaceType, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -11780,6 +11836,7 @@ typedef $$FlooringMaterialsTableCreateCompanionBuilder =
       required String id,
       required String name,
       required double thermalResistance,
+      Value<String> surfaceType,
       Value<int> rowid,
     });
 typedef $$FlooringMaterialsTableUpdateCompanionBuilder =
@@ -11787,6 +11844,7 @@ typedef $$FlooringMaterialsTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> name,
       Value<double> thermalResistance,
+      Value<String> surfaceType,
       Value<int> rowid,
     });
 
@@ -11849,6 +11907,11 @@ class $$FlooringMaterialsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get surfaceType => $composableBuilder(
+    column: $table.surfaceType,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> heatingZonesRefs(
     Expression<bool> Function($$HeatingZonesTableFilterComposer f) f,
   ) {
@@ -11898,6 +11961,11 @@ class $$FlooringMaterialsTableOrderingComposer
     column: $table.thermalResistance,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<String> get surfaceType => $composableBuilder(
+    column: $table.surfaceType,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$FlooringMaterialsTableAnnotationComposer
@@ -11917,6 +11985,11 @@ class $$FlooringMaterialsTableAnnotationComposer
 
   GeneratedColumn<double> get thermalResistance => $composableBuilder(
     column: $table.thermalResistance,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get surfaceType => $composableBuilder(
+    column: $table.surfaceType,
     builder: (column) => column,
   );
 
@@ -11982,11 +12055,13 @@ class $$FlooringMaterialsTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<double> thermalResistance = const Value.absent(),
+                Value<String> surfaceType = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FlooringMaterialsCompanion(
                 id: id,
                 name: name,
                 thermalResistance: thermalResistance,
+                surfaceType: surfaceType,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -11994,11 +12069,13 @@ class $$FlooringMaterialsTableTableManager
                 required String id,
                 required String name,
                 required double thermalResistance,
+                Value<String> surfaceType = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FlooringMaterialsCompanion.insert(
                 id: id,
                 name: name,
                 thermalResistance: thermalResistance,
+                surfaceType: surfaceType,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

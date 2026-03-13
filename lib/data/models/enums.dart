@@ -47,6 +47,12 @@ enum TubeMaterial { peRt, peXa, peXb, peXc, pb, copper, multiLayer }
 /// Severity level for validation messages.
 enum WarningSeverity { error, warning, info }
 
+/// Applicable surface type for a [FlooringMaterial].
+///
+/// Used to filter materials in the properties panel so only
+/// appropriate choices are shown for each zone type.
+enum SurfaceType { floor, wall, both }
+
 /// Active drawing tool on the canvas.
 enum DrawingTool {
   select,

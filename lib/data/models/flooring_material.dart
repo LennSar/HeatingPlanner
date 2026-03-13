@@ -1,12 +1,14 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import 'enums.dart';
+
 part 'flooring_material.freezed.dart';
 part 'flooring_material.g.dart';
 
-/// A floor covering with its thermal resistance.
+/// A surface covering with its thermal resistance.
 ///
 /// Used by the heating-output engine to calculate the temperature
-/// reduction across the floor structure (EN 1264-2 R_λB term).
+/// reduction across the floor or wall structure (EN 1264-2 R_λB term).
 @freezed
 abstract class FlooringMaterial with _$FlooringMaterial {
   const factory FlooringMaterial({
@@ -18,6 +20,9 @@ abstract class FlooringMaterial with _$FlooringMaterial {
 
     /// Total thermal resistance of the covering in m²·K/W.
     required double thermalResistance,
+
+    /// Which zone surface this material is applicable to.
+    @Default(SurfaceType.floor) SurfaceType surfaceType,
   }) = _FlooringMaterial;
 
   factory FlooringMaterial.fromJson(Map<String, dynamic> json) =>

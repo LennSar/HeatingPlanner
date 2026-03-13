@@ -203,26 +203,31 @@ class HeatingDao extends DatabaseAccessor<AppDatabase>
         id: '20000000-0000-4000-8000-000000000001',
         name: 'Ceramic tile',
         r: 0.01,
+        surfaceType: 'both',
       ),
       (
         id: '20000000-0000-4000-8000-000000000002',
         name: 'Parquet',
         r: 0.10,
+        surfaceType: 'floor',
       ),
       (
         id: '20000000-0000-4000-8000-000000000003',
         name: 'Laminate',
         r: 0.07,
+        surfaceType: 'floor',
       ),
       (
         id: '20000000-0000-4000-8000-000000000004',
         name: 'Carpet',
         r: 0.15,
+        surfaceType: 'floor',
       ),
       (
         id: '20000000-0000-4000-8000-000000000005',
         name: 'Vinyl',
         r: 0.01,
+        surfaceType: 'floor',
       ),
     ];
 
@@ -232,6 +237,76 @@ class HeatingDao extends DatabaseAccessor<AppDatabase>
           id: r.id,
           name: r.name,
           thermalResistance: r.r,
+          surfaceType: Value(r.surfaceType),
+        ),
+      );
+    }
+
+    await _upsertWallSurfaceMaterials();
+  }
+
+  /// Upserts the built-in wall and shared surface materials.
+  ///
+  /// Called both from [seedDefaults] (new installs) and from the
+  /// schema-v4 migration (existing databases upgrading from v3).
+  Future<void> seedSurfaceTypeMigration() async {
+    // Correct ceramic tile, which was seeded before surfaceType existed.
+    await (update(flooringMaterials)
+          ..where(
+            (t) => t.id.equals(
+              '20000000-0000-4000-8000-000000000001',
+            ),
+          ))
+        .write(
+      const FlooringMaterialsCompanion(
+        surfaceType: Value('both'),
+      ),
+    );
+
+    await _upsertWallSurfaceMaterials();
+  }
+
+  Future<void> _upsertWallSurfaceMaterials() async {
+    const wallRows = [
+      (
+        id: '20000000-0000-4000-8000-000000000010',
+        name: 'Gypsum plaster',
+        r: 0.02,
+        surfaceType: 'wall',
+      ),
+      (
+        id: '20000000-0000-4000-8000-000000000011',
+        name: 'Lime plaster',
+        r: 0.02,
+        surfaceType: 'wall',
+      ),
+      (
+        id: '20000000-0000-4000-8000-000000000012',
+        name: 'Clay plaster',
+        r: 0.03,
+        surfaceType: 'wall',
+      ),
+      (
+        id: '20000000-0000-4000-8000-000000000013',
+        name: 'Gypsum board',
+        r: 0.04,
+        surfaceType: 'wall',
+      ),
+      (
+        id: '20000000-0000-4000-8000-000000000014',
+        name: 'Natural stone',
+        r: 0.01,
+        surfaceType: 'both',
+      ),
+    ];
+
+    for (final r in wallRows) {
+      await upsertFlooringMaterial(
+        FlooringMaterialsCompanion.insert(
+          id: r.id,
+          name: r.name,
+          thermalResistance: r.r,
+          surfaceType: Value(r.surfaceType),
         ),
       );
     }
