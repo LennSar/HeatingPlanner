@@ -39,9 +39,10 @@ class HeatingZoneProperties extends ConsumerStatefulWidget {
 
 class _HeatingZonePropertiesState
     extends ConsumerState<HeatingZoneProperties> {
-  // Text controllers for numeric text inputs (spacing, border).
+  // Text controllers for numeric text inputs (spacing, border, height).
   late TextEditingController _spacingController;
   late TextEditingController _borderController;
+  late TextEditingController _heightController;
 
   /// Snapshot taken when a slider drag starts for undo grouping.
   HeatingZone? _zoneAtSliderStart;
@@ -54,28 +55,34 @@ class _HeatingZonePropertiesState
     super.initState();
     _spacingController = TextEditingController();
     _borderController = TextEditingController();
+    _heightController = TextEditingController();
   }
 
   @override
   void dispose() {
     _spacingController.dispose();
     _borderController.dispose();
+    _heightController.dispose();
     super.dispose();
   }
 
-  /// Syncs text controllers from the model when the zone
-  /// or its spacing/border values change externally (undo/redo).
+  /// Syncs text controllers from the model when the zone or its
+  /// parameter values change externally (undo/redo).
   void _syncControllers(HeatingZone zone) {
+    final heightStr =
+        (zone.heightMm ?? maxRoomHeightMm).toString();
     if (_lastSyncedZoneId == zone.id &&
         _spacingController.text ==
             zone.tubeSpacingMm.toString() &&
         _borderController.text ==
-            zone.borderDistanceMm.toString()) {
+            zone.borderDistanceMm.toString() &&
+        _heightController.text == heightStr) {
       return;
     }
     _lastSyncedZoneId = zone.id;
     _spacingController.text = zone.tubeSpacingMm.toString();
     _borderController.text = zone.borderDistanceMm.toString();
+    _heightController.text = heightStr;
   }
 
   /// Commits a zone update via the undo stack.
@@ -115,6 +122,11 @@ class _HeatingZonePropertiesState
           prevZone.borderDistanceMm != zone.borderDistanceMm) {
         _borderController.text = zone.borderDistanceMm.toString();
       }
+      if (prevZone == null ||
+          prevZone.heightMm != zone.heightMm) {
+        _heightController.text =
+            (zone.heightMm ?? maxRoomHeightMm).toString();
+      }
     });
 
     final editorState = ref.watch(editorStateProvider);
@@ -134,9 +146,24 @@ class _HeatingZonePropertiesState
 
     _syncControllers(zone);
 
-    final areaM2 = zone.polygon.length >= 3
-        ? GeometryEngine.polygonAreaM2(zone.polygon)
-        : double.nan;
+    // For wall zones, display the heated wall surface area:
+    //   wallLength × heightMm / 1e6  (m²).
+    // For floor zones, use the polygon area (shoelace formula).
+    final double areaM2;
+    final isWallZone = zone.zoneType == ZoneType.wallHeating;
+    if (isWallZone && zone.polygon.length >= 2) {
+      final wallLengthMm = GeometryEngine.distanceMm(
+        zone.polygon[0],
+        zone.polygon[1],
+      );
+      final heightMm =
+          (zone.heightMm ?? maxRoomHeightMm).toDouble();
+      areaM2 = wallLengthMm * heightMm / 1e6;
+    } else if (zone.polygon.length >= 3) {
+      areaM2 = GeometryEngine.polygonAreaM2(zone.polygon);
+    } else {
+      areaM2 = double.nan;
+    }
 
     final tubeTypesAsync = ref.watch(tubeTypesProvider);
     final flooringAsync = ref.watch(flooringMaterialsProvider);
@@ -224,58 +251,119 @@ class _HeatingZonePropertiesState
             },
           ),
 
-          const SizedBox(height: Spacing.md),
-
-          // ── Border distance ──────────────────────────────────────
-          Text(
-            'Border Distance: ${zone.borderDistanceMm}\u202Fmm',
-            style: textTheme.bodyMedium,
-          ),
-          Slider(
-            value: zone.borderDistanceMm.toDouble(),
-            min: minBorderDistanceMm.toDouble(),
-            max: maxBorderDistanceMm.toDouble(),
-            divisions:
-                (maxBorderDistanceMm - minBorderDistanceMm) ~/ 10,
-            label: '${zone.borderDistanceMm}\u202Fmm',
-            onChangeStart: (_) => _zoneAtSliderStart = zone,
-            onChanged: (value) {
-              final mm = value.round();
-              _borderController.text = mm.toString();
-              ref
-                  .read(editorStateProvider.notifier)
-                  .updateZone(
-                    zone.copyWith(borderDistanceMm: mm),
+          // ── Wall zone height ─────────────────────────────────────
+          // Shown only for wall heating zones.
+          if (isWallZone) ...[
+            Text(
+              'Height: '
+              '${zone.heightMm ?? maxRoomHeightMm}\u202Fmm',
+              style: textTheme.bodyMedium,
+            ),
+            Slider(
+              value: (zone.heightMm ?? maxRoomHeightMm)
+                  .toDouble()
+                  .clamp(
+                    minWallZoneHeightMm.toDouble(),
+                    maxRoomHeightMm.toDouble(),
+                  ),
+              min: minWallZoneHeightMm.toDouble(),
+              max: maxRoomHeightMm.toDouble(),
+              divisions: (maxRoomHeightMm - minWallZoneHeightMm) ~/
+                  10,
+              label:
+                  '${zone.heightMm ?? maxRoomHeightMm}\u202Fmm',
+              onChangeStart: (_) => _zoneAtSliderStart = zone,
+              onChanged: (value) {
+                final mm = value.round();
+                _heightController.text = mm.toString();
+                ref
+                    .read(editorStateProvider.notifier)
+                    .updateZone(zone.copyWith(heightMm: mm));
+              },
+              onChangeEnd: (value) {
+                final start = _zoneAtSliderStart;
+                _zoneAtSliderStart = null;
+                if (start == null) return;
+                final mm = value.round();
+                final prev = start.heightMm ?? maxRoomHeightMm;
+                if (prev != mm) {
+                  _commit(
+                    start,
+                    start.copyWith(heightMm: mm),
                   );
-            },
-            onChangeEnd: (value) {
-              final start = _zoneAtSliderStart;
-              _zoneAtSliderStart = null;
-              if (start == null) return;
-              final mm = value.round();
-              if (start.borderDistanceMm != mm) {
+                }
+              },
+            ),
+            _NumericMmField(
+              controller: _heightController,
+              min: minWallZoneHeightMm,
+              max: maxRoomHeightMm,
+              suffix: 'mm',
+              helperText:
+                  '$minWallZoneHeightMm\u2013$maxRoomHeightMm mm',
+              onSubmitted: (mm) {
+                final prev = zone.heightMm ?? maxRoomHeightMm;
+                if (prev == mm) return;
+                _commit(zone, zone.copyWith(heightMm: mm));
+              },
+            ),
+            const SizedBox(height: Spacing.md),
+          ],
+
+          // ── Border distance (floor zones only) ───────────────────
+          if (!isWallZone) ...[
+            Text(
+              'Border Distance: ${zone.borderDistanceMm}\u202Fmm',
+              style: textTheme.bodyMedium,
+            ),
+            Slider(
+              value: zone.borderDistanceMm.toDouble(),
+              min: minBorderDistanceMm.toDouble(),
+              max: maxBorderDistanceMm.toDouble(),
+              divisions:
+                  (maxBorderDistanceMm - minBorderDistanceMm) ~/
+                      10,
+              label: '${zone.borderDistanceMm}\u202Fmm',
+              onChangeStart: (_) => _zoneAtSliderStart = zone,
+              onChanged: (value) {
+                final mm = value.round();
+                _borderController.text = mm.toString();
+                ref
+                    .read(editorStateProvider.notifier)
+                    .updateZone(
+                      zone.copyWith(borderDistanceMm: mm),
+                    );
+              },
+              onChangeEnd: (value) {
+                final start = _zoneAtSliderStart;
+                _zoneAtSliderStart = null;
+                if (start == null) return;
+                final mm = value.round();
+                if (start.borderDistanceMm != mm) {
+                  _commit(
+                    start,
+                    start.copyWith(borderDistanceMm: mm),
+                  );
+                }
+              },
+            ),
+            _NumericMmField(
+              controller: _borderController,
+              min: minBorderDistanceMm,
+              max: maxBorderDistanceMm,
+              suffix: 'mm',
+              helperText:
+                  '$minBorderDistanceMm\u2013$maxBorderDistanceMm mm',
+              onSubmitted: (mm) {
+                if (mm == zone.borderDistanceMm) return;
                 _commit(
-                  start,
-                  start.copyWith(borderDistanceMm: mm),
+                  zone,
+                  zone.copyWith(borderDistanceMm: mm),
                 );
-              }
-            },
-          ),
-          _NumericMmField(
-            controller: _borderController,
-            min: minBorderDistanceMm,
-            max: maxBorderDistanceMm,
-            suffix: 'mm',
-            helperText:
-                '$minBorderDistanceMm\u2013$maxBorderDistanceMm mm',
-            onSubmitted: (mm) {
-              if (mm == zone.borderDistanceMm) return;
-              _commit(
-                zone,
-                zone.copyWith(borderDistanceMm: mm),
-              );
-            },
-          ),
+              },
+            ),
+            const SizedBox(height: Spacing.md),
+          ],
 
           const Divider(height: Spacing.lg),
 

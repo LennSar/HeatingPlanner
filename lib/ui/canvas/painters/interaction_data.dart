@@ -166,6 +166,27 @@ class ZoneSelectionData extends InteractionData {
   final int? activeHandleIndex;
 }
 
+/// Hover highlight for the wall zone placement tool.
+///
+/// Produced by [WallZonePlaceTool] when the cursor is within
+/// hit-distance of a room-assigned wall segment. The
+/// [InteractionPainter] draws a warm amber overlay on the wall
+/// to signal that clicking will place a wall heating zone.
+@immutable
+class WallZoneHoverData extends InteractionData {
+  /// Creates [WallZoneHoverData].
+  const WallZoneHoverData({
+    required this.wallStart,
+    required this.wallEnd,
+  });
+
+  /// Start endpoint of the highlighted wall (world mm).
+  final Point2D wallStart;
+
+  /// End endpoint of the highlighted wall (world mm).
+  final Point2D wallEnd;
+}
+
 /// Highlight data for a selected window or door element.
 ///
 /// Produced by [SelectTool] when a window or door is

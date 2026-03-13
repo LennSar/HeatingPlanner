@@ -54,6 +54,9 @@ enum DrawingTool {
   placeWindow,
   placeDoor,
   drawZone,
+
+  /// Place a wall heating zone by clicking a wall segment.
+  drawWallZone,
   placeDistributor,
   routePipe,
   measure,

@@ -104,6 +104,8 @@ final Map<ShortcutActivator, Intent> editorShortcuts = {
       const SwitchToolIntent(DrawingTool.placeDoor),
   const SingleActivator(LogicalKeyboardKey.keyH):
       const SwitchToolIntent(DrawingTool.drawZone),
+  const SingleActivator(LogicalKeyboardKey.keyK):
+      const SwitchToolIntent(DrawingTool.drawWallZone),
   const SingleActivator(LogicalKeyboardKey.keyG):
       const SwitchToolIntent(DrawingTool.placeDistributor),
   const SingleActivator(LogicalKeyboardKey.keyR):

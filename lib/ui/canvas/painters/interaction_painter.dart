@@ -113,8 +113,32 @@ class InteractionPainter extends CustomPainter {
           if (handles.isNotEmpty) {
             _drawWallHandles(canvas, handles, activeHandleIndex);
           }
+        case WallZoneHoverData(:final wallStart, :final wallEnd):
+          _drawWallZoneHover(
+            canvas,
+            Offset(wallStart.x, wallStart.y),
+            Offset(wallEnd.x, wallEnd.y),
+          );
       }
     }
+  }
+
+  /// Highlights a wall segment in amber to indicate it can receive
+  /// a wall heating zone on click.
+  void _drawWallZoneHover(
+    Canvas canvas,
+    Offset wallStart,
+    Offset wallEnd,
+  ) {
+    canvas.drawLine(
+      wallStart,
+      wallEnd,
+      Paint()
+        ..color = Colors.orange.withValues(alpha: 0.7)
+        ..strokeWidth = 10.0
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round,
+    );
   }
 
   /// Draws a selection highlight for a committed heating zone.

@@ -188,7 +188,12 @@ class _Toolbar extends StatelessWidget {
     _ToolEntry(
       DrawingTool.drawZone,
       Icons.grid_on,
-      'Zone',
+      'Floor Zone',
+    ),
+    _ToolEntry(
+      DrawingTool.drawWallZone,
+      Icons.view_column_outlined,
+      'Wall Zone',
     ),
     _ToolEntry(
       DrawingTool.placeDistributor,

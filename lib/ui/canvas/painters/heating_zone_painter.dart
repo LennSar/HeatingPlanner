@@ -1,3 +1,5 @@
+import 'dart:math' show sqrt;
+
 import 'package:flutter/material.dart';
 
 import '../../../data/models/enums.dart';
@@ -55,7 +57,11 @@ class HeatingZonePainter extends CustomPainter {
       // ADR-004 priority chain:
       // State 1 — unconnected (circuitId == null) → red hatched.
       // States 2-5 not yet reachable (no distributor wiring).
-      _paintUnconnected(canvas, path, zone);
+      if (zone.zoneType == ZoneType.wallHeating) {
+        _paintWallZoneUnconnected(canvas, path, zone);
+      } else {
+        _paintUnconnected(canvas, path, zone);
+      }
     }
   }
 
@@ -185,6 +191,102 @@ class HeatingZonePainter extends CustomPainter {
     }
 
     canvas.drawPath(meander, tubePaint);
+  }
+
+  /// Paint an unconnected wall heating zone (ADR-004 state 1).
+  ///
+  /// Renders the zone band with the same red hatched fill as floor
+  /// zones, then draws tube-line preview lines that run across the
+  /// short axis of the band (perpendicular to the wall direction)
+  /// at [HeatingZone.tubeSpacingMm] intervals along the wall.
+  ///
+  /// The band polygon is a 4-vertex rectangle with vertices ordered
+  /// [outer-start, outer-end, inner-end, inner-start] as produced by
+  /// [WallZonePlaceTool._wallBandPolygon].
+  void _paintWallZoneUnconnected(
+    Canvas canvas,
+    Path path,
+    HeatingZone zone,
+  ) {
+    // Semi-transparent red fill.
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = zoneRed.withValues(alpha: 0.15)
+        ..style = PaintingStyle.fill,
+    );
+
+    // Red zone outline.
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = zoneRed
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.0,
+    );
+
+    // 45° hatch (clipped to polygon).
+    canvas.save();
+    canvas.clipPath(path);
+    _drawHatch(canvas, path);
+    canvas.restore();
+
+    // Transverse tube-line preview (clipped to polygon).
+    canvas.save();
+    canvas.clipPath(path);
+    _drawWallZoneTubePreview(canvas, zone);
+    canvas.restore();
+  }
+
+  /// Draws tube-line preview for a wall heating zone.
+  ///
+  /// Lines run across the band's short axis (perpendicular to the
+  /// wall direction) at [HeatingZone.tubeSpacingMm] intervals.
+  /// Derived from the 4-vertex band polygon.
+  ///
+  /// The canvas must already be clipped to the zone polygon.
+  void _drawWallZoneTubePreview(Canvas canvas, HeatingZone zone) {
+    if (zone.polygon.length < 4) return;
+    final spacing = zone.tubeSpacingMm.toDouble();
+    if (spacing <= 0) return;
+
+    // Polygon vertices: [outerStart, outerEnd, innerEnd, innerStart].
+    final p0 = zone.polygon[0]; // outer-start
+    final p1 = zone.polygon[1]; // outer-end
+    final p3 = zone.polygon[3]; // inner-start
+
+    // Wall direction vector and its length.
+    final wallDx = p1.x - p0.x;
+    final wallDy = p1.y - p0.y;
+    final wallLen = sqrt(wallDx * wallDx + wallDy * wallDy);
+    if (wallLen < 1) return;
+
+    // Perpendicular vector (short-axis of the band).
+    final perpDx = p3.x - p0.x;
+    final perpDy = p3.y - p0.y;
+
+    final tubePaint = Paint()
+      ..color = supplyPipe.withValues(alpha: 0.45)
+      ..strokeWidth = 8.0
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    // Draw lines across the band at [spacing] intervals.
+    var offset = spacing / 2;
+    while (offset < wallLen) {
+      final t = offset / wallLen;
+      // Interpolate start and end across the band width.
+      final fromX = p0.x + wallDx * t;
+      final fromY = p0.y + wallDy * t;
+      final toX = fromX + perpDx;
+      final toY = fromY + perpDy;
+      canvas.drawLine(
+        Offset(fromX, fromY),
+        Offset(toX, toY),
+        tubePaint,
+      );
+      offset += spacing;
+    }
   }
 
   @override

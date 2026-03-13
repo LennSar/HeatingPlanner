@@ -41,6 +41,9 @@ const double maxTubeOuterDiamMm = 32.0;
 const int minBorderDistanceMm = 50;
 const int maxBorderDistanceMm = 300;
 
+/// Minimum height of a wall heating zone (mm).
+const int minWallZoneHeightMm = 300;
+
 // ── Hydraulic ─────────────────────────────────────────────────────────────────
 /// Upper noise threshold — flow above this generates a warning.
 const double maxFlowVelocityMs = 0.5;

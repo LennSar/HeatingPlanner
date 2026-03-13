@@ -32,6 +32,7 @@ import 'tools/tool_base.dart';
 import 'tools/undo_redo_service.dart';
 import 'tools/wall_draw_tool.dart';
 import 'tools/window_place_tool.dart';
+import 'tools/wall_zone_place_tool.dart';
 import 'tools/zone_draw_tool.dart';
 
 /// Provider that signals tools to cancel (incremented on
@@ -148,6 +149,10 @@ class _FloorPlanCanvasState
       undoRedo: undoRedo,
     );
     _tools[DrawingTool.drawZone] = ZoneDrawTool(
+      callbacks: this,
+      onStateChanged: onChanged,
+    );
+    _tools[DrawingTool.drawWallZone] = WallZonePlaceTool(
       callbacks: this,
       onStateChanged: onChanged,
     );
@@ -605,13 +610,20 @@ class _FloorPlanCanvasState
 
                 final idata = _activeTool?.getInteractionData();
 
-                // Surface zone-draw hint to the status bar.
-                final hint =
-                    (idata is ZoneDrawData &&
-                            idata.cursorOutsideValidArea)
-                        ? 'Move cursor inside a room to place '
-                            'zone vertices'
-                        : null;
+                // Surface tool hints to the status bar.
+                final String? hint;
+                if (idata is ZoneDrawData &&
+                    idata.cursorOutsideValidArea) {
+                  hint = 'Move cursor inside a room to '
+                      'place zone vertices';
+                } else if (ref.read(selectedToolProvider) ==
+                        DrawingTool.drawWallZone &&
+                    idata == null) {
+                  hint = 'Hover over a wall to place a '
+                      'wall heating zone';
+                } else {
+                  hint = null;
+                }
                 ref
                     .read(toolStatusHintProvider.notifier)
                     .set(hint);
@@ -667,6 +679,7 @@ class _FloorPlanCanvasState
       DrawingTool.placeWindow => SystemMouseCursors.precise,
       DrawingTool.placeDoor => SystemMouseCursors.precise,
       DrawingTool.drawZone => SystemMouseCursors.precise,
+      DrawingTool.drawWallZone => SystemMouseCursors.precise,
       DrawingTool.placeDistributor =>
         SystemMouseCursors.precise,
       DrawingTool.routePipe => SystemMouseCursors.precise,
