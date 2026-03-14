@@ -7,6 +7,7 @@ import '../../calculation/providers/heat_demand_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../providers/editor_state_provider.dart';
 import '../providers/selection_provider.dart';
+import 'distributor_properties.dart';
 import 'heating_zone_properties.dart';
 import 'opening_properties.dart';
 import 'room_properties.dart';
@@ -158,6 +159,8 @@ class _ElementProperties extends ConsumerWidget {
         WindowProperties(windowId: selection.id),
       'door' => DoorProperties(doorId: selection.id),
       'zone' => HeatingZoneProperties(zoneId: selection.id),
+      'distributor' =>
+        DistributorProperties(distributorId: selection.id),
       _ => _GenericInfo(selection: selection),
     };
   }

@@ -13,6 +13,8 @@ _Distributor _$DistributorFromJson(Map<String, dynamic> json) => _Distributor(
   supplyTempC: (json['supplyTempC'] as num?)?.toDouble() ?? 35.0,
   returnTempC: (json['returnTempC'] as num?)?.toDouble() ?? 28.0,
   pumpHeadPa: (json['pumpHeadPa'] as num?)?.toDouble() ?? 25000.0,
+  widthMm: (json['widthMm'] as num?)?.toInt() ?? 500,
+  rotationDeg: (json['rotationDeg'] as num?)?.toInt() ?? 0,
 );
 
 Map<String, dynamic> _$DistributorToJson(_Distributor instance) =>
@@ -23,4 +25,6 @@ Map<String, dynamic> _$DistributorToJson(_Distributor instance) =>
       'supplyTempC': instance.supplyTempC,
       'returnTempC': instance.returnTempC,
       'pumpHeadPa': instance.pumpHeadPa,
+      'widthMm': instance.widthMm,
+      'rotationDeg': instance.rotationDeg,
     };

@@ -28,6 +28,15 @@ abstract class Distributor with _$Distributor {
 
     /// Available pump head pressure in Pa. Must be > 0.
     @Default(25000.0) double pumpHeadPa,
+
+    /// Width of the distributor body in millimetres. Default 500 mm.
+    @Default(500) int widthMm,
+
+    /// Rotation of the distributor in degrees (0, 90, 180, or 270).
+    ///
+    /// 0° = supply stubs up / return stubs down (default).
+    /// 90° = rotated 90° clockwise.
+    @Default(0) int rotationDeg,
   }) = _Distributor;
 
   factory Distributor.fromJson(Map<String, dynamic> json) =>

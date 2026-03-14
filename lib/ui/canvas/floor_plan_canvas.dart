@@ -6,6 +6,7 @@ import 'package:vector_math/vector_math_64.dart'
 
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/id_generator.dart';
+import '../../data/models/distributor.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/point2d.dart';
 import '../../data/models/room.dart';
@@ -26,6 +27,8 @@ import 'painters/pipe_route_painter.dart';
 import 'painters/wall_painter.dart';
 import '../../data/models/heating_zone.dart';
 import 'tools/editor_callbacks.dart';
+import 'painters/distributor_painter.dart';
+import 'tools/distributor_place_tool.dart';
 import 'tools/door_place_tool.dart';
 import 'tools/select_tool.dart';
 import 'tools/tool_base.dart';
@@ -155,6 +158,11 @@ class _FloorPlanCanvasState
     _tools[DrawingTool.drawWallZone] = WallZonePlaceTool(
       callbacks: this,
       onStateChanged: onChanged,
+    );
+    _tools[DrawingTool.placeDistributor] = DistributorPlaceTool(
+      callbacks: this,
+      onStateChanged: onChanged,
+      undoRedo: undoRedo,
     );
   }
 
@@ -410,6 +418,93 @@ class _FloorPlanCanvasState
   List<HeatingZone> get currentZones =>
       ref.read(editorStateProvider).zones;
 
+  // ---- Distributor ----
+
+  @override
+  void commitDistributor(Distributor distributor) {
+    ref.read(editorStateProvider.notifier).setDistributor(distributor);
+  }
+
+  @override
+  void updateDistributor(Distributor distributor) {
+    ref.read(editorStateProvider.notifier).updateDistributor(distributor);
+  }
+
+  @override
+  void removeDistributor() {
+    ref.read(editorStateProvider.notifier).clearDistributor();
+  }
+
+  @override
+  Distributor? get currentDistributor =>
+      ref.read(editorStateProvider).distributor;
+
+  @override
+  void requestDistributorReplaceDialog({
+    required void Function() onMove,
+    required void Function() onReplace,
+  }) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Distributor already placed'),
+        content: const Text(
+          'A distributor already exists on this floor.\n'
+          'Move it to the new position, or replace it with '
+          'a fresh one?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              onMove();
+            },
+            child: const Text('Move'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              onReplace();
+            },
+            child: const Text('Replace'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  void requestDistributorDeleteDialog({
+    required void Function() onConfirmed,
+  }) {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete distributor?'),
+        content: const Text(
+          'This will remove the distributor from the floor plan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              onConfirmed();
+            },
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   double get currentZoom =>
       ref.read(canvasControllerProvider).zoom;
@@ -660,6 +755,7 @@ class _FloorPlanCanvasState
                       windows: editorState.windows,
                       doors: editorState.doors,
                       zones: editorState.zones,
+                      distributor: editorState.distributor,
                       interactionData: _interactionData,
                     ),
                   ),
@@ -729,6 +825,7 @@ class _CanvasCompositePainter extends CustomPainter {
     required this.windows,
     required this.doors,
     required this.zones,
+    this.distributor,
     this.hoverWorldPoint,
     this.interactionData,
   });
@@ -743,6 +840,7 @@ class _CanvasCompositePainter extends CustomPainter {
   final List<WindowElement> windows;
   final List<Door> doors;
   final List<HeatingZone> zones;
+  final Distributor? distributor;
   final InteractionData? interactionData;
 
   @override
@@ -782,7 +880,17 @@ class _CanvasCompositePainter extends CustomPainter {
       doors: doors,
     ).paint(canvas, size);
 
-    // Layer 5: Pipe routes
+    // Layer 5: Distributor
+    if (distributor != null) {
+      DistributorPainter(
+        distributor: distributor!,
+        bodyColor: colors.wallFill,
+        strokeColor: colors.wallStroke,
+        labelColor: colors.wallStroke,
+      ).paint(canvas, size);
+    }
+
+    // Layer 6: Pipe routes
     PipeRoutePainter(
       supplyPipe: colors.supplyPipe,
       returnPipe: colors.returnPipe,

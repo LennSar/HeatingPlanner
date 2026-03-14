@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 
 import '../../../calculation/engines/geometry_engine.dart';
 import '../../../core/utils/geometry_utils.dart';
+import '../../../data/models/distributor.dart';
 import '../../../data/models/door.dart';
 import '../../../data/models/enums.dart';
 import '../../../data/models/heating_zone.dart';
@@ -164,6 +165,30 @@ class SelectTool extends CanvasTool {
   /// Cleared in the immediately-following [onTap] call.
   bool _zonePointerOnZone = false;
 
+  // -- Distributor selection/drag state --
+
+  /// True when the distributor is the selected element.
+  bool _selectedDistributor = false;
+
+  /// True when pointer went down on the selected distributor body.
+  bool _distributorPointerOnBody = false;
+
+  /// World anchor point at distributor drag start (for threshold check).
+  Point2D? _distributorDragAnchor;
+
+  /// Distributor snapshot at drag start (for revert/undo).
+  Distributor? _distributorAtDragStart;
+
+  /// True once the pointer moved past the drag threshold.
+  bool _distributorDragActive = false;
+
+  /// Which handle (start=left, mid=center, end=right) is being dragged,
+  /// or null if the drag is a plain body drag.
+  DragHandleType? _distributorDragHandle;
+
+  /// Deferred tap suppressed by distributor pointer-down.
+  ({Point2D point, PointerDeviceKind kind})? _distributorDeferredTap;
+
   @override
   String get name => 'Select';
 
@@ -178,6 +203,13 @@ class SelectTool extends CanvasTool {
   ) {
     // Ignore taps during active wall / opening drags.
     if (_dragHandle != null || _openingDragHandle != null) {
+      return;
+    }
+
+    // Pointer went down on a selected distributor — defer the tap.
+    if (_distributorPointerOnBody) {
+      _distributorDeferredTap = (point: worldPoint, kind: deviceKind);
+      _distributorPointerOnBody = false;
       return;
     }
 
@@ -356,6 +388,37 @@ class SelectTool extends CanvasTool {
       // wall-handle hit-test or tap-based cycling.
     }
 
+    // Distributor handle / body drag initiation.
+    if (_selectedDistributor) {
+      final d = callbacks.currentDistributor;
+      if (d != null) {
+        // Check handles first.
+        final zoom = callbacks.currentZoom;
+        final thresholdMm =
+            zoom > 0 ? _handleHitRadiusPx / zoom : _handleRadiusMm;
+        final handles = _distributorHandles(d);
+        DragHandleType? hitHandle;
+        for (var i = 0; i < handles.length; i++) {
+          if (GeometryEngine.distanceMm(worldPoint, handles[i]) <=
+              thresholdMm) {
+            hitHandle = DragHandleType.values[i];
+            break;
+          }
+        }
+        // Fall back to body hit.
+        if (hitHandle != null ||
+            _isPointOnDistributor(worldPoint, d)) {
+          _distributorDragHandle = hitHandle;
+          _distributorDragAnchor = worldPoint;
+          _distributorAtDragStart = d;
+          _distributorDragActive = false;
+          _distributorPointerOnBody = true;
+          onStateChanged();
+          return;
+        }
+      }
+    }
+
     // Wall handle hit-test.
     if (_selectedWall == null) return;
     final handleType = _hitTestHandle(worldPoint);
@@ -380,6 +443,27 @@ class SelectTool extends CanvasTool {
 
   @override
   void onDragUpdate(Point2D worldPoint) {
+    // Distributor body drag.
+    if (_distributorDragAnchor != null) {
+      if (!_distributorDragActive) {
+        final thresholdMm =
+            _zoneDragThresholdPx / callbacks.currentZoom;
+        if (GeometryEngine.distanceMm(
+              worldPoint,
+              _distributorDragAnchor!,
+            ) >=
+            thresholdMm) {
+          _distributorDragActive = true;
+          _distributorDeferredTap = null;
+        }
+      }
+      if (_distributorDragActive) {
+        _applyDistributorDrag(worldPoint);
+        onStateChanged();
+      }
+      return;
+    }
+
     // Wall zone handle drag.
     if (_wallZoneDragHandle != null) {
       _applyWallZoneDrag(worldPoint);
@@ -445,6 +529,23 @@ class SelectTool extends CanvasTool {
 
   @override
   void onDragEnd(Point2D worldPoint) {
+    // Distributor drag end.
+    if (_distributorDragAnchor != null) {
+      if (_distributorDragActive) {
+        _commitDistributorDrag();
+      } else if (_distributorDeferredTap != null) {
+        final tap = _distributorDeferredTap!;
+        _distributorDeferredTap = null;
+        _clearDistributorDragState();
+        _doTap(tap.point, tap.kind);
+        onStateChanged();
+        return;
+      }
+      _clearDistributorDragState();
+      onStateChanged();
+      return;
+    }
+
     // Wall zone handle drag end.
     if (_wallZoneDragHandle != null) {
       _commitWallZoneDrag();
@@ -557,6 +658,8 @@ class SelectTool extends CanvasTool {
       _deleteSelectedWindow();
     } else if (_selectedDoor != null) {
       _deleteSelectedDoor();
+    } else if (_selectedDistributor) {
+      _deleteSelectedDistributor();
     } else if (_selectedZone != null) {
       _deleteSelectedZone();
     } else if (_selectedWall != null) {
@@ -573,6 +676,16 @@ class SelectTool extends CanvasTool {
 
   @override
   void onPointerUp(Point2D worldPoint) {
+    // Execute deferred distributor tap.
+    if (_distributorDeferredTap != null) {
+      final tap = _distributorDeferredTap!;
+      _distributorDeferredTap = null;
+      _clearDistributorDragState();
+      _doTap(tap.point, tap.kind);
+      onStateChanged();
+      return;
+    }
+
     // Execute the deferred zone tap (pure click, no movement).
     if (_deferredTap != null) {
       final tap = _deferredTap!;
@@ -587,6 +700,16 @@ class SelectTool extends CanvasTool {
 
   @override
   void cancel() {
+    // Revert distributor drag.
+    if (_distributorDragAnchor != null) {
+      if (_distributorAtDragStart != null) {
+        callbacks.updateDistributor(_distributorAtDragStart!);
+      }
+      _clearDistributorDragState();
+      onStateChanged();
+      return;
+    }
+
     // Revert wall zone drag.
     if (_wallZoneDragHandle != null) {
       if (_zoneAtDragStart != null) {
@@ -645,6 +768,19 @@ class SelectTool extends CanvasTool {
     // Opening selection takes priority over everything.
     if (_selectedWindow != null || _selectedDoor != null) {
       return _buildOpeningSelectionData();
+    }
+
+    // Distributor selection.
+    if (_selectedDistributor) {
+      final d = callbacks.currentDistributor;
+      if (d != null) {
+        return DistributorSelectionData(
+          position: d.position,
+          widthMm: d.widthMm.toDouble(),
+          handles: _distributorHandles(d),
+          activeHandleIndex: _distributorDragHandle?.index,
+        );
+      }
     }
 
     // Zone selection.
@@ -1402,6 +1538,7 @@ class SelectTool extends CanvasTool {
     _selectedWindow = null;
     _selectedDoor = null;
     _selectedZone = null;
+    _selectedDistributor = false;
   }
 
   // ================================================================
@@ -1765,7 +1902,13 @@ class SelectTool extends CanvasTool {
       items.add((type: 'door', id: door.id));
     }
 
-    // 3. Heating zones (smallest area first).
+    // 3. Distributor (ADR-005: after openings, before zones).
+    final dist = callbacks.currentDistributor;
+    if (dist != null && _isPointOnDistributor(point, dist)) {
+      items.add((type: 'distributor', id: dist.id));
+    }
+
+    // 4. Heating zones (smallest area first).
     final zones = callbacks.currentZones
         .where(
           (z) =>
@@ -1826,6 +1969,12 @@ class SelectTool extends CanvasTool {
           _selectedDoor = d;
           callbacks.selectElement('door', d.id);
         }
+      case 'distributor':
+        final d = callbacks.currentDistributor;
+        if (d != null && d.id == item.id) {
+          _selectedDistributor = true;
+          callbacks.selectElement('distributor', d.id);
+        }
       case 'zone':
         final z = callbacks.currentZones
             .where((x) => x.id == item.id)
@@ -1861,6 +2010,8 @@ class SelectTool extends CanvasTool {
         callbacks.currentWindows.any((x) => x.id == item.id),
       'door' =>
         callbacks.currentDoors.any((x) => x.id == item.id),
+      'distributor' =>
+        callbacks.currentDistributor?.id == item.id,
       'zone' =>
         callbacks.currentZones.any((x) => x.id == item.id),
       'wall' =>
@@ -1869,6 +2020,102 @@ class SelectTool extends CanvasTool {
         callbacks.currentRooms.any((x) => x.id == item.id),
       _ => false,
     };
+  }
+
+  // ================================================================
+  // Distributor helpers
+  // ================================================================
+
+  static const double _distHalfH = 240.0 / 2;
+  static const double _distMinWidthMm = 100.0;
+
+  bool _isPointOnDistributor(Point2D point, Distributor d) {
+    final halfW = d.widthMm.toDouble() / 2;
+    return (point.x - d.position.x).abs() <= halfW &&
+        (point.y - d.position.y).abs() <= _distHalfH;
+  }
+
+  /// Three handles: [0] left edge (start), [1] centre (mid), [2] right edge (end).
+  List<Point2D> _distributorHandles(Distributor d) {
+    final halfW = d.widthMm.toDouble() / 2;
+    return [
+      Point2D(x: d.position.x - halfW, y: d.position.y),
+      Point2D(x: d.position.x, y: d.position.y),
+      Point2D(x: d.position.x + halfW, y: d.position.y),
+    ];
+  }
+
+  void _applyDistributorDrag(Point2D worldPoint) {
+    final orig = _distributorAtDragStart!;
+    final halfW = orig.widthMm.toDouble() / 2;
+    final snappedX =
+        (worldPoint.x / SnapService.gridSpacingMm).round() *
+            SnapService.gridSpacingMm;
+
+    switch (_distributorDragHandle) {
+      case DragHandleType.start: // left handle → resize from left
+        final rightEdge = orig.position.x + halfW;
+        final newLeft =
+            snappedX.clamp(double.negativeInfinity, rightEdge - _distMinWidthMm);
+        final newWidth = (rightEdge - newLeft).round();
+        final newCenterX = rightEdge - newWidth / 2;
+        callbacks.updateDistributor(orig.copyWith(
+          position: Point2D(x: newCenterX, y: orig.position.y),
+          widthMm: newWidth,
+        ));
+      case DragHandleType.end: // right handle → resize from right
+        final leftEdge = orig.position.x - halfW;
+        final newRight =
+            snappedX.clamp(leftEdge + _distMinWidthMm, double.infinity);
+        final newWidth = (newRight - leftEdge).round();
+        final newCenterX = leftEdge + newWidth / 2;
+        callbacks.updateDistributor(orig.copyWith(
+          position: Point2D(x: newCenterX, y: orig.position.y),
+          widthMm: newWidth,
+        ));
+      case DragHandleType.mid || null: // centre handle or body → move
+        final snapped = SnapService.snapToGrid(worldPoint);
+        callbacks.updateDistributor(orig.copyWith(position: snapped));
+    }
+  }
+
+  void _commitDistributorDrag() {
+    if (_distributorAtDragStart == null) return;
+    final current = callbacks.currentDistributor;
+    if (current != null && current != _distributorAtDragStart) {
+      undoRedo.execute(_MoveDistributorCommand(
+        oldDistributor: _distributorAtDragStart!,
+        newDistributor: current,
+        update: callbacks.updateDistributor,
+      ));
+    }
+    _selectedDistributor = true;
+  }
+
+  void _clearDistributorDragState() {
+    _distributorDragAnchor = null;
+    _distributorAtDragStart = null;
+    _distributorDragActive = false;
+    _distributorDragHandle = null;
+    _distributorDeferredTap = null;
+    _distributorPointerOnBody = false;
+  }
+
+  void _deleteSelectedDistributor() {
+    final d = callbacks.currentDistributor;
+    if (d == null) return;
+    callbacks.requestDistributorDeleteDialog(
+      onConfirmed: () {
+        undoRedo.execute(_DeleteDistributorCommand(
+          distributor: d,
+          add: callbacks.commitDistributor,
+          remove: callbacks.removeDistributor,
+        ));
+        _selectedDistributor = false;
+        callbacks.selectElement(null, null);
+        onStateChanged();
+      },
+    );
   }
 
   WallSegment? _hitTestWall(Point2D point) {
@@ -2166,6 +2413,50 @@ class _UpdateWallZoneCommand extends Command {
 
   @override
   void undo() => update(oldZone);
+}
+
+/// Command: move the distributor to a new position.
+class _MoveDistributorCommand extends Command {
+  _MoveDistributorCommand({
+    required this.oldDistributor,
+    required this.newDistributor,
+    required this.update,
+  });
+
+  final Distributor oldDistributor;
+  final Distributor newDistributor;
+  final void Function(Distributor) update;
+
+  @override
+  String get label => 'Move distributor';
+
+  @override
+  void execute() => update(newDistributor);
+
+  @override
+  void undo() => update(oldDistributor);
+}
+
+/// Command: delete the distributor from the floor.
+class _DeleteDistributorCommand extends Command {
+  _DeleteDistributorCommand({
+    required this.distributor,
+    required this.add,
+    required this.remove,
+  });
+
+  final Distributor distributor;
+  final void Function(Distributor) add;
+  final void Function() remove;
+
+  @override
+  String get label => 'Delete distributor';
+
+  @override
+  void execute() => remove();
+
+  @override
+  void undo() => add(distributor);
 }
 
 /// Command: move a zone polygon (vertex drag or body drag).

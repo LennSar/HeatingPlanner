@@ -9,6 +9,23 @@ const double maxIndoorTempC = 30.0;
 const double minSupplyTempC = 20.0;
 const double maxSupplyTempC = 55.0;
 
+/// Minimum return temperature for a distributor (°C).
+const double minReturnTempC = 10.0;
+
+/// Maximum return temperature for a distributor (°C).
+///
+/// Always less than [maxSupplyTempC]; at runtime further
+/// constrained to be < the configured supply temperature.
+const double maxReturnTempC = 50.0;
+
+// ── Hydraulic (distributor) ───────────────────────────────────────────────────
+
+/// Minimum available pump head at the distributor (Pa).
+const double minPumpHeadPa = 1000.0;
+
+/// Maximum available pump head at the distributor (Pa).
+const double maxPumpHeadPa = 100000.0;
+
 // ── Geometry ─────────────────────────────────────────────────────────────────
 const int minWallLengthMm = 100;
 const int minRoomHeightMm = 2000;

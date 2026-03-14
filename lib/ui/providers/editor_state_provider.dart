@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/engines/geometry_engine.dart';
 import '../../core/utils/id_generator.dart';
+import '../../data/models/distributor.dart';
 import '../../data/models/door.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/heating_zone.dart';
@@ -23,6 +24,7 @@ class EditorState {
     this.windows = const [],
     this.doors = const [],
     this.zones = const [],
+    this.distributor,
     this.constructions = const [],
     this.materialLayers = const [],
   });
@@ -46,6 +48,9 @@ class EditorState {
   /// also persisted to the database via the heating repository.
   final List<HeatingZone> zones;
 
+  /// The distributor placed on this floor, or null if none yet.
+  final Distributor? distributor;
+
   /// All wall constructions on the current floor.
   final List<WallConstruction> constructions;
 
@@ -53,12 +58,18 @@ class EditorState {
   final List<MaterialLayer> materialLayers;
 
   /// Returns a copy with updated fields.
+  ///
+  /// Pass [clearDistributor] = true to set [distributor] to null
+  /// (since null cannot be distinguished from "no change" with the
+  /// standard nullable-override pattern).
   EditorState copyWith({
     List<WallSegment>? walls,
     List<Room>? rooms,
     List<WindowElement>? windows,
     List<Door>? doors,
     List<HeatingZone>? zones,
+    Distributor? distributor,
+    bool clearDistributor = false,
     List<WallConstruction>? constructions,
     List<MaterialLayer>? materialLayers,
   }) {
@@ -68,6 +79,9 @@ class EditorState {
       windows: windows ?? this.windows,
       doors: doors ?? this.doors,
       zones: zones ?? this.zones,
+      distributor: clearDistributor
+          ? null
+          : (distributor ?? this.distributor),
       constructions: constructions ?? this.constructions,
       materialLayers: materialLayers ?? this.materialLayers,
     );
@@ -303,6 +317,23 @@ class EditorStateNotifier extends Notifier<EditorState> {
           .where((z) => z.id != zoneId)
           .toList(),
     );
+  }
+
+  // ---- Distributor ----
+
+  /// Set (or replace) the floor's distributor.
+  void setDistributor(Distributor d) {
+    state = state.copyWith(distributor: d);
+  }
+
+  /// Replace the existing distributor with an updated copy.
+  void updateDistributor(Distributor d) {
+    state = state.copyWith(distributor: d);
+  }
+
+  /// Remove the distributor.
+  void clearDistributor() {
+    state = state.copyWith(clearDistributor: true);
   }
 
   // ---- Constructions ----

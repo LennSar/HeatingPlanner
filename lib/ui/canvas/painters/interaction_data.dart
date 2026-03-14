@@ -9,6 +9,58 @@ sealed class InteractionData {
   const InteractionData();
 }
 
+/// Ghost shown while placing a distributor on the floor plan.
+@immutable
+class DistributorGhostData extends InteractionData {
+  /// Creates [DistributorGhostData] at [position] (world mm).
+  const DistributorGhostData({
+    required this.position,
+    required this.widthMm,
+    this.rotationDeg = 0,
+  });
+
+  /// Grid-snapped cursor position in world coordinates (mm).
+  final Point2D position;
+
+  /// Body width in world-space mm.
+  final double widthMm;
+
+  /// Current wall-snapped rotation in degrees (0, 90, 180, or 270).
+  final int rotationDeg;
+}
+
+/// Selection highlight for a distributor element.
+///
+/// Produced by [SelectTool] when a distributor is selected.
+/// Tells [InteractionPainter] to draw a selection rect and
+/// three resize handles (left edge, centre, right edge).
+@immutable
+class DistributorSelectionData extends InteractionData {
+  /// Creates [DistributorSelectionData].
+  const DistributorSelectionData({
+    required this.position,
+    required this.widthMm,
+    required this.handles,
+    this.activeHandleIndex,
+    this.rotationDeg = 0,
+  });
+
+  /// Centre of the distributor in world coordinates (mm).
+  final Point2D position;
+
+  /// Body width in world-space mm.
+  final double widthMm;
+
+  /// Three handle positions: [0] left edge, [1] centre, [2] right edge.
+  final List<Point2D> handles;
+
+  /// Index of the currently dragged handle, or null.
+  final int? activeHandleIndex;
+
+  /// Current rotation in degrees (0, 90, 180, or 270).
+  final int rotationDeg;
+}
+
 /// Ghost line shown while drawing a wall.
 @immutable
 class GhostLineData extends InteractionData {

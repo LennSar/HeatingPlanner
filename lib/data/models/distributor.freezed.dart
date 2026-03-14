@@ -21,7 +21,12 @@ mixin _$Distributor {
  Point2D get position;/// Supply water temperature in °C. Range: 20–55.
  double get supplyTempC;/// Return water temperature in °C. Must be < [supplyTempC].
  double get returnTempC;/// Available pump head pressure in Pa. Must be > 0.
- double get pumpHeadPa;
+ double get pumpHeadPa;/// Width of the distributor body in millimetres. Default 500 mm.
+ int get widthMm;/// Rotation of the distributor in degrees (0, 90, 180, or 270).
+///
+/// 0° = supply stubs up / return stubs down (default).
+/// 90° = rotated 90° clockwise.
+ int get rotationDeg;
 /// Create a copy of Distributor
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -34,16 +39,16 @@ $DistributorCopyWith<Distributor> get copyWith => _$DistributorCopyWithImpl<Dist
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Distributor&&(identical(other.id, id) || other.id == id)&&(identical(other.floorId, floorId) || other.floorId == floorId)&&(identical(other.position, position) || other.position == position)&&(identical(other.supplyTempC, supplyTempC) || other.supplyTempC == supplyTempC)&&(identical(other.returnTempC, returnTempC) || other.returnTempC == returnTempC)&&(identical(other.pumpHeadPa, pumpHeadPa) || other.pumpHeadPa == pumpHeadPa));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Distributor&&(identical(other.id, id) || other.id == id)&&(identical(other.floorId, floorId) || other.floorId == floorId)&&(identical(other.position, position) || other.position == position)&&(identical(other.supplyTempC, supplyTempC) || other.supplyTempC == supplyTempC)&&(identical(other.returnTempC, returnTempC) || other.returnTempC == returnTempC)&&(identical(other.pumpHeadPa, pumpHeadPa) || other.pumpHeadPa == pumpHeadPa)&&(identical(other.widthMm, widthMm) || other.widthMm == widthMm)&&(identical(other.rotationDeg, rotationDeg) || other.rotationDeg == rotationDeg));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,floorId,position,supplyTempC,returnTempC,pumpHeadPa);
+int get hashCode => Object.hash(runtimeType,id,floorId,position,supplyTempC,returnTempC,pumpHeadPa,widthMm,rotationDeg);
 
 @override
 String toString() {
-  return 'Distributor(id: $id, floorId: $floorId, position: $position, supplyTempC: $supplyTempC, returnTempC: $returnTempC, pumpHeadPa: $pumpHeadPa)';
+  return 'Distributor(id: $id, floorId: $floorId, position: $position, supplyTempC: $supplyTempC, returnTempC: $returnTempC, pumpHeadPa: $pumpHeadPa, widthMm: $widthMm, rotationDeg: $rotationDeg)';
 }
 
 
@@ -54,7 +59,7 @@ abstract mixin class $DistributorCopyWith<$Res>  {
   factory $DistributorCopyWith(Distributor value, $Res Function(Distributor) _then) = _$DistributorCopyWithImpl;
 @useResult
 $Res call({
- String id, String floorId, Point2D position, double supplyTempC, double returnTempC, double pumpHeadPa
+ String id, String floorId, Point2D position, double supplyTempC, double returnTempC, double pumpHeadPa, int widthMm, int rotationDeg
 });
 
 
@@ -71,7 +76,7 @@ class _$DistributorCopyWithImpl<$Res>
 
 /// Create a copy of Distributor
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? floorId = null,Object? position = null,Object? supplyTempC = null,Object? returnTempC = null,Object? pumpHeadPa = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? floorId = null,Object? position = null,Object? supplyTempC = null,Object? returnTempC = null,Object? pumpHeadPa = null,Object? widthMm = null,Object? rotationDeg = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,floorId: null == floorId ? _self.floorId : floorId // ignore: cast_nullable_to_non_nullable
@@ -79,7 +84,9 @@ as String,position: null == position ? _self.position : position // ignore: cast
 as Point2D,supplyTempC: null == supplyTempC ? _self.supplyTempC : supplyTempC // ignore: cast_nullable_to_non_nullable
 as double,returnTempC: null == returnTempC ? _self.returnTempC : returnTempC // ignore: cast_nullable_to_non_nullable
 as double,pumpHeadPa: null == pumpHeadPa ? _self.pumpHeadPa : pumpHeadPa // ignore: cast_nullable_to_non_nullable
-as double,
+as double,widthMm: null == widthMm ? _self.widthMm : widthMm // ignore: cast_nullable_to_non_nullable
+as int,rotationDeg: null == rotationDeg ? _self.rotationDeg : rotationDeg // ignore: cast_nullable_to_non_nullable
+as int,
   ));
 }
 /// Create a copy of Distributor
@@ -173,10 +180,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String floorId,  Point2D position,  double supplyTempC,  double returnTempC,  double pumpHeadPa)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String floorId,  Point2D position,  double supplyTempC,  double returnTempC,  double pumpHeadPa,  int widthMm,  int rotationDeg)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Distributor() when $default != null:
-return $default(_that.id,_that.floorId,_that.position,_that.supplyTempC,_that.returnTempC,_that.pumpHeadPa);case _:
+return $default(_that.id,_that.floorId,_that.position,_that.supplyTempC,_that.returnTempC,_that.pumpHeadPa,_that.widthMm,_that.rotationDeg);case _:
   return orElse();
 
 }
@@ -194,10 +201,10 @@ return $default(_that.id,_that.floorId,_that.position,_that.supplyTempC,_that.re
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String floorId,  Point2D position,  double supplyTempC,  double returnTempC,  double pumpHeadPa)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String floorId,  Point2D position,  double supplyTempC,  double returnTempC,  double pumpHeadPa,  int widthMm,  int rotationDeg)  $default,) {final _that = this;
 switch (_that) {
 case _Distributor():
-return $default(_that.id,_that.floorId,_that.position,_that.supplyTempC,_that.returnTempC,_that.pumpHeadPa);case _:
+return $default(_that.id,_that.floorId,_that.position,_that.supplyTempC,_that.returnTempC,_that.pumpHeadPa,_that.widthMm,_that.rotationDeg);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -214,10 +221,10 @@ return $default(_that.id,_that.floorId,_that.position,_that.supplyTempC,_that.re
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String floorId,  Point2D position,  double supplyTempC,  double returnTempC,  double pumpHeadPa)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String floorId,  Point2D position,  double supplyTempC,  double returnTempC,  double pumpHeadPa,  int widthMm,  int rotationDeg)?  $default,) {final _that = this;
 switch (_that) {
 case _Distributor() when $default != null:
-return $default(_that.id,_that.floorId,_that.position,_that.supplyTempC,_that.returnTempC,_that.pumpHeadPa);case _:
+return $default(_that.id,_that.floorId,_that.position,_that.supplyTempC,_that.returnTempC,_that.pumpHeadPa,_that.widthMm,_that.rotationDeg);case _:
   return null;
 
 }
@@ -229,7 +236,7 @@ return $default(_that.id,_that.floorId,_that.position,_that.supplyTempC,_that.re
 @JsonSerializable()
 
 class _Distributor implements Distributor {
-  const _Distributor({required this.id, required this.floorId, required this.position, this.supplyTempC = 35.0, this.returnTempC = 28.0, this.pumpHeadPa = 25000.0});
+  const _Distributor({required this.id, required this.floorId, required this.position, this.supplyTempC = 35.0, this.returnTempC = 28.0, this.pumpHeadPa = 25000.0, this.widthMm = 500, this.rotationDeg = 0});
   factory _Distributor.fromJson(Map<String, dynamic> json) => _$DistributorFromJson(json);
 
 /// UUID v4 primary key.
@@ -244,6 +251,13 @@ class _Distributor implements Distributor {
 @override@JsonKey() final  double returnTempC;
 /// Available pump head pressure in Pa. Must be > 0.
 @override@JsonKey() final  double pumpHeadPa;
+/// Width of the distributor body in millimetres. Default 500 mm.
+@override@JsonKey() final  int widthMm;
+/// Rotation of the distributor in degrees (0, 90, 180, or 270).
+///
+/// 0° = supply stubs up / return stubs down (default).
+/// 90° = rotated 90° clockwise.
+@override@JsonKey() final  int rotationDeg;
 
 /// Create a copy of Distributor
 /// with the given fields replaced by the non-null parameter values.
@@ -258,16 +272,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Distributor&&(identical(other.id, id) || other.id == id)&&(identical(other.floorId, floorId) || other.floorId == floorId)&&(identical(other.position, position) || other.position == position)&&(identical(other.supplyTempC, supplyTempC) || other.supplyTempC == supplyTempC)&&(identical(other.returnTempC, returnTempC) || other.returnTempC == returnTempC)&&(identical(other.pumpHeadPa, pumpHeadPa) || other.pumpHeadPa == pumpHeadPa));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Distributor&&(identical(other.id, id) || other.id == id)&&(identical(other.floorId, floorId) || other.floorId == floorId)&&(identical(other.position, position) || other.position == position)&&(identical(other.supplyTempC, supplyTempC) || other.supplyTempC == supplyTempC)&&(identical(other.returnTempC, returnTempC) || other.returnTempC == returnTempC)&&(identical(other.pumpHeadPa, pumpHeadPa) || other.pumpHeadPa == pumpHeadPa)&&(identical(other.widthMm, widthMm) || other.widthMm == widthMm)&&(identical(other.rotationDeg, rotationDeg) || other.rotationDeg == rotationDeg));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,floorId,position,supplyTempC,returnTempC,pumpHeadPa);
+int get hashCode => Object.hash(runtimeType,id,floorId,position,supplyTempC,returnTempC,pumpHeadPa,widthMm,rotationDeg);
 
 @override
 String toString() {
-  return 'Distributor(id: $id, floorId: $floorId, position: $position, supplyTempC: $supplyTempC, returnTempC: $returnTempC, pumpHeadPa: $pumpHeadPa)';
+  return 'Distributor(id: $id, floorId: $floorId, position: $position, supplyTempC: $supplyTempC, returnTempC: $returnTempC, pumpHeadPa: $pumpHeadPa, widthMm: $widthMm, rotationDeg: $rotationDeg)';
 }
 
 
@@ -278,7 +292,7 @@ abstract mixin class _$DistributorCopyWith<$Res> implements $DistributorCopyWith
   factory _$DistributorCopyWith(_Distributor value, $Res Function(_Distributor) _then) = __$DistributorCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String floorId, Point2D position, double supplyTempC, double returnTempC, double pumpHeadPa
+ String id, String floorId, Point2D position, double supplyTempC, double returnTempC, double pumpHeadPa, int widthMm, int rotationDeg
 });
 
 
@@ -295,7 +309,7 @@ class __$DistributorCopyWithImpl<$Res>
 
 /// Create a copy of Distributor
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? floorId = null,Object? position = null,Object? supplyTempC = null,Object? returnTempC = null,Object? pumpHeadPa = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? floorId = null,Object? position = null,Object? supplyTempC = null,Object? returnTempC = null,Object? pumpHeadPa = null,Object? widthMm = null,Object? rotationDeg = null,}) {
   return _then(_Distributor(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,floorId: null == floorId ? _self.floorId : floorId // ignore: cast_nullable_to_non_nullable
@@ -303,7 +317,9 @@ as String,position: null == position ? _self.position : position // ignore: cast
 as Point2D,supplyTempC: null == supplyTempC ? _self.supplyTempC : supplyTempC // ignore: cast_nullable_to_non_nullable
 as double,returnTempC: null == returnTempC ? _self.returnTempC : returnTempC // ignore: cast_nullable_to_non_nullable
 as double,pumpHeadPa: null == pumpHeadPa ? _self.pumpHeadPa : pumpHeadPa // ignore: cast_nullable_to_non_nullable
-as double,
+as double,widthMm: null == widthMm ? _self.widthMm : widthMm // ignore: cast_nullable_to_non_nullable
+as int,rotationDeg: null == rotationDeg ? _self.rotationDeg : rotationDeg // ignore: cast_nullable_to_non_nullable
+as int,
   ));
 }
 

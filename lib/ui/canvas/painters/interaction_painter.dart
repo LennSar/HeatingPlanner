@@ -1,4 +1,4 @@
-import 'dart:math' show sqrt;
+import 'dart:math' show pi, sqrt;
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -137,6 +137,31 @@ class InteractionPainter extends CustomPainter {
             Offset(wallStart.x, wallStart.y),
             Offset(wallEnd.x, wallEnd.y),
           );
+        case DistributorGhostData(
+              :final position,
+              :final widthMm,
+              :final rotationDeg,
+            ):
+          _drawDistributorGhost(
+            canvas,
+            Offset(position.x, position.y),
+            widthMm,
+            rotationDeg,
+          );
+        case DistributorSelectionData(
+              :final position,
+              :final widthMm,
+              :final handles,
+              :final activeHandleIndex,
+              :final rotationDeg,
+            ):
+          _drawDistributorSelection(
+            canvas,
+            Offset(position.x, position.y),
+            widthMm,
+            rotationDeg,
+          );
+          _drawWallHandles(canvas, handles, activeHandleIndex);
       }
     }
   }
@@ -692,6 +717,90 @@ class InteractionPainter extends CustomPainter {
       ..style = PaintingStyle.stroke
       ..strokeWidth = 6.0;
     canvas.drawPath(path, strokePaint);
+  }
+
+  // ── Distributor ghost / selection ─────────────────────────
+
+  static const double _distBodyH = 240.0;
+
+  void _drawDistributorGhost(
+    Canvas canvas,
+    Offset center,
+    double widthMm,
+    int rotationDeg,
+  ) {
+    final rect = Rect.fromCenter(
+      center: center,
+      width: widthMm,
+      height: _distBodyH,
+    );
+    final color = selectionHighlightColor ?? Colors.blue;
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(rotationDeg * pi / 180.0);
+    canvas.translate(-center.dx, -center.dy);
+
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..color = color.withValues(alpha: 0.12)
+        ..style = PaintingStyle.fill,
+    );
+    _drawDashedRect(canvas, rect, color.withValues(alpha: 0.7));
+
+    canvas.restore();
+  }
+
+  void _drawDistributorSelection(
+    Canvas canvas,
+    Offset center,
+    double widthMm,
+    int rotationDeg,
+  ) {
+    final rect = Rect.fromCenter(
+      center: center,
+      width: widthMm,
+      height: _distBodyH,
+    );
+    final color = selectionHighlightColor ?? Colors.blue;
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(rotationDeg * pi / 180.0);
+    canvas.translate(-center.dx, -center.dy);
+
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..color = color.withValues(alpha: 0.20)
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawRect(
+      rect,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 8.0,
+    );
+
+    canvas.restore();
+  }
+
+  void _drawDashedRect(Canvas canvas, Rect rect, Color color) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 5.0
+      ..style = PaintingStyle.stroke;
+    const dash = 30.0;
+    // top
+    _drawDashedLine(canvas, rect.topLeft, rect.topRight, paint, dash);
+    // right
+    _drawDashedLine(canvas, rect.topRight, rect.bottomRight, paint, dash);
+    // bottom
+    _drawDashedLine(canvas, rect.bottomRight, rect.bottomLeft, paint, dash);
+    // left
+    _drawDashedLine(canvas, rect.bottomLeft, rect.topLeft, paint, dash);
   }
 
   @override

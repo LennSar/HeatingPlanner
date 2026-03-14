@@ -1,3 +1,4 @@
+import '../../../data/models/distributor.dart';
 import '../../../data/models/door.dart';
 import '../../../data/models/heating_zone.dart';
 import '../../../data/models/point2d.dart';
@@ -65,6 +66,38 @@ abstract class EditorCallbacks {
 
   /// Remove a door by ID.
   void removeDoor(String doorId);
+
+  // ---- Distributor ----
+
+  /// Set (or replace) the floor's distributor.
+  void commitDistributor(Distributor distributor);
+
+  /// Replace the existing distributor in-place (same ID).
+  void updateDistributor(Distributor distributor);
+
+  /// Remove the current distributor from the editor state.
+  void removeDistributor();
+
+  /// The current distributor on this floor, or null.
+  Distributor? get currentDistributor;
+
+  /// Show the "Replace existing distributor?" dialog.
+  ///
+  /// [onMove] is called when the user chooses to keep the
+  /// existing distributor's properties and move it to the
+  /// new position.  [onReplace] is called when the user
+  /// chooses to create a fresh distributor at the new position.
+  void requestDistributorReplaceDialog({
+    required void Function() onMove,
+    required void Function() onReplace,
+  });
+
+  /// Show the "Delete distributor and all connected circuits?"
+  /// confirmation dialog.  [onConfirmed] is called if the user
+  /// confirms the deletion.
+  void requestDistributorDeleteDialog({
+    required void Function() onConfirmed,
+  });
 
   // ---- Zones ----
 
