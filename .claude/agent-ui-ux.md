@@ -260,7 +260,7 @@ At viewport width < 600dp:
 **Trigger:** User selects the Distributor tool.
 
 1. User clicks a location on the floor plan → distributor symbol is placed (a small rectangle icon with pipe stubs).
-2. Properties panel shows: supply temperature, return temperature, pump head.
+2. Properties panel shows: supply temperature, return temperature. Pump head is a calculated read-only field shown after circuits are connected (see ADR-007). An optional pump capacity field allows the user to enter an existing pump's rating for validation.
 3. Only one distributor per floor is allowed. If one already exists, show dialog: "Replace existing distributor?" with Move/Replace/Cancel options.
 
 ### 5.5 Circuit Routing (Pipe Drawing)
@@ -566,6 +566,18 @@ The properties panel content changes based on what is selected. Here are the con
 | Specific output | Display (W/m²) | No |
 | Total output | Display (W), colour-coded | No |
 | Surface temperature | Display (°C), warn if over limit | No |
+
+### 7.5 Distributor Selected
+
+| Field | Type | Editable |
+|-------|------|----------|
+| Supply temperature | Slider 20-55°C + numeric | Yes |
+| Return temperature | Slider + numeric, must be < supply | Yes |
+| Pump capacity | Numeric input (Pa), optional | Yes |
+| **Computed (shown after circuits connected)** |
+| Required pump head | Display (Pa), read-only (see ADR-007) | No |
+| Number of circuits | Display | No |
+| Total flow rate | Display (kg/h) | No |
 
 ---
 

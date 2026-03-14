@@ -448,7 +448,8 @@ Each model below is defined in its own file under `lib/data/models/`. I am listi
 | position | Point2D | mm | required |
 | supplyTempC | double | 20-55 | 35.0 |
 | returnTempC | double | < supplyTemp | 28.0 |
-| pumpHeadPa | double | > 0 | 25000 |
+| pumpHeadPa | double | calculated | 0.0 |
+| pumpCapacityPa | double? | optional, user-entered for validation | null |
 
 **HeatingCircuit**
 | Field | Type | Constraint | Default |

@@ -178,3 +178,30 @@ direction), but it is the same approach used by commercial design tools.
    different target temperatures — output estimate is approximate. Consider
    separate zones for accurate room-by-room control."
 5. When both rooms share the same target temperature, no warning is emitted.
+
+---
+
+## ADR-007 — Pump head is a calculated output, not a user input
+
+**What.**
+The `pumpHeadPa` field on the Distributor model is a calculated value, not
+user-entered. It equals the pressure loss of the highest-loss circuit connected
+to the distributor. An optional `pumpCapacityPa` field allows the user to enter
+an existing pump's rated capacity for validation purposes.
+
+**Why.**
+The correct workflow is: design zones and circuits → calculate pressure loss per
+circuit → the worst-case circuit determines the minimum pump head → select or
+validate a pump against that requirement. Requiring the user to enter pump head
+before circuits exist inverts this dependency and produces meaningless values.
+
+**Rule.**
+1. `pumpHeadPa` is computed by the hydraulic balancing provider as
+   `max(pressureLossPa)` across all circuits on the distributor. It is read-only
+   in the UI.
+2. `pumpCapacityPa` is optional and user-editable. When provided, the system
+   emits a warning if `pumpCapacityPa < pumpHeadPa` ("Selected pump may be
+   undersized for this system").
+3. The distributor properties panel shows `pumpHeadPa` as a read-only computed
+   field (displayed after circuits are connected) and `pumpCapacityPa` as an
+   optional input field.
