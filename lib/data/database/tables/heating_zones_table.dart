@@ -40,6 +40,12 @@ class HeatingZones extends Table {
   /// Length of the zone along the wall in mm; null means full wall length.
   IntColumn get widthMm => integer().nullable()();
 
+  /// User-specified surface covering resistance in m²·K/W.
+  ///
+  /// Only used when [flooringMaterialId] is the custom sentinel.
+  /// Null until set by the user.
+  RealColumn get customFlooringResistance => real().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

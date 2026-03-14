@@ -159,6 +159,7 @@ HeatingZone _zoneFromRow($db.HeatingZone row) {
     heightMm: row.heightMm,
     positionOnWallMm: row.positionOnWallMm,
     widthMm: row.widthMm,
+    customFlooringResistance: row.customFlooringResistance,
   );
 }
 
@@ -231,6 +232,7 @@ $db.HeatingZonesCompanion _zoneToCompanion(HeatingZone zone) {
     heightMm: Value(zone.heightMm),
     positionOnWallMm: Value(zone.positionOnWallMm),
     widthMm: Value(zone.widthMm),
+    customFlooringResistance: Value(zone.customFlooringResistance),
   );
 }
 

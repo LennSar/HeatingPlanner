@@ -5233,6 +5233,17 @@ class $HeatingZonesTable extends HeatingZones
     type: DriftSqlType.int,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _customFlooringResistanceMeta =
+      const VerificationMeta('customFlooringResistance');
+  @override
+  late final GeneratedColumn<double> customFlooringResistance =
+      GeneratedColumn<double>(
+        'custom_flooring_resistance',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -5249,6 +5260,7 @@ class $HeatingZonesTable extends HeatingZones
     heightMm,
     positionOnWallMm,
     widthMm,
+    customFlooringResistance,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -5375,6 +5387,15 @@ class $HeatingZonesTable extends HeatingZones
         widthMm.isAcceptableOrUnknown(data['width_mm']!, _widthMmMeta),
       );
     }
+    if (data.containsKey('custom_flooring_resistance')) {
+      context.handle(
+        _customFlooringResistanceMeta,
+        customFlooringResistance.isAcceptableOrUnknown(
+          data['custom_flooring_resistance']!,
+          _customFlooringResistanceMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -5440,6 +5461,10 @@ class $HeatingZonesTable extends HeatingZones
         DriftSqlType.int,
         data['${effectivePrefix}width_mm'],
       ),
+      customFlooringResistance: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}custom_flooring_resistance'],
+      ),
     );
   }
 
@@ -5474,6 +5499,12 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
 
   /// Length of the zone along the wall in mm; null means full wall length.
   final int? widthMm;
+
+  /// User-specified surface covering resistance in m²·K/W.
+  ///
+  /// Only used when [flooringMaterialId] is the custom sentinel.
+  /// Null until set by the user.
+  final double? customFlooringResistance;
   const HeatingZone({
     required this.id,
     required this.roomId,
@@ -5489,6 +5520,7 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
     this.heightMm,
     this.positionOnWallMm,
     this.widthMm,
+    this.customFlooringResistance,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -5516,6 +5548,11 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
     }
     if (!nullToAbsent || widthMm != null) {
       map['width_mm'] = Variable<int>(widthMm);
+    }
+    if (!nullToAbsent || customFlooringResistance != null) {
+      map['custom_flooring_resistance'] = Variable<double>(
+        customFlooringResistance,
+      );
     }
     return map;
   }
@@ -5546,6 +5583,9 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
       widthMm: widthMm == null && nullToAbsent
           ? const Value.absent()
           : Value(widthMm),
+      customFlooringResistance: customFlooringResistance == null && nullToAbsent
+          ? const Value.absent()
+          : Value(customFlooringResistance),
     );
   }
 
@@ -5571,6 +5611,9 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
       heightMm: serializer.fromJson<int?>(json['heightMm']),
       positionOnWallMm: serializer.fromJson<double?>(json['positionOnWallMm']),
       widthMm: serializer.fromJson<int?>(json['widthMm']),
+      customFlooringResistance: serializer.fromJson<double?>(
+        json['customFlooringResistance'],
+      ),
     );
   }
   @override
@@ -5591,6 +5634,9 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
       'heightMm': serializer.toJson<int?>(heightMm),
       'positionOnWallMm': serializer.toJson<double?>(positionOnWallMm),
       'widthMm': serializer.toJson<int?>(widthMm),
+      'customFlooringResistance': serializer.toJson<double?>(
+        customFlooringResistance,
+      ),
     };
   }
 
@@ -5609,6 +5655,7 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
     Value<int?> heightMm = const Value.absent(),
     Value<double?> positionOnWallMm = const Value.absent(),
     Value<int?> widthMm = const Value.absent(),
+    Value<double?> customFlooringResistance = const Value.absent(),
   }) => HeatingZone(
     id: id ?? this.id,
     roomId: roomId ?? this.roomId,
@@ -5628,6 +5675,9 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
         ? positionOnWallMm.value
         : this.positionOnWallMm,
     widthMm: widthMm.present ? widthMm.value : this.widthMm,
+    customFlooringResistance: customFlooringResistance.present
+        ? customFlooringResistance.value
+        : this.customFlooringResistance,
   );
   HeatingZone copyWithCompanion(HeatingZonesCompanion data) {
     return HeatingZone(
@@ -5661,6 +5711,9 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
           ? data.positionOnWallMm.value
           : this.positionOnWallMm,
       widthMm: data.widthMm.present ? data.widthMm.value : this.widthMm,
+      customFlooringResistance: data.customFlooringResistance.present
+          ? data.customFlooringResistance.value
+          : this.customFlooringResistance,
     );
   }
 
@@ -5680,7 +5733,8 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
           ..write('wallSegmentId: $wallSegmentId, ')
           ..write('heightMm: $heightMm, ')
           ..write('positionOnWallMm: $positionOnWallMm, ')
-          ..write('widthMm: $widthMm')
+          ..write('widthMm: $widthMm, ')
+          ..write('customFlooringResistance: $customFlooringResistance')
           ..write(')'))
         .toString();
   }
@@ -5701,6 +5755,7 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
     heightMm,
     positionOnWallMm,
     widthMm,
+    customFlooringResistance,
   );
   @override
   bool operator ==(Object other) =>
@@ -5719,7 +5774,8 @@ class HeatingZone extends DataClass implements Insertable<HeatingZone> {
           other.wallSegmentId == this.wallSegmentId &&
           other.heightMm == this.heightMm &&
           other.positionOnWallMm == this.positionOnWallMm &&
-          other.widthMm == this.widthMm);
+          other.widthMm == this.widthMm &&
+          other.customFlooringResistance == this.customFlooringResistance);
 }
 
 class HeatingZonesCompanion extends UpdateCompanion<HeatingZone> {
@@ -5737,6 +5793,7 @@ class HeatingZonesCompanion extends UpdateCompanion<HeatingZone> {
   final Value<int?> heightMm;
   final Value<double?> positionOnWallMm;
   final Value<int?> widthMm;
+  final Value<double?> customFlooringResistance;
   final Value<int> rowid;
   const HeatingZonesCompanion({
     this.id = const Value.absent(),
@@ -5753,6 +5810,7 @@ class HeatingZonesCompanion extends UpdateCompanion<HeatingZone> {
     this.heightMm = const Value.absent(),
     this.positionOnWallMm = const Value.absent(),
     this.widthMm = const Value.absent(),
+    this.customFlooringResistance = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   HeatingZonesCompanion.insert({
@@ -5770,6 +5828,7 @@ class HeatingZonesCompanion extends UpdateCompanion<HeatingZone> {
     this.heightMm = const Value.absent(),
     this.positionOnWallMm = const Value.absent(),
     this.widthMm = const Value.absent(),
+    this.customFlooringResistance = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        roomId = Value(roomId),
@@ -5790,6 +5849,7 @@ class HeatingZonesCompanion extends UpdateCompanion<HeatingZone> {
     Expression<int>? heightMm,
     Expression<double>? positionOnWallMm,
     Expression<int>? widthMm,
+    Expression<double>? customFlooringResistance,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -5808,6 +5868,8 @@ class HeatingZonesCompanion extends UpdateCompanion<HeatingZone> {
       if (heightMm != null) 'height_mm': heightMm,
       if (positionOnWallMm != null) 'position_on_wall_mm': positionOnWallMm,
       if (widthMm != null) 'width_mm': widthMm,
+      if (customFlooringResistance != null)
+        'custom_flooring_resistance': customFlooringResistance,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -5827,6 +5889,7 @@ class HeatingZonesCompanion extends UpdateCompanion<HeatingZone> {
     Value<int?>? heightMm,
     Value<double?>? positionOnWallMm,
     Value<int?>? widthMm,
+    Value<double?>? customFlooringResistance,
     Value<int>? rowid,
   }) {
     return HeatingZonesCompanion(
@@ -5844,6 +5907,8 @@ class HeatingZonesCompanion extends UpdateCompanion<HeatingZone> {
       heightMm: heightMm ?? this.heightMm,
       positionOnWallMm: positionOnWallMm ?? this.positionOnWallMm,
       widthMm: widthMm ?? this.widthMm,
+      customFlooringResistance:
+          customFlooringResistance ?? this.customFlooringResistance,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -5893,6 +5958,11 @@ class HeatingZonesCompanion extends UpdateCompanion<HeatingZone> {
     if (widthMm.present) {
       map['width_mm'] = Variable<int>(widthMm.value);
     }
+    if (customFlooringResistance.present) {
+      map['custom_flooring_resistance'] = Variable<double>(
+        customFlooringResistance.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -5916,6 +5986,7 @@ class HeatingZonesCompanion extends UpdateCompanion<HeatingZone> {
           ..write('heightMm: $heightMm, ')
           ..write('positionOnWallMm: $positionOnWallMm, ')
           ..write('widthMm: $widthMm, ')
+          ..write('customFlooringResistance: $customFlooringResistance, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -12152,6 +12223,7 @@ typedef $$HeatingZonesTableCreateCompanionBuilder =
       Value<int?> heightMm,
       Value<double?> positionOnWallMm,
       Value<int?> widthMm,
+      Value<double?> customFlooringResistance,
       Value<int> rowid,
     });
 typedef $$HeatingZonesTableUpdateCompanionBuilder =
@@ -12170,6 +12242,7 @@ typedef $$HeatingZonesTableUpdateCompanionBuilder =
       Value<int?> heightMm,
       Value<double?> positionOnWallMm,
       Value<int?> widthMm,
+      Value<double?> customFlooringResistance,
       Value<int> rowid,
     });
 
@@ -12335,6 +12408,11 @@ class $$HeatingZonesTableFilterComposer
 
   ColumnFilters<int> get widthMm => $composableBuilder(
     column: $table.widthMm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get customFlooringResistance => $composableBuilder(
+    column: $table.customFlooringResistance,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12515,6 +12593,11 @@ class $$HeatingZonesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get customFlooringResistance => $composableBuilder(
+    column: $table.customFlooringResistance,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$RoomsTableOrderingComposer get roomId {
     final $$RoomsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -12656,6 +12739,11 @@ class $$HeatingZonesTableAnnotationComposer
 
   GeneratedColumn<int> get widthMm =>
       $composableBuilder(column: $table.widthMm, builder: (column) => column);
+
+  GeneratedColumn<double> get customFlooringResistance => $composableBuilder(
+    column: $table.customFlooringResistance,
+    builder: (column) => column,
+  );
 
   $$RoomsTableAnnotationComposer get roomId {
     final $$RoomsTableAnnotationComposer composer = $composerBuilder(
@@ -12824,6 +12912,7 @@ class $$HeatingZonesTableTableManager
                 Value<int?> heightMm = const Value.absent(),
                 Value<double?> positionOnWallMm = const Value.absent(),
                 Value<int?> widthMm = const Value.absent(),
+                Value<double?> customFlooringResistance = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => HeatingZonesCompanion(
                 id: id,
@@ -12840,6 +12929,7 @@ class $$HeatingZonesTableTableManager
                 heightMm: heightMm,
                 positionOnWallMm: positionOnWallMm,
                 widthMm: widthMm,
+                customFlooringResistance: customFlooringResistance,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -12858,6 +12948,7 @@ class $$HeatingZonesTableTableManager
                 Value<int?> heightMm = const Value.absent(),
                 Value<double?> positionOnWallMm = const Value.absent(),
                 Value<int?> widthMm = const Value.absent(),
+                Value<double?> customFlooringResistance = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => HeatingZonesCompanion.insert(
                 id: id,
@@ -12874,6 +12965,7 @@ class $$HeatingZonesTableTableManager
                 heightMm: heightMm,
                 positionOnWallMm: positionOnWallMm,
                 widthMm: widthMm,
+                customFlooringResistance: customFlooringResistance,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

@@ -29,6 +29,8 @@ _HeatingZone _$HeatingZoneFromJson(Map<String, dynamic> json) => _HeatingZone(
   heightMm: (json['heightMm'] as num?)?.toInt(),
   positionOnWallMm: (json['positionOnWallMm'] as num?)?.toDouble(),
   widthMm: (json['widthMm'] as num?)?.toInt(),
+  customFlooringResistance: (json['customFlooringResistance'] as num?)
+      ?.toDouble(),
 );
 
 Map<String, dynamic> _$HeatingZoneToJson(_HeatingZone instance) =>
@@ -47,6 +49,7 @@ Map<String, dynamic> _$HeatingZoneToJson(_HeatingZone instance) =>
       'heightMm': instance.heightMm,
       'positionOnWallMm': instance.positionOnWallMm,
       'widthMm': instance.widthMm,
+      'customFlooringResistance': instance.customFlooringResistance,
     };
 
 const _$ZoneTypeEnumMap = {

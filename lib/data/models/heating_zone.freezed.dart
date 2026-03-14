@@ -43,7 +43,12 @@ mixin _$HeatingZone {
 ///
 /// Null for [ZoneType.floorHeating]. For wall zones, null means
 /// the zone spans the full wall length. Range: 50 to wallLength.
- int? get widthMm;
+ int? get widthMm;/// User-specified thermal resistance in m²·K/W.
+///
+/// Only meaningful when [flooringMaterialId] equals
+/// [kCustomFlooringMaterialId]. Range: 0.000–0.500. Null until
+/// the user sets a value.
+ double? get customFlooringResistance;
 /// Create a copy of HeatingZone
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -56,16 +61,16 @@ $HeatingZoneCopyWith<HeatingZone> get copyWith => _$HeatingZoneCopyWithImpl<Heat
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is HeatingZone&&(identical(other.id, id) || other.id == id)&&(identical(other.roomId, roomId) || other.roomId == roomId)&&(identical(other.zoneType, zoneType) || other.zoneType == zoneType)&&const DeepCollectionEquality().equals(other.polygon, polygon)&&(identical(other.tubeSpacingMm, tubeSpacingMm) || other.tubeSpacingMm == tubeSpacingMm)&&(identical(other.tubeTypeId, tubeTypeId) || other.tubeTypeId == tubeTypeId)&&(identical(other.flooringMaterialId, flooringMaterialId) || other.flooringMaterialId == flooringMaterialId)&&(identical(other.borderDistanceMm, borderDistanceMm) || other.borderDistanceMm == borderDistanceMm)&&(identical(other.layoutPattern, layoutPattern) || other.layoutPattern == layoutPattern)&&(identical(other.circuitId, circuitId) || other.circuitId == circuitId)&&(identical(other.wallSegmentId, wallSegmentId) || other.wallSegmentId == wallSegmentId)&&(identical(other.heightMm, heightMm) || other.heightMm == heightMm)&&(identical(other.positionOnWallMm, positionOnWallMm) || other.positionOnWallMm == positionOnWallMm)&&(identical(other.widthMm, widthMm) || other.widthMm == widthMm));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is HeatingZone&&(identical(other.id, id) || other.id == id)&&(identical(other.roomId, roomId) || other.roomId == roomId)&&(identical(other.zoneType, zoneType) || other.zoneType == zoneType)&&const DeepCollectionEquality().equals(other.polygon, polygon)&&(identical(other.tubeSpacingMm, tubeSpacingMm) || other.tubeSpacingMm == tubeSpacingMm)&&(identical(other.tubeTypeId, tubeTypeId) || other.tubeTypeId == tubeTypeId)&&(identical(other.flooringMaterialId, flooringMaterialId) || other.flooringMaterialId == flooringMaterialId)&&(identical(other.borderDistanceMm, borderDistanceMm) || other.borderDistanceMm == borderDistanceMm)&&(identical(other.layoutPattern, layoutPattern) || other.layoutPattern == layoutPattern)&&(identical(other.circuitId, circuitId) || other.circuitId == circuitId)&&(identical(other.wallSegmentId, wallSegmentId) || other.wallSegmentId == wallSegmentId)&&(identical(other.heightMm, heightMm) || other.heightMm == heightMm)&&(identical(other.positionOnWallMm, positionOnWallMm) || other.positionOnWallMm == positionOnWallMm)&&(identical(other.widthMm, widthMm) || other.widthMm == widthMm)&&(identical(other.customFlooringResistance, customFlooringResistance) || other.customFlooringResistance == customFlooringResistance));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,roomId,zoneType,const DeepCollectionEquality().hash(polygon),tubeSpacingMm,tubeTypeId,flooringMaterialId,borderDistanceMm,layoutPattern,circuitId,wallSegmentId,heightMm,positionOnWallMm,widthMm);
+int get hashCode => Object.hash(runtimeType,id,roomId,zoneType,const DeepCollectionEquality().hash(polygon),tubeSpacingMm,tubeTypeId,flooringMaterialId,borderDistanceMm,layoutPattern,circuitId,wallSegmentId,heightMm,positionOnWallMm,widthMm,customFlooringResistance);
 
 @override
 String toString() {
-  return 'HeatingZone(id: $id, roomId: $roomId, zoneType: $zoneType, polygon: $polygon, tubeSpacingMm: $tubeSpacingMm, tubeTypeId: $tubeTypeId, flooringMaterialId: $flooringMaterialId, borderDistanceMm: $borderDistanceMm, layoutPattern: $layoutPattern, circuitId: $circuitId, wallSegmentId: $wallSegmentId, heightMm: $heightMm, positionOnWallMm: $positionOnWallMm, widthMm: $widthMm)';
+  return 'HeatingZone(id: $id, roomId: $roomId, zoneType: $zoneType, polygon: $polygon, tubeSpacingMm: $tubeSpacingMm, tubeTypeId: $tubeTypeId, flooringMaterialId: $flooringMaterialId, borderDistanceMm: $borderDistanceMm, layoutPattern: $layoutPattern, circuitId: $circuitId, wallSegmentId: $wallSegmentId, heightMm: $heightMm, positionOnWallMm: $positionOnWallMm, widthMm: $widthMm, customFlooringResistance: $customFlooringResistance)';
 }
 
 
@@ -76,7 +81,7 @@ abstract mixin class $HeatingZoneCopyWith<$Res>  {
   factory $HeatingZoneCopyWith(HeatingZone value, $Res Function(HeatingZone) _then) = _$HeatingZoneCopyWithImpl;
 @useResult
 $Res call({
- String id, String roomId, ZoneType zoneType, List<Point2D> polygon, int tubeSpacingMm, String tubeTypeId, String flooringMaterialId, int borderDistanceMm, LayoutPattern layoutPattern, String? circuitId, String? wallSegmentId, int? heightMm, double? positionOnWallMm, int? widthMm
+ String id, String roomId, ZoneType zoneType, List<Point2D> polygon, int tubeSpacingMm, String tubeTypeId, String flooringMaterialId, int borderDistanceMm, LayoutPattern layoutPattern, String? circuitId, String? wallSegmentId, int? heightMm, double? positionOnWallMm, int? widthMm, double? customFlooringResistance
 });
 
 
@@ -93,7 +98,7 @@ class _$HeatingZoneCopyWithImpl<$Res>
 
 /// Create a copy of HeatingZone
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? roomId = null,Object? zoneType = null,Object? polygon = null,Object? tubeSpacingMm = null,Object? tubeTypeId = null,Object? flooringMaterialId = null,Object? borderDistanceMm = null,Object? layoutPattern = null,Object? circuitId = freezed,Object? wallSegmentId = freezed,Object? heightMm = freezed,Object? positionOnWallMm = freezed,Object? widthMm = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? roomId = null,Object? zoneType = null,Object? polygon = null,Object? tubeSpacingMm = null,Object? tubeTypeId = null,Object? flooringMaterialId = null,Object? borderDistanceMm = null,Object? layoutPattern = null,Object? circuitId = freezed,Object? wallSegmentId = freezed,Object? heightMm = freezed,Object? positionOnWallMm = freezed,Object? widthMm = freezed,Object? customFlooringResistance = freezed,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,roomId: null == roomId ? _self.roomId : roomId // ignore: cast_nullable_to_non_nullable
@@ -109,7 +114,8 @@ as String?,wallSegmentId: freezed == wallSegmentId ? _self.wallSegmentId : wallS
 as String?,heightMm: freezed == heightMm ? _self.heightMm : heightMm // ignore: cast_nullable_to_non_nullable
 as int?,positionOnWallMm: freezed == positionOnWallMm ? _self.positionOnWallMm : positionOnWallMm // ignore: cast_nullable_to_non_nullable
 as double?,widthMm: freezed == widthMm ? _self.widthMm : widthMm // ignore: cast_nullable_to_non_nullable
-as int?,
+as int?,customFlooringResistance: freezed == customFlooringResistance ? _self.customFlooringResistance : customFlooringResistance // ignore: cast_nullable_to_non_nullable
+as double?,
   ));
 }
 
@@ -194,10 +200,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String roomId,  ZoneType zoneType,  List<Point2D> polygon,  int tubeSpacingMm,  String tubeTypeId,  String flooringMaterialId,  int borderDistanceMm,  LayoutPattern layoutPattern,  String? circuitId,  String? wallSegmentId,  int? heightMm,  double? positionOnWallMm,  int? widthMm)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String roomId,  ZoneType zoneType,  List<Point2D> polygon,  int tubeSpacingMm,  String tubeTypeId,  String flooringMaterialId,  int borderDistanceMm,  LayoutPattern layoutPattern,  String? circuitId,  String? wallSegmentId,  int? heightMm,  double? positionOnWallMm,  int? widthMm,  double? customFlooringResistance)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _HeatingZone() when $default != null:
-return $default(_that.id,_that.roomId,_that.zoneType,_that.polygon,_that.tubeSpacingMm,_that.tubeTypeId,_that.flooringMaterialId,_that.borderDistanceMm,_that.layoutPattern,_that.circuitId,_that.wallSegmentId,_that.heightMm,_that.positionOnWallMm,_that.widthMm);case _:
+return $default(_that.id,_that.roomId,_that.zoneType,_that.polygon,_that.tubeSpacingMm,_that.tubeTypeId,_that.flooringMaterialId,_that.borderDistanceMm,_that.layoutPattern,_that.circuitId,_that.wallSegmentId,_that.heightMm,_that.positionOnWallMm,_that.widthMm,_that.customFlooringResistance);case _:
   return orElse();
 
 }
@@ -215,10 +221,10 @@ return $default(_that.id,_that.roomId,_that.zoneType,_that.polygon,_that.tubeSpa
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String roomId,  ZoneType zoneType,  List<Point2D> polygon,  int tubeSpacingMm,  String tubeTypeId,  String flooringMaterialId,  int borderDistanceMm,  LayoutPattern layoutPattern,  String? circuitId,  String? wallSegmentId,  int? heightMm,  double? positionOnWallMm,  int? widthMm)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String roomId,  ZoneType zoneType,  List<Point2D> polygon,  int tubeSpacingMm,  String tubeTypeId,  String flooringMaterialId,  int borderDistanceMm,  LayoutPattern layoutPattern,  String? circuitId,  String? wallSegmentId,  int? heightMm,  double? positionOnWallMm,  int? widthMm,  double? customFlooringResistance)  $default,) {final _that = this;
 switch (_that) {
 case _HeatingZone():
-return $default(_that.id,_that.roomId,_that.zoneType,_that.polygon,_that.tubeSpacingMm,_that.tubeTypeId,_that.flooringMaterialId,_that.borderDistanceMm,_that.layoutPattern,_that.circuitId,_that.wallSegmentId,_that.heightMm,_that.positionOnWallMm,_that.widthMm);case _:
+return $default(_that.id,_that.roomId,_that.zoneType,_that.polygon,_that.tubeSpacingMm,_that.tubeTypeId,_that.flooringMaterialId,_that.borderDistanceMm,_that.layoutPattern,_that.circuitId,_that.wallSegmentId,_that.heightMm,_that.positionOnWallMm,_that.widthMm,_that.customFlooringResistance);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -235,10 +241,10 @@ return $default(_that.id,_that.roomId,_that.zoneType,_that.polygon,_that.tubeSpa
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String roomId,  ZoneType zoneType,  List<Point2D> polygon,  int tubeSpacingMm,  String tubeTypeId,  String flooringMaterialId,  int borderDistanceMm,  LayoutPattern layoutPattern,  String? circuitId,  String? wallSegmentId,  int? heightMm,  double? positionOnWallMm,  int? widthMm)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String roomId,  ZoneType zoneType,  List<Point2D> polygon,  int tubeSpacingMm,  String tubeTypeId,  String flooringMaterialId,  int borderDistanceMm,  LayoutPattern layoutPattern,  String? circuitId,  String? wallSegmentId,  int? heightMm,  double? positionOnWallMm,  int? widthMm,  double? customFlooringResistance)?  $default,) {final _that = this;
 switch (_that) {
 case _HeatingZone() when $default != null:
-return $default(_that.id,_that.roomId,_that.zoneType,_that.polygon,_that.tubeSpacingMm,_that.tubeTypeId,_that.flooringMaterialId,_that.borderDistanceMm,_that.layoutPattern,_that.circuitId,_that.wallSegmentId,_that.heightMm,_that.positionOnWallMm,_that.widthMm);case _:
+return $default(_that.id,_that.roomId,_that.zoneType,_that.polygon,_that.tubeSpacingMm,_that.tubeTypeId,_that.flooringMaterialId,_that.borderDistanceMm,_that.layoutPattern,_that.circuitId,_that.wallSegmentId,_that.heightMm,_that.positionOnWallMm,_that.widthMm,_that.customFlooringResistance);case _:
   return null;
 
 }
@@ -250,7 +256,7 @@ return $default(_that.id,_that.roomId,_that.zoneType,_that.polygon,_that.tubeSpa
 @JsonSerializable()
 
 class _HeatingZone implements HeatingZone {
-  const _HeatingZone({required this.id, required this.roomId, this.zoneType = ZoneType.floorHeating, final  List<Point2D> polygon = const [], this.tubeSpacingMm = 150, required this.tubeTypeId, required this.flooringMaterialId, this.borderDistanceMm = 100, this.layoutPattern = LayoutPattern.meander, this.circuitId, this.wallSegmentId, this.heightMm, this.positionOnWallMm, this.widthMm}): _polygon = polygon;
+  const _HeatingZone({required this.id, required this.roomId, this.zoneType = ZoneType.floorHeating, final  List<Point2D> polygon = const [], this.tubeSpacingMm = 150, required this.tubeTypeId, required this.flooringMaterialId, this.borderDistanceMm = 100, this.layoutPattern = LayoutPattern.meander, this.circuitId, this.wallSegmentId, this.heightMm, this.positionOnWallMm, this.widthMm, this.customFlooringResistance}): _polygon = polygon;
   factory _HeatingZone.fromJson(Map<String, dynamic> json) => _$HeatingZoneFromJson(json);
 
 /// UUID v4 primary key.
@@ -302,6 +308,12 @@ class _HeatingZone implements HeatingZone {
 /// Null for [ZoneType.floorHeating]. For wall zones, null means
 /// the zone spans the full wall length. Range: 50 to wallLength.
 @override final  int? widthMm;
+/// User-specified thermal resistance in m²·K/W.
+///
+/// Only meaningful when [flooringMaterialId] equals
+/// [kCustomFlooringMaterialId]. Range: 0.000–0.500. Null until
+/// the user sets a value.
+@override final  double? customFlooringResistance;
 
 /// Create a copy of HeatingZone
 /// with the given fields replaced by the non-null parameter values.
@@ -316,16 +328,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _HeatingZone&&(identical(other.id, id) || other.id == id)&&(identical(other.roomId, roomId) || other.roomId == roomId)&&(identical(other.zoneType, zoneType) || other.zoneType == zoneType)&&const DeepCollectionEquality().equals(other._polygon, _polygon)&&(identical(other.tubeSpacingMm, tubeSpacingMm) || other.tubeSpacingMm == tubeSpacingMm)&&(identical(other.tubeTypeId, tubeTypeId) || other.tubeTypeId == tubeTypeId)&&(identical(other.flooringMaterialId, flooringMaterialId) || other.flooringMaterialId == flooringMaterialId)&&(identical(other.borderDistanceMm, borderDistanceMm) || other.borderDistanceMm == borderDistanceMm)&&(identical(other.layoutPattern, layoutPattern) || other.layoutPattern == layoutPattern)&&(identical(other.circuitId, circuitId) || other.circuitId == circuitId)&&(identical(other.wallSegmentId, wallSegmentId) || other.wallSegmentId == wallSegmentId)&&(identical(other.heightMm, heightMm) || other.heightMm == heightMm)&&(identical(other.positionOnWallMm, positionOnWallMm) || other.positionOnWallMm == positionOnWallMm)&&(identical(other.widthMm, widthMm) || other.widthMm == widthMm));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _HeatingZone&&(identical(other.id, id) || other.id == id)&&(identical(other.roomId, roomId) || other.roomId == roomId)&&(identical(other.zoneType, zoneType) || other.zoneType == zoneType)&&const DeepCollectionEquality().equals(other._polygon, _polygon)&&(identical(other.tubeSpacingMm, tubeSpacingMm) || other.tubeSpacingMm == tubeSpacingMm)&&(identical(other.tubeTypeId, tubeTypeId) || other.tubeTypeId == tubeTypeId)&&(identical(other.flooringMaterialId, flooringMaterialId) || other.flooringMaterialId == flooringMaterialId)&&(identical(other.borderDistanceMm, borderDistanceMm) || other.borderDistanceMm == borderDistanceMm)&&(identical(other.layoutPattern, layoutPattern) || other.layoutPattern == layoutPattern)&&(identical(other.circuitId, circuitId) || other.circuitId == circuitId)&&(identical(other.wallSegmentId, wallSegmentId) || other.wallSegmentId == wallSegmentId)&&(identical(other.heightMm, heightMm) || other.heightMm == heightMm)&&(identical(other.positionOnWallMm, positionOnWallMm) || other.positionOnWallMm == positionOnWallMm)&&(identical(other.widthMm, widthMm) || other.widthMm == widthMm)&&(identical(other.customFlooringResistance, customFlooringResistance) || other.customFlooringResistance == customFlooringResistance));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,roomId,zoneType,const DeepCollectionEquality().hash(_polygon),tubeSpacingMm,tubeTypeId,flooringMaterialId,borderDistanceMm,layoutPattern,circuitId,wallSegmentId,heightMm,positionOnWallMm,widthMm);
+int get hashCode => Object.hash(runtimeType,id,roomId,zoneType,const DeepCollectionEquality().hash(_polygon),tubeSpacingMm,tubeTypeId,flooringMaterialId,borderDistanceMm,layoutPattern,circuitId,wallSegmentId,heightMm,positionOnWallMm,widthMm,customFlooringResistance);
 
 @override
 String toString() {
-  return 'HeatingZone(id: $id, roomId: $roomId, zoneType: $zoneType, polygon: $polygon, tubeSpacingMm: $tubeSpacingMm, tubeTypeId: $tubeTypeId, flooringMaterialId: $flooringMaterialId, borderDistanceMm: $borderDistanceMm, layoutPattern: $layoutPattern, circuitId: $circuitId, wallSegmentId: $wallSegmentId, heightMm: $heightMm, positionOnWallMm: $positionOnWallMm, widthMm: $widthMm)';
+  return 'HeatingZone(id: $id, roomId: $roomId, zoneType: $zoneType, polygon: $polygon, tubeSpacingMm: $tubeSpacingMm, tubeTypeId: $tubeTypeId, flooringMaterialId: $flooringMaterialId, borderDistanceMm: $borderDistanceMm, layoutPattern: $layoutPattern, circuitId: $circuitId, wallSegmentId: $wallSegmentId, heightMm: $heightMm, positionOnWallMm: $positionOnWallMm, widthMm: $widthMm, customFlooringResistance: $customFlooringResistance)';
 }
 
 
@@ -336,7 +348,7 @@ abstract mixin class _$HeatingZoneCopyWith<$Res> implements $HeatingZoneCopyWith
   factory _$HeatingZoneCopyWith(_HeatingZone value, $Res Function(_HeatingZone) _then) = __$HeatingZoneCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String roomId, ZoneType zoneType, List<Point2D> polygon, int tubeSpacingMm, String tubeTypeId, String flooringMaterialId, int borderDistanceMm, LayoutPattern layoutPattern, String? circuitId, String? wallSegmentId, int? heightMm, double? positionOnWallMm, int? widthMm
+ String id, String roomId, ZoneType zoneType, List<Point2D> polygon, int tubeSpacingMm, String tubeTypeId, String flooringMaterialId, int borderDistanceMm, LayoutPattern layoutPattern, String? circuitId, String? wallSegmentId, int? heightMm, double? positionOnWallMm, int? widthMm, double? customFlooringResistance
 });
 
 
@@ -353,7 +365,7 @@ class __$HeatingZoneCopyWithImpl<$Res>
 
 /// Create a copy of HeatingZone
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? roomId = null,Object? zoneType = null,Object? polygon = null,Object? tubeSpacingMm = null,Object? tubeTypeId = null,Object? flooringMaterialId = null,Object? borderDistanceMm = null,Object? layoutPattern = null,Object? circuitId = freezed,Object? wallSegmentId = freezed,Object? heightMm = freezed,Object? positionOnWallMm = freezed,Object? widthMm = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? roomId = null,Object? zoneType = null,Object? polygon = null,Object? tubeSpacingMm = null,Object? tubeTypeId = null,Object? flooringMaterialId = null,Object? borderDistanceMm = null,Object? layoutPattern = null,Object? circuitId = freezed,Object? wallSegmentId = freezed,Object? heightMm = freezed,Object? positionOnWallMm = freezed,Object? widthMm = freezed,Object? customFlooringResistance = freezed,}) {
   return _then(_HeatingZone(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,roomId: null == roomId ? _self.roomId : roomId // ignore: cast_nullable_to_non_nullable
@@ -369,7 +381,8 @@ as String?,wallSegmentId: freezed == wallSegmentId ? _self.wallSegmentId : wallS
 as String?,heightMm: freezed == heightMm ? _self.heightMm : heightMm // ignore: cast_nullable_to_non_nullable
 as int?,positionOnWallMm: freezed == positionOnWallMm ? _self.positionOnWallMm : positionOnWallMm // ignore: cast_nullable_to_non_nullable
 as double?,widthMm: freezed == widthMm ? _self.widthMm : widthMm // ignore: cast_nullable_to_non_nullable
-as int?,
+as int?,customFlooringResistance: freezed == customFlooringResistance ? _self.customFlooringResistance : customFlooringResistance // ignore: cast_nullable_to_non_nullable
+as double?,
   ));
 }
 

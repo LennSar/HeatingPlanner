@@ -40,10 +40,12 @@ class HeatingZoneProperties extends ConsumerStatefulWidget {
 
 class _HeatingZonePropertiesState
     extends ConsumerState<HeatingZoneProperties> {
-  // Text controllers for numeric text inputs (spacing, border, height).
+  // Text controllers for numeric text inputs (spacing, border, height,
+  // and custom R value).
   late TextEditingController _spacingController;
   late TextEditingController _borderController;
   late TextEditingController _heightController;
+  late TextEditingController _customRController;
 
   /// Snapshot taken when a slider drag starts for undo grouping.
   HeatingZone? _zoneAtSliderStart;
@@ -57,6 +59,7 @@ class _HeatingZonePropertiesState
     _spacingController = TextEditingController();
     _borderController = TextEditingController();
     _heightController = TextEditingController();
+    _customRController = TextEditingController();
   }
 
   @override
@@ -64,6 +67,7 @@ class _HeatingZonePropertiesState
     _spacingController.dispose();
     _borderController.dispose();
     _heightController.dispose();
+    _customRController.dispose();
     super.dispose();
   }
 
@@ -72,18 +76,23 @@ class _HeatingZonePropertiesState
   void _syncControllers(HeatingZone zone, int defaultHeightMm) {
     final heightStr =
         (zone.heightMm ?? defaultHeightMm).toString();
+    final customRStr =
+        (zone.customFlooringResistance ?? 0.0)
+            .toStringAsFixed(3);
     if (_lastSyncedZoneId == zone.id &&
         _spacingController.text ==
             zone.tubeSpacingMm.toString() &&
         _borderController.text ==
             zone.borderDistanceMm.toString() &&
-        _heightController.text == heightStr) {
+        _heightController.text == heightStr &&
+        _customRController.text == customRStr) {
       return;
     }
     _lastSyncedZoneId = zone.id;
     _spacingController.text = zone.tubeSpacingMm.toString();
     _borderController.text = zone.borderDistanceMm.toString();
     _heightController.text = heightStr;
+    _customRController.text = customRStr;
   }
 
   /// Commits a zone update via the undo stack.
@@ -164,6 +173,13 @@ class _HeatingZonePropertiesState
         _heightController.text =
             (z.heightMm ?? ref.read(floorHeightMmProvider))
                 .toString();
+      }
+      if (prevZ == null ||
+          prevZ.customFlooringResistance !=
+              z.customFlooringResistance) {
+        _customRController.text =
+            (z.customFlooringResistance ?? 0.0)
+                .toStringAsFixed(3);
       }
     });
 
@@ -425,7 +441,12 @@ class _HeatingZonePropertiesState
           const SizedBox(height: Spacing.xs),
           flooringAsync.when(
             data: (allMaterials) {
+              // Filter to zone-appropriate materials; the Custom
+              // sentinel is appended manually below.
               final filtered = allMaterials.where((m) {
+                if (m.id == kCustomFlooringMaterialId) {
+                  return false;
+                }
                 if (isWallZone) {
                   return m.surfaceType == SurfaceType.wall ||
                       m.surfaceType == SurfaceType.both;
@@ -433,16 +454,83 @@ class _HeatingZonePropertiesState
                 return m.surfaceType == SurfaceType.floor ||
                     m.surfaceType == SurfaceType.both;
               }).toList();
-              return _FlooringMaterialDropdown(
-                materials: filtered,
-                selectedId: zone.flooringMaterialId,
-                onChanged: (id) {
-                  if (id == zone.flooringMaterialId) return;
-                  _commit(
-                    zone,
-                    zone.copyWith(flooringMaterialId: id),
-                  );
-                },
+
+              final isCustom = zone.flooringMaterialId ==
+                  kCustomFlooringMaterialId;
+              final effectiveId = isCustom
+                  ? kCustomFlooringMaterialId
+                  : (filtered.any(
+                        (m) => m.id == zone.flooringMaterialId,
+                      )
+                        ? zone.flooringMaterialId
+                        : (filtered.isEmpty
+                            ? kCustomFlooringMaterialId
+                            : filtered.first.id));
+
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  InputDecorator(
+                    decoration:
+                        const InputDecoration(isDense: true),
+                    child: DropdownButton<String>(
+                      value: effectiveId,
+                      isDense: true,
+                      isExpanded: true,
+                      underline: const SizedBox.shrink(),
+                      items: [
+                        ...filtered.map(
+                          (m) => DropdownMenuItem(
+                            value: m.id,
+                            child: Text(
+                              '${m.name}'
+                              ' (R\u03BB\u202F'
+                              '${m.thermalResistance.toStringAsFixed(3)}'
+                              '\u202Fm\u00B2K/W)',
+                              style: textTheme.bodyMedium,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ),
+                        DropdownMenuItem(
+                          value: kCustomFlooringMaterialId,
+                          child: Text(
+                            'Custom\u2026',
+                            style: textTheme.bodyMedium,
+                          ),
+                        ),
+                      ],
+                      onChanged: (id) {
+                        if (id == null ||
+                            id == zone.flooringMaterialId) {
+                          return;
+                        }
+                        _commit(
+                          zone,
+                          zone.copyWith(flooringMaterialId: id),
+                        );
+                      },
+                    ),
+                  ),
+                  if (isCustom) ...[
+                    const SizedBox(height: Spacing.xs),
+                    _CustomRValueField(
+                      controller: _customRController,
+                      onSubmitted: (r) {
+                        if (r ==
+                            zone.customFlooringResistance) {
+                          return;
+                        }
+                        _commit(
+                          zone,
+                          zone.copyWith(
+                            customFlooringResistance: r,
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ],
               );
             },
             loading: () => const LinearProgressIndicator(),
@@ -623,58 +711,47 @@ class _TubeTypeDropdown extends StatelessWidget {
   }
 }
 
-/// Dropdown for selecting a [FlooringMaterial] by ID.
-class _FlooringMaterialDropdown extends StatelessWidget {
-  const _FlooringMaterialDropdown({
-    required this.materials,
-    required this.selectedId,
-    required this.onChanged,
+/// Numeric input for a custom surface covering R value (m²·K/W).
+///
+/// Range: [minCustomFlooringResistance]–[maxCustomFlooringResistance].
+class _CustomRValueField extends StatelessWidget {
+  const _CustomRValueField({
+    required this.controller,
+    required this.onSubmitted,
   });
 
-  final List<FlooringMaterial> materials;
-  final String selectedId;
-  final void Function(String id) onChanged;
+  final TextEditingController controller;
+  final void Function(double r) onSubmitted;
 
   @override
   Widget build(BuildContext context) {
-    final textTheme = Theme.of(context).textTheme;
-    if (materials.isEmpty) {
-      return Text(
-        'No flooring materials available',
-        style: textTheme.bodySmall,
-      );
-    }
-
-    final effectiveId =
-        materials.any((m) => m.id == selectedId)
-            ? selectedId
-            : materials.first.id;
-
-    return InputDecorator(
-      decoration: const InputDecoration(isDense: true),
-      child: DropdownButton<String>(
-        value: effectiveId,
-        isDense: true,
-        isExpanded: true,
-        underline: const SizedBox.shrink(),
-        items: materials
-            .map(
-              (m) => DropdownMenuItem(
-                value: m.id,
-                child: Text(
-                  '${m.name} (R\u03BB\u202F'
-                  '${m.thermalResistance.toStringAsFixed(3)}\u202F'
-                  'm\u00B2K/W)',
-                  style: textTheme.bodyMedium,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            )
-            .toList(),
-        onChanged: (id) {
-          if (id != null) onChanged(id);
-        },
+    return TextField(
+      controller: controller,
+      keyboardType: const TextInputType.numberWithOptions(
+        decimal: true,
       ),
+      decoration: InputDecoration(
+        labelText: 'R value',
+        suffixText: 'm\u00B2K/W',
+        helperText:
+            '${minCustomFlooringResistance.toStringAsFixed(3)}'
+            '\u2013'
+            '${maxCustomFlooringResistance.toStringAsFixed(3)}'
+            '\u202Fm\u00B2K/W',
+        isDense: true,
+      ),
+      onSubmitted: (raw) {
+        final parsed = double.tryParse(
+          raw.trim().replaceAll(',', '.'),
+        );
+        if (parsed == null) return;
+        final clamped = parsed.clamp(
+          minCustomFlooringResistance,
+          maxCustomFlooringResistance,
+        );
+        controller.text = clamped.toStringAsFixed(3);
+        onSubmitted(clamped);
+      },
     );
   }
 }

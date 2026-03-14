@@ -61,6 +61,10 @@ const double maxTubeLength12mm = 90.0;
 const double minAirChangeRate = 0.1;
 const double maxAirChangeRate = 5.0;
 
+// ── Custom surface covering R value ──────────────────────────────────────────
+const double minCustomFlooringResistance = 0.000; // m²K/W
+const double maxCustomFlooringResistance = 0.500; // m²K/W
+
 // ── Surface temperature limits (EN 1264) ─────────────────────────────────────
 const double maxSurfaceTempOccupiedFloor = 29.0;
 const double maxSurfaceTempPeripheralFloor = 35.0;

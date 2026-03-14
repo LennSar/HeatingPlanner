@@ -5,6 +5,13 @@ import 'enums.dart';
 part 'flooring_material.freezed.dart';
 part 'flooring_material.g.dart';
 
+/// ID of the built-in 'Custom' [FlooringMaterial] sentinel.
+///
+/// When a zone's `flooringMaterialId` equals this value, the zone's
+/// `customFlooringResistance` field is used for calculations instead
+/// of this row's placeholder R value of 0.
+const kCustomFlooringMaterialId = '20000000-0000-4000-8000-000000000099';
+
 /// A surface covering with its thermal resistance.
 ///
 /// Used by the heating-output engine to calculate the temperature

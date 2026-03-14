@@ -67,6 +67,13 @@ abstract class HeatingZone with _$HeatingZone {
     /// Null for [ZoneType.floorHeating]. For wall zones, null means
     /// the zone spans the full wall length. Range: 50 to wallLength.
     int? widthMm,
+
+    /// User-specified thermal resistance in m²·K/W.
+    ///
+    /// Only meaningful when [flooringMaterialId] equals
+    /// [kCustomFlooringMaterialId]. Range: 0.000–0.500. Null until
+    /// the user sets a value.
+    double? customFlooringResistance,
   }) = _HeatingZone;
 
   factory HeatingZone.fromJson(Map<String, dynamic> json) =>
