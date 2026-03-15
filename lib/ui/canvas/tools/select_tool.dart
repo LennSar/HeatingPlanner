@@ -7,6 +7,7 @@ import '../../../core/utils/geometry_utils.dart';
 import '../../../data/models/distributor.dart';
 import '../../../data/models/door.dart';
 import '../../../data/models/enums.dart';
+import '../../../data/models/heating_circuit.dart';
 import '../../../data/models/heating_zone.dart';
 import '../../../data/models/point2d.dart';
 import '../../../data/models/room.dart';
@@ -46,6 +47,9 @@ class SelectTool extends CanvasTool {
 
   /// Hit-test threshold for walls (half wall thickness).
   static const double _wallHitThresholdMm = 100.0;
+
+  /// Hit-test threshold for circuit polylines (mm).
+  static const double _circuitHitThresholdMm = 200.0;
 
   /// Cycle-click threshold in screen pixels (ADR-005).
   static const double _cycleThresholdPx = 5.0;
@@ -166,6 +170,11 @@ class SelectTool extends CanvasTool {
   /// Set in [onPointerDown] when the pointer lands on a selected zone.
   /// Cleared in the immediately-following [onTap] call.
   bool _zonePointerOnZone = false;
+
+  // -- Circuit selection state --
+
+  /// Currently selected circuit, if any.
+  HeatingCircuit? _selectedCircuit;
 
   // -- Distributor selection/drag state --
 
@@ -767,6 +776,9 @@ class SelectTool extends CanvasTool {
 
   @override
   InteractionData? getInteractionData() {
+    // Circuit selection — no handles needed.
+    if (_selectedCircuit != null) return null;
+
     // Opening selection takes priority over everything.
     if (_selectedWindow != null || _selectedDoor != null) {
       return _buildOpeningSelectionData();
@@ -1492,6 +1504,37 @@ class SelectTool extends CanvasTool {
   }
 
   // ================================================================
+  // Circuit hit-testing
+  // ================================================================
+
+  /// Returns true if [point] is within [_circuitHitThresholdMm] of any
+  /// segment in [path].
+  bool _polylineHit(List<Point2D> path, Point2D point) {
+    for (var i = 0; i < path.length - 1; i++) {
+      if (GeometryUtils.distanceToSegment(
+            point,
+            path[i],
+            path[i + 1],
+          ) <=
+          _circuitHitThresholdMm) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Returns the first circuit whose supply or return polyline is hit.
+  HeatingCircuit? _hitTestCircuit(Point2D point) {
+    for (final circuit in callbacks.currentCircuits) {
+      if (_polylineHit(circuit.supplyRoutePath, point) ||
+          _polylineHit(circuit.returnRoutePath, point)) {
+        return circuit;
+      }
+    }
+    return null;
+  }
+
+  // ================================================================
   // Opening deletion
   // ================================================================
 
@@ -1542,6 +1585,7 @@ class SelectTool extends CanvasTool {
     _selectedDoor = null;
     _selectedZone = null;
     _selectedDistributor = false;
+    _selectedCircuit = null;
   }
 
   // ================================================================
@@ -1911,7 +1955,13 @@ class SelectTool extends CanvasTool {
       items.add((type: 'distributor', id: dist.id));
     }
 
-    // 4. Heating zones (smallest area first).
+    // 4. Heating circuits (polyline proximity).
+    final circuit = _hitTestCircuit(point);
+    if (circuit != null) {
+      items.add((type: 'circuit', id: circuit.id));
+    }
+
+    // 5. Heating zones (smallest area first).
     final zones = callbacks.currentZones
         .where(
           (z) =>
@@ -1978,6 +2028,14 @@ class SelectTool extends CanvasTool {
           _selectedDistributor = true;
           callbacks.selectElement('distributor', d.id);
         }
+      case 'circuit':
+        final c = callbacks.currentCircuits
+            .where((x) => x.id == item.id)
+            .firstOrNull;
+        if (c != null) {
+          _selectedCircuit = c;
+          callbacks.selectElement('circuit', c.id);
+        }
       case 'zone':
         final z = callbacks.currentZones
             .where((x) => x.id == item.id)
@@ -2015,6 +2073,8 @@ class SelectTool extends CanvasTool {
         callbacks.currentDoors.any((x) => x.id == item.id),
       'distributor' =>
         callbacks.currentDistributor?.id == item.id,
+      'circuit' =>
+        callbacks.currentCircuits.any((x) => x.id == item.id),
       'zone' =>
         callbacks.currentZones.any((x) => x.id == item.id),
       'wall' =>

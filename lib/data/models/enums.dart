@@ -53,6 +53,18 @@ enum WarningSeverity { error, warning, info }
 /// appropriate choices are shown for each zone type.
 enum SurfaceType { floor, wall, both }
 
+/// Supply and return run insulation strategy (ADR-008).
+enum SupplyPipeInsulationType {
+  /// Pipe embedded directly in screed — full heat output to transit room.
+  none,
+
+  /// Pipe in corrugated PE conduit (Wellrohr) in screed — ~25–30 % residual heat.
+  corrugatedConduit,
+
+  /// Pipe routed inside the insulation layer below the screed — no heat output.
+  insulationLayer,
+}
+
 /// Active drawing tool on the canvas.
 enum DrawingTool {
   select,

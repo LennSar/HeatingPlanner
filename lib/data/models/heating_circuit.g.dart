@@ -25,6 +25,10 @@ _HeatingCircuit _$HeatingCircuitFromJson(Map<String, dynamic> json) =>
       flowRateKgH: (json['flowRateKgH'] as num?)?.toDouble() ?? 0.0,
       pressureLossPa: (json['pressureLossPa'] as num?)?.toDouble() ?? 0.0,
       valveSetting: (json['valveSetting'] as num?)?.toDouble() ?? 0.0,
+      supplyPipeInsulationType: $enumDecodeNullable(
+        _$SupplyPipeInsulationTypeEnumMap,
+        json['supplyPipeInsulationType'],
+      ),
     );
 
 Map<String, dynamic> _$HeatingCircuitToJson(_HeatingCircuit instance) =>
@@ -38,4 +42,12 @@ Map<String, dynamic> _$HeatingCircuitToJson(_HeatingCircuit instance) =>
       'flowRateKgH': instance.flowRateKgH,
       'pressureLossPa': instance.pressureLossPa,
       'valveSetting': instance.valveSetting,
+      'supplyPipeInsulationType':
+          _$SupplyPipeInsulationTypeEnumMap[instance.supplyPipeInsulationType],
     };
+
+const _$SupplyPipeInsulationTypeEnumMap = {
+  SupplyPipeInsulationType.none: 'none',
+  SupplyPipeInsulationType.corrugatedConduit: 'corrugatedConduit',
+  SupplyPipeInsulationType.insulationLayer: 'insulationLayer',
+};

@@ -105,6 +105,9 @@ abstract class EditorCallbacks {
   /// Commit a completed heating circuit to the editor state.
   void commitCircuit(HeatingCircuit circuit);
 
+  /// Replace an existing heating circuit (same ID).
+  void updateCircuit(HeatingCircuit circuit);
+
   /// All heating circuits currently in the editor.
   List<HeatingCircuit> get currentCircuits;
 

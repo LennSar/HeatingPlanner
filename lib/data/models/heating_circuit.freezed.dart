@@ -24,7 +24,8 @@ mixin _$HeatingCircuit {
  double get tubeLengthM;/// Design flow rate in kg/h (calculated).
  double get flowRateKgH;/// Pressure drop across this circuit in Pa (calculated).
  double get pressureLossPa;/// Valve pre-setting for hydraulic balancing (calculated).
- double get valveSetting;
+ double get valveSetting;/// Supply/return run insulation strategy (ADR-008). Null = not yet chosen.
+ SupplyPipeInsulationType? get supplyPipeInsulationType;
 /// Create a copy of HeatingCircuit
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -37,16 +38,16 @@ $HeatingCircuitCopyWith<HeatingCircuit> get copyWith => _$HeatingCircuitCopyWith
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is HeatingCircuit&&(identical(other.id, id) || other.id == id)&&(identical(other.distributorId, distributorId) || other.distributorId == distributorId)&&(identical(other.heatingZoneId, heatingZoneId) || other.heatingZoneId == heatingZoneId)&&const DeepCollectionEquality().equals(other.supplyRoutePath, supplyRoutePath)&&const DeepCollectionEquality().equals(other.returnRoutePath, returnRoutePath)&&(identical(other.tubeLengthM, tubeLengthM) || other.tubeLengthM == tubeLengthM)&&(identical(other.flowRateKgH, flowRateKgH) || other.flowRateKgH == flowRateKgH)&&(identical(other.pressureLossPa, pressureLossPa) || other.pressureLossPa == pressureLossPa)&&(identical(other.valveSetting, valveSetting) || other.valveSetting == valveSetting));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is HeatingCircuit&&(identical(other.id, id) || other.id == id)&&(identical(other.distributorId, distributorId) || other.distributorId == distributorId)&&(identical(other.heatingZoneId, heatingZoneId) || other.heatingZoneId == heatingZoneId)&&const DeepCollectionEquality().equals(other.supplyRoutePath, supplyRoutePath)&&const DeepCollectionEquality().equals(other.returnRoutePath, returnRoutePath)&&(identical(other.tubeLengthM, tubeLengthM) || other.tubeLengthM == tubeLengthM)&&(identical(other.flowRateKgH, flowRateKgH) || other.flowRateKgH == flowRateKgH)&&(identical(other.pressureLossPa, pressureLossPa) || other.pressureLossPa == pressureLossPa)&&(identical(other.valveSetting, valveSetting) || other.valveSetting == valveSetting)&&(identical(other.supplyPipeInsulationType, supplyPipeInsulationType) || other.supplyPipeInsulationType == supplyPipeInsulationType));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,distributorId,heatingZoneId,const DeepCollectionEquality().hash(supplyRoutePath),const DeepCollectionEquality().hash(returnRoutePath),tubeLengthM,flowRateKgH,pressureLossPa,valveSetting);
+int get hashCode => Object.hash(runtimeType,id,distributorId,heatingZoneId,const DeepCollectionEquality().hash(supplyRoutePath),const DeepCollectionEquality().hash(returnRoutePath),tubeLengthM,flowRateKgH,pressureLossPa,valveSetting,supplyPipeInsulationType);
 
 @override
 String toString() {
-  return 'HeatingCircuit(id: $id, distributorId: $distributorId, heatingZoneId: $heatingZoneId, supplyRoutePath: $supplyRoutePath, returnRoutePath: $returnRoutePath, tubeLengthM: $tubeLengthM, flowRateKgH: $flowRateKgH, pressureLossPa: $pressureLossPa, valveSetting: $valveSetting)';
+  return 'HeatingCircuit(id: $id, distributorId: $distributorId, heatingZoneId: $heatingZoneId, supplyRoutePath: $supplyRoutePath, returnRoutePath: $returnRoutePath, tubeLengthM: $tubeLengthM, flowRateKgH: $flowRateKgH, pressureLossPa: $pressureLossPa, valveSetting: $valveSetting, supplyPipeInsulationType: $supplyPipeInsulationType)';
 }
 
 
@@ -57,7 +58,7 @@ abstract mixin class $HeatingCircuitCopyWith<$Res>  {
   factory $HeatingCircuitCopyWith(HeatingCircuit value, $Res Function(HeatingCircuit) _then) = _$HeatingCircuitCopyWithImpl;
 @useResult
 $Res call({
- String id, String distributorId, String heatingZoneId, List<Point2D> supplyRoutePath, List<Point2D> returnRoutePath, double tubeLengthM, double flowRateKgH, double pressureLossPa, double valveSetting
+ String id, String distributorId, String heatingZoneId, List<Point2D> supplyRoutePath, List<Point2D> returnRoutePath, double tubeLengthM, double flowRateKgH, double pressureLossPa, double valveSetting, SupplyPipeInsulationType? supplyPipeInsulationType
 });
 
 
@@ -74,7 +75,7 @@ class _$HeatingCircuitCopyWithImpl<$Res>
 
 /// Create a copy of HeatingCircuit
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? distributorId = null,Object? heatingZoneId = null,Object? supplyRoutePath = null,Object? returnRoutePath = null,Object? tubeLengthM = null,Object? flowRateKgH = null,Object? pressureLossPa = null,Object? valveSetting = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? distributorId = null,Object? heatingZoneId = null,Object? supplyRoutePath = null,Object? returnRoutePath = null,Object? tubeLengthM = null,Object? flowRateKgH = null,Object? pressureLossPa = null,Object? valveSetting = null,Object? supplyPipeInsulationType = freezed,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,distributorId: null == distributorId ? _self.distributorId : distributorId // ignore: cast_nullable_to_non_nullable
@@ -85,7 +86,8 @@ as List<Point2D>,tubeLengthM: null == tubeLengthM ? _self.tubeLengthM : tubeLeng
 as double,flowRateKgH: null == flowRateKgH ? _self.flowRateKgH : flowRateKgH // ignore: cast_nullable_to_non_nullable
 as double,pressureLossPa: null == pressureLossPa ? _self.pressureLossPa : pressureLossPa // ignore: cast_nullable_to_non_nullable
 as double,valveSetting: null == valveSetting ? _self.valveSetting : valveSetting // ignore: cast_nullable_to_non_nullable
-as double,
+as double,supplyPipeInsulationType: freezed == supplyPipeInsulationType ? _self.supplyPipeInsulationType : supplyPipeInsulationType // ignore: cast_nullable_to_non_nullable
+as SupplyPipeInsulationType?,
   ));
 }
 
@@ -170,10 +172,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String distributorId,  String heatingZoneId,  List<Point2D> supplyRoutePath,  List<Point2D> returnRoutePath,  double tubeLengthM,  double flowRateKgH,  double pressureLossPa,  double valveSetting)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String distributorId,  String heatingZoneId,  List<Point2D> supplyRoutePath,  List<Point2D> returnRoutePath,  double tubeLengthM,  double flowRateKgH,  double pressureLossPa,  double valveSetting,  SupplyPipeInsulationType? supplyPipeInsulationType)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _HeatingCircuit() when $default != null:
-return $default(_that.id,_that.distributorId,_that.heatingZoneId,_that.supplyRoutePath,_that.returnRoutePath,_that.tubeLengthM,_that.flowRateKgH,_that.pressureLossPa,_that.valveSetting);case _:
+return $default(_that.id,_that.distributorId,_that.heatingZoneId,_that.supplyRoutePath,_that.returnRoutePath,_that.tubeLengthM,_that.flowRateKgH,_that.pressureLossPa,_that.valveSetting,_that.supplyPipeInsulationType);case _:
   return orElse();
 
 }
@@ -191,10 +193,10 @@ return $default(_that.id,_that.distributorId,_that.heatingZoneId,_that.supplyRou
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String distributorId,  String heatingZoneId,  List<Point2D> supplyRoutePath,  List<Point2D> returnRoutePath,  double tubeLengthM,  double flowRateKgH,  double pressureLossPa,  double valveSetting)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String distributorId,  String heatingZoneId,  List<Point2D> supplyRoutePath,  List<Point2D> returnRoutePath,  double tubeLengthM,  double flowRateKgH,  double pressureLossPa,  double valveSetting,  SupplyPipeInsulationType? supplyPipeInsulationType)  $default,) {final _that = this;
 switch (_that) {
 case _HeatingCircuit():
-return $default(_that.id,_that.distributorId,_that.heatingZoneId,_that.supplyRoutePath,_that.returnRoutePath,_that.tubeLengthM,_that.flowRateKgH,_that.pressureLossPa,_that.valveSetting);case _:
+return $default(_that.id,_that.distributorId,_that.heatingZoneId,_that.supplyRoutePath,_that.returnRoutePath,_that.tubeLengthM,_that.flowRateKgH,_that.pressureLossPa,_that.valveSetting,_that.supplyPipeInsulationType);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -211,10 +213,10 @@ return $default(_that.id,_that.distributorId,_that.heatingZoneId,_that.supplyRou
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String distributorId,  String heatingZoneId,  List<Point2D> supplyRoutePath,  List<Point2D> returnRoutePath,  double tubeLengthM,  double flowRateKgH,  double pressureLossPa,  double valveSetting)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String distributorId,  String heatingZoneId,  List<Point2D> supplyRoutePath,  List<Point2D> returnRoutePath,  double tubeLengthM,  double flowRateKgH,  double pressureLossPa,  double valveSetting,  SupplyPipeInsulationType? supplyPipeInsulationType)?  $default,) {final _that = this;
 switch (_that) {
 case _HeatingCircuit() when $default != null:
-return $default(_that.id,_that.distributorId,_that.heatingZoneId,_that.supplyRoutePath,_that.returnRoutePath,_that.tubeLengthM,_that.flowRateKgH,_that.pressureLossPa,_that.valveSetting);case _:
+return $default(_that.id,_that.distributorId,_that.heatingZoneId,_that.supplyRoutePath,_that.returnRoutePath,_that.tubeLengthM,_that.flowRateKgH,_that.pressureLossPa,_that.valveSetting,_that.supplyPipeInsulationType);case _:
   return null;
 
 }
@@ -226,7 +228,7 @@ return $default(_that.id,_that.distributorId,_that.heatingZoneId,_that.supplyRou
 @JsonSerializable()
 
 class _HeatingCircuit implements HeatingCircuit {
-  const _HeatingCircuit({required this.id, required this.distributorId, required this.heatingZoneId, final  List<Point2D> supplyRoutePath = const [], final  List<Point2D> returnRoutePath = const [], this.tubeLengthM = 0.0, this.flowRateKgH = 0.0, this.pressureLossPa = 0.0, this.valveSetting = 0.0}): _supplyRoutePath = supplyRoutePath,_returnRoutePath = returnRoutePath;
+  const _HeatingCircuit({required this.id, required this.distributorId, required this.heatingZoneId, final  List<Point2D> supplyRoutePath = const [], final  List<Point2D> returnRoutePath = const [], this.tubeLengthM = 0.0, this.flowRateKgH = 0.0, this.pressureLossPa = 0.0, this.valveSetting = 0.0, this.supplyPipeInsulationType}): _supplyRoutePath = supplyRoutePath,_returnRoutePath = returnRoutePath;
   factory _HeatingCircuit.fromJson(Map<String, dynamic> json) => _$HeatingCircuitFromJson(json);
 
 /// UUID v4 primary key.
@@ -261,6 +263,8 @@ class _HeatingCircuit implements HeatingCircuit {
 @override@JsonKey() final  double pressureLossPa;
 /// Valve pre-setting for hydraulic balancing (calculated).
 @override@JsonKey() final  double valveSetting;
+/// Supply/return run insulation strategy (ADR-008). Null = not yet chosen.
+@override final  SupplyPipeInsulationType? supplyPipeInsulationType;
 
 /// Create a copy of HeatingCircuit
 /// with the given fields replaced by the non-null parameter values.
@@ -275,16 +279,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _HeatingCircuit&&(identical(other.id, id) || other.id == id)&&(identical(other.distributorId, distributorId) || other.distributorId == distributorId)&&(identical(other.heatingZoneId, heatingZoneId) || other.heatingZoneId == heatingZoneId)&&const DeepCollectionEquality().equals(other._supplyRoutePath, _supplyRoutePath)&&const DeepCollectionEquality().equals(other._returnRoutePath, _returnRoutePath)&&(identical(other.tubeLengthM, tubeLengthM) || other.tubeLengthM == tubeLengthM)&&(identical(other.flowRateKgH, flowRateKgH) || other.flowRateKgH == flowRateKgH)&&(identical(other.pressureLossPa, pressureLossPa) || other.pressureLossPa == pressureLossPa)&&(identical(other.valveSetting, valveSetting) || other.valveSetting == valveSetting));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _HeatingCircuit&&(identical(other.id, id) || other.id == id)&&(identical(other.distributorId, distributorId) || other.distributorId == distributorId)&&(identical(other.heatingZoneId, heatingZoneId) || other.heatingZoneId == heatingZoneId)&&const DeepCollectionEquality().equals(other._supplyRoutePath, _supplyRoutePath)&&const DeepCollectionEquality().equals(other._returnRoutePath, _returnRoutePath)&&(identical(other.tubeLengthM, tubeLengthM) || other.tubeLengthM == tubeLengthM)&&(identical(other.flowRateKgH, flowRateKgH) || other.flowRateKgH == flowRateKgH)&&(identical(other.pressureLossPa, pressureLossPa) || other.pressureLossPa == pressureLossPa)&&(identical(other.valveSetting, valveSetting) || other.valveSetting == valveSetting)&&(identical(other.supplyPipeInsulationType, supplyPipeInsulationType) || other.supplyPipeInsulationType == supplyPipeInsulationType));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,distributorId,heatingZoneId,const DeepCollectionEquality().hash(_supplyRoutePath),const DeepCollectionEquality().hash(_returnRoutePath),tubeLengthM,flowRateKgH,pressureLossPa,valveSetting);
+int get hashCode => Object.hash(runtimeType,id,distributorId,heatingZoneId,const DeepCollectionEquality().hash(_supplyRoutePath),const DeepCollectionEquality().hash(_returnRoutePath),tubeLengthM,flowRateKgH,pressureLossPa,valveSetting,supplyPipeInsulationType);
 
 @override
 String toString() {
-  return 'HeatingCircuit(id: $id, distributorId: $distributorId, heatingZoneId: $heatingZoneId, supplyRoutePath: $supplyRoutePath, returnRoutePath: $returnRoutePath, tubeLengthM: $tubeLengthM, flowRateKgH: $flowRateKgH, pressureLossPa: $pressureLossPa, valveSetting: $valveSetting)';
+  return 'HeatingCircuit(id: $id, distributorId: $distributorId, heatingZoneId: $heatingZoneId, supplyRoutePath: $supplyRoutePath, returnRoutePath: $returnRoutePath, tubeLengthM: $tubeLengthM, flowRateKgH: $flowRateKgH, pressureLossPa: $pressureLossPa, valveSetting: $valveSetting, supplyPipeInsulationType: $supplyPipeInsulationType)';
 }
 
 
@@ -295,7 +299,7 @@ abstract mixin class _$HeatingCircuitCopyWith<$Res> implements $HeatingCircuitCo
   factory _$HeatingCircuitCopyWith(_HeatingCircuit value, $Res Function(_HeatingCircuit) _then) = __$HeatingCircuitCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String distributorId, String heatingZoneId, List<Point2D> supplyRoutePath, List<Point2D> returnRoutePath, double tubeLengthM, double flowRateKgH, double pressureLossPa, double valveSetting
+ String id, String distributorId, String heatingZoneId, List<Point2D> supplyRoutePath, List<Point2D> returnRoutePath, double tubeLengthM, double flowRateKgH, double pressureLossPa, double valveSetting, SupplyPipeInsulationType? supplyPipeInsulationType
 });
 
 
@@ -312,7 +316,7 @@ class __$HeatingCircuitCopyWithImpl<$Res>
 
 /// Create a copy of HeatingCircuit
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? distributorId = null,Object? heatingZoneId = null,Object? supplyRoutePath = null,Object? returnRoutePath = null,Object? tubeLengthM = null,Object? flowRateKgH = null,Object? pressureLossPa = null,Object? valveSetting = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? distributorId = null,Object? heatingZoneId = null,Object? supplyRoutePath = null,Object? returnRoutePath = null,Object? tubeLengthM = null,Object? flowRateKgH = null,Object? pressureLossPa = null,Object? valveSetting = null,Object? supplyPipeInsulationType = freezed,}) {
   return _then(_HeatingCircuit(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,distributorId: null == distributorId ? _self.distributorId : distributorId // ignore: cast_nullable_to_non_nullable
@@ -323,7 +327,8 @@ as List<Point2D>,tubeLengthM: null == tubeLengthM ? _self.tubeLengthM : tubeLeng
 as double,flowRateKgH: null == flowRateKgH ? _self.flowRateKgH : flowRateKgH // ignore: cast_nullable_to_non_nullable
 as double,pressureLossPa: null == pressureLossPa ? _self.pressureLossPa : pressureLossPa // ignore: cast_nullable_to_non_nullable
 as double,valveSetting: null == valveSetting ? _self.valveSetting : valveSetting // ignore: cast_nullable_to_non_nullable
-as double,
+as double,supplyPipeInsulationType: freezed == supplyPipeInsulationType ? _self.supplyPipeInsulationType : supplyPipeInsulationType // ignore: cast_nullable_to_non_nullable
+as SupplyPipeInsulationType?,
   ));
 }
 

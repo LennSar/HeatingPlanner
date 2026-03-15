@@ -338,6 +338,15 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
   }
 
+  /// Replace a heating circuit with the same ID.
+  void updateCircuit(HeatingCircuit circuit) {
+    state = state.copyWith(
+      circuits: state.circuits
+          .map((c) => c.id == circuit.id ? circuit : c)
+          .toList(),
+    );
+  }
+
   // ---- Distributor ----
 
   /// Set (or replace) the floor's distributor.

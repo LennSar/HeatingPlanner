@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import 'enums.dart';
 import 'point2d.dart';
 
 part 'heating_circuit.freezed.dart';
@@ -39,6 +40,9 @@ abstract class HeatingCircuit with _$HeatingCircuit {
 
     /// Valve pre-setting for hydraulic balancing (calculated).
     @Default(0.0) double valveSetting,
+
+    /// Supply/return run insulation strategy (ADR-008). Null = not yet chosen.
+    SupplyPipeInsulationType? supplyPipeInsulationType,
   }) = _HeatingCircuit;
 
   factory HeatingCircuit.fromJson(Map<String, dynamic> json) =>

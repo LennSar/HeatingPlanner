@@ -2,7 +2,6 @@ import 'package:flutter/gestures.dart';
 
 import '../../../calculation/engines/geometry_engine.dart';
 import '../../../core/utils/id_generator.dart';
-import '../../../data/models/enums.dart';
 import '../../../data/models/heating_circuit.dart';
 import '../../../data/models/heating_zone.dart';
 import '../../../data/models/point2d.dart';
@@ -73,7 +72,7 @@ class RouteDrawTool extends CanvasTool {
         }
 
       case _Phase.supply:
-        final zone = _floorZoneAt(worldPoint);
+        final zone = _zoneAt(worldPoint);
         if (zone != null) {
           // Finalise supply path at the snapped click point.
           _supplyPoints.add(snapped);
@@ -107,7 +106,7 @@ class RouteDrawTool extends CanvasTool {
     _current = worldPoint;
     // Show warning when hovering over an already-routed zone.
     if (_phase == _Phase.supply) {
-      final zone = _floorZoneAt(worldPoint);
+      final zone = _zoneAt(worldPoint);
       _hoveredZoneConnected =
           zone != null && zone.circuitId != null;
     } else {
@@ -150,12 +149,11 @@ class RouteDrawTool extends CanvasTool {
         _distributorHitRadiusMm;
   }
 
-  /// Returns the first floor-heating zone whose polygon
+  /// Returns the first heating zone (floor or wall) whose polygon
   /// contains [point], or null.
-  HeatingZone? _floorZoneAt(Point2D point) {
+  HeatingZone? _zoneAt(Point2D point) {
     for (final zone in callbacks.currentZones) {
-      if (zone.zoneType == ZoneType.floorHeating &&
-          zone.polygon.length >= 3 &&
+      if (zone.polygon.length >= 3 &&
           GeometryEngine.isPointInPolygon(
             point,
             zone.polygon,

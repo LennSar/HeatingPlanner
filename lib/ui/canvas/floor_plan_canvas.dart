@@ -313,6 +313,13 @@ class _FloorPlanCanvasState
   }
 
   @override
+  void updateCircuit(HeatingCircuit circuit) {
+    ref
+        .read(editorStateProvider.notifier)
+        .updateCircuit(circuit);
+  }
+
+  @override
   List<HeatingCircuit> get currentCircuits =>
       ref.read(editorStateProvider).circuits;
 
