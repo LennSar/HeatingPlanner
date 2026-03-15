@@ -70,11 +70,6 @@ class EditorState {
   /// Pass [clearDistributor] = true to set [distributor] to null
   /// (since null cannot be distinguished from "no change" with the
   /// standard nullable-override pattern).
-  /// Returns a copy with updated fields.
-  ///
-  /// Pass [clearDistributor] = true to set [distributor] to null
-  /// (since null cannot be distinguished from "no change" with the
-  /// standard nullable-override pattern).
   EditorState copyWith({
     List<WallSegment>? walls,
     List<Room>? rooms,

@@ -18,6 +18,8 @@ class InteractionPainter extends CustomPainter {
     this.hoverPoint,
     this.selectionHighlightColor,
     this.interactionData,
+    this.supplyPipeColor = const Color(0xFFEF4444),
+    this.returnPipeColor = const Color(0xFF3B82F6),
   });
 
   /// Current hover position in world coordinates, if any.
@@ -29,6 +31,12 @@ class InteractionPainter extends CustomPainter {
   /// Tool-produced interaction data (ghost line or
   /// selection highlight).
   final InteractionData? interactionData;
+
+  /// Supply pipe colour used when drawing a route ghost.
+  final Color supplyPipeColor;
+
+  /// Return pipe colour used when drawing a route ghost.
+  final Color returnPipeColor;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -162,6 +170,21 @@ class InteractionPainter extends CustomPainter {
             rotationDeg,
           );
           _drawWallHandles(canvas, handles, activeHandleIndex);
+        case RouteDrawData(
+              :final phase,
+              :final supplyPoints,
+              :final returnPoints,
+              :final currentPoint,
+              :final hoveredZoneAlreadyConnected,
+            ):
+          _drawRouteGhost(
+            canvas,
+            phase,
+            supplyPoints,
+            returnPoints,
+            currentPoint,
+            hoveredZoneAlreadyConnected,
+          );
       }
     }
   }
@@ -787,6 +810,206 @@ class InteractionPainter extends CustomPainter {
     canvas.restore();
   }
 
+  // ── Route drawing ghost ──────────────────────────────────
+
+  /// Draws the in-progress circuit route ghost.
+  ///
+  /// Renders:
+  ///  - committed supply waypoints as a solid [supplyPipeColor]
+  ///    polyline with directional arrows
+  ///  - committed return waypoints as a solid [returnPipeColor]
+  ///    polyline with directional arrows
+  ///  - a dashed ghost edge from the last committed point to
+  ///    the cursor in the active phase colour
+  ///  - small vertex dots at each waypoint
+  ///  - an amber warning indicator when [hoveredZoneConnected]
+  void _drawRouteGhost(
+    Canvas canvas,
+    RoutePhase phase,
+    List<Point2D> supplyPoints,
+    List<Point2D> returnPoints,
+    Point2D? currentPoint,
+    bool hoveredZoneConnected,
+  ) {
+    // Committed supply path.
+    if (supplyPoints.length >= 2) {
+      _drawRoutePath(canvas, supplyPoints, supplyPipeColor);
+    }
+
+    // Committed return path.
+    if (returnPoints.length >= 2) {
+      _drawRoutePath(canvas, returnPoints, returnPipeColor);
+    }
+
+    // Ghost edge from the last committed point to cursor.
+    if (currentPoint != null) {
+      final isSupply = phase == RoutePhase.supply;
+      final activeColor =
+          isSupply ? supplyPipeColor : returnPipeColor;
+      final activePoints =
+          isSupply ? supplyPoints : returnPoints;
+      if (activePoints.isNotEmpty) {
+        final last = activePoints.last;
+        _drawDashedLine(
+          canvas,
+          Offset(last.x, last.y),
+          Offset(currentPoint.x, currentPoint.y),
+          Paint()
+            ..color = activeColor.withValues(alpha: 0.55)
+            ..strokeWidth = 3.0
+            ..style = PaintingStyle.stroke,
+          30.0,
+        );
+      }
+    }
+
+    // Waypoint dots.
+    _drawWaypointDots(canvas, supplyPoints, supplyPipeColor);
+    _drawWaypointDots(canvas, returnPoints, returnPipeColor);
+
+    // Warning when zone already has a circuit.
+    if (hoveredZoneConnected && currentPoint != null) {
+      _drawAlreadyConnectedWarning(canvas, currentPoint);
+    }
+  }
+
+  /// Draws [points] as a solid polyline in [color] with
+  /// directional arrows every 500 mm.
+  void _drawRoutePath(
+    Canvas canvas,
+    List<Point2D> points,
+    Color color,
+  ) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 3.0
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final path = Path()
+      ..moveTo(points.first.x, points.first.y);
+    for (var i = 1; i < points.length; i++) {
+      path.lineTo(points[i].x, points[i].y);
+    }
+    canvas.drawPath(path, paint);
+    _drawRouteArrows(canvas, points, color);
+  }
+
+  /// Places a filled arrowhead every 500 mm along [points].
+  void _drawRouteArrows(
+    Canvas canvas,
+    List<Point2D> points,
+    Color color,
+  ) {
+    const spacingMm = 500.0;
+    const halfLen = 50.0;
+    const halfWidth = 30.0;
+    final arrowPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+
+    var distToNext = spacingMm * 0.5;
+
+    for (var i = 0; i < points.length - 1; i++) {
+      final ax = points[i].x;
+      final ay = points[i].y;
+      final bx = points[i + 1].x;
+      final by = points[i + 1].y;
+      final dx = bx - ax;
+      final dy = by - ay;
+      final segLen = sqrt(dx * dx + dy * dy);
+      if (segLen < 1) continue;
+      final ux = dx / segLen;
+      final uy = dy / segLen;
+
+      var walked = 0.0;
+      while (walked + distToNext <= segLen) {
+        walked += distToNext;
+        distToNext = spacingMm;
+        final cx = ax + ux * walked;
+        final cy = ay + uy * walked;
+        final tipX = cx + ux * halfLen;
+        final tipY = cy + uy * halfLen;
+        final baseX = cx - ux * halfLen;
+        final baseY = cy - uy * halfLen;
+        final px = -uy * halfWidth;
+        final py = ux * halfWidth;
+        final arrowPath = Path()
+          ..moveTo(tipX, tipY)
+          ..lineTo(baseX + px, baseY + py)
+          ..lineTo(baseX - px, baseY - py)
+          ..close();
+        canvas.drawPath(arrowPath, arrowPaint);
+      }
+      distToNext -= segLen - walked;
+    }
+  }
+
+  /// Draws a small filled circle at each waypoint in [points].
+  void _drawWaypointDots(
+    Canvas canvas,
+    List<Point2D> points,
+    Color color,
+  ) {
+    final dotPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    for (final p in points) {
+      canvas.drawCircle(Offset(p.x, p.y), 12.0, dotPaint);
+    }
+  }
+
+  /// Draws an amber ⚠ indicator near [point] to signal that
+  /// the hovered zone is already connected to a circuit.
+  void _drawAlreadyConnectedWarning(
+    Canvas canvas,
+    Point2D point,
+  ) {
+    const size = 80.0; // world-space mm
+    const yOffset = 130.0;
+    final cx = point.x;
+    final cy = point.y - yOffset;
+
+    // Equilateral triangle.
+    final triPath = Path()
+      ..moveTo(cx, cy - size * 0.6)
+      ..lineTo(cx - size * 0.55, cy + size * 0.4)
+      ..lineTo(cx + size * 0.55, cy + size * 0.4)
+      ..close();
+
+    const amber = Color(0xFFF59E0B);
+    canvas
+      ..drawPath(
+        triPath,
+        Paint()
+          ..color = amber.withValues(alpha: 0.9)
+          ..style = PaintingStyle.fill,
+      )
+      ..drawPath(
+        triPath,
+        Paint()
+          ..color = amber
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 5.0,
+      )
+      // Exclamation stem.
+      ..drawLine(
+        Offset(cx, cy - size * 0.25),
+        Offset(cx, cy + size * 0.1),
+        Paint()
+          ..color = Colors.white
+          ..strokeWidth = 8.0
+          ..strokeCap = StrokeCap.round,
+      );
+    // Exclamation dot.
+    canvas.drawCircle(
+      Offset(cx, cy + size * 0.28),
+      5.0,
+      Paint()..color = Colors.white,
+    );
+  }
+
   void _drawDashedRect(Canvas canvas, Rect rect, Color color) {
     final paint = Paint()
       ..color = color
@@ -806,6 +1029,8 @@ class InteractionPainter extends CustomPainter {
   @override
   bool shouldRepaint(InteractionPainter oldDelegate) {
     return oldDelegate.hoverPoint != hoverPoint ||
-        oldDelegate.interactionData != interactionData;
+        oldDelegate.interactionData != interactionData ||
+        oldDelegate.supplyPipeColor != supplyPipeColor ||
+        oldDelegate.returnPipeColor != returnPipeColor;
   }
 }

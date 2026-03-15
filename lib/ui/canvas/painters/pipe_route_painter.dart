@@ -1,4 +1,4 @@
-import 'dart:math' show sqrt, atan2, cos, sin;
+import 'dart:math' show sqrt;
 
 import 'package:flutter/material.dart';
 
@@ -145,7 +145,3 @@ class PipeRoutePainter extends CustomPainter {
   }
 }
 
-// Suppress unused import for atan2/cos/sin — kept for
-// potential future oriented-arrow enhancements.
-// ignore: unused_element
-double _keepImports(double v) => atan2(cos(v), sin(v));

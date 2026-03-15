@@ -8,6 +8,7 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/id_generator.dart';
 import '../../data/models/distributor.dart';
 import '../../data/models/enums.dart';
+import '../../data/models/heating_circuit.dart';
 import '../../data/models/point2d.dart';
 import '../../data/models/room.dart';
 import '../../data/models/door.dart';
@@ -30,6 +31,7 @@ import 'tools/editor_callbacks.dart';
 import 'painters/distributor_painter.dart';
 import 'tools/distributor_place_tool.dart';
 import 'tools/door_place_tool.dart';
+import 'tools/route_draw_tool.dart';
 import 'tools/select_tool.dart';
 import 'tools/tool_base.dart';
 import 'tools/undo_redo_service.dart';
@@ -181,6 +183,10 @@ class _FloorPlanCanvasState
       onStateChanged: onChanged,
       undoRedo: undoRedo,
     );
+    _tools[DrawingTool.routePipe] = RouteDrawTool(
+      callbacks: this,
+      onStateChanged: onChanged,
+    );
   }
 
   CanvasTool? get _activeTool {
@@ -296,6 +302,19 @@ class _FloorPlanCanvasState
   void removeZone(String zoneId) {
     ref.read(editorStateProvider.notifier).removeZone(zoneId);
   }
+
+  // ---- Circuits ----
+
+  @override
+  void commitCircuit(HeatingCircuit circuit) {
+    ref
+        .read(editorStateProvider.notifier)
+        .addCircuit(circuit);
+  }
+
+  @override
+  List<HeatingCircuit> get currentCircuits =>
+      ref.read(editorStateProvider).circuits;
 
   // ---- Default IDs (from seeded data in HeatingDao.seedDefaults) ----
 
@@ -737,6 +756,12 @@ class _FloorPlanCanvasState
                     idata == null) {
                   hint = 'Hover over a wall to place a '
                       'wall heating zone';
+                } else if (idata is RouteDrawData) {
+                  final lenM =
+                      idata.cumulativeLengthMm / 1000.0;
+                  hint =
+                      'Pipe length: '
+                      '${lenM.toStringAsFixed(1)} m';
                 } else {
                   hint = null;
                 }
@@ -776,6 +801,7 @@ class _FloorPlanCanvasState
                       windows: editorState.windows,
                       doors: editorState.doors,
                       zones: editorState.zones,
+                      circuits: editorState.circuits,
                       distributor: editorState.distributor,
                       interactionData: _interactionData,
                     ),
@@ -846,6 +872,7 @@ class _CanvasCompositePainter extends CustomPainter {
     required this.windows,
     required this.doors,
     required this.zones,
+    required this.circuits,
     this.distributor,
     this.hoverWorldPoint,
     this.interactionData,
@@ -861,6 +888,7 @@ class _CanvasCompositePainter extends CustomPainter {
   final List<WindowElement> windows;
   final List<Door> doors;
   final List<HeatingZone> zones;
+  final List<HeatingCircuit> circuits;
   final Distributor? distributor;
   final InteractionData? interactionData;
 
@@ -915,6 +943,7 @@ class _CanvasCompositePainter extends CustomPainter {
     PipeRoutePainter(
       supplyPipe: colors.supplyPipe,
       returnPipe: colors.returnPipe,
+      circuits: circuits,
     ).paint(canvas, size);
 
     // Layer 6: Annotations
@@ -925,6 +954,8 @@ class _CanvasCompositePainter extends CustomPainter {
     InteractionPainter(
       hoverPoint: hoverWorldPoint,
       selectionHighlightColor: colors.selectionHighlight,
+      supplyPipeColor: colors.supplyPipe,
+      returnPipeColor: colors.returnPipe,
       interactionData: interactionData,
     ).paint(canvas, size);
 
