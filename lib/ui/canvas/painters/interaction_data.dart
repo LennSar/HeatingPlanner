@@ -291,6 +291,59 @@ class WallZoneHoverData extends InteractionData {
   final Point2D wallEnd;
 }
 
+/// Phase of a pipe circuit routing operation.
+///
+/// Used by [RouteDrawData] to indicate which segment of
+/// the circuit is currently being drawn.
+enum RoutePhase {
+  /// Drawing the supply line from the distributor to the zone.
+  supply,
+
+  /// Drawing the return line from the zone back to the distributor.
+  returnLine,
+}
+
+/// Data produced by [RouteDrawTool] during circuit routing.
+///
+/// Emitted each frame so [InteractionPainter] can render:
+///  - committed supply and return waypoints as solid polylines
+///  - a dashed ghost edge from the last waypoint to the cursor
+///  - directional arrows every 500 mm along each committed path
+///  - a warning indicator when hovering over an already-connected zone
+@immutable
+class RouteDrawData extends InteractionData {
+  /// Creates [RouteDrawData].
+  const RouteDrawData({
+    required this.phase,
+    required this.supplyPoints,
+    this.returnPoints = const [],
+    this.currentPoint,
+    this.hoveredZoneAlreadyConnected = false,
+    this.cumulativeLengthMm = 0.0,
+  });
+
+  /// Current routing phase.
+  final RoutePhase phase;
+
+  /// Supply route waypoints committed so far (world mm).
+  final List<Point2D> supplyPoints;
+
+  /// Return route waypoints committed so far (world mm).
+  final List<Point2D> returnPoints;
+
+  /// Current cursor position (world mm), null when off-canvas.
+  final Point2D? currentPoint;
+
+  /// True when the cursor hovers over a zone that already has
+  /// an assigned circuit — triggers the warning indicator.
+  final bool hoveredZoneAlreadyConnected;
+
+  /// Cumulative pipe length in mm (supply + return + ghost edge).
+  ///
+  /// Shown in the status bar as the user draws the route.
+  final double cumulativeLengthMm;
+}
+
 /// Highlight data for a selected window or door element.
 ///
 /// Produced by [SelectTool] when a window or door is

@@ -1,5 +1,6 @@
 import '../../../data/models/distributor.dart';
 import '../../../data/models/door.dart';
+import '../../../data/models/heating_circuit.dart';
 import '../../../data/models/heating_zone.dart';
 import '../../../data/models/point2d.dart';
 import '../../../data/models/room.dart';
@@ -98,6 +99,14 @@ abstract class EditorCallbacks {
   void requestDistributorDeleteDialog({
     required void Function() onConfirmed,
   });
+
+  // ---- Circuits ----
+
+  /// Commit a completed heating circuit to the editor state.
+  void commitCircuit(HeatingCircuit circuit);
+
+  /// All heating circuits currently in the editor.
+  List<HeatingCircuit> get currentCircuits;
 
   // ---- Zones ----
 

@@ -6,6 +6,7 @@ import '../../core/utils/id_generator.dart';
 import '../../data/models/distributor.dart';
 import '../../data/models/door.dart';
 import '../../data/models/enums.dart';
+import '../../data/models/heating_circuit.dart';
 import '../../data/models/heating_zone.dart';
 import '../../data/models/material_layer.dart';
 import '../../data/models/point2d.dart';
@@ -24,6 +25,7 @@ class EditorState {
     this.windows = const [],
     this.doors = const [],
     this.zones = const [],
+    this.circuits = const [],
     this.distributor,
     this.constructions = const [],
     this.materialLayers = const [],
@@ -48,6 +50,12 @@ class EditorState {
   /// also persisted to the database via the heating repository.
   final List<HeatingZone> zones;
 
+  /// All heating circuits on the current floor (in-memory state).
+  ///
+  /// Circuits are added by [RouteDrawTool] when the user completes
+  /// a supply-and-return pipe loop.
+  final List<HeatingCircuit> circuits;
+
   /// The distributor placed on this floor, or null if none yet.
   final Distributor? distributor;
 
@@ -62,12 +70,18 @@ class EditorState {
   /// Pass [clearDistributor] = true to set [distributor] to null
   /// (since null cannot be distinguished from "no change" with the
   /// standard nullable-override pattern).
+  /// Returns a copy with updated fields.
+  ///
+  /// Pass [clearDistributor] = true to set [distributor] to null
+  /// (since null cannot be distinguished from "no change" with the
+  /// standard nullable-override pattern).
   EditorState copyWith({
     List<WallSegment>? walls,
     List<Room>? rooms,
     List<WindowElement>? windows,
     List<Door>? doors,
     List<HeatingZone>? zones,
+    List<HeatingCircuit>? circuits,
     Distributor? distributor,
     bool clearDistributor = false,
     List<WallConstruction>? constructions,
@@ -79,6 +93,7 @@ class EditorState {
       windows: windows ?? this.windows,
       doors: doors ?? this.doors,
       zones: zones ?? this.zones,
+      circuits: circuits ?? this.circuits,
       distributor: clearDistributor
           ? null
           : (distributor ?? this.distributor),
@@ -316,6 +331,15 @@ class EditorStateNotifier extends Notifier<EditorState> {
       zones: state.zones
           .where((z) => z.id != zoneId)
           .toList(),
+    );
+  }
+
+  // ---- Circuits ----
+
+  /// Add a heating circuit.
+  void addCircuit(HeatingCircuit circuit) {
+    state = state.copyWith(
+      circuits: [...state.circuits, circuit],
     );
   }
 
