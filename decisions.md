@@ -181,6 +181,66 @@ direction), but it is the same approach used by commercial design tools.
 
 ---
 
+## ADR-008 — Three supply pipe insulation variants with distinct calculation models
+
+**What.**
+A `HeatingCircuit`'s supply and return runs (the stretch from the distributor
+to the heating zone and back) can be configured in one of three modes via
+`supplyPipeInsulationType`:
+
+| Enum value | Meaning | Heat output to transit room |
+|---|---|---|
+| `none` | Uninsulated in screed | 100 % — full BVF model |
+| `corrugatedConduit` | Corrugated PE conduit (Wellrohr) in screed | ~25–30 % residual — BVF model × reduction factor |
+| `insulationLayer` | Routed inside the insulation layer beneath the screed (e.g. Kermi x-net connect principle) | 0 % — no heat output to transit room |
+
+**Why.**
+The three variants have fundamentally different thermal behaviours and cannot
+share a single formula:
+- `none` and `corrugatedConduit` both embed the pipe in the screed and
+  therefore contribute to the heat balance of any room the pipe traverses.
+  The BVF information sheet (2014) provides the calculation basis: a
+  corrugated conduit creates a ~2 mm still-air gap that reduces surface
+  temperature from ~50 °C to ~35 °C, yielding roughly 70–75 % reduction in
+  heat output compared to an uninsulated pipe; a simultaneous-use factor of
+  0.5 is applied on top.
+- `insulationLayer` keeps the pipe entirely below the screed, so it emits
+  zero heat to the transit room's floor surface. This eliminates uncontrolled
+  room heating and enables GEG §63 single-room control in corridor/transit
+  areas. The routing is geometrically unrestricted (diagonal paths are
+  valid and preferred to minimise length).
+
+The corrugated-conduit reduction factors are confirmed by thermal testing
+(BVF, 2014). The insulation-layer model is the basis of proprietary systems
+such as Kermi x-net connect but can be applied to any manufacturer's
+equivalent solution.
+
+**Rule.**
+1. `supplyPipeInsulationType` is a required field on `HeatingCircuit`. No
+   default is assumed; the user must make an explicit choice.
+2. `HydraulicEngine.supplyPipeHeatOutput` accepts the insulation type and
+   returns the heat contribution (W) of the supply/return runs to the rooms
+   they traverse. For `insulationLayer` it always returns 0.0.
+3. `HydraulicEngine.supplyPipeTubeLength` calculates differently per type:
+   for `insulationLayer`, the shortest straight-line (Euclidean) path through
+   the floor plan is used; for the other two types, the user-drawn polyline
+   length is used as-is.
+4. Validation emits `WarningSeverity.warning` when the supply/return polyline
+   of a circuit with `supplyPipeInsulationType != insulationLayer` geometrically
+   intersects or overlaps any `HeatingZone` polygon on the same floor. Reason:
+   uninsulated/corrugated pipes beneath a heating zone surface cause unintended
+   additional heat output on that zone's area that is not accounted for in the
+   EN 1264 zone calculation.
+5. The 1/3 rule (BVF): the total length of supply + return runs must not
+   exceed one third of the heating circuit length of the transit room's own
+   heating circuit. If no heating circuit exists in the transit room, the
+   validation is skipped. Violation → `WarningSeverity.warning`.
+6. Routing in the insulation layer across another room's heating zone
+   (type `insulationLayer`) is geometrically allowed and carries no warning —
+   the pipe is thermally decoupled from the screed above.
+
+---
+
 ## ADR-007 — Pump head is a calculated output, not a user input
 
 **What.**

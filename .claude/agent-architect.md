@@ -286,6 +286,12 @@ enum TubeMaterial { peRt, peXa, peXb, peXc, pb, copper, multiLayer }
 
 enum WarningSeverity { error, warning, info }
 
+enum SupplyPipeInsulationType {
+  none,               // Uninsulated, embedded in screed
+  corrugatedConduit,  // PE corrugated conduit (Wellrohr) in screed, ~70-75% heat reduction
+  insulationLayer,    // Routed inside the insulation layer below screed, zero heat to transit room
+}
+
 enum DrawingTool {
   select, drawWall, placeWindow, placeDoor,
   drawZone, placeDistributor, routePipe, measure
@@ -457,6 +463,7 @@ Each model below is defined in its own file under `lib/data/models/`. I am listi
 | id | String | UUID v4 | auto |
 | distributorId | String | FK → Distributor | required |
 | heatingZoneId | String | FK → HeatingZone | required |
+| supplyPipeInsulationType | SupplyPipeInsulationType | enum | required (no default) |
 | supplyRoutePath | List\<Point2D\> | continuous from dist. | required |
 | returnRoutePath | List\<Point2D\> | continuous to dist. | required |
 | tubeLengthM | double | calculated | 0.0 |

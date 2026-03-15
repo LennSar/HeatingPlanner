@@ -390,6 +390,33 @@ class HydraulicEngine {
 
   /// Polyline length (m) from list of Point2D in mm
   static double polylineLengthM(List<Point2D> points);
+
+  /// Heat output of supply + return runs to the transit room (W).
+  ///
+  /// Implements the three-variant model (ADR-008):
+  /// - [SupplyPipeInsulationType.none]: full heat output per BVF model.
+  ///   q_pipe = specificOutputUninsulated(T_supply_mean, T_room, spacingMm=50)
+  ///   Q = q_pipe × pipeAreaM2 × simultaneousUseFactor (0.5)
+  /// - [SupplyPipeInsulationType.corrugatedConduit]: same formula × 0.30
+  ///   (corrugated conduit reduces surface temp from ~50°C to ~35°C,
+  ///    confirmed by BVF thermal testing: ~70–75% reduction).
+  ///   After applying factor: Q × simultaneousUseFactor (0.5).
+  /// - [SupplyPipeInsulationType.insulationLayer]: always returns 0.0.
+  ///   Pipe is below the screed; no heat is emitted to the transit room floor.
+  ///
+  /// [pipeLengthM] total supply + return run length through the transit room.
+  /// [tubeOuterDiameterMm] for area calculation: pipeAreaM2 = L × outerD/1000.
+  /// [tSupplyMeanC] arithmetic mean of supply and return temps.
+  /// [tRoomC] target temperature of the transit room.
+  static double supplyPipeHeatOutput({
+    required SupplyPipeInsulationType insulationType,
+    required double pipeLengthM,
+    required double tubeOuterDiameterMm,
+    required double tSupplyMeanC,
+    required double tRoomC,
+    double simultaneousUseFactor = 0.5,
+    double corrugatedReductionFactor = 0.30,
+  });
 }
 ```
 
@@ -616,8 +643,13 @@ const double minFlowVelocityMs = 0.2;   // turbulence threshold
 const double maxTubeLength16mm = 120.0;  // m
 const double maxTubeLength12mm = 90.0;   // m
 
-// Air change
-const double minAirChangeRate = 0.1;
+// Supply pipe insulation (ADR-008)
+// BVF simultaneous-use factor for transit-room heat output calculation
+const double supplyPipeSimultaneousUseFactor = 0.5;
+// Residual heat output fraction for corrugated conduit (Wellrohr) vs. uninsulated
+const double corrugatedConduitResidualFactor = 0.30;
+// 1/3 rule: supply+return length must not exceed this fraction of the transit room's own circuit length
+const double supplyPipeMaxFractionOfRoomCircuit = 1.0 / 3.0;
 const double maxAirChangeRate = 5.0;
 
 // Surface temperature limits (EN 1264)
@@ -714,3 +746,4 @@ When implementing, add these as `// TODO(HVAC):` comments and raise to the user:
 3. **Inter-floor heat transfer:** Heat loss through floor slabs between floors at different temperatures is not currently modelled. Flag if the user creates floors with rooms at different set temperatures.
 4. **Water temperature dependency:** Physical properties of water (ρ, μ, ν) vary with temperature. Current implementation uses 40°C values as constants. For higher accuracy, implement temperature-dependent lookup.
 5. **Wall heating exponent:** EN 15377 may specify a different exponent `n` for wall heating versus floor heating. Currently both use 1.1.
+6. **Supply pipe insulation variants (ADR-008):** The `corrugatedConduit` residual factor (0.30) and simultaneous-use factor (0.5) are derived from BVF information sheet data (2014) for Bauart A (wet screed) systems only. For Bauart B (dry systems) or thin-layer constructions these values do not apply — flag to user if such a system type is selected.
