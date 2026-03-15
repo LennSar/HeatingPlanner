@@ -6057,17 +6057,16 @@ class $DistributorsTable extends Distributors
     requiredDuringInsert: false,
     defaultValue: const Constant(28.0),
   );
-  static const VerificationMeta _pumpHeadPaMeta = const VerificationMeta(
-    'pumpHeadPa',
+  static const VerificationMeta _pumpCapacityPaMeta = const VerificationMeta(
+    'pumpCapacityPa',
   );
   @override
-  late final GeneratedColumn<double> pumpHeadPa = GeneratedColumn<double>(
-    'pump_head_pa',
+  late final GeneratedColumn<double> pumpCapacityPa = GeneratedColumn<double>(
+    'pump_capacity_pa',
     aliasedName,
-    false,
+    true,
     type: DriftSqlType.double,
     requiredDuringInsert: false,
-    defaultValue: const Constant(25000.0),
   );
   @override
   List<GeneratedColumn> get $columns => [
@@ -6076,7 +6075,7 @@ class $DistributorsTable extends Distributors
     positionJson,
     supplyTempC,
     returnTempC,
-    pumpHeadPa,
+    pumpCapacityPa,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -6132,12 +6131,12 @@ class $DistributorsTable extends Distributors
         ),
       );
     }
-    if (data.containsKey('pump_head_pa')) {
+    if (data.containsKey('pump_capacity_pa')) {
       context.handle(
-        _pumpHeadPaMeta,
-        pumpHeadPa.isAcceptableOrUnknown(
-          data['pump_head_pa']!,
-          _pumpHeadPaMeta,
+        _pumpCapacityPaMeta,
+        pumpCapacityPa.isAcceptableOrUnknown(
+          data['pump_capacity_pa']!,
+          _pumpCapacityPaMeta,
         ),
       );
     }
@@ -6170,10 +6169,10 @@ class $DistributorsTable extends Distributors
         DriftSqlType.double,
         data['${effectivePrefix}return_temp_c'],
       )!,
-      pumpHeadPa: attachedDatabase.typeMapping.read(
+      pumpCapacityPa: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
-        data['${effectivePrefix}pump_head_pa'],
-      )!,
+        data['${effectivePrefix}pump_capacity_pa'],
+      ),
     );
   }
 
@@ -6191,14 +6190,16 @@ class Distributor extends DataClass implements Insertable<Distributor> {
   final String positionJson;
   final double supplyTempC;
   final double returnTempC;
-  final double pumpHeadPa;
+
+  /// Optional rated pump capacity entered by the user (Pa).
+  final double? pumpCapacityPa;
   const Distributor({
     required this.id,
     required this.floorId,
     required this.positionJson,
     required this.supplyTempC,
     required this.returnTempC,
-    required this.pumpHeadPa,
+    this.pumpCapacityPa,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -6208,7 +6209,9 @@ class Distributor extends DataClass implements Insertable<Distributor> {
     map['position_json'] = Variable<String>(positionJson);
     map['supply_temp_c'] = Variable<double>(supplyTempC);
     map['return_temp_c'] = Variable<double>(returnTempC);
-    map['pump_head_pa'] = Variable<double>(pumpHeadPa);
+    if (!nullToAbsent || pumpCapacityPa != null) {
+      map['pump_capacity_pa'] = Variable<double>(pumpCapacityPa);
+    }
     return map;
   }
 
@@ -6219,7 +6222,9 @@ class Distributor extends DataClass implements Insertable<Distributor> {
       positionJson: Value(positionJson),
       supplyTempC: Value(supplyTempC),
       returnTempC: Value(returnTempC),
-      pumpHeadPa: Value(pumpHeadPa),
+      pumpCapacityPa: pumpCapacityPa == null && nullToAbsent
+          ? const Value.absent()
+          : Value(pumpCapacityPa),
     );
   }
 
@@ -6234,7 +6239,7 @@ class Distributor extends DataClass implements Insertable<Distributor> {
       positionJson: serializer.fromJson<String>(json['positionJson']),
       supplyTempC: serializer.fromJson<double>(json['supplyTempC']),
       returnTempC: serializer.fromJson<double>(json['returnTempC']),
-      pumpHeadPa: serializer.fromJson<double>(json['pumpHeadPa']),
+      pumpCapacityPa: serializer.fromJson<double?>(json['pumpCapacityPa']),
     );
   }
   @override
@@ -6246,7 +6251,7 @@ class Distributor extends DataClass implements Insertable<Distributor> {
       'positionJson': serializer.toJson<String>(positionJson),
       'supplyTempC': serializer.toJson<double>(supplyTempC),
       'returnTempC': serializer.toJson<double>(returnTempC),
-      'pumpHeadPa': serializer.toJson<double>(pumpHeadPa),
+      'pumpCapacityPa': serializer.toJson<double?>(pumpCapacityPa),
     };
   }
 
@@ -6256,14 +6261,16 @@ class Distributor extends DataClass implements Insertable<Distributor> {
     String? positionJson,
     double? supplyTempC,
     double? returnTempC,
-    double? pumpHeadPa,
+    Value<double?> pumpCapacityPa = const Value.absent(),
   }) => Distributor(
     id: id ?? this.id,
     floorId: floorId ?? this.floorId,
     positionJson: positionJson ?? this.positionJson,
     supplyTempC: supplyTempC ?? this.supplyTempC,
     returnTempC: returnTempC ?? this.returnTempC,
-    pumpHeadPa: pumpHeadPa ?? this.pumpHeadPa,
+    pumpCapacityPa: pumpCapacityPa.present
+        ? pumpCapacityPa.value
+        : this.pumpCapacityPa,
   );
   Distributor copyWithCompanion(DistributorsCompanion data) {
     return Distributor(
@@ -6278,9 +6285,9 @@ class Distributor extends DataClass implements Insertable<Distributor> {
       returnTempC: data.returnTempC.present
           ? data.returnTempC.value
           : this.returnTempC,
-      pumpHeadPa: data.pumpHeadPa.present
-          ? data.pumpHeadPa.value
-          : this.pumpHeadPa,
+      pumpCapacityPa: data.pumpCapacityPa.present
+          ? data.pumpCapacityPa.value
+          : this.pumpCapacityPa,
     );
   }
 
@@ -6292,7 +6299,7 @@ class Distributor extends DataClass implements Insertable<Distributor> {
           ..write('positionJson: $positionJson, ')
           ..write('supplyTempC: $supplyTempC, ')
           ..write('returnTempC: $returnTempC, ')
-          ..write('pumpHeadPa: $pumpHeadPa')
+          ..write('pumpCapacityPa: $pumpCapacityPa')
           ..write(')'))
         .toString();
   }
@@ -6304,7 +6311,7 @@ class Distributor extends DataClass implements Insertable<Distributor> {
     positionJson,
     supplyTempC,
     returnTempC,
-    pumpHeadPa,
+    pumpCapacityPa,
   );
   @override
   bool operator ==(Object other) =>
@@ -6315,7 +6322,7 @@ class Distributor extends DataClass implements Insertable<Distributor> {
           other.positionJson == this.positionJson &&
           other.supplyTempC == this.supplyTempC &&
           other.returnTempC == this.returnTempC &&
-          other.pumpHeadPa == this.pumpHeadPa);
+          other.pumpCapacityPa == this.pumpCapacityPa);
 }
 
 class DistributorsCompanion extends UpdateCompanion<Distributor> {
@@ -6324,7 +6331,7 @@ class DistributorsCompanion extends UpdateCompanion<Distributor> {
   final Value<String> positionJson;
   final Value<double> supplyTempC;
   final Value<double> returnTempC;
-  final Value<double> pumpHeadPa;
+  final Value<double?> pumpCapacityPa;
   final Value<int> rowid;
   const DistributorsCompanion({
     this.id = const Value.absent(),
@@ -6332,7 +6339,7 @@ class DistributorsCompanion extends UpdateCompanion<Distributor> {
     this.positionJson = const Value.absent(),
     this.supplyTempC = const Value.absent(),
     this.returnTempC = const Value.absent(),
-    this.pumpHeadPa = const Value.absent(),
+    this.pumpCapacityPa = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   DistributorsCompanion.insert({
@@ -6341,7 +6348,7 @@ class DistributorsCompanion extends UpdateCompanion<Distributor> {
     required String positionJson,
     this.supplyTempC = const Value.absent(),
     this.returnTempC = const Value.absent(),
-    this.pumpHeadPa = const Value.absent(),
+    this.pumpCapacityPa = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        floorId = Value(floorId),
@@ -6352,7 +6359,7 @@ class DistributorsCompanion extends UpdateCompanion<Distributor> {
     Expression<String>? positionJson,
     Expression<double>? supplyTempC,
     Expression<double>? returnTempC,
-    Expression<double>? pumpHeadPa,
+    Expression<double>? pumpCapacityPa,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -6361,7 +6368,7 @@ class DistributorsCompanion extends UpdateCompanion<Distributor> {
       if (positionJson != null) 'position_json': positionJson,
       if (supplyTempC != null) 'supply_temp_c': supplyTempC,
       if (returnTempC != null) 'return_temp_c': returnTempC,
-      if (pumpHeadPa != null) 'pump_head_pa': pumpHeadPa,
+      if (pumpCapacityPa != null) 'pump_capacity_pa': pumpCapacityPa,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -6372,7 +6379,7 @@ class DistributorsCompanion extends UpdateCompanion<Distributor> {
     Value<String>? positionJson,
     Value<double>? supplyTempC,
     Value<double>? returnTempC,
-    Value<double>? pumpHeadPa,
+    Value<double?>? pumpCapacityPa,
     Value<int>? rowid,
   }) {
     return DistributorsCompanion(
@@ -6381,7 +6388,7 @@ class DistributorsCompanion extends UpdateCompanion<Distributor> {
       positionJson: positionJson ?? this.positionJson,
       supplyTempC: supplyTempC ?? this.supplyTempC,
       returnTempC: returnTempC ?? this.returnTempC,
-      pumpHeadPa: pumpHeadPa ?? this.pumpHeadPa,
+      pumpCapacityPa: pumpCapacityPa ?? this.pumpCapacityPa,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -6404,8 +6411,8 @@ class DistributorsCompanion extends UpdateCompanion<Distributor> {
     if (returnTempC.present) {
       map['return_temp_c'] = Variable<double>(returnTempC.value);
     }
-    if (pumpHeadPa.present) {
-      map['pump_head_pa'] = Variable<double>(pumpHeadPa.value);
+    if (pumpCapacityPa.present) {
+      map['pump_capacity_pa'] = Variable<double>(pumpCapacityPa.value);
     }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
@@ -6421,7 +6428,7 @@ class DistributorsCompanion extends UpdateCompanion<Distributor> {
           ..write('positionJson: $positionJson, ')
           ..write('supplyTempC: $supplyTempC, ')
           ..write('returnTempC: $returnTempC, ')
-          ..write('pumpHeadPa: $pumpHeadPa, ')
+          ..write('pumpCapacityPa: $pumpCapacityPa, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -13126,7 +13133,7 @@ typedef $$DistributorsTableCreateCompanionBuilder =
       required String positionJson,
       Value<double> supplyTempC,
       Value<double> returnTempC,
-      Value<double> pumpHeadPa,
+      Value<double?> pumpCapacityPa,
       Value<int> rowid,
     });
 typedef $$DistributorsTableUpdateCompanionBuilder =
@@ -13136,7 +13143,7 @@ typedef $$DistributorsTableUpdateCompanionBuilder =
       Value<String> positionJson,
       Value<double> supplyTempC,
       Value<double> returnTempC,
-      Value<double> pumpHeadPa,
+      Value<double?> pumpCapacityPa,
       Value<int> rowid,
     });
 
@@ -13215,8 +13222,8 @@ class $$DistributorsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<double> get pumpHeadPa => $composableBuilder(
-    column: $table.pumpHeadPa,
+  ColumnFilters<double> get pumpCapacityPa => $composableBuilder(
+    column: $table.pumpCapacityPa,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -13298,8 +13305,8 @@ class $$DistributorsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<double> get pumpHeadPa => $composableBuilder(
-    column: $table.pumpHeadPa,
+  ColumnOrderings<double> get pumpCapacityPa => $composableBuilder(
+    column: $table.pumpCapacityPa,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -13354,8 +13361,8 @@ class $$DistributorsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<double> get pumpHeadPa => $composableBuilder(
-    column: $table.pumpHeadPa,
+  GeneratedColumn<double> get pumpCapacityPa => $composableBuilder(
+    column: $table.pumpCapacityPa,
     builder: (column) => column,
   );
 
@@ -13441,7 +13448,7 @@ class $$DistributorsTableTableManager
                 Value<String> positionJson = const Value.absent(),
                 Value<double> supplyTempC = const Value.absent(),
                 Value<double> returnTempC = const Value.absent(),
-                Value<double> pumpHeadPa = const Value.absent(),
+                Value<double?> pumpCapacityPa = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DistributorsCompanion(
                 id: id,
@@ -13449,7 +13456,7 @@ class $$DistributorsTableTableManager
                 positionJson: positionJson,
                 supplyTempC: supplyTempC,
                 returnTempC: returnTempC,
-                pumpHeadPa: pumpHeadPa,
+                pumpCapacityPa: pumpCapacityPa,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -13459,7 +13466,7 @@ class $$DistributorsTableTableManager
                 required String positionJson,
                 Value<double> supplyTempC = const Value.absent(),
                 Value<double> returnTempC = const Value.absent(),
-                Value<double> pumpHeadPa = const Value.absent(),
+                Value<double?> pumpCapacityPa = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DistributorsCompanion.insert(
                 id: id,
@@ -13467,7 +13474,7 @@ class $$DistributorsTableTableManager
                 positionJson: positionJson,
                 supplyTempC: supplyTempC,
                 returnTempC: returnTempC,
-                pumpHeadPa: pumpHeadPa,
+                pumpCapacityPa: pumpCapacityPa,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

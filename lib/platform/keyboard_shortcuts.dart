@@ -6,6 +6,8 @@ import '../data/models/enums.dart';
 import '../ui/canvas/canvas_controller.dart';
 import '../ui/canvas/floor_plan_canvas.dart';
 import '../ui/canvas/tools/undo_redo_service.dart';
+import '../ui/panels/properties_panel.dart'
+    show selectedElementProvider;
 import '../ui/screens/editor_screen.dart';
 
 // ----------------------------------------------------------
@@ -63,6 +65,13 @@ class ZoomToFitIntent extends Intent {
   const ZoomToFitIntent();
 }
 
+/// Rotate the selected distributor 90° clockwise; if no distributor is
+/// selected, switch to the route-pipe tool instead.
+class RotateOrRoutePipeIntent extends Intent {
+  /// Creates a [RotateOrRoutePipeIntent].
+  const RotateOrRoutePipeIntent();
+}
+
 // ----------------------------------------------------------
 // Shortcut map
 // ----------------------------------------------------------
@@ -109,7 +118,7 @@ final Map<ShortcutActivator, Intent> editorShortcuts = {
   const SingleActivator(LogicalKeyboardKey.keyG):
       const SwitchToolIntent(DrawingTool.placeDistributor),
   const SingleActivator(LogicalKeyboardKey.keyR):
-      const SwitchToolIntent(DrawingTool.routePipe),
+      const RotateOrRoutePipeIntent(),
   const SingleActivator(LogicalKeyboardKey.keyM):
       const SwitchToolIntent(DrawingTool.measure),
 
@@ -231,6 +240,30 @@ class EditorShortcuts extends ConsumerWidget {
                     canvasControllerProvider.notifier,
                   )
                   .zoomToFit();
+              return null;
+            },
+          ),
+          RotateOrRoutePipeIntent:
+              CallbackAction<RotateOrRoutePipeIntent>(
+            onInvoke: (_) {
+              if (_isTextFieldFocused()) return null;
+              final selected =
+                  ref.read(selectedElementProvider);
+              final activeTool =
+                  ref.read(selectedToolProvider);
+              if (selected?.type == 'distributor' &&
+                  activeTool == DrawingTool.select) {
+                ref
+                    .read(
+                      toolRotateDistributorProvider
+                          .notifier,
+                    )
+                    .rotate();
+              } else {
+                ref
+                    .read(selectedToolProvider.notifier)
+                    .select(DrawingTool.routePipe);
+              }
               return null;
             },
           ),

@@ -73,6 +73,23 @@ class ToolDeleteNotifier extends Notifier<int> {
   }
 }
 
+/// Provider that signals the select tool to rotate the selected distributor.
+final toolRotateDistributorProvider =
+    NotifierProvider<ToolRotateDistributorNotifier, int>(
+  ToolRotateDistributorNotifier.new,
+);
+
+/// Notifier that increments a counter to trigger distributor rotation.
+class ToolRotateDistributorNotifier extends Notifier<int> {
+  @override
+  int build() => 0;
+
+  /// Signal a 90° clockwise rotation of the selected distributor.
+  void rotate() {
+    state = state + 1;
+  }
+}
+
 /// The main 2D floor plan canvas with pan/zoom and
 /// layered [CustomPaint] rendering.
 ///
@@ -532,6 +549,10 @@ class _FloorPlanCanvasState
     });
     ref.listen<int>(toolDeleteProvider, (_, __) {
       _activeTool?.onDelete();
+    });
+    ref.listen<int>(toolRotateDistributorProvider, (_, __) {
+      final t = _activeTool;
+      if (t is SelectTool) t.onRotateDistributor();
     });
 
     return LayoutBuilder(

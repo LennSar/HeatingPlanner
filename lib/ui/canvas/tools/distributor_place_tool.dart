@@ -82,8 +82,11 @@ class DistributorPlaceTool extends CanvasTool {
 
   // ── Private helpers ────────────────────────────────────────
 
-  /// Returns the rotation (0, 90, 180, or 270°) that aligns the distributor
+  /// Returns the rotation (in degrees, 0–359) that aligns the distributor
   /// parallel to the nearest wall within [SnapService.wallHoverThresholdMm].
+  ///
+  /// Uses the exact wall angle so the distributor aligns for walls at any
+  /// orientation, not just horizontal and vertical.
   /// Returns [_ghostRotationDeg] unchanged when no wall is nearby.
   int _wallSnapRotation(Point2D position) {
     final nearest = SnapService.nearestWall(
@@ -96,7 +99,7 @@ class DistributorPlaceTool extends CanvasTool {
     final dy = nearest.endPoint.y - nearest.startPoint.y;
     double angleDeg = math.atan2(dy, dx) * 180.0 / math.pi;
     if (angleDeg < 0) angleDeg += 360.0;
-    return ((angleDeg / 90.0).round() * 90) % 360;
+    return angleDeg.round() % 360;
   }
 
   void _placeNew(Point2D position) {

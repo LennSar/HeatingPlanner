@@ -13,8 +13,8 @@ class Distributors extends Table {
       real().withDefault(const Constant(35.0))();
   RealColumn get returnTempC =>
       real().withDefault(const Constant(28.0))();
-  RealColumn get pumpHeadPa =>
-      real().withDefault(const Constant(25000.0))();
+  /// Optional rated pump capacity entered by the user (Pa).
+  RealColumn get pumpCapacityPa => real().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

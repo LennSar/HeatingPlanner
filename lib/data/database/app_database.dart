@@ -65,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -101,6 +101,12 @@ class AppDatabase extends _$AppDatabase {
               heatingZones.customFlooringResistance,
             );
             await heatingDao.seedMaterialCorrectionsV5();
+          }
+          if (from < 6) {
+            await m.addColumn(
+              distributors,
+              distributors.pumpCapacityPa,
+            );
           }
         },
       );

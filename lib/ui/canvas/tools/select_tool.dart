@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/gestures.dart';
 
 import '../../../calculation/engines/geometry_engine.dart';
@@ -779,6 +781,7 @@ class SelectTool extends CanvasTool {
           widthMm: d.widthMm.toDouble(),
           handles: _distributorHandles(d),
           activeHandleIndex: _distributorDragHandle?.index,
+          rotationDeg: d.rotationDeg,
         );
       }
     }
@@ -2030,53 +2033,126 @@ class SelectTool extends CanvasTool {
   static const double _distMinWidthMm = 100.0;
 
   bool _isPointOnDistributor(Point2D point, Distributor d) {
+    final cx = d.position.x;
+    final cy = d.position.y;
+    final dx = point.x - cx;
+    final dy = point.y - cy;
+    // Transform point into the distributor's local (unrotated) space.
+    final rad = -d.rotationDeg * math.pi / 180.0;
+    final lx = dx * math.cos(rad) - dy * math.sin(rad);
+    final ly = dx * math.sin(rad) + dy * math.cos(rad);
     final halfW = d.widthMm.toDouble() / 2;
-    return (point.x - d.position.x).abs() <= halfW &&
-        (point.y - d.position.y).abs() <= _distHalfH;
+    return lx.abs() <= halfW && ly.abs() <= _distHalfH;
   }
 
-  /// Three handles: [0] left edge (start), [1] centre (mid), [2] right edge (end).
+  /// Three handles: [0] left/start, [1] centre/mid, [2] right/end.
+  ///
+  /// Handle positions are rotated to match the distributor's [rotationDeg].
   List<Point2D> _distributorHandles(Distributor d) {
+    final cx = d.position.x;
+    final cy = d.position.y;
     final halfW = d.widthMm.toDouble() / 2;
+    final rad = d.rotationDeg * math.pi / 180.0;
+    final cosA = math.cos(rad);
+    final sinA = math.sin(rad);
     return [
-      Point2D(x: d.position.x - halfW, y: d.position.y),
-      Point2D(x: d.position.x, y: d.position.y),
-      Point2D(x: d.position.x + halfW, y: d.position.y),
+      Point2D(x: cx - halfW * cosA, y: cy - halfW * sinA),
+      Point2D(x: cx, y: cy),
+      Point2D(x: cx + halfW * cosA, y: cy + halfW * sinA),
     ];
+  }
+
+  /// Returns the rotation (0–359°) that aligns the distributor parallel to
+  /// the nearest wall within [SnapService.wallHoverThresholdMm].
+  ///
+  /// Uses the exact wall angle so any wall orientation is supported.
+  /// Returns [currentRotation] unchanged when no wall is nearby.
+  static int _wallSnapRotationAt(
+    Point2D position,
+    int currentRotation,
+    List<WallSegment> walls,
+  ) {
+    final nearest = SnapService.nearestWall(position, walls);
+    if (nearest == null) return currentRotation;
+    final dx = nearest.endPoint.x - nearest.startPoint.x;
+    final dy = nearest.endPoint.y - nearest.startPoint.y;
+    double angleDeg = math.atan2(dy, dx) * 180.0 / math.pi;
+    if (angleDeg < 0) angleDeg += 360.0;
+    return angleDeg.round() % 360;
   }
 
   void _applyDistributorDrag(Point2D worldPoint) {
     final orig = _distributorAtDragStart!;
     final halfW = orig.widthMm.toDouble() / 2;
-    final snappedX =
-        (worldPoint.x / SnapService.gridSpacingMm).round() *
+
+    // Project cursor onto the distributor's rotated axis (local space).
+    final rad = orig.rotationDeg * math.pi / 180.0;
+    final cosA = math.cos(rad);
+    final sinA = math.sin(rad);
+    final relX = worldPoint.x - orig.position.x;
+    final relY = worldPoint.y - orig.position.y;
+    final projAlong = relX * cosA + relY * sinA;
+    final snappedProj =
+        (projAlong / SnapService.gridSpacingMm).round() *
             SnapService.gridSpacingMm;
 
     switch (_distributorDragHandle) {
-      case DragHandleType.start: // left handle → resize from left
-        final rightEdge = orig.position.x + halfW;
-        final newLeft =
-            snappedX.clamp(double.negativeInfinity, rightEdge - _distMinWidthMm);
-        final newWidth = (rightEdge - newLeft).round();
-        final newCenterX = rightEdge - newWidth / 2;
+      case DragHandleType.start: // start/left handle — right edge fixed
+        final newLeftProj = snappedProj.clamp(
+          double.negativeInfinity,
+          halfW - _distMinWidthMm,
+        );
+        final newWidth = (halfW - newLeftProj).round();
+        final newCenterOffset = (halfW + newLeftProj) / 2.0;
         callbacks.updateDistributor(orig.copyWith(
-          position: Point2D(x: newCenterX, y: orig.position.y),
+          position: Point2D(
+            x: orig.position.x + newCenterOffset * cosA,
+            y: orig.position.y + newCenterOffset * sinA,
+          ),
           widthMm: newWidth,
         ));
-      case DragHandleType.end: // right handle → resize from right
-        final leftEdge = orig.position.x - halfW;
-        final newRight =
-            snappedX.clamp(leftEdge + _distMinWidthMm, double.infinity);
-        final newWidth = (newRight - leftEdge).round();
-        final newCenterX = leftEdge + newWidth / 2;
+      case DragHandleType.end: // end/right handle — left edge fixed
+        final newRightProj = snappedProj.clamp(
+          -halfW + _distMinWidthMm,
+          double.infinity,
+        );
+        final newWidth = (newRightProj + halfW).round();
+        final newCenterOffset = (-halfW + newRightProj) / 2.0;
         callbacks.updateDistributor(orig.copyWith(
-          position: Point2D(x: newCenterX, y: orig.position.y),
+          position: Point2D(
+            x: orig.position.x + newCenterOffset * cosA,
+            y: orig.position.y + newCenterOffset * sinA,
+          ),
           widthMm: newWidth,
         ));
-      case DragHandleType.mid || null: // centre handle or body → move
+      case DragHandleType.mid || null: // body / centre handle — move + wall snap
         final snapped = SnapService.snapToGrid(worldPoint);
-        callbacks.updateDistributor(orig.copyWith(position: snapped));
+        final newRotation = _wallSnapRotationAt(
+          snapped,
+          orig.rotationDeg,
+          callbacks.currentWalls,
+        );
+        callbacks.updateDistributor(orig.copyWith(
+          position: snapped,
+          rotationDeg: newRotation,
+        ));
     }
+  }
+
+  /// Cycle the selected distributor's rotation 90° clockwise.
+  void onRotateDistributor() {
+    if (!_selectedDistributor) return;
+    final d = callbacks.currentDistributor;
+    if (d == null) return;
+    final newRotation = (d.rotationDeg + 90) % 360;
+    final updated = d.copyWith(rotationDeg: newRotation);
+    undoRedo.execute(_MoveDistributorCommand(
+      oldDistributor: d,
+      newDistributor: updated,
+      update: callbacks.updateDistributor,
+      label: 'Rotate distributor',
+    ));
+    onStateChanged();
   }
 
   void _commitDistributorDrag() {
@@ -2415,20 +2491,22 @@ class _UpdateWallZoneCommand extends Command {
   void undo() => update(oldZone);
 }
 
-/// Command: move the distributor to a new position.
+/// Command: move or rotate the distributor.
 class _MoveDistributorCommand extends Command {
   _MoveDistributorCommand({
     required this.oldDistributor,
     required this.newDistributor,
     required this.update,
-  });
+    String? label,
+  }) : _label = label ?? 'Move distributor';
 
   final Distributor oldDistributor;
   final Distributor newDistributor;
   final void Function(Distributor) update;
+  final String _label;
 
   @override
-  String get label => 'Move distributor';
+  String get label => _label;
 
   @override
   void execute() => update(newDistributor);

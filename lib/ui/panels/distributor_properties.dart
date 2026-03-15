@@ -12,7 +12,11 @@ import '../providers/editor_state_provider.dart';
 /// Shows editable fields for:
 /// - Supply temperature (°C) — range [minSupplyTempC, maxSupplyTempC]
 /// - Return temperature (°C) — range [minReturnTempC, max < supplyTempC]
-/// - Pump head (Pa) — range [minPumpHeadPa, maxPumpHeadPa]
+/// - Pump capacity (Pa) — optional, user's pump rating (ADR-007)
+///
+/// Read-only fields:
+/// - Min. required pump pressure (Pa) — computed; shows "—" until circuits
+///   are connected.
 ///
 /// Values take effect immediately (no Apply button) — see
 /// UI/UX Section 2 "Immediate feedback".
@@ -36,7 +40,7 @@ class _DistributorPropertiesState
     extends ConsumerState<DistributorProperties> {
   late TextEditingController _supplyCtrl;
   late TextEditingController _returnCtrl;
-  late TextEditingController _pumpCtrl;
+  late TextEditingController _capacityCtrl;
 
   Distributor? _last;
 
@@ -45,14 +49,14 @@ class _DistributorPropertiesState
     super.initState();
     _supplyCtrl = TextEditingController();
     _returnCtrl = TextEditingController();
-    _pumpCtrl = TextEditingController();
+    _capacityCtrl = TextEditingController();
   }
 
   @override
   void dispose() {
     _supplyCtrl.dispose();
     _returnCtrl.dispose();
-    _pumpCtrl.dispose();
+    _capacityCtrl.dispose();
     super.dispose();
   }
 
@@ -63,7 +67,9 @@ class _DistributorPropertiesState
     _last = d;
     final supply = d.supplyTempC.toStringAsFixed(1);
     final ret = d.returnTempC.toStringAsFixed(1);
-    final pump = d.pumpHeadPa.round().toString();
+    final capacity = d.pumpCapacityPa != null
+        ? d.pumpCapacityPa!.round().toString()
+        : '';
 
     if (_supplyCtrl.text != supply) {
       _supplyCtrl.value = _supplyCtrl.value.copyWith(
@@ -81,11 +87,11 @@ class _DistributorPropertiesState
         ),
       );
     }
-    if (_pumpCtrl.text != pump) {
-      _pumpCtrl.value = _pumpCtrl.value.copyWith(
-        text: pump,
+    if (_capacityCtrl.text != capacity) {
+      _capacityCtrl.value = _capacityCtrl.value.copyWith(
+        text: capacity,
         selection: TextSelection.collapsed(
-          offset: pump.length,
+          offset: capacity.length,
         ),
       );
     }
@@ -226,41 +232,6 @@ class _DistributorPropertiesState
           ),
           const SizedBox(height: Spacing.md),
 
-          // ── Pump head ──────────────────────────────────────
-          _SectionLabel(
-            label: 'Pump Head',
-            unit: 'Pa',
-            textTheme: textTheme,
-          ),
-          const SizedBox(height: Spacing.xs),
-          Slider(
-            value: distributor.pumpHeadPa.clamp(
-              minPumpHeadPa,
-              maxPumpHeadPa,
-            ),
-            min: minPumpHeadPa,
-            max: maxPumpHeadPa,
-            divisions: 99,
-            label:
-                '${(distributor.pumpHeadPa / 1000).toStringAsFixed(1)} kPa',
-            onChanged: (v) => _update(
-              distributor.copyWith(pumpHeadPa: v),
-            ),
-          ),
-          _NumericField(
-            controller: _pumpCtrl,
-            min: minPumpHeadPa,
-            max: maxPumpHeadPa,
-            onCommit: (v) {
-              final clamped =
-                  v.clamp(minPumpHeadPa, maxPumpHeadPa);
-              _update(
-                distributor.copyWith(pumpHeadPa: clamped),
-              );
-            },
-          ),
-          const SizedBox(height: Spacing.md),
-
           // ── Read-only info ─────────────────────────────────
           _infoRow(
             'Width',
@@ -274,6 +245,44 @@ class _DistributorPropertiesState
             '\u0394T',
             '${(distributor.supplyTempC - distributor.returnTempC).toStringAsFixed(1)}\u00B0C',
             textTheme,
+          ),
+          const SizedBox(height: Spacing.lg),
+
+          // ── Pump section ───────────────────────────────────
+          Text(
+            'Pump',
+            style: textTheme.headlineSmall,
+          ),
+          const SizedBox(height: Spacing.sm),
+
+          // Min. required pump pressure — read-only, computed
+          _infoRow(
+            'Min. required pump pressure',
+            '— Pa',
+            textTheme,
+          ),
+          const SizedBox(height: Spacing.md),
+
+          // Pump capacity — optional user input
+          _SectionLabel(
+            label: 'Pump Capacity (optional)',
+            unit: 'Pa',
+            textTheme: textTheme,
+          ),
+          const SizedBox(height: Spacing.xs),
+          _NumericField(
+            controller: _capacityCtrl,
+            min: minPumpHeadPa,
+            max: maxPumpHeadPa,
+            onCommit: (v) {
+              final clamped =
+                  v.clamp(minPumpHeadPa, maxPumpHeadPa);
+              _update(
+                distributor.copyWith(
+                  pumpCapacityPa: clamped,
+                ),
+              );
+            },
           ),
         ],
       ),

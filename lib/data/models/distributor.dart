@@ -26,8 +26,11 @@ abstract class Distributor with _$Distributor {
     /// Return water temperature in °C. Must be < [supplyTempC].
     @Default(28.0) double returnTempC,
 
-    /// Available pump head pressure in Pa. Must be > 0.
-    @Default(25000.0) double pumpHeadPa,
+    /// Optional rated capacity of the user's pump (Pa).
+    ///
+    /// When provided, the system warns if this value falls below the
+    /// calculated minimum required pump pressure (ADR-007).
+    double? pumpCapacityPa,
 
     /// Width of the distributor body in millimetres. Default 500 mm.
     @Default(500) int widthMm,

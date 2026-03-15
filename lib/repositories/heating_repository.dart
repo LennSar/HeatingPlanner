@@ -196,7 +196,7 @@ Distributor _distributorFromRow($db.Distributor row) {
     position: _decodePoint(row.positionJson),
     supplyTempC: row.supplyTempC,
     returnTempC: row.returnTempC,
-    pumpHeadPa: row.pumpHeadPa,
+    pumpCapacityPa: row.pumpCapacityPa,
   );
 }
 
@@ -271,7 +271,7 @@ $db.DistributorsCompanion _distributorToCompanion(
     positionJson: Value(_encodePoint(distributor.position)),
     supplyTempC: Value(distributor.supplyTempC),
     returnTempC: Value(distributor.returnTempC),
-    pumpHeadPa: Value(distributor.pumpHeadPa),
+    pumpCapacityPa: Value(distributor.pumpCapacityPa),
   );
 }
 
