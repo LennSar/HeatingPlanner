@@ -76,6 +76,53 @@ final flooringMaterialsProvider =
       .map((rows) => rows.map(_flooringMaterialFromRow).toList());
 });
 
+// ── Per-ID stream providers ───────────────────────────────────────────────────
+
+/// Reactive stream for a single [HeatingZone] by [id].
+final zoneByIdProvider =
+    StreamProvider.family<HeatingZone, String>((ref, id) {
+  return ref
+      .watch(_heatingDaoProvider)
+      .watchZoneById(id)
+      .map(_zoneFromRow);
+});
+
+/// Reactive stream for a single [TubeType] by [id].
+final tubeTypeByIdProvider =
+    StreamProvider.family<TubeType, String>((ref, id) {
+  return ref
+      .watch(_heatingDaoProvider)
+      .watchTubeTypeById(id)
+      .map(_tubeTypeFromRow);
+});
+
+/// Reactive stream for a single [FlooringMaterial] by [id].
+final flooringMaterialByIdProvider =
+    StreamProvider.family<FlooringMaterial, String>((ref, id) {
+  return ref
+      .watch(_heatingDaoProvider)
+      .watchFlooringMaterialById(id)
+      .map(_flooringMaterialFromRow);
+});
+
+/// Reactive stream for a single [HeatingCircuit] by [id].
+final circuitByIdProvider =
+    StreamProvider.family<HeatingCircuit, String>((ref, id) {
+  return ref
+      .watch(_heatingDaoProvider)
+      .watchCircuitById(id)
+      .map(_circuitFromRow);
+});
+
+/// Reactive stream for a single [Distributor] by [id].
+final distributorByIdProvider =
+    StreamProvider.family<Distributor, String>((ref, id) {
+  return ref
+      .watch(_heatingDaoProvider)
+      .watchDistributorById(id)
+      .map(_distributorFromRow);
+});
+
 // ── HeatingZone CRUD ──────────────────────────────────────────────────────────
 
 /// Inserts or replaces [zone] in the database.

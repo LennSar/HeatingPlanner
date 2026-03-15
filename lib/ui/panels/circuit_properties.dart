@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/engines/geometry_engine.dart';
+import '../../calculation/providers/tube_length_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/heating_circuit.dart';
-import '../../data/models/heating_zone.dart';
 import '../../data/models/point2d.dart';
 import '../providers/editor_state_provider.dart';
 
@@ -48,8 +48,11 @@ class CircuitProperties extends ConsumerWidget {
 
     final supplyM = _routeLengthM(circuit.supplyRoutePath);
     final returnM = _routeLengthM(circuit.returnRoutePath);
-    final zoneM = _zoneTubeLengthM(zone);
-    final totalM = supplyM + returnM + zoneM;
+    final zoneM = zone != null
+        ? ref.watch(zoneTubeLengthProvider(zone.id))
+        : double.nan;
+    final totalM =
+        zoneM.isNaN ? double.nan : supplyM + returnM + zoneM;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(Spacing.md),
@@ -97,14 +100,16 @@ class CircuitProperties extends ConsumerWidget {
           ),
           _infoRow(
             'Zone tube',
-            zoneM > 0
+            !zoneM.isNaN && zoneM > 0
                 ? '${zoneM.toStringAsFixed(1)} m'
                 : '\u2014',
             textTheme,
           ),
           _infoRow(
             'Total tube',
-            '${totalM.toStringAsFixed(1)} m',
+            !totalM.isNaN
+                ? '${totalM.toStringAsFixed(1)} m'
+                : '\u2014',
             textTheme,
           ),
 
@@ -143,14 +148,6 @@ class CircuitProperties extends ConsumerWidget {
     return total / 1000.0;
   }
 
-  /// Estimated zone tube length: zone area / tube spacing.
-  static double _zoneTubeLengthM(HeatingZone? zone) {
-    if (zone == null || zone.polygon.length < 3) return 0.0;
-    final areaM2 = GeometryEngine.polygonAreaM2(zone.polygon);
-    final spacingM = zone.tubeSpacingMm / 1000.0;
-    if (spacingM <= 0) return 0.0;
-    return areaM2 / spacingM;
-  }
 }
 
 /// Radio group for selecting [SupplyPipeInsulationType].
