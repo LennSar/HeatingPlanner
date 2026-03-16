@@ -212,6 +212,15 @@ class _HeatingZonePropertiesState
     final surfaceTempC =
         ref.watch(zoneSurfaceTempProvider(widget.zoneId));
 
+    final outputTooltip = specificOutputWPerM2.isNaN
+        ? _zoneMissingPrereqs(
+            zone,
+            editorState,
+            tubeTypesAsync.asData?.value,
+            flooringAsync.asData?.value,
+          )
+        : null;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(Spacing.md),
       child: Column(
@@ -577,6 +586,8 @@ class _HeatingZonePropertiesState
                 ? '\u2014'
                 : '${specificOutputWPerM2.toStringAsFixed(1)}\u202FW/m\u00B2',
             textTheme,
+            context: context,
+            tooltipMessage: outputTooltip,
           ),
           _readOnlyRow(
             'Total Output',
@@ -584,6 +595,8 @@ class _HeatingZonePropertiesState
                 ? '\u2014'
                 : '${totalOutputW.round()}\u202FW',
             textTheme,
+            context: context,
+            tooltipMessage: outputTooltip,
           ),
           _readOnlyRow(
             'Surface Temperature',
@@ -615,22 +628,87 @@ String _patternLabel(LayoutPattern p) => switch (p) {
 Widget _readOnlyRow(
   String label,
   String value,
-  TextTheme textTheme,
-) {
+  TextTheme textTheme, {
+  BuildContext? context,
+  String? tooltipMessage,
+}) {
+  final valueStyle =
+      textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
+
+  Widget valueWidget;
+  if (value == '\u2014' &&
+      tooltipMessage != null &&
+      context != null) {
+    final secondaryColor =
+        Theme.of(context).colorScheme.onSurfaceVariant;
+    valueWidget = Tooltip(
+      message: tooltipMessage,
+      child: Text(
+        value,
+        style: valueStyle?.copyWith(
+          color: secondaryColor,
+          decoration: TextDecoration.underline,
+          decorationStyle: TextDecorationStyle.dotted,
+          decorationColor: secondaryColor,
+        ),
+      ),
+    );
+  } else {
+    valueWidget = Text(value, style: valueStyle);
+  }
+
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: textTheme.bodyMedium),
-        Text(
-          value,
-          style: textTheme.bodyMedium
-              ?.copyWith(fontWeight: FontWeight.w600),
-        ),
+        valueWidget,
       ],
     ),
   );
+}
+
+/// Returns a newline-separated list of unmet prerequisites for
+/// zone heat output, or null when all prerequisites are met.
+///
+/// Checks: circuit connection, distributor, supply/return temperature
+/// spread, tube type availability, flooring material availability.
+String? _zoneMissingPrereqs(
+  HeatingZone zone,
+  EditorState state,
+  List<TubeType>? loadedTubeTypes,
+  List<FlooringMaterial>? loadedMaterials,
+) {
+  final missing = <String>[];
+
+  if (zone.circuitId == null) {
+    missing.add('No circuit connected');
+  }
+
+  if (state.distributor == null) {
+    missing.add('No distributor placed');
+  } else {
+    final d = state.distributor!;
+    if ((d.supplyTempC - d.returnTempC).abs() < 0.5) {
+      missing.add('Supply/return temperature not set');
+    }
+  }
+
+  if (loadedTubeTypes != null &&
+      loadedTubeTypes.isNotEmpty &&
+      !loadedTubeTypes.any((t) => t.id == zone.tubeTypeId)) {
+    missing.add('No tube type selected');
+  }
+
+  if (loadedMaterials != null &&
+      loadedMaterials.isNotEmpty &&
+      zone.flooringMaterialId != kCustomFlooringMaterialId &&
+      !loadedMaterials.any((m) => m.id == zone.flooringMaterialId)) {
+    missing.add('No flooring material selected');
+  }
+
+  return missing.isEmpty ? null : missing.join('\n');
 }
 
 // ── Sub-widgets ───────────────────────────────────────────────────────────────

@@ -568,18 +568,36 @@ class _FloorPlanCanvasState
         Theme.of(context).colorScheme.onSurface;
 
     // Compute ADR-004 zone display states from calculation providers.
+    // Priority order is strict — see ADR-004 and DECISIONS.md.
     final zoneStates = <String, ZoneColorState>{};
     for (final zone in editorState.zones) {
+      // Priority 1: no circuit assigned → red hatched.
       if (zone.circuitId == null) {
         zoneStates[zone.id] = ZoneColorState.unconnected;
         continue;
       }
+
+      // Priority 2: room demand is NaN (incomplete data, e.g. an
+      // exterior wall has no construction) → grey.  This check MUST
+      // come before the output check so that a valid output value
+      // cannot mask missing demand data.
+      final demandW =
+          ref.watch(roomHeatDemandProvider(zone.roomId));
+      if (demandW.isNaN) {
+        zoneStates[zone.id] = ZoneColorState.noDemand;
+        continue;
+      }
+
+      // Compute specific output (W/m²) now that demand is confirmed
+      // to be a real number.  If output cannot be determined (e.g.
+      // distributor not yet configured) fall back to unconnected.
       final specificOutput =
           ref.watch(zoneHeatOutputProvider(zone.id));
       if (specificOutput.isNaN) {
         zoneStates[zone.id] = ZoneColorState.unconnected;
         continue;
       }
+
       final areaM2 = zone.polygon.length >= 3
           ? GeometryEngine.polygonAreaM2(zone.polygon)
           : 0.0;
@@ -587,13 +605,17 @@ class _FloorPlanCanvasState
         zoneStates[zone.id] = ZoneColorState.unconnected;
         continue;
       }
+
       final totalOutputW = specificOutput * areaM2;
-      final demandW =
-          ref.watch(roomHeatDemandProvider(zone.roomId));
-      if (demandW.isNaN || demandW <= 0) {
-        zoneStates[zone.id] = ZoneColorState.noDemand;
+
+      // Genuinely zero demand (e.g. interior room with equal adjacent
+      // temperatures): no heating needed, so the zone is sufficient.
+      if (demandW <= 0) {
+        zoneStates[zone.id] = ZoneColorState.sufficient;
         continue;
       }
+
+      // Priorities 3–5: compare output to demand.
       final ratio = totalOutputW / demandW;
       zoneStates[zone.id] = ratio >= 1.0
           ? ZoneColorState.sufficient

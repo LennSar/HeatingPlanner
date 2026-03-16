@@ -25,6 +25,12 @@ class ConstructionDao extends DatabaseAccessor<AppDatabase>
   Stream<WallConstruction> watchById(String id) =>
       (select(wallConstructions)..where((t) => t.id.equals(id))).watchSingle();
 
+  /// Single wall construction by [id], or null if not found.
+  Stream<WallConstruction?> watchByIdNullable(String id) =>
+      (select(wallConstructions)..where((t) => t.id.equals(id)))
+          .watch()
+          .map((list) => list.isEmpty ? null : list.first);
+
   /// Inserts or replaces a wall-construction row.
   Future<void> upsertConstruction(WallConstructionsCompanion companion) =>
       into(wallConstructions).insertOnConflictUpdate(companion);

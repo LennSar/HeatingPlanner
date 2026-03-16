@@ -4,6 +4,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/engines/geometry_engine.dart';
+import '../../repositories/building_repository.dart';
+import '../../repositories/construction_repository.dart';
 import '../../repositories/heating_repository.dart';
 import '../../core/utils/id_generator.dart';
 import '../../data/models/distributor.dart';
@@ -114,6 +116,10 @@ class EditorStateNotifier extends Notifier<EditorState> {
     state = state.copyWith(
       walls: [...state.walls, wall],
     );
+    if (wall.roomId.isNotEmpty) {
+      final dao = ref.read(buildingDaoProvider);
+      unawaited(upsertWallSegment(dao, wall));
+    }
   }
 
   /// Replace a wall with the same ID.
@@ -123,6 +129,10 @@ class EditorStateNotifier extends Notifier<EditorState> {
           .map((w) => w.id == wall.id ? wall : w)
           .toList(),
     );
+    if (wall.roomId.isNotEmpty) {
+      final dao = ref.read(buildingDaoProvider);
+      unawaited(upsertWallSegment(dao, wall));
+    }
   }
 
   /// Remove a wall by ID.
@@ -132,10 +142,15 @@ class EditorStateNotifier extends Notifier<EditorState> {
           .where((w) => w.id != wallId)
           .toList(),
     );
+    final dao = ref.read(buildingDaoProvider);
+    unawaited(deleteWallSegment(dao, wallId));
   }
 
   /// Clear roomId on all walls that reference [roomId].
   void clearRoomIdOnWalls(String roomId) {
+    // Delete persisted walls before clearing their roomId in memory.
+    final toDelete =
+        state.walls.where((w) => w.roomId == roomId).toList();
     state = state.copyWith(
       walls: state.walls
           .map(
@@ -145,6 +160,12 @@ class EditorStateNotifier extends Notifier<EditorState> {
           )
           .toList(),
     );
+    if (toDelete.isNotEmpty) {
+      final dao = ref.read(buildingDaoProvider);
+      for (final w in toDelete) {
+        unawaited(deleteWallSegment(dao, w.id));
+      }
+    }
   }
 
   /// Assign a list of walls to a room.
@@ -152,15 +173,18 @@ class EditorStateNotifier extends Notifier<EditorState> {
     List<String> wallIds,
     String roomId,
   ) {
-    state = state.copyWith(
-      walls: state.walls
-          .map(
-            (w) => wallIds.contains(w.id)
-                ? w.copyWith(roomId: roomId)
-                : w,
-          )
-          .toList(),
-    );
+    final updated = state.walls
+        .map(
+          (w) => wallIds.contains(w.id)
+              ? w.copyWith(roomId: roomId)
+              : w,
+        )
+        .toList();
+    state = state.copyWith(walls: updated);
+    final dao = ref.read(buildingDaoProvider);
+    for (final w in updated.where((w) => wallIds.contains(w.id))) {
+      unawaited(upsertWallSegment(dao, w));
+    }
   }
 
   // ---- Rooms ----
@@ -170,6 +194,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
     state = state.copyWith(
       rooms: [...state.rooms, room],
     );
+    final dao = ref.read(buildingDaoProvider);
+    unawaited(upsertRoom(dao, room));
   }
 
   /// Update an existing room.
@@ -179,6 +205,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
           .map((r) => r.id == room.id ? room : r)
           .toList(),
     );
+    final dao = ref.read(buildingDaoProvider);
+    unawaited(upsertRoom(dao, room));
   }
 
   /// Remove a room by ID.
@@ -188,6 +216,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
           .where((r) => r.id != roomId)
           .toList(),
     );
+    final dao = ref.read(buildingDaoProvider);
+    unawaited(deleteRoom(dao, roomId));
   }
 
   // ---- Walls batch operations ----
@@ -217,6 +247,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
     state = state.copyWith(
       windows: [...state.windows, window],
     );
+    final dao = ref.read(buildingDaoProvider);
+    unawaited(upsertWindow(dao, window));
   }
 
   /// Replace a window with the same ID.
@@ -226,6 +258,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
           .map((w) => w.id == window.id ? window : w)
           .toList(),
     );
+    final dao = ref.read(buildingDaoProvider);
+    unawaited(upsertWindow(dao, window));
   }
 
   /// Remove a window by ID.
@@ -235,15 +269,26 @@ class EditorStateNotifier extends Notifier<EditorState> {
           .where((w) => w.id != windowId)
           .toList(),
     );
+    final dao = ref.read(buildingDaoProvider);
+    unawaited(deleteWindow(dao, windowId));
   }
 
   /// Remove all windows on a given wall segment.
   void removeWindowsOnWall(String wallId) {
+    final toDelete = state.windows
+        .where((w) => w.wallSegmentId == wallId)
+        .toList();
     state = state.copyWith(
       windows: state.windows
           .where((w) => w.wallSegmentId != wallId)
           .toList(),
     );
+    if (toDelete.isNotEmpty) {
+      final dao = ref.read(buildingDaoProvider);
+      for (final w in toDelete) {
+        unawaited(deleteWindow(dao, w.id));
+      }
+    }
   }
 
   // ---- Doors ----
@@ -253,6 +298,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
     state = state.copyWith(
       doors: [...state.doors, door],
     );
+    final dao = ref.read(buildingDaoProvider);
+    unawaited(upsertDoor(dao, door));
   }
 
   /// Replace a door with the same ID.
@@ -262,6 +309,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
           .map((d) => d.id == door.id ? door : d)
           .toList(),
     );
+    final dao = ref.read(buildingDaoProvider);
+    unawaited(upsertDoor(dao, door));
   }
 
   /// Remove a door by ID.
@@ -271,15 +320,26 @@ class EditorStateNotifier extends Notifier<EditorState> {
           .where((d) => d.id != doorId)
           .toList(),
     );
+    final dao = ref.read(buildingDaoProvider);
+    unawaited(deleteDoor(dao, doorId));
   }
 
   /// Remove all doors on a given wall segment.
   void removeDoorsOnWall(String wallId) {
+    final toDelete = state.doors
+        .where((d) => d.wallSegmentId == wallId)
+        .toList();
     state = state.copyWith(
       doors: state.doors
           .where((d) => d.wallSegmentId != wallId)
           .toList(),
     );
+    if (toDelete.isNotEmpty) {
+      final dao = ref.read(buildingDaoProvider);
+      for (final d in toDelete) {
+        unawaited(deleteDoor(dao, d.id));
+      }
+    }
   }
 
   // ---- Zones ----
@@ -404,6 +464,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
         construction,
       ],
     );
+    final dao = ref.read(constructionDaoProvider);
+    unawaited(upsertConstruction(dao, construction));
   }
 
   /// Replace a construction with the same ID.
@@ -417,6 +479,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
           )
           .toList(),
     );
+    final dao = ref.read(constructionDaoProvider);
+    unawaited(upsertConstruction(dao, construction));
   }
 
   /// Remove a construction by ID (and its layers).
@@ -431,6 +495,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
           )
           .toList(),
     );
+    final dao = ref.read(constructionDaoProvider);
+    unawaited(deleteConstruction(dao, constructionId));
   }
 
   // ---- Material layers ----
@@ -440,6 +506,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
     state = state.copyWith(
       materialLayers: [...state.materialLayers, layer],
     );
+    final dao = ref.read(constructionDaoProvider);
+    unawaited(upsertLayer(dao, layer));
   }
 
   /// Replace a material layer with the same ID.
@@ -449,6 +517,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
           .map((l) => l.id == layer.id ? layer : l)
           .toList(),
     );
+    final dao = ref.read(constructionDaoProvider);
+    unawaited(upsertLayer(dao, layer));
   }
 
   /// Remove a material layer by ID.
@@ -458,6 +528,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
           .where((l) => l.id != layerId)
           .toList(),
     );
+    final dao = ref.read(constructionDaoProvider);
+    unawaited(deleteLayer(dao, layerId));
   }
 
   /// Replace all layers for a construction atomically.
@@ -474,6 +546,10 @@ class EditorStateNotifier extends Notifier<EditorState> {
     state = state.copyWith(
       materialLayers: [...retained, ...newLayers],
     );
+    final dao = ref.read(constructionDaoProvider);
+    for (final l in newLayers) {
+      unawaited(upsertLayer(dao, l));
+    }
   }
 
   // ---- Composite mutations ----
@@ -488,6 +564,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
   /// All mutations are committed in a single state update.
   void commitWallWithSplit(WallSegment wall) {
     var walls = List<WallSegment>.from(state.walls);
+    final removed = <String>[];
+    final addedPersisted = <WallSegment>[];
 
     for (final pt in [wall.startPoint, wall.endPoint]) {
       for (var i = 0; i < walls.length; i++) {
@@ -516,6 +594,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
           orientation: host.orientation,
         );
 
+        removed.add(host.id);
+        addedPersisted.addAll([before, after]);
         walls.removeAt(i);
         walls.insertAll(i, [before, after]);
         break;
@@ -524,6 +604,16 @@ class EditorStateNotifier extends Notifier<EditorState> {
 
     walls.add(wall);
     state = state.copyWith(walls: walls);
+
+    if (removed.isNotEmpty || addedPersisted.isNotEmpty) {
+      final dao = ref.read(buildingDaoProvider);
+      for (final id in removed) {
+        unawaited(deleteWallSegment(dao, id));
+      }
+      for (final w in addedPersisted) {
+        unawaited(upsertWallSegment(dao, w));
+      }
+    }
   }
 
   /// Create a room from auto-detection results, handling
@@ -535,6 +625,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     required List<String> wallIds,
   }) {
     final updatedWalls = [...state.walls];
+    final toPersist = <WallSegment>[];
 
     for (int i = 0; i < wallIds.length; i++) {
       final wallId = wallIds[i];
@@ -545,13 +636,17 @@ class EditorStateNotifier extends Notifier<EditorState> {
       final wall = updatedWalls[idx];
 
       if (wall.roomId.isEmpty) {
-        updatedWalls[idx] = wall.copyWith(roomId: room.id);
+        final assigned = wall.copyWith(roomId: room.id);
+        updatedWalls[idx] = assigned;
+        toPersist.add(assigned);
       } else {
         final neighbourRoomId = wall.roomId;
-        updatedWalls[idx] = wall.copyWith(
+        final updated = wall.copyWith(
           wallType: WallType.interior,
           adjacentRoomId: room.id,
         );
+        updatedWalls[idx] = updated;
+        toPersist.add(updated);
 
         final mirror = WallSegment(
           id: IdGenerator.newId(),
@@ -564,6 +659,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
           orientation: wall.orientation,
         );
         updatedWalls.add(mirror);
+        toPersist.add(mirror);
       }
     }
 
@@ -571,6 +667,12 @@ class EditorStateNotifier extends Notifier<EditorState> {
       walls: updatedWalls,
       rooms: [...state.rooms, room],
     );
+
+    final dao = ref.read(buildingDaoProvider);
+    unawaited(upsertRoom(dao, room));
+    for (final w in toPersist) {
+      unawaited(upsertWallSegment(dao, w));
+    }
   }
 
   /// Next suggested room number.

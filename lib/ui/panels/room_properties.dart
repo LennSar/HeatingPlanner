@@ -6,6 +6,7 @@ import '../../calculation/engines/thermal_engine.dart';
 import '../../calculation/providers/heat_demand_providers.dart';
 import '../../calculation/providers/project_settings_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../data/models/enums.dart';
 import '../../data/models/room.dart';
 import '../canvas/tools/undo_redo_service.dart';
 import '../providers/editor_state_provider.dart';
@@ -494,6 +495,10 @@ class _RoomPropertiesState
             : double.nan;
 
     final colorScheme = Theme.of(context).colorScheme;
+    final demandTooltip = _roomDemandMissingPrereqs(
+      room,
+      editorState,
+    );
 
     return [
       if (hasAnyConstruction)
@@ -534,15 +539,30 @@ class _RoomPropertiesState
                 fontWeight: FontWeight.w600,
               ),
             ),
-            Text(
-              totalDemandW.isNaN
-                  ? '\u2014'
-                  : '${totalDemandW.round()} W',
-              style: textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.primary,
+            if (totalDemandW.isNaN && demandTooltip != null)
+              Tooltip(
+                message: demandTooltip,
+                child: Text(
+                  '\u2014',
+                  style: textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.onSurfaceVariant,
+                    decoration: TextDecoration.underline,
+                    decorationStyle: TextDecorationStyle.dotted,
+                    decorationColor: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              )
+            else
+              Text(
+                totalDemandW.isNaN
+                    ? '\u2014'
+                    : '${totalDemandW.round()} W',
+                style: textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: colorScheme.primary,
+                ),
               ),
-            ),
           ],
         ),
       ),
@@ -553,6 +573,8 @@ class _RoomPropertiesState
             ? '\u2014'
             : '${specificW.toStringAsFixed(1)} W/m\u00B2',
         textTheme,
+        context: context,
+        tooltipMessage: specificW.isNaN ? demandTooltip : null,
       ),
     ];
   }
@@ -665,8 +687,35 @@ class _AcrField extends StatelessWidget {
 Widget _readOnlyRow(
   String label,
   String value,
-  TextTheme textTheme,
-) {
+  TextTheme textTheme, {
+  BuildContext? context,
+  String? tooltipMessage,
+}) {
+  final valueStyle =
+      textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
+
+  Widget valueWidget;
+  if (value == '\u2014' &&
+      tooltipMessage != null &&
+      context != null) {
+    final secondaryColor =
+        Theme.of(context).colorScheme.onSurfaceVariant;
+    valueWidget = Tooltip(
+      message: tooltipMessage,
+      child: Text(
+        value,
+        style: valueStyle?.copyWith(
+          color: secondaryColor,
+          decoration: TextDecoration.underline,
+          decorationStyle: TextDecorationStyle.dotted,
+          decorationColor: secondaryColor,
+        ),
+      ),
+    );
+  } else {
+    valueWidget = Text(value, style: valueStyle);
+  }
+
   return Padding(
     padding: const EdgeInsets.symmetric(
       vertical: Spacing.xs,
@@ -675,15 +724,39 @@ Widget _readOnlyRow(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: textTheme.bodyMedium),
-        Text(
-          value,
-          style: textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
+        valueWidget,
       ],
     ),
   );
+}
+
+/// Returns a newline-separated list of unmet prerequisites for
+/// room heat demand, or null when all prerequisites are met.
+String? _roomDemandMissingPrereqs(Room room, EditorState state) {
+  final roomWalls =
+      state.walls.where((w) => w.roomId == room.id).toList();
+
+  final missing = <String>[];
+
+  if (roomWalls.isEmpty) {
+    missing.add('No exterior walls defined');
+    return missing.join('\n');
+  }
+
+  final hasExterior =
+      roomWalls.any((w) => w.wallType == WallType.exterior);
+  if (!hasExterior) {
+    missing.add('No exterior walls defined');
+  } else {
+    final hasConstruction = roomWalls
+        .where((w) => w.wallType == WallType.exterior)
+        .any((w) => w.constructionId != null);
+    if (!hasConstruction) {
+      missing.add('No wall construction assigned to exterior walls');
+    }
+  }
+
+  return missing.isEmpty ? null : missing.join('\n');
 }
 
 // ================================================================

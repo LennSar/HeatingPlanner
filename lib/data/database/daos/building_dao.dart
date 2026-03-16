@@ -45,6 +45,18 @@ class BuildingDao extends DatabaseAccessor<AppDatabase>
   Stream<Room> watchRoom(String id) =>
       (select(rooms)..where((t) => t.id.equals(id))).watchSingle();
 
+  /// Single room by [id], or null if not found.
+  Stream<Room?> watchRoomNullable(String id) =>
+      (select(rooms)..where((t) => t.id.equals(id)))
+          .watch()
+          .map((list) => list.isEmpty ? null : list.first);
+
+  /// Single floor by [id], or null if not found.
+  Stream<Floor?> watchFloorNullable(String id) =>
+      (select(floors)..where((t) => t.id.equals(id)))
+          .watch()
+          .map((list) => list.isEmpty ? null : list.first);
+
   /// Inserts or replaces a room row.
   Future<void> upsertRoom(RoomsCompanion companion) =>
       into(rooms).insertOnConflictUpdate(companion);

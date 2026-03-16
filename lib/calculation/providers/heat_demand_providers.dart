@@ -16,11 +16,15 @@ import 'u_value_providers.dart';
 /// EN 12831 design heat demand:
 ///   Q_total = Q_T (transmission) + Q_V (ventilation)
 ///
-/// Iterates all [WallSegment]s owned by the room per ADR-001. Walls
-/// without a [WallSegment.constructionId] are skipped. Interior and
-/// partition walls use [ThermalEngine.interiorCorrectionFactor] per
+/// Iterates all [WallSegment]s owned by the room per ADR-001. Interior
+/// and partition walls use [ThermalEngine.interiorCorrectionFactor] per
 /// ADR-002. When [WallSegment.adjacentRoomId] is null the correction
 /// factor defaults to 0.0 (safe over-estimate, per ADR-002).
+///
+/// Returns [double.nan] when any exterior wall has no
+/// [WallSegment.constructionId] assigned — this signals incomplete
+/// data (as opposed to a genuinely zero demand) so that downstream
+/// consumers (e.g. zone colour logic) can distinguish the two cases.
 ///
 /// Depends on [roomProvider], [wallSegmentsProvider],
 /// [windowsProvider], [doorsProvider], [floorProvider],
@@ -28,11 +32,20 @@ import 'u_value_providers.dart';
 final roomHeatDemandProvider =
     Provider.family<double, String>((ref, roomId) {
   final room = ref.watch(roomProvider(roomId)).asData?.value;
-  if (room == null) return double.nan;
+  if (room == null) return 0.0;
 
   final walls =
       ref.watch(wallSegmentsProvider(roomId)).asData?.value;
   if (walls == null) return double.nan;
+
+  // If any exterior wall lacks a construction the demand cannot be
+  // accurately computed — return NaN to signal incomplete data.
+  final hasIncompleteExteriorWall = walls.any(
+    (w) =>
+        w.wallType == WallType.exterior &&
+        w.constructionId == null,
+  );
+  if (hasIncompleteExteriorWall) return double.nan;
 
   final tOutdoor = ref.watch(designOutdoorTempCProvider);
   final tThis = room.targetTempC;
