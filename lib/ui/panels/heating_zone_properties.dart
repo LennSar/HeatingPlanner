@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/engines/geometry_engine.dart';
+import '../../calculation/providers/heat_output_providers.dart';
 import '../../calculation/providers/project_settings_provider.dart';
 import '../../calculation/providers/tube_length_providers.dart';
 import '../../core/constants/validation_limits.dart';
@@ -201,6 +202,15 @@ class _HeatingZonePropertiesState
 
     final tubeTypesAsync = ref.watch(tubeTypesProvider);
     final flooringAsync = ref.watch(flooringMaterialsProvider);
+
+    final specificOutputWPerM2 =
+        ref.watch(zoneHeatOutputProvider(widget.zoneId));
+    final totalOutputW =
+        !specificOutputWPerM2.isNaN && !areaM2.isNaN
+            ? specificOutputWPerM2 * areaM2
+            : double.nan;
+    final surfaceTempC =
+        ref.watch(zoneSurfaceTempProvider(widget.zoneId));
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(Spacing.md),
@@ -563,12 +573,23 @@ class _HeatingZonePropertiesState
           ),
           _readOnlyRow(
             'Specific Output',
-            '\u2014', // TODO(hvac): wire zoneHeatOutputProvider
+            specificOutputWPerM2.isNaN
+                ? '\u2014'
+                : '${specificOutputWPerM2.toStringAsFixed(1)}\u202FW/m\u00B2',
             textTheme,
           ),
           _readOnlyRow(
             'Total Output',
-            '\u2014', // TODO(hvac): wire zoneHeatOutputProvider
+            totalOutputW.isNaN
+                ? '\u2014'
+                : '${totalOutputW.round()}\u202FW',
+            textTheme,
+          ),
+          _readOnlyRow(
+            'Surface Temperature',
+            surfaceTempC.isNaN
+                ? '\u2014'
+                : '${surfaceTempC.toStringAsFixed(1)}\u202F\u00B0C',
             textTheme,
           ),
         ],

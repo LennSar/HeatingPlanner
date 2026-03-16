@@ -5,26 +5,44 @@ import 'package:flutter/material.dart';
 import '../../../data/models/enums.dart';
 import '../../../data/models/heating_zone.dart';
 
+/// ADR-004 display state for a heating zone.
+enum ZoneColorState {
+  /// No circuit assigned — red hatched (ADR-004 state 1).
+  unconnected,
+
+  /// Room has no heat demand — grey fill (ADR-004 state 2).
+  noDemand,
+
+  /// Output < 90 % of demand — red fill (ADR-004 state 3).
+  insufficient,
+
+  /// Output 90–99 % of demand — yellow fill (ADR-004 state 4).
+  marginal,
+
+  /// Output ≥ 100 % of demand — green fill (ADR-004 state 5).
+  sufficient,
+}
+
 /// Draws committed heating zone polygons on the canvas.
 ///
 /// Each zone is coloured according to ADR-004's priority-ordered
-/// state machine. For now every zone is in state 1 (unconnected —
-/// no distributor/circuit assigned) and is painted with the
-/// **red hatched** style: a semi-transparent red fill overlaid
-/// with 45° diagonal hatch lines.
+/// state machine. The display state per zone is supplied via
+/// [zoneStates]; zones not present in the map default to
+/// [ZoneColorState.unconnected] (red hatched).
 ///
-/// Inside every unconnected zone a simplified tube-routing
-/// preview is drawn for the [LayoutPattern.meander] pattern,
-/// based on [HeatingZone.tubeSpacingMm] and
-/// [HeatingZone.borderDistanceMm].
+/// Inside every zone a simplified tube-routing preview is drawn
+/// for the [LayoutPattern.meander] pattern, based on
+/// [HeatingZone.tubeSpacingMm] and [HeatingZone.borderDistanceMm].
 class HeatingZonePainter extends CustomPainter {
   /// Creates a [HeatingZonePainter].
   const HeatingZonePainter({
     required this.zoneGreen,
     required this.zoneYellow,
     required this.zoneRed,
+    required this.zoneGrey,
     required this.supplyPipe,
     this.zones = const [],
+    this.zoneStates = const {},
   });
 
   /// Sufficient-output zone colour.
@@ -36,11 +54,17 @@ class HeatingZonePainter extends CustomPainter {
   /// Insufficient-output / unconnected zone colour.
   final Color zoneRed;
 
+  /// No-demand zone colour.
+  final Color zoneGrey;
+
   /// Supply-pipe colour used for the meander routing preview.
   final Color supplyPipe;
 
   /// All heating zones to render on this floor.
   final List<HeatingZone> zones;
+
+  /// ADR-004 display state keyed by zone ID.
+  final Map<String, ZoneColorState> zoneStates;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -54,15 +78,56 @@ class HeatingZonePainter extends CustomPainter {
       }
       path.close();
 
-      // ADR-004 priority chain:
-      // State 1 — unconnected (circuitId == null) → red hatched.
-      // States 2-5 not yet reachable (no distributor wiring).
-      if (zone.zoneType == ZoneType.wallHeating) {
-        _paintWallZoneUnconnected(canvas, path, zone);
-      } else {
-        _paintUnconnected(canvas, path, zone);
+      final state =
+          zoneStates[zone.id] ?? ZoneColorState.unconnected;
+      switch (state) {
+        case ZoneColorState.unconnected:
+          if (zone.zoneType == ZoneType.wallHeating) {
+            _paintWallZoneUnconnected(canvas, path, zone);
+          } else {
+            _paintUnconnected(canvas, path, zone);
+          }
+        case ZoneColorState.noDemand:
+          _paintConnected(canvas, path, zone, zoneGrey);
+        case ZoneColorState.insufficient:
+          _paintConnected(canvas, path, zone, zoneRed);
+        case ZoneColorState.marginal:
+          _paintConnected(canvas, path, zone, zoneYellow);
+        case ZoneColorState.sufficient:
+          _paintConnected(canvas, path, zone, zoneGreen);
       }
     }
+  }
+
+  /// Paint a connected zone (ADR-004 states 2–5) with a solid
+  /// semi-transparent [color] fill and a tube-routing preview.
+  void _paintConnected(
+    Canvas canvas,
+    Path path,
+    HeatingZone zone,
+    Color color,
+  ) {
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color.withValues(alpha: 0.25)
+        ..style = PaintingStyle.fill,
+    );
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.0,
+    );
+    canvas.save();
+    canvas.clipPath(path);
+    if (zone.zoneType == ZoneType.wallHeating) {
+      _drawWallZoneTubePreview(canvas, zone);
+    } else if (zone.layoutPattern == LayoutPattern.meander) {
+      _drawMeanderPreview(canvas, path, zone);
+    }
+    canvas.restore();
   }
 
   /// Paint a zone that has no circuit assigned (ADR-004 state 1).
@@ -292,9 +357,11 @@ class HeatingZonePainter extends CustomPainter {
   @override
   bool shouldRepaint(HeatingZonePainter oldDelegate) {
     return oldDelegate.zones != zones ||
+        oldDelegate.zoneStates != zoneStates ||
         oldDelegate.zoneRed != zoneRed ||
         oldDelegate.zoneGreen != zoneGreen ||
         oldDelegate.zoneYellow != zoneYellow ||
+        oldDelegate.zoneGrey != zoneGrey ||
         oldDelegate.supplyPipe != supplyPipe;
   }
 }

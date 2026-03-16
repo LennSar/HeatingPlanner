@@ -42,6 +42,7 @@ class HeatingPlannerColors
     required this.zoneGreen,
     required this.zoneYellow,
     required this.zoneRed,
+    required this.zoneGrey,
     required this.supplyPipe,
     required this.returnPipe,
     required this.gridLine,
@@ -60,6 +61,7 @@ class HeatingPlannerColors
       zoneGreen: Color(0xFF4CAF50),
       zoneYellow: Color(0xFFFFC107),
       zoneRed: Color(0xFFF44336),
+      zoneGrey: Color(0xFF9E9E9E),
       supplyPipe: Color(0xFFEF4444),
       returnPipe: Color(0xFF3B82F6),
       gridLine: Color(0xFFE5E7EB),
@@ -90,6 +92,9 @@ class HeatingPlannerColors
   /// Heating zone — insufficient output (use with 30% opacity).
   final Color zoneRed;
 
+  /// Heating zone — no heat demand (use with 30% opacity).
+  final Color zoneGrey;
+
   /// Supply pipe routing line colour.
   final Color supplyPipe;
 
@@ -117,6 +122,7 @@ class HeatingPlannerColors
     Color? zoneGreen,
     Color? zoneYellow,
     Color? zoneRed,
+    Color? zoneGrey,
     Color? supplyPipe,
     Color? returnPipe,
     Color? gridLine,
@@ -132,6 +138,7 @@ class HeatingPlannerColors
       zoneGreen: zoneGreen ?? this.zoneGreen,
       zoneYellow: zoneYellow ?? this.zoneYellow,
       zoneRed: zoneRed ?? this.zoneRed,
+      zoneGrey: zoneGrey ?? this.zoneGrey,
       supplyPipe: supplyPipe ?? this.supplyPipe,
       returnPipe: returnPipe ?? this.returnPipe,
       gridLine: gridLine ?? this.gridLine,
@@ -164,6 +171,8 @@ class HeatingPlannerColors
           Color.lerp(zoneYellow, other.zoneYellow, t)!,
       zoneRed:
           Color.lerp(zoneRed, other.zoneRed, t)!,
+      zoneGrey:
+          Color.lerp(zoneGrey, other.zoneGrey, t)!,
       supplyPipe:
           Color.lerp(supplyPipe, other.supplyPipe, t)!,
       returnPipe:

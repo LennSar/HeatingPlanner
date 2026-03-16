@@ -16,7 +16,8 @@ import '../data/models/tube_type.dart';
 // ── DAO provider ──────────────────────────────────────────────────────────────
 
 /// Provides the [HeatingDao] from the singleton [AppDatabase].
-final _heatingDaoProvider = Provider<HeatingDao>((ref) {
+/// Provides the [HeatingDao] for use in persistence calls.
+final heatingDaoProvider = Provider<HeatingDao>((ref) {
   return ref.watch($db.appDatabaseProvider).heatingDao;
 });
 
@@ -27,7 +28,7 @@ final heatingZonesProvider =
     StreamProvider.family<List<HeatingZone>, String>(
   (ref, roomId) {
     return ref
-        .watch(_heatingDaoProvider)
+        .watch(heatingDaoProvider)
         .watchZones(roomId)
         .map((rows) => rows.map(_zoneFromRow).toList());
   },
@@ -39,7 +40,7 @@ final distributorProvider =
     StreamProvider.family<Distributor?, String>(
   (ref, floorId) {
     return ref
-        .watch(_heatingDaoProvider)
+        .watch(heatingDaoProvider)
         .watchDistributor(floorId)
         .map(
           (row) => row == null ? null : _distributorFromRow(row),
@@ -53,7 +54,7 @@ final circuitsProvider =
     StreamProvider.family<List<HeatingCircuit>, String>(
   (ref, distributorId) {
     return ref
-        .watch(_heatingDaoProvider)
+        .watch(heatingDaoProvider)
         .watchCircuits(distributorId)
         .map((rows) => rows.map(_circuitFromRow).toList());
   },
@@ -62,7 +63,7 @@ final circuitsProvider =
 /// Reactive stream of all [TubeType]s, ordered by name.
 final tubeTypesProvider = StreamProvider<List<TubeType>>((ref) {
   return ref
-      .watch(_heatingDaoProvider)
+      .watch(heatingDaoProvider)
       .watchTubeTypes()
       .map((rows) => rows.map(_tubeTypeFromRow).toList());
 });
@@ -71,7 +72,7 @@ final tubeTypesProvider = StreamProvider<List<TubeType>>((ref) {
 final flooringMaterialsProvider =
     StreamProvider<List<FlooringMaterial>>((ref) {
   return ref
-      .watch(_heatingDaoProvider)
+      .watch(heatingDaoProvider)
       .watchFlooringMaterials()
       .map((rows) => rows.map(_flooringMaterialFromRow).toList());
 });
@@ -82,7 +83,7 @@ final flooringMaterialsProvider =
 final zoneByIdProvider =
     StreamProvider.family<HeatingZone, String>((ref, id) {
   return ref
-      .watch(_heatingDaoProvider)
+      .watch(heatingDaoProvider)
       .watchZoneById(id)
       .map(_zoneFromRow);
 });
@@ -91,7 +92,7 @@ final zoneByIdProvider =
 final tubeTypeByIdProvider =
     StreamProvider.family<TubeType, String>((ref, id) {
   return ref
-      .watch(_heatingDaoProvider)
+      .watch(heatingDaoProvider)
       .watchTubeTypeById(id)
       .map(_tubeTypeFromRow);
 });
@@ -100,7 +101,7 @@ final tubeTypeByIdProvider =
 final flooringMaterialByIdProvider =
     StreamProvider.family<FlooringMaterial, String>((ref, id) {
   return ref
-      .watch(_heatingDaoProvider)
+      .watch(heatingDaoProvider)
       .watchFlooringMaterialById(id)
       .map(_flooringMaterialFromRow);
 });
@@ -109,7 +110,7 @@ final flooringMaterialByIdProvider =
 final circuitByIdProvider =
     StreamProvider.family<HeatingCircuit, String>((ref, id) {
   return ref
-      .watch(_heatingDaoProvider)
+      .watch(heatingDaoProvider)
       .watchCircuitById(id)
       .map(_circuitFromRow);
 });
@@ -118,7 +119,7 @@ final circuitByIdProvider =
 final distributorByIdProvider =
     StreamProvider.family<Distributor, String>((ref, id) {
   return ref
-      .watch(_heatingDaoProvider)
+      .watch(heatingDaoProvider)
       .watchDistributorById(id)
       .map(_distributorFromRow);
 });

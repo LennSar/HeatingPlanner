@@ -39,6 +39,9 @@ import 'tools/wall_draw_tool.dart';
 import 'tools/window_place_tool.dart';
 import 'tools/wall_zone_place_tool.dart';
 import 'tools/zone_draw_tool.dart';
+import '../../calculation/engines/geometry_engine.dart';
+import '../../calculation/providers/heat_demand_providers.dart';
+import '../../calculation/providers/heat_output_providers.dart';
 
 /// Provider that signals tools to cancel (incremented on
 /// Escape). Tools check this to know when cancel is pressed.
@@ -564,6 +567,41 @@ class _FloorPlanCanvasState
     final onSurface =
         Theme.of(context).colorScheme.onSurface;
 
+    // Compute ADR-004 zone display states from calculation providers.
+    final zoneStates = <String, ZoneColorState>{};
+    for (final zone in editorState.zones) {
+      if (zone.circuitId == null) {
+        zoneStates[zone.id] = ZoneColorState.unconnected;
+        continue;
+      }
+      final specificOutput =
+          ref.watch(zoneHeatOutputProvider(zone.id));
+      if (specificOutput.isNaN) {
+        zoneStates[zone.id] = ZoneColorState.unconnected;
+        continue;
+      }
+      final areaM2 = zone.polygon.length >= 3
+          ? GeometryEngine.polygonAreaM2(zone.polygon)
+          : 0.0;
+      if (areaM2 <= 0) {
+        zoneStates[zone.id] = ZoneColorState.unconnected;
+        continue;
+      }
+      final totalOutputW = specificOutput * areaM2;
+      final demandW =
+          ref.watch(roomHeatDemandProvider(zone.roomId));
+      if (demandW.isNaN || demandW <= 0) {
+        zoneStates[zone.id] = ZoneColorState.noDemand;
+        continue;
+      }
+      final ratio = totalOutputW / demandW;
+      zoneStates[zone.id] = ratio >= 1.0
+          ? ZoneColorState.sufficient
+          : ratio >= 0.9
+              ? ZoneColorState.marginal
+              : ZoneColorState.insufficient;
+    }
+
     // Watch selected tool to react to tool switches.
     ref.watch(selectedToolProvider);
 
@@ -808,6 +846,7 @@ class _FloorPlanCanvasState
                       windows: editorState.windows,
                       doors: editorState.doors,
                       zones: editorState.zones,
+                      zoneStates: zoneStates,
                       circuits: editorState.circuits,
                       distributor: editorState.distributor,
                       interactionData: _interactionData,
@@ -879,6 +918,7 @@ class _CanvasCompositePainter extends CustomPainter {
     required this.windows,
     required this.doors,
     required this.zones,
+    required this.zoneStates,
     required this.circuits,
     this.distributor,
     this.hoverWorldPoint,
@@ -895,6 +935,7 @@ class _CanvasCompositePainter extends CustomPainter {
   final List<WindowElement> windows;
   final List<Door> doors;
   final List<HeatingZone> zones;
+  final Map<String, ZoneColorState> zoneStates;
   final List<HeatingCircuit> circuits;
   final Distributor? distributor;
   final InteractionData? interactionData;
@@ -916,8 +957,10 @@ class _CanvasCompositePainter extends CustomPainter {
       zoneGreen: colors.zoneGreen,
       zoneYellow: colors.zoneYellow,
       zoneRed: colors.zoneRed,
+      zoneGrey: colors.zoneGrey,
       supplyPipe: colors.supplyPipe,
       zones: zones,
+      zoneStates: zoneStates,
     ).paint(canvas, size);
 
     // Layer 3: Walls

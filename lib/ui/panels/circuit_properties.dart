@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/engines/geometry_engine.dart';
+import '../../calculation/providers/flow_rate_providers.dart';
+import '../../calculation/providers/heat_output_providers.dart';
+import '../../calculation/providers/pressure_loss_providers.dart';
 import '../../calculation/providers/tube_length_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/enums.dart';
@@ -53,6 +56,23 @@ class CircuitProperties extends ConsumerWidget {
         : double.nan;
     final totalM =
         zoneM.isNaN ? double.nan : supplyM + returnM + zoneM;
+
+    final flowRateKgH = ref.watch(flowRateProvider(circuitId));
+    final pressureLossPa =
+        ref.watch(pressureLossProvider(circuitId)).asData?.value ??
+            double.nan;
+    final zoneId = zone?.id;
+    final specificOutputWPerM2 = zoneId != null
+        ? ref.watch(zoneHeatOutputProvider(zoneId))
+        : double.nan;
+    final heatOutputAreaM2 =
+        (zone != null && zone.polygon.length >= 3)
+            ? GeometryEngine.polygonAreaM2(zone.polygon)
+            : double.nan;
+    final heatOutputW =
+        !specificOutputWPerM2.isNaN && !heatOutputAreaM2.isNaN
+            ? specificOutputWPerM2 * heatOutputAreaM2
+            : double.nan;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(Spacing.md),
@@ -120,20 +140,26 @@ class CircuitProperties extends ConsumerWidget {
           const SizedBox(height: Spacing.xs),
           _infoRow(
             'Flow rate',
-            circuit.flowRateKgH > 0
-                ? '${circuit.flowRateKgH.toStringAsFixed(1)} kg/h'
+            !flowRateKgH.isNaN && flowRateKgH > 0
+                ? '${flowRateKgH.toStringAsFixed(1)} kg/h'
                 : '\u2014',
             textTheme,
           ),
           _infoRow('Flow velocity', '\u2014', textTheme),
           _infoRow(
             'Pressure loss',
-            circuit.pressureLossPa > 0
-                ? '${circuit.pressureLossPa.round()} Pa'
+            !pressureLossPa.isNaN && pressureLossPa > 0
+                ? '${pressureLossPa.round()} Pa'
                 : '\u2014',
             textTheme,
           ),
-          _infoRow('Heat output', '\u2014', textTheme),
+          _infoRow(
+            'Heat output',
+            !heatOutputW.isNaN && heatOutputW > 0
+                ? '${heatOutputW.round()} W'
+                : '\u2014',
+            textTheme,
+          ),
         ],
       ),
     );

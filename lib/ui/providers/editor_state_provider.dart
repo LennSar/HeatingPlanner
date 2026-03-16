@@ -1,7 +1,10 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/engines/geometry_engine.dart';
+import '../../repositories/heating_repository.dart';
 import '../../core/utils/id_generator.dart';
 import '../../data/models/distributor.dart';
 import '../../data/models/door.dart';
@@ -286,6 +289,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
     state = state.copyWith(
       zones: [...state.zones, zone],
     );
+    final dao = ref.read(heatingDaoProvider);
+    unawaited(upsertHeatingZone(dao, zone));
   }
 
   /// Replace a heating zone with the same ID.
@@ -295,6 +300,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
           .map((z) => z.id == zone.id ? zone : z)
           .toList(),
     );
+    final dao = ref.read(heatingDaoProvider);
+    unawaited(upsertHeatingZone(dao, zone));
   }
 
   /// Updates wall heating zones whose [HeatingZone.heightMm] equals
@@ -309,15 +316,23 @@ class EditorStateNotifier extends Notifier<EditorState> {
     int newHeightMm,
   ) {
     if (oldHeightMm == newHeightMm) return;
-    state = state.copyWith(
-      zones: state.zones.map((z) {
-        if (z.zoneType == ZoneType.wallHeating &&
-            z.heightMm == oldHeightMm) {
-          return z.copyWith(heightMm: newHeightMm);
-        }
-        return z;
-      }).toList(),
-    );
+    final changed = <HeatingZone>[];
+    final updatedZones = state.zones.map((z) {
+      if (z.zoneType == ZoneType.wallHeating &&
+          z.heightMm == oldHeightMm) {
+        final updated = z.copyWith(heightMm: newHeightMm);
+        changed.add(updated);
+        return updated;
+      }
+      return z;
+    }).toList();
+    state = state.copyWith(zones: updatedZones);
+    if (changed.isNotEmpty) {
+      final dao = ref.read(heatingDaoProvider);
+      for (final z in changed) {
+        unawaited(upsertHeatingZone(dao, z));
+      }
+    }
   }
 
   /// Remove a heating zone by ID.
@@ -327,6 +342,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
           .where((z) => z.id != zoneId)
           .toList(),
     );
+    final dao = ref.read(heatingDaoProvider);
+    unawaited(deleteHeatingZone(dao, zoneId));
   }
 
   // ---- Circuits ----
@@ -336,6 +353,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
     state = state.copyWith(
       circuits: [...state.circuits, circuit],
     );
+    final dao = ref.read(heatingDaoProvider);
+    unawaited(upsertHeatingCircuit(dao, circuit));
   }
 
   /// Replace a heating circuit with the same ID.
@@ -345,6 +364,8 @@ class EditorStateNotifier extends Notifier<EditorState> {
           .map((c) => c.id == circuit.id ? circuit : c)
           .toList(),
     );
+    final dao = ref.read(heatingDaoProvider);
+    unawaited(upsertHeatingCircuit(dao, circuit));
   }
 
   // ---- Distributor ----
@@ -352,16 +373,25 @@ class EditorStateNotifier extends Notifier<EditorState> {
   /// Set (or replace) the floor's distributor.
   void setDistributor(Distributor d) {
     state = state.copyWith(distributor: d);
+    final dao = ref.read(heatingDaoProvider);
+    unawaited(upsertDistributor(dao, d));
   }
 
   /// Replace the existing distributor with an updated copy.
   void updateDistributor(Distributor d) {
     state = state.copyWith(distributor: d);
+    final dao = ref.read(heatingDaoProvider);
+    unawaited(upsertDistributor(dao, d));
   }
 
   /// Remove the distributor.
   void clearDistributor() {
+    final id = state.distributor?.id;
     state = state.copyWith(clearDistributor: true);
+    if (id != null) {
+      final dao = ref.read(heatingDaoProvider);
+      unawaited(deleteDistributor(dao, id));
+    }
   }
 
   // ---- Constructions ----
