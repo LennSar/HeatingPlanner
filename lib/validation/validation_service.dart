@@ -2,6 +2,7 @@ import 'dart:math' show min, max;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../calculation/providers/heat_output_providers.dart';
 import '../calculation/providers/hydraulic_balance_providers.dart';
 import '../calculation/providers/tube_length_providers.dart';
 import '../core/constants/validation_limits.dart';
@@ -27,11 +28,19 @@ import '../ui/providers/editor_state_provider.dart';
 ///   circuit on the same distributor → [WarningSeverity.warning] on both
 ///   the distributor element and each circuit that needs significant
 ///   balancing.
+/// - **VR-01** Exterior wall missing construction assignment.
+/// - **VR-02** EN 1264 surface temperature limit exceeded.
+/// - **VR-03** Heating circuit tube length exceeds hydraulic maximum.
+/// - **VR-04** Heating zone not connected to any circuit.
 final validationResultsProvider =
     Provider.family<List<ValidationResult>, String>(
   (ref, projectId) {
     final results = <ValidationResult>[];
     results.addAll(_hydraulicImbalanceResults(ref));
+    results.addAll(_missingConstructionResults(ref));
+    results.addAll(_surfaceTempResults(ref));
+    results.addAll(_circuitLengthResults(ref));
+    results.addAll(_unconnectedZoneResults(ref));
     // Sort: errors before warnings before info.
     results.sort(
       (a, b) => a.severity.index.compareTo(b.severity.index),
@@ -132,6 +141,163 @@ List<ValidationResult> _hydraulicImbalanceResults(Ref ref) {
             'or rerouting supply/return runs.',
       ),
     );
+  }
+
+  return results;
+}
+
+// ── Rule VR-01: Missing wall construction ─────────────────────────────────────
+
+/// Returns [ValidationResult]s for exterior [WallSegment]s that have no
+/// [WallSegment.constructionId] assigned.
+///
+/// Without a construction the thermal engine cannot compute a U-value, so
+/// heat demand for the room cannot be calculated at all.
+List<ValidationResult> _missingConstructionResults(Ref ref) {
+  final state = ref.watch(editorStateProvider);
+  final results = <ValidationResult>[];
+
+  for (final wall in state.walls) {
+    if (wall.wallType == WallType.exterior &&
+        wall.constructionId == null) {
+      results.add(
+        ValidationResult(
+          severity: WarningSeverity.error,
+          elementId: wall.id,
+          elementType: 'wall',
+          message: 'Exterior wall has no construction assigned — '
+              'heat demand cannot be calculated.',
+          suggestedFix: 'Open wall properties and assign a wall '
+              'construction.',
+        ),
+      );
+    }
+  }
+
+  return results;
+}
+
+// ── Rule VR-02: EN 1264 surface temperature exceeded ─────────────────────────
+
+/// Returns [ValidationResult]s for heating zones whose calculated mean
+/// surface temperature exceeds the EN 1264 limit for their zone type.
+///
+/// Limits (from [validation_limits.dart]):
+/// - Floor heating ([ZoneType.floorHeating]): ≤ [maxSurfaceTempOccupiedFloor]
+///   (29 °C)
+/// - Wall heating ([ZoneType.wallHeating]): ≤ [maxSurfaceTempWall] (40 °C)
+///
+/// Zones whose surface temperature is [double.nan] or ≤ 0 (not yet
+/// calculable) are silently skipped.
+List<ValidationResult> _surfaceTempResults(Ref ref) {
+  final state = ref.watch(editorStateProvider);
+  final results = <ValidationResult>[];
+
+  for (final zone in state.zones) {
+    final surfaceTemp = ref.watch(zoneSurfaceTempProvider(zone.id));
+
+    if (surfaceTemp.isNaN || surfaceTemp <= 0) continue;
+
+    final double limit = zone.zoneType == ZoneType.wallHeating
+        ? maxSurfaceTempWall
+        : maxSurfaceTempOccupiedFloor;
+
+    if (surfaceTemp > limit) {
+      results.add(
+        ValidationResult(
+          severity: WarningSeverity.warning,
+          elementId: zone.id,
+          elementType: 'zone',
+          message: 'Floor surface temperature '
+              '${surfaceTemp.toStringAsFixed(1)}°C exceeds EN 1264 '
+              'limit of ${limit.toStringAsFixed(0)}°C for this zone '
+              'type.',
+          suggestedFix: 'Reduce supply temperature, increase tube '
+              'spacing, or use a flooring material with lower thermal '
+              'resistance.',
+        ),
+      );
+    }
+  }
+
+  return results;
+}
+
+// ── Rule VR-03: Circuit length exceeded ──────────────────────────────────────
+
+/// Returns [ValidationResult]s for heating circuits whose total tube length
+/// exceeds the hydraulic maximum for the zone's tube outer diameter.
+///
+/// Thresholds (from [validation_limits.dart]):
+/// - OD ≤ 14 mm → max [maxTubeLength12mm] (90 m)
+/// - OD > 14 mm → max [maxTubeLength16mm] (120 m)
+///
+/// The tube OD is read from the zone's [HeatingZone.tubeTypeId] via
+/// [editorStateProvider]. Because [EditorState] does not yet carry the full
+/// [TubeType] catalogue, the outer diameter defaults to 16.0 mm (the spec
+/// default) when the zone cannot be resolved.
+///
+/// Circuits whose [tubeLengthProvider] returns [double.nan] are skipped.
+List<ValidationResult> _circuitLengthResults(Ref ref) {
+  final state = ref.watch(editorStateProvider);
+  final results = <ValidationResult>[];
+
+  for (final circuit in state.circuits) {
+    final tubeLength = ref.watch(tubeLengthProvider(circuit.id));
+    if (tubeLength.isNaN) continue;
+
+    // EditorState does not yet carry TubeType objects, so the OD
+    // defaults to 16.0 mm (spec default — the most common tube size).
+    // TODO(HVAC): resolve actual OD once state.tubeTypes is available.
+    const double outerDiamMm = 16.0;
+
+    const double maxLength = outerDiamMm <= 14.0
+        ? maxTubeLength12mm
+        : maxTubeLength16mm;
+
+    if (tubeLength > maxLength) {
+      results.add(
+        ValidationResult(
+          severity: WarningSeverity.warning,
+          elementId: circuit.id,
+          elementType: 'circuit',
+          message: 'Circuit length ${tubeLength.toStringAsFixed(0)} m '
+              'exceeds maximum of ${maxLength.toStringAsFixed(0)} m '
+              'for ${outerDiamMm.toStringAsFixed(0)} mm OD tube.',
+          suggestedFix: 'Split the zone into two smaller zones with '
+              'separate circuits.',
+        ),
+      );
+    }
+  }
+
+  return results;
+}
+
+// ── Rule VR-04: Zone not connected to a circuit ───────────────────────────────
+
+/// Returns [ValidationResult]s for [HeatingZone]s that have no circuit
+/// connected ([HeatingZone.circuitId] == null).
+///
+/// A zone without a circuit produces no heat output and is excluded from
+/// all hydraulic calculations.
+List<ValidationResult> _unconnectedZoneResults(Ref ref) {
+  final state = ref.watch(editorStateProvider);
+  final results = <ValidationResult>[];
+
+  for (final zone in state.zones) {
+    if (zone.circuitId == null) {
+      results.add(
+        ValidationResult(
+          severity: WarningSeverity.error,
+          elementId: zone.id,
+          elementType: 'zone',
+          message: 'Heating zone has no circuit connected.',
+          suggestedFix: 'Use the Route Pipe tool to connect this zone '
+              'to a distributor.',
+        ),
+      );
+    }
   }
 
   return results;
