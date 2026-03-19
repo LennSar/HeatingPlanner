@@ -9,6 +9,7 @@ import '../canvas/floor_plan_canvas.dart';
 import '../dialogs/project_settings_dialog.dart';
 import '../panels/properties_panel.dart';
 import '../providers/editor_state_provider.dart';
+import '../../validation/validation_service.dart';
 
 /// Notifier for the active drawing tool.
 class SelectedToolNotifier extends Notifier<DrawingTool> {
@@ -358,6 +359,9 @@ class _StatusBar extends ConsumerWidget {
     final editorState = ref.watch(editorStateProvider);
     final roomCount = editorState.rooms.length;
     final toolHint = ref.watch(toolStatusHintProvider);
+    final warningCount = ref
+        .watch(validationResultsProvider(''))
+        .length;
     final textTheme = Theme.of(context).textTheme;
     final colors = Theme.of(context)
         .extension<HeatingPlannerColors>()!;
@@ -419,10 +423,15 @@ class _StatusBar extends ConsumerWidget {
             Icon(
               Icons.warning_amber_rounded,
               size: 14,
-              color: colors.zoneYellow,
+              color: warningCount > 0
+                  ? colors.zoneYellow
+                  : Theme.of(context).colorScheme.onSurfaceVariant,
             ),
             const SizedBox(width: Spacing.xs),
-            Text('0 warnings', style: textTheme.bodySmall),
+            Text(
+              '$warningCount warning${warningCount == 1 ? '' : 's'}',
+              style: textTheme.bodySmall,
+            ),
             const SizedBox(width: Spacing.md),
 
             // Room count

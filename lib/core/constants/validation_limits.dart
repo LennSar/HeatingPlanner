@@ -74,6 +74,21 @@ const double maxTubeLength16mm = 120.0;
 /// Maximum circuit length for outer diameter ≤ 14 mm [m]
 const double maxTubeLength12mm = 90.0;
 
+/// Maximum permitted ratio of longest to shortest circuit tube length on the
+/// same distributor before a hydraulic-imbalance warning is raised.
+///
+/// If longest / shortest > 1.3 (i.e. more than 30% length difference) the
+/// pressure-loss difference is large enough that passive flow distribution
+/// will be noticeably unequal.  The installer must either
+/// shorten/lengthen circuits to bring them within ratio or fit balancing
+/// (Strangregulier-) valves on the short circuits.
+const double maxCircuitLengthImbalanceRatio = 1.3;
+
+/// Minimum required valve Δp (Pa) for a circuit to be included in the
+/// per-circuit imbalance warning.  Below this threshold the throttling
+/// required is small enough to be negligible.
+const double significantValveSettingPa = 2000.0;
+
 // ── Air change ───────────────────────────────────────────────────────────────
 const double minAirChangeRate = 0.1;
 const double maxAirChangeRate = 5.0;
