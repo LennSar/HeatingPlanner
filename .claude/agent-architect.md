@@ -296,6 +296,15 @@ enum DrawingTool {
   select, drawWall, placeWindow, placeDoor,
   drawZone, placeDistributor, routePipe, measure
 }
+
+/// Describes what is on the other side of a room's floor or ceiling slab.
+/// Determines the correction factor applied to U × A × ΔT transmission loss.
+enum BoundaryCondition {
+  exterior,      // Direct outdoor air contact (e.g. flat roof, exposed soffit)
+  ground,        // In contact with ground — uses simplified 0.6 factor (ISO 13370)
+  unheatedSpace, // Adjacent unheated space (attic, garage, crawlspace, cellar)
+  interior,      // Adjacent heated room at the same target temperature — no loss
+}
 ```
 
 ### 5.2 Point2D
@@ -345,6 +354,19 @@ Each model below is defined in its own file under `lib/data/models/`. I am listi
 | targetTempC | double | 15.0-30.0 | 20.0 |
 | airChangeRate | double | 0.1-5.0 (1/h) | 0.5 |
 | polygon | List\<Point2D\> | ≥ 3 vertices, closed | required |
+| floorConstructionId | String? | FK → WallConstruction (reused) | null |
+| ceilingConstructionId | String? | FK → WallConstruction (reused) | null |
+| floorBoundary | BoundaryCondition | enum | `ground` |
+| ceilingBoundary | BoundaryCondition | enum | `exterior` |
+| floorUnheatedCorrectionFactor | double? | 0.0–1.0, only when floorBoundary = unheatedSpace | null (defaults to 0.6 in engine) |
+| ceilingUnheatedCorrectionFactor | double? | 0.0–1.0, only when ceilingBoundary = unheatedSpace | null (defaults to 0.8 in engine) |
+
+**Floor/ceiling construction note:** `floorConstructionId` and
+`ceilingConstructionId` reference the existing `WallConstruction` table.
+No new model is needed — constructions are layer assemblies regardless of
+whether they represent a wall, floor slab, or roof build-up.
+The DB schema change is a migration adding 6 new nullable columns to `rooms`
+(schema version 7).
 
 **WallSegment**
 | Field | Type | Constraint | Default |
@@ -532,7 +554,7 @@ Use `@riverpod` annotation with code generation. Every provider is defined in th
 When data changes, providers automatically re-evaluate because they depend on upstream streams. However, ensure:
 
 - `uValueProvider(constructionId)` depends on `layersProvider(constructionId)`.
-- `roomHeatDemandProvider(roomId)` depends on: `roomProvider(roomId)`, `wallSegmentsProvider(roomId)`, every `uValueProvider` for each wall's construction, `windowsProvider` / `doorsProvider`, project's `designOutdoorTempC`.
+- `roomHeatDemandProvider(roomId)` depends on: `roomProvider(roomId)`, `wallSegmentsProvider(roomId)`, every `uValueProvider` for each wall's construction, `windowsProvider` / `doorsProvider`, project's `designOutdoorTempC`, `uValueProvider(room.floorConstructionId)` (when set), `uValueProvider(room.ceilingConstructionId)` (when set). Floor and ceiling losses use `ThermalEngine.boundaryCorrectionFactor()` with the room's `floorBoundary` / `ceilingBoundary` fields.
 - `zoneHeatOutputProvider(zoneId)` depends on: zone params, `TubeType`, `FlooringMaterial`, distributor supply/return temps.
 - `pressureLossProvider(circuitId)` depends on: `tubeLengthProvider(circuitId)`, `flowRateProvider(circuitId)`, tube inner diameter, roughness.
 - `hydraulicBalanceProvider(distributorId)` depends on: every `pressureLossProvider` for each circuit of that distributor.

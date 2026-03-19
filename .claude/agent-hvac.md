@@ -191,6 +191,22 @@ class ThermalEngine {
     required double tOutdoorC,
   });
 
+  /// Temperature correction factor for floor or ceiling boundary conditions.
+  ///
+  /// | BoundaryCondition | Formula / Value |
+  /// |-------------------|----------------|
+  /// | exterior          | 1.0 (direct outdoor contact) |
+  /// | ground            | [groundCorrectionFactorDefault] = 0.6 (simplified ISO 13370) |
+  /// | unheatedSpace     | user-supplied [unheatedCorrectionFactor] ∈ [0.0, 1.0] |
+  /// | interior          | 0.0 (same temperature on both sides — no loss) |
+  ///
+  /// Returns [double.nan] if [condition] is unheatedSpace and
+  /// [unheatedCorrectionFactor] is null.
+  static double boundaryCorrectionFactor({
+    required BoundaryCondition condition,
+    double? unheatedCorrectionFactor,
+  });
+
   /// Ventilation heat loss (W)
   /// Q_V = V × n × ρ_air × c_air × (T_i - T_e) / 3600
   static double ventilationLoss({
@@ -214,6 +230,51 @@ class ThermalEngine {
 - `uValue`: Validate that all λ values are > 0, all thicknesses are > 0, and arrays are non-empty and equal-length. Return `double.nan` on violation.
 - `transmissionLoss`: If `correctionF` is 0, return 0.0 (no loss between same-temp rooms).
 - `ventilationLoss`: The `/3600` converts from J/h to W (watts = J/s).
+
+### 5.1a Floor and Ceiling Heat Loss
+
+Floor and ceiling heat loss uses the same `transmissionLoss()` formula as walls.
+The U-value is calculated with `uValue()` using the construction's material layers.
+The key differences are the surface resistances and correction factors.
+
+**Surface resistances (EN ISO 6946 Table 1) — heat flow direction:**
+
+| Element | Heat flow direction | R_si (m²K/W) | R_se (m²K/W) |
+|---------|--------------------|--------------|----|
+| Floor (loss downward into ground/space below) | Downward | 0.17 | 0.04 |
+| Ceiling / roof (loss upward into space above) | Upward | 0.10 | 0.04 |
+
+For ground contact (`BoundaryCondition.ground`), R_se is still 0.04 but the
+correction factor (0.6) absorbs the simplified ISO 13370 ground correction.
+Flag to the user that ISO 13370 gives a more accurate ground U-value for slabs
+on grade, especially for large floor areas.
+
+**Boundary correction factors:**
+
+| BoundaryCondition | Correction factor f | Notes |
+|-------------------|---------------------|-------|
+| `exterior` | 1.0 | Roof directly exposed to outdoor air |
+| `ground` | `groundCorrectionFactorDefault` = 0.6 | Simplified EN 12831 / ISO 13370 approach |
+| `unheatedSpace` | user-adjustable 0.0–1.0 | Preset defaults: attic 0.8, garage/basement 0.6, crawlspace 0.5 |
+| `interior` | 0.0 | Adjacent room at same temperature — no heat loss |
+
+**Heat loss formula** (identical to wall transmission loss):
+```
+Q_floor   = U_floor   × A_room × f_floor   × (T_indoor − T_outdoor)
+Q_ceiling = U_ceiling × A_room × f_ceiling × (T_indoor − T_outdoor)
+```
+where A_room is the polygon area of the room (m²). Floors and ceilings have no
+openings to subtract.
+
+**Unheated space correction factor presets** (add to `thermal_defaults.dart`):
+```dart
+const double unheatedAtticCorrectionFactor     = 0.8; // well-ventilated loft
+const double unheatedBasementCorrectionFactor  = 0.6; // semi-conditioned cellar
+const double unheatedGarageCorrectionFactor    = 0.6; // attached unheated garage
+const double unheatedCrawlspaceCorrectionFactor = 0.5; // vented crawlspace
+```
+These are EN 12831-1 Annex B temperature-ratio (b_u) approximations. The user
+may override with a custom value.
 
 ### 5.2 Heating Output Engine
 
@@ -433,6 +494,16 @@ class HydraulicEngine {
 **Maximum circuit length warnings:**
 - Outer diameter ≤ 14 mm → max 90 m
 - Outer diameter > 14 mm → max 120 m
+
+**Hydraulic imbalance warning (rule HB-01):**
+- Threshold constant: `maxCircuitLengthImbalanceRatio = 1.3` (in `validation_limits.dart`)
+- Trigger: longest circuit total tube length / shortest circuit total tube length > 1.3 within the same distributor
+- Severity: `WarningSeverity.warning`
+- One distributor-level warning (overview) + one per-circuit warning for each circuit whose required valve Δp ≥ `significantValveSettingPa` (2000 Pa)
+- Suggested fix text must include **both** remediation options:
+  1. Install a balancing valve at the computed Δp (kPa) on the short circuit
+  2. Lengthen the circuit to approximately match the longest circuit
+- Rationale: in a parallel manifold, hydraulic resistance is roughly proportional to circuit length for equal-diameter tubes. A 1.5× length ratio produces a significant flow imbalance without passive correction.
 
 ### 5.4 Geometry Engine
 

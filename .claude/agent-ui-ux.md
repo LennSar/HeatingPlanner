@@ -529,14 +529,81 @@ The properties panel content changes based on what is selected. Here are the con
 | Room name | Text input | Yes | 1-100 chars |
 | Target temperature | Slider + numeric (°C) | Yes | 15.0 – 30.0 |
 | Air change rate | Dropdown + custom | Yes | 0.1 – 5.0 |
-| **Computed (read-only)** |
+| **Computed (read-only)** | | | |
 | Floor area | Display (m²) | No | — |
 | Room volume | Display (m³) | No | — |
-| Transmission loss | Display (W) | No | — |
+| Transmission loss — walls | Display (W) | No | — |
+| Transmission loss — floor | Display (W) | No | "—" if no floor construction assigned |
+| Transmission loss — ceiling | Display (W) | No | "—" if no ceiling construction assigned |
 | Ventilation loss | Display (W) | No | — |
-| Total heat demand | Display (W), bold | No | — |
+| Total heat demand | Display (W), bold | No | "—" if any exterior wall or assigned slab lacks a construction |
 | Heat output | Display (W) | No | Only if zone exists |
 | Balance | Display (W), colour-coded | No | Green if output ≥ demand |
+
+#### 7.2.1 Floor and Ceiling Envelope Section
+
+Below the heat demand numbers, show a collapsible section labelled **"Envelope
+— Floor & Ceiling"** (collapsed by default, expands on tap).
+
+**Floor subsection:**
+
+```
+Floor
+  What's below?  [ Ground ▾ ]          ← boundary condition dropdown
+  Construction   [ Not assigned  Edit ] ← button opens WallConstruction editor
+  Correction f.  0.60                   ← read-only for Ground/Exterior;
+                                           slider 0.0–1.0 for Unheated Space
+```
+
+**Ceiling subsection (identical layout):**
+
+```
+Ceiling
+  What's above?  [ Exterior roof ▾ ]
+  Construction   [ Not assigned  Edit ]
+  Correction f.  1.00                   ← read-only 1.0 for Exterior
+```
+
+**Boundary condition dropdown options:**
+
+| Display label | `BoundaryCondition` value | Correction factor shown |
+|---------------|--------------------------|------------------------|
+| Ground (slab on grade) | `ground` | 0.60 (read-only, with ⓘ tooltip explaining ISO 13370 simplification) |
+| Exterior / Roof | `exterior` | 1.00 (read-only) |
+| Unheated attic | `unheatedSpace` | Slider 0.0–1.0, pre-filled 0.80 |
+| Unheated basement / garage | `unheatedSpace` | Slider 0.0–1.0, pre-filled 0.60 |
+| Unheated crawlspace | `unheatedSpace` | Slider 0.0–1.0, pre-filled 0.50 |
+| Adjacent heated room (same temp) | `interior` | 0.00 (read-only, "No heat loss") |
+
+> **Note on preset vs custom:** "Unheated attic", "Unheated basement / garage",
+> and "Unheated crawlspace" all map to `BoundaryCondition.unheatedSpace` — they
+> differ only in the pre-filled correction factor value. After selecting a
+> preset, the user can drag the slider to override. This avoids exposing
+> `BoundaryCondition` as an enum to the user while still giving full control.
+
+**Construction button behaviour:**
+- If no construction assigned: button label "Not assigned  [+ Assign]"
+- If assigned: button label shows construction name + computed U-value,
+  e.g. "Flat roof 200mm EPS — U 0.18 W/(m²K)  [Edit]"
+- Tapping opens the same `WallConstruction` editor modal used for walls
+  (Section 5.7), pre-titled "Floor construction" or "Roof/ceiling construction"
+
+**When construction is not assigned:**
+- Floor/ceiling transmission loss rows in the heat demand breakdown show "—"
+- Total heat demand shows "—" and a diagnostic tooltip:
+  "Floor or ceiling construction missing — assign a construction to include
+  slab heat loss in the demand calculation. If the floor/ceiling has
+  negligible heat loss (e.g. well-insulated party wall to identical heated
+  room), set boundary to 'Adjacent heated room'."
+- Zone colour is NOT affected by missing floor/ceiling construction — only
+  missing wall constructions trigger the grey NaN state (because wall U-values
+  dominate; floor/ceiling are optional refinements)
+
+**Spacing and layout:**
+- The envelope section uses `md` (16px) padding
+- Boundary dropdown: full width
+- Construction button: full width, left-aligned label, right-aligned action
+- Correction factor row: label left, value or slider right (slider width 120px)
 
 ### 7.3 Wall Segment Selected
 
