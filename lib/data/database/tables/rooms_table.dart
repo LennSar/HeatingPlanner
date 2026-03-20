@@ -15,6 +15,28 @@ class Rooms extends Table {
   /// JSON array of {x, y} objects representing the room polygon in mm.
   TextColumn get polygonJson => text().withDefault(const Constant('[]'))();
 
+  /// UUID of the floor construction; null = not assigned.
+  TextColumn get floorConstructionId => text().nullable()();
+
+  /// UUID of the ceiling construction; null = not assigned.
+  TextColumn get ceilingConstructionId => text().nullable()();
+
+  /// Boundary condition below the floor slab (stored as enum name).
+  TextColumn get floorBoundary =>
+      text().withDefault(const Constant('ground'))();
+
+  /// Boundary condition above the ceiling slab (stored as enum name).
+  TextColumn get ceilingBoundary =>
+      text().withDefault(const Constant('exterior'))();
+
+  /// User-supplied correction factor for unheated floor boundary
+  /// (0.0–1.0).
+  RealColumn get floorUnheatedCorrectionFactor => real().nullable()();
+
+  /// User-supplied correction factor for unheated ceiling boundary
+  /// (0.0–1.0).
+  RealColumn get ceilingUnheatedCorrectionFactor => real().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

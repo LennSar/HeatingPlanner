@@ -173,6 +173,16 @@ Room _roomFromRow($db.Room row) {
     targetTempC: row.targetTempC,
     airChangeRate: row.airChangeRate,
     polygon: _decodePointList(row.polygonJson),
+    floorConstructionId: row.floorConstructionId,
+    ceilingConstructionId: row.ceilingConstructionId,
+    floorBoundary:
+        BoundaryCondition.values.byName(row.floorBoundary),
+    ceilingBoundary:
+        BoundaryCondition.values.byName(row.ceilingBoundary),
+    floorUnheatedCorrectionFactor:
+        row.floorUnheatedCorrectionFactor,
+    ceilingUnheatedCorrectionFactor:
+        row.ceilingUnheatedCorrectionFactor,
   );
 }
 
@@ -233,6 +243,14 @@ $db.RoomsCompanion _roomToCompanion(Room room) {
     targetTempC: Value(room.targetTempC),
     airChangeRate: Value(room.airChangeRate),
     polygonJson: Value(_encodePointList(room.polygon)),
+    floorConstructionId: Value(room.floorConstructionId),
+    ceilingConstructionId: Value(room.ceilingConstructionId),
+    floorBoundary: Value(room.floorBoundary.name),
+    ceilingBoundary: Value(room.ceilingBoundary.name),
+    floorUnheatedCorrectionFactor:
+        Value(room.floorUnheatedCorrectionFactor),
+    ceilingUnheatedCorrectionFactor:
+        Value(room.ceilingUnheatedCorrectionFactor),
   );
 }
 

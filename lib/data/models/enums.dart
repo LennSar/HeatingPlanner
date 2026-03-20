@@ -79,3 +79,24 @@ enum DrawingTool {
   routePipe,
   measure,
 }
+
+/// Boundary condition for a room's floor or ceiling slab.
+///
+/// Determines the correction factor applied in the floor/ceiling
+/// heat loss calculation (EN 12831 / ISO 13370).
+enum BoundaryCondition {
+  /// Direct outdoor air contact (e.g. flat roof, exposed soffit).
+  /// Correction factor: 1.0.
+  exterior,
+
+  /// In contact with ground — simplified 0.6 factor (ISO 13370).
+  ground,
+
+  /// Adjacent unheated space (attic, garage, crawlspace, cellar).
+  /// Correction factor supplied by the user.
+  unheatedSpace,
+
+  /// Adjacent heated room at the same target temperature.
+  /// Correction factor: 0.0 (no heat loss).
+  interior,
+}

@@ -17,6 +17,21 @@ _Room _$RoomFromJson(Map<String, dynamic> json) => _Room(
           ?.map((e) => Point2D.fromJson(e as Map<String, dynamic>))
           .toList() ??
       const [],
+  floorConstructionId: json['floorConstructionId'] as String?,
+  ceilingConstructionId: json['ceilingConstructionId'] as String?,
+  floorBoundary:
+      $enumDecodeNullable(_$BoundaryConditionEnumMap, json['floorBoundary']) ??
+      BoundaryCondition.ground,
+  ceilingBoundary:
+      $enumDecodeNullable(
+        _$BoundaryConditionEnumMap,
+        json['ceilingBoundary'],
+      ) ??
+      BoundaryCondition.exterior,
+  floorUnheatedCorrectionFactor: (json['floorUnheatedCorrectionFactor'] as num?)
+      ?.toDouble(),
+  ceilingUnheatedCorrectionFactor:
+      (json['ceilingUnheatedCorrectionFactor'] as num?)?.toDouble(),
 );
 
 Map<String, dynamic> _$RoomToJson(_Room instance) => <String, dynamic>{
@@ -26,4 +41,17 @@ Map<String, dynamic> _$RoomToJson(_Room instance) => <String, dynamic>{
   'targetTempC': instance.targetTempC,
   'airChangeRate': instance.airChangeRate,
   'polygon': instance.polygon,
+  'floorConstructionId': instance.floorConstructionId,
+  'ceilingConstructionId': instance.ceilingConstructionId,
+  'floorBoundary': _$BoundaryConditionEnumMap[instance.floorBoundary]!,
+  'ceilingBoundary': _$BoundaryConditionEnumMap[instance.ceilingBoundary]!,
+  'floorUnheatedCorrectionFactor': instance.floorUnheatedCorrectionFactor,
+  'ceilingUnheatedCorrectionFactor': instance.ceilingUnheatedCorrectionFactor,
+};
+
+const _$BoundaryConditionEnumMap = {
+  BoundaryCondition.exterior: 'exterior',
+  BoundaryCondition.ground: 'ground',
+  BoundaryCondition.unheatedSpace: 'unheatedSpace',
+  BoundaryCondition.interior: 'interior',
 };

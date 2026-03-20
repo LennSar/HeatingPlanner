@@ -173,6 +173,61 @@ final roomHeatDemandProvider =
     }
   }
 
+  // Floor heat loss — optional refinement.
+  //
+  // Only included when room.floorConstructionId is set. Missing
+  // floor construction does NOT cause NaN in the total — it simply
+  // means no floor loss is added (per task spec: floor/ceiling are
+  // additive refinements, not required inputs).
+  if (room.floorConstructionId != null &&
+      !floorAreaM2.isNaN &&
+      floorAreaM2 > 0) {
+    final uFloor =
+        ref.watch(uValueProvider(room.floorConstructionId!));
+    if (!uFloor.isNaN) {
+      final fFloor = ThermalEngine.boundaryCorrectionFactor(
+        condition: room.floorBoundary,
+        unheatedCorrectionFactor:
+            room.floorUnheatedCorrectionFactor,
+      );
+      if (!fFloor.isNaN) {
+        final qFloor = ThermalEngine.transmissionLoss(
+          uValue: uFloor,
+          areaM2: floorAreaM2,
+          correctionF: fFloor,
+          tIndoorC: tThis,
+          tOutdoorC: tOutdoor,
+        );
+        if (!qFloor.isNaN) totalW += qFloor;
+      }
+    }
+  }
+
+  // Ceiling heat loss — optional refinement (same pattern as floor).
+  if (room.ceilingConstructionId != null &&
+      !floorAreaM2.isNaN &&
+      floorAreaM2 > 0) {
+    final uCeiling =
+        ref.watch(uValueProvider(room.ceilingConstructionId!));
+    if (!uCeiling.isNaN) {
+      final fCeiling = ThermalEngine.boundaryCorrectionFactor(
+        condition: room.ceilingBoundary,
+        unheatedCorrectionFactor:
+            room.ceilingUnheatedCorrectionFactor,
+      );
+      if (!fCeiling.isNaN) {
+        final qCeiling = ThermalEngine.transmissionLoss(
+          uValue: uCeiling,
+          areaM2: floorAreaM2,
+          correctionF: fCeiling,
+          tIndoorC: tThis,
+          tOutdoorC: tOutdoor,
+        );
+        if (!qCeiling.isNaN) totalW += qCeiling;
+      }
+    }
+  }
+
   return totalW;
 });
 

@@ -32,3 +32,19 @@ const Map<String, double> airChangeRatePresets = {
   'Utility room': 2.0,
   'Server room': 3.0,
 };
+
+// ── Unheated space correction factor presets (EN 12831-1 Annex B) ──────────
+
+/// Correction factor for a well-ventilated unheated attic above
+/// the ceiling.
+const double unheatedAtticCorrectionFactor = 0.8;
+
+/// Correction factor for an unheated basement or garage below
+/// the floor.
+const double unheatedBasementCorrectionFactor = 0.6;
+
+/// Correction factor for an unheated attached garage.
+const double unheatedGarageCorrectionFactor = 0.6;
+
+/// Correction factor for a vented crawlspace below the floor.
+const double unheatedCrawlspaceCorrectionFactor = 0.5;

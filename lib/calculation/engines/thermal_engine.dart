@@ -1,3 +1,6 @@
+import '../../core/constants/thermal_defaults.dart';
+import '../../data/models/enums.dart';
+
 /// Thermal calculation engine — EN ISO 6946 / EN 12831.
 ///
 /// All functions are pure static. Returns [double.nan] for invalid inputs;
@@ -125,6 +128,36 @@ class ThermalEngine {
       gross -= o.widthMm * o.heightMm / 1e6;
     }
     return gross < 0 ? 0.0 : gross;
+  }
+
+  /// Temperature correction factor for floor or ceiling boundary
+  /// conditions.
+  ///
+  /// | [BoundaryCondition] | Factor |
+  /// |---------------------|--------|
+  /// | exterior            | 1.0 (direct outdoor contact) |
+  /// | ground              | [groundCorrectionFactorDefault] = 0.6 |
+  /// | unheatedSpace       | [unheatedCorrectionFactor] (caller-supplied) |
+  /// | interior            | 0.0 (no heat loss) |
+  ///
+  /// Returns [double.nan] if [condition] is
+  /// [BoundaryCondition.unheatedSpace] and [unheatedCorrectionFactor]
+  /// is null.
+  static double boundaryCorrectionFactor({
+    required BoundaryCondition condition,
+    double? unheatedCorrectionFactor,
+  }) {
+    switch (condition) {
+      case BoundaryCondition.exterior:
+        return 1.0;
+      case BoundaryCondition.ground:
+        return groundCorrectionFactorDefault;
+      case BoundaryCondition.interior:
+        return 0.0;
+      case BoundaryCondition.unheatedSpace:
+        if (unheatedCorrectionFactor == null) return double.nan;
+        return unheatedCorrectionFactor;
+    }
   }
 
   /// Temperature correction factor for interior walls.

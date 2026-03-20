@@ -1,5 +1,6 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 
+import 'enums.dart';
 import 'point2d.dart';
 
 part 'room.freezed.dart';
@@ -30,6 +31,32 @@ abstract class Room with _$Room {
     /// Room boundary polygon. Must be closed (last vertex = first vertex)
     /// and contain at least 3 distinct vertices.
     @Default([]) List<Point2D> polygon,
+
+    /// UUID of the [WallConstruction] used for floor/slab.
+    /// Null = not assigned.
+    String? floorConstructionId,
+
+    /// UUID of the [WallConstruction] used for ceiling/roof.
+    /// Null = not assigned.
+    String? ceilingConstructionId,
+
+    /// Boundary condition below the floor slab.
+    @Default(BoundaryCondition.ground)
+    BoundaryCondition floorBoundary,
+
+    /// Boundary condition above the ceiling slab.
+    @Default(BoundaryCondition.exterior)
+    BoundaryCondition ceilingBoundary,
+
+    /// User-supplied correction factor (0.0–1.0) for floor, when
+    /// [floorBoundary] == [BoundaryCondition.unheatedSpace].
+    /// Null means the engine will return NaN (user must set it).
+    double? floorUnheatedCorrectionFactor,
+
+    /// User-supplied correction factor (0.0–1.0) for ceiling, when
+    /// [ceilingBoundary] == [BoundaryCondition.unheatedSpace].
+    /// Null means the engine will return NaN (user must set it).
+    double? ceilingUnheatedCorrectionFactor,
   }) = _Room;
 
   factory Room.fromJson(Map<String, dynamic> json) => _$RoomFromJson(json);

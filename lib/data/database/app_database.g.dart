@@ -921,6 +921,74 @@ class $RoomsTable extends Rooms with TableInfo<$RoomsTable, Room> {
     requiredDuringInsert: false,
     defaultValue: const Constant('[]'),
   );
+  static const VerificationMeta _floorConstructionIdMeta =
+      const VerificationMeta('floorConstructionId');
+  @override
+  late final GeneratedColumn<String> floorConstructionId =
+      GeneratedColumn<String>(
+        'floor_construction_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _ceilingConstructionIdMeta =
+      const VerificationMeta('ceilingConstructionId');
+  @override
+  late final GeneratedColumn<String> ceilingConstructionId =
+      GeneratedColumn<String>(
+        'ceiling_construction_id',
+        aliasedName,
+        true,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _floorBoundaryMeta = const VerificationMeta(
+    'floorBoundary',
+  );
+  @override
+  late final GeneratedColumn<String> floorBoundary = GeneratedColumn<String>(
+    'floor_boundary',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('ground'),
+  );
+  static const VerificationMeta _ceilingBoundaryMeta = const VerificationMeta(
+    'ceilingBoundary',
+  );
+  @override
+  late final GeneratedColumn<String> ceilingBoundary = GeneratedColumn<String>(
+    'ceiling_boundary',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('exterior'),
+  );
+  static const VerificationMeta _floorUnheatedCorrectionFactorMeta =
+      const VerificationMeta('floorUnheatedCorrectionFactor');
+  @override
+  late final GeneratedColumn<double> floorUnheatedCorrectionFactor =
+      GeneratedColumn<double>(
+        'floor_unheated_correction_factor',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
+  static const VerificationMeta _ceilingUnheatedCorrectionFactorMeta =
+      const VerificationMeta('ceilingUnheatedCorrectionFactor');
+  @override
+  late final GeneratedColumn<double> ceilingUnheatedCorrectionFactor =
+      GeneratedColumn<double>(
+        'ceiling_unheated_correction_factor',
+        aliasedName,
+        true,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+      );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -929,6 +997,12 @@ class $RoomsTable extends Rooms with TableInfo<$RoomsTable, Room> {
     targetTempC,
     airChangeRate,
     polygonJson,
+    floorConstructionId,
+    ceilingConstructionId,
+    floorBoundary,
+    ceilingBoundary,
+    floorUnheatedCorrectionFactor,
+    ceilingUnheatedCorrectionFactor,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -990,6 +1064,60 @@ class $RoomsTable extends Rooms with TableInfo<$RoomsTable, Room> {
         ),
       );
     }
+    if (data.containsKey('floor_construction_id')) {
+      context.handle(
+        _floorConstructionIdMeta,
+        floorConstructionId.isAcceptableOrUnknown(
+          data['floor_construction_id']!,
+          _floorConstructionIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('ceiling_construction_id')) {
+      context.handle(
+        _ceilingConstructionIdMeta,
+        ceilingConstructionId.isAcceptableOrUnknown(
+          data['ceiling_construction_id']!,
+          _ceilingConstructionIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('floor_boundary')) {
+      context.handle(
+        _floorBoundaryMeta,
+        floorBoundary.isAcceptableOrUnknown(
+          data['floor_boundary']!,
+          _floorBoundaryMeta,
+        ),
+      );
+    }
+    if (data.containsKey('ceiling_boundary')) {
+      context.handle(
+        _ceilingBoundaryMeta,
+        ceilingBoundary.isAcceptableOrUnknown(
+          data['ceiling_boundary']!,
+          _ceilingBoundaryMeta,
+        ),
+      );
+    }
+    if (data.containsKey('floor_unheated_correction_factor')) {
+      context.handle(
+        _floorUnheatedCorrectionFactorMeta,
+        floorUnheatedCorrectionFactor.isAcceptableOrUnknown(
+          data['floor_unheated_correction_factor']!,
+          _floorUnheatedCorrectionFactorMeta,
+        ),
+      );
+    }
+    if (data.containsKey('ceiling_unheated_correction_factor')) {
+      context.handle(
+        _ceilingUnheatedCorrectionFactorMeta,
+        ceilingUnheatedCorrectionFactor.isAcceptableOrUnknown(
+          data['ceiling_unheated_correction_factor']!,
+          _ceilingUnheatedCorrectionFactorMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -1023,6 +1151,30 @@ class $RoomsTable extends Rooms with TableInfo<$RoomsTable, Room> {
         DriftSqlType.string,
         data['${effectivePrefix}polygon_json'],
       )!,
+      floorConstructionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}floor_construction_id'],
+      ),
+      ceilingConstructionId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ceiling_construction_id'],
+      ),
+      floorBoundary: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}floor_boundary'],
+      )!,
+      ceilingBoundary: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}ceiling_boundary'],
+      )!,
+      floorUnheatedCorrectionFactor: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}floor_unheated_correction_factor'],
+      ),
+      ceilingUnheatedCorrectionFactor: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}ceiling_unheated_correction_factor'],
+      ),
     );
   }
 
@@ -1041,6 +1193,26 @@ class Room extends DataClass implements Insertable<Room> {
 
   /// JSON array of {x, y} objects representing the room polygon in mm.
   final String polygonJson;
+
+  /// UUID of the floor construction; null = not assigned.
+  final String? floorConstructionId;
+
+  /// UUID of the ceiling construction; null = not assigned.
+  final String? ceilingConstructionId;
+
+  /// Boundary condition below the floor slab (stored as enum name).
+  final String floorBoundary;
+
+  /// Boundary condition above the ceiling slab (stored as enum name).
+  final String ceilingBoundary;
+
+  /// User-supplied correction factor for unheated floor boundary
+  /// (0.0–1.0).
+  final double? floorUnheatedCorrectionFactor;
+
+  /// User-supplied correction factor for unheated ceiling boundary
+  /// (0.0–1.0).
+  final double? ceilingUnheatedCorrectionFactor;
   const Room({
     required this.id,
     required this.floorId,
@@ -1048,6 +1220,12 @@ class Room extends DataClass implements Insertable<Room> {
     required this.targetTempC,
     required this.airChangeRate,
     required this.polygonJson,
+    this.floorConstructionId,
+    this.ceilingConstructionId,
+    required this.floorBoundary,
+    required this.ceilingBoundary,
+    this.floorUnheatedCorrectionFactor,
+    this.ceilingUnheatedCorrectionFactor,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1058,6 +1236,24 @@ class Room extends DataClass implements Insertable<Room> {
     map['target_temp_c'] = Variable<double>(targetTempC);
     map['air_change_rate'] = Variable<double>(airChangeRate);
     map['polygon_json'] = Variable<String>(polygonJson);
+    if (!nullToAbsent || floorConstructionId != null) {
+      map['floor_construction_id'] = Variable<String>(floorConstructionId);
+    }
+    if (!nullToAbsent || ceilingConstructionId != null) {
+      map['ceiling_construction_id'] = Variable<String>(ceilingConstructionId);
+    }
+    map['floor_boundary'] = Variable<String>(floorBoundary);
+    map['ceiling_boundary'] = Variable<String>(ceilingBoundary);
+    if (!nullToAbsent || floorUnheatedCorrectionFactor != null) {
+      map['floor_unheated_correction_factor'] = Variable<double>(
+        floorUnheatedCorrectionFactor,
+      );
+    }
+    if (!nullToAbsent || ceilingUnheatedCorrectionFactor != null) {
+      map['ceiling_unheated_correction_factor'] = Variable<double>(
+        ceilingUnheatedCorrectionFactor,
+      );
+    }
     return map;
   }
 
@@ -1069,6 +1265,22 @@ class Room extends DataClass implements Insertable<Room> {
       targetTempC: Value(targetTempC),
       airChangeRate: Value(airChangeRate),
       polygonJson: Value(polygonJson),
+      floorConstructionId: floorConstructionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(floorConstructionId),
+      ceilingConstructionId: ceilingConstructionId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ceilingConstructionId),
+      floorBoundary: Value(floorBoundary),
+      ceilingBoundary: Value(ceilingBoundary),
+      floorUnheatedCorrectionFactor:
+          floorUnheatedCorrectionFactor == null && nullToAbsent
+          ? const Value.absent()
+          : Value(floorUnheatedCorrectionFactor),
+      ceilingUnheatedCorrectionFactor:
+          ceilingUnheatedCorrectionFactor == null && nullToAbsent
+          ? const Value.absent()
+          : Value(ceilingUnheatedCorrectionFactor),
     );
   }
 
@@ -1084,6 +1296,20 @@ class Room extends DataClass implements Insertable<Room> {
       targetTempC: serializer.fromJson<double>(json['targetTempC']),
       airChangeRate: serializer.fromJson<double>(json['airChangeRate']),
       polygonJson: serializer.fromJson<String>(json['polygonJson']),
+      floorConstructionId: serializer.fromJson<String?>(
+        json['floorConstructionId'],
+      ),
+      ceilingConstructionId: serializer.fromJson<String?>(
+        json['ceilingConstructionId'],
+      ),
+      floorBoundary: serializer.fromJson<String>(json['floorBoundary']),
+      ceilingBoundary: serializer.fromJson<String>(json['ceilingBoundary']),
+      floorUnheatedCorrectionFactor: serializer.fromJson<double?>(
+        json['floorUnheatedCorrectionFactor'],
+      ),
+      ceilingUnheatedCorrectionFactor: serializer.fromJson<double?>(
+        json['ceilingUnheatedCorrectionFactor'],
+      ),
     );
   }
   @override
@@ -1096,6 +1322,18 @@ class Room extends DataClass implements Insertable<Room> {
       'targetTempC': serializer.toJson<double>(targetTempC),
       'airChangeRate': serializer.toJson<double>(airChangeRate),
       'polygonJson': serializer.toJson<String>(polygonJson),
+      'floorConstructionId': serializer.toJson<String?>(floorConstructionId),
+      'ceilingConstructionId': serializer.toJson<String?>(
+        ceilingConstructionId,
+      ),
+      'floorBoundary': serializer.toJson<String>(floorBoundary),
+      'ceilingBoundary': serializer.toJson<String>(ceilingBoundary),
+      'floorUnheatedCorrectionFactor': serializer.toJson<double?>(
+        floorUnheatedCorrectionFactor,
+      ),
+      'ceilingUnheatedCorrectionFactor': serializer.toJson<double?>(
+        ceilingUnheatedCorrectionFactor,
+      ),
     };
   }
 
@@ -1106,6 +1344,12 @@ class Room extends DataClass implements Insertable<Room> {
     double? targetTempC,
     double? airChangeRate,
     String? polygonJson,
+    Value<String?> floorConstructionId = const Value.absent(),
+    Value<String?> ceilingConstructionId = const Value.absent(),
+    String? floorBoundary,
+    String? ceilingBoundary,
+    Value<double?> floorUnheatedCorrectionFactor = const Value.absent(),
+    Value<double?> ceilingUnheatedCorrectionFactor = const Value.absent(),
   }) => Room(
     id: id ?? this.id,
     floorId: floorId ?? this.floorId,
@@ -1113,6 +1357,20 @@ class Room extends DataClass implements Insertable<Room> {
     targetTempC: targetTempC ?? this.targetTempC,
     airChangeRate: airChangeRate ?? this.airChangeRate,
     polygonJson: polygonJson ?? this.polygonJson,
+    floorConstructionId: floorConstructionId.present
+        ? floorConstructionId.value
+        : this.floorConstructionId,
+    ceilingConstructionId: ceilingConstructionId.present
+        ? ceilingConstructionId.value
+        : this.ceilingConstructionId,
+    floorBoundary: floorBoundary ?? this.floorBoundary,
+    ceilingBoundary: ceilingBoundary ?? this.ceilingBoundary,
+    floorUnheatedCorrectionFactor: floorUnheatedCorrectionFactor.present
+        ? floorUnheatedCorrectionFactor.value
+        : this.floorUnheatedCorrectionFactor,
+    ceilingUnheatedCorrectionFactor: ceilingUnheatedCorrectionFactor.present
+        ? ceilingUnheatedCorrectionFactor.value
+        : this.ceilingUnheatedCorrectionFactor,
   );
   Room copyWithCompanion(RoomsCompanion data) {
     return Room(
@@ -1128,6 +1386,25 @@ class Room extends DataClass implements Insertable<Room> {
       polygonJson: data.polygonJson.present
           ? data.polygonJson.value
           : this.polygonJson,
+      floorConstructionId: data.floorConstructionId.present
+          ? data.floorConstructionId.value
+          : this.floorConstructionId,
+      ceilingConstructionId: data.ceilingConstructionId.present
+          ? data.ceilingConstructionId.value
+          : this.ceilingConstructionId,
+      floorBoundary: data.floorBoundary.present
+          ? data.floorBoundary.value
+          : this.floorBoundary,
+      ceilingBoundary: data.ceilingBoundary.present
+          ? data.ceilingBoundary.value
+          : this.ceilingBoundary,
+      floorUnheatedCorrectionFactor: data.floorUnheatedCorrectionFactor.present
+          ? data.floorUnheatedCorrectionFactor.value
+          : this.floorUnheatedCorrectionFactor,
+      ceilingUnheatedCorrectionFactor:
+          data.ceilingUnheatedCorrectionFactor.present
+          ? data.ceilingUnheatedCorrectionFactor.value
+          : this.ceilingUnheatedCorrectionFactor,
     );
   }
 
@@ -1139,14 +1416,36 @@ class Room extends DataClass implements Insertable<Room> {
           ..write('name: $name, ')
           ..write('targetTempC: $targetTempC, ')
           ..write('airChangeRate: $airChangeRate, ')
-          ..write('polygonJson: $polygonJson')
+          ..write('polygonJson: $polygonJson, ')
+          ..write('floorConstructionId: $floorConstructionId, ')
+          ..write('ceilingConstructionId: $ceilingConstructionId, ')
+          ..write('floorBoundary: $floorBoundary, ')
+          ..write('ceilingBoundary: $ceilingBoundary, ')
+          ..write(
+            'floorUnheatedCorrectionFactor: $floorUnheatedCorrectionFactor, ',
+          )
+          ..write(
+            'ceilingUnheatedCorrectionFactor: $ceilingUnheatedCorrectionFactor',
+          )
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode =>
-      Object.hash(id, floorId, name, targetTempC, airChangeRate, polygonJson);
+  int get hashCode => Object.hash(
+    id,
+    floorId,
+    name,
+    targetTempC,
+    airChangeRate,
+    polygonJson,
+    floorConstructionId,
+    ceilingConstructionId,
+    floorBoundary,
+    ceilingBoundary,
+    floorUnheatedCorrectionFactor,
+    ceilingUnheatedCorrectionFactor,
+  );
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1156,7 +1455,15 @@ class Room extends DataClass implements Insertable<Room> {
           other.name == this.name &&
           other.targetTempC == this.targetTempC &&
           other.airChangeRate == this.airChangeRate &&
-          other.polygonJson == this.polygonJson);
+          other.polygonJson == this.polygonJson &&
+          other.floorConstructionId == this.floorConstructionId &&
+          other.ceilingConstructionId == this.ceilingConstructionId &&
+          other.floorBoundary == this.floorBoundary &&
+          other.ceilingBoundary == this.ceilingBoundary &&
+          other.floorUnheatedCorrectionFactor ==
+              this.floorUnheatedCorrectionFactor &&
+          other.ceilingUnheatedCorrectionFactor ==
+              this.ceilingUnheatedCorrectionFactor);
 }
 
 class RoomsCompanion extends UpdateCompanion<Room> {
@@ -1166,6 +1473,12 @@ class RoomsCompanion extends UpdateCompanion<Room> {
   final Value<double> targetTempC;
   final Value<double> airChangeRate;
   final Value<String> polygonJson;
+  final Value<String?> floorConstructionId;
+  final Value<String?> ceilingConstructionId;
+  final Value<String> floorBoundary;
+  final Value<String> ceilingBoundary;
+  final Value<double?> floorUnheatedCorrectionFactor;
+  final Value<double?> ceilingUnheatedCorrectionFactor;
   final Value<int> rowid;
   const RoomsCompanion({
     this.id = const Value.absent(),
@@ -1174,6 +1487,12 @@ class RoomsCompanion extends UpdateCompanion<Room> {
     this.targetTempC = const Value.absent(),
     this.airChangeRate = const Value.absent(),
     this.polygonJson = const Value.absent(),
+    this.floorConstructionId = const Value.absent(),
+    this.ceilingConstructionId = const Value.absent(),
+    this.floorBoundary = const Value.absent(),
+    this.ceilingBoundary = const Value.absent(),
+    this.floorUnheatedCorrectionFactor = const Value.absent(),
+    this.ceilingUnheatedCorrectionFactor = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   RoomsCompanion.insert({
@@ -1183,6 +1502,12 @@ class RoomsCompanion extends UpdateCompanion<Room> {
     this.targetTempC = const Value.absent(),
     this.airChangeRate = const Value.absent(),
     this.polygonJson = const Value.absent(),
+    this.floorConstructionId = const Value.absent(),
+    this.ceilingConstructionId = const Value.absent(),
+    this.floorBoundary = const Value.absent(),
+    this.ceilingBoundary = const Value.absent(),
+    this.floorUnheatedCorrectionFactor = const Value.absent(),
+    this.ceilingUnheatedCorrectionFactor = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        floorId = Value(floorId),
@@ -1194,6 +1519,12 @@ class RoomsCompanion extends UpdateCompanion<Room> {
     Expression<double>? targetTempC,
     Expression<double>? airChangeRate,
     Expression<String>? polygonJson,
+    Expression<String>? floorConstructionId,
+    Expression<String>? ceilingConstructionId,
+    Expression<String>? floorBoundary,
+    Expression<String>? ceilingBoundary,
+    Expression<double>? floorUnheatedCorrectionFactor,
+    Expression<double>? ceilingUnheatedCorrectionFactor,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1203,6 +1534,16 @@ class RoomsCompanion extends UpdateCompanion<Room> {
       if (targetTempC != null) 'target_temp_c': targetTempC,
       if (airChangeRate != null) 'air_change_rate': airChangeRate,
       if (polygonJson != null) 'polygon_json': polygonJson,
+      if (floorConstructionId != null)
+        'floor_construction_id': floorConstructionId,
+      if (ceilingConstructionId != null)
+        'ceiling_construction_id': ceilingConstructionId,
+      if (floorBoundary != null) 'floor_boundary': floorBoundary,
+      if (ceilingBoundary != null) 'ceiling_boundary': ceilingBoundary,
+      if (floorUnheatedCorrectionFactor != null)
+        'floor_unheated_correction_factor': floorUnheatedCorrectionFactor,
+      if (ceilingUnheatedCorrectionFactor != null)
+        'ceiling_unheated_correction_factor': ceilingUnheatedCorrectionFactor,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1214,6 +1555,12 @@ class RoomsCompanion extends UpdateCompanion<Room> {
     Value<double>? targetTempC,
     Value<double>? airChangeRate,
     Value<String>? polygonJson,
+    Value<String?>? floorConstructionId,
+    Value<String?>? ceilingConstructionId,
+    Value<String>? floorBoundary,
+    Value<String>? ceilingBoundary,
+    Value<double?>? floorUnheatedCorrectionFactor,
+    Value<double?>? ceilingUnheatedCorrectionFactor,
     Value<int>? rowid,
   }) {
     return RoomsCompanion(
@@ -1223,6 +1570,16 @@ class RoomsCompanion extends UpdateCompanion<Room> {
       targetTempC: targetTempC ?? this.targetTempC,
       airChangeRate: airChangeRate ?? this.airChangeRate,
       polygonJson: polygonJson ?? this.polygonJson,
+      floorConstructionId: floorConstructionId ?? this.floorConstructionId,
+      ceilingConstructionId:
+          ceilingConstructionId ?? this.ceilingConstructionId,
+      floorBoundary: floorBoundary ?? this.floorBoundary,
+      ceilingBoundary: ceilingBoundary ?? this.ceilingBoundary,
+      floorUnheatedCorrectionFactor:
+          floorUnheatedCorrectionFactor ?? this.floorUnheatedCorrectionFactor,
+      ceilingUnheatedCorrectionFactor:
+          ceilingUnheatedCorrectionFactor ??
+          this.ceilingUnheatedCorrectionFactor,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1248,6 +1605,32 @@ class RoomsCompanion extends UpdateCompanion<Room> {
     if (polygonJson.present) {
       map['polygon_json'] = Variable<String>(polygonJson.value);
     }
+    if (floorConstructionId.present) {
+      map['floor_construction_id'] = Variable<String>(
+        floorConstructionId.value,
+      );
+    }
+    if (ceilingConstructionId.present) {
+      map['ceiling_construction_id'] = Variable<String>(
+        ceilingConstructionId.value,
+      );
+    }
+    if (floorBoundary.present) {
+      map['floor_boundary'] = Variable<String>(floorBoundary.value);
+    }
+    if (ceilingBoundary.present) {
+      map['ceiling_boundary'] = Variable<String>(ceilingBoundary.value);
+    }
+    if (floorUnheatedCorrectionFactor.present) {
+      map['floor_unheated_correction_factor'] = Variable<double>(
+        floorUnheatedCorrectionFactor.value,
+      );
+    }
+    if (ceilingUnheatedCorrectionFactor.present) {
+      map['ceiling_unheated_correction_factor'] = Variable<double>(
+        ceilingUnheatedCorrectionFactor.value,
+      );
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1263,6 +1646,16 @@ class RoomsCompanion extends UpdateCompanion<Room> {
           ..write('targetTempC: $targetTempC, ')
           ..write('airChangeRate: $airChangeRate, ')
           ..write('polygonJson: $polygonJson, ')
+          ..write('floorConstructionId: $floorConstructionId, ')
+          ..write('ceilingConstructionId: $ceilingConstructionId, ')
+          ..write('floorBoundary: $floorBoundary, ')
+          ..write('ceilingBoundary: $ceilingBoundary, ')
+          ..write(
+            'floorUnheatedCorrectionFactor: $floorUnheatedCorrectionFactor, ',
+          )
+          ..write(
+            'ceilingUnheatedCorrectionFactor: $ceilingUnheatedCorrectionFactor, ',
+          )
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -8040,6 +8433,12 @@ typedef $$RoomsTableCreateCompanionBuilder =
       Value<double> targetTempC,
       Value<double> airChangeRate,
       Value<String> polygonJson,
+      Value<String?> floorConstructionId,
+      Value<String?> ceilingConstructionId,
+      Value<String> floorBoundary,
+      Value<String> ceilingBoundary,
+      Value<double?> floorUnheatedCorrectionFactor,
+      Value<double?> ceilingUnheatedCorrectionFactor,
       Value<int> rowid,
     });
 typedef $$RoomsTableUpdateCompanionBuilder =
@@ -8050,6 +8449,12 @@ typedef $$RoomsTableUpdateCompanionBuilder =
       Value<double> targetTempC,
       Value<double> airChangeRate,
       Value<String> polygonJson,
+      Value<String?> floorConstructionId,
+      Value<String?> ceilingConstructionId,
+      Value<String> floorBoundary,
+      Value<String> ceilingBoundary,
+      Value<double?> floorUnheatedCorrectionFactor,
+      Value<double?> ceilingUnheatedCorrectionFactor,
       Value<int> rowid,
     });
 
@@ -8167,6 +8572,37 @@ class $$RoomsTableFilterComposer extends Composer<_$AppDatabase, $RoomsTable> {
     column: $table.polygonJson,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<String> get floorConstructionId => $composableBuilder(
+    column: $table.floorConstructionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ceilingConstructionId => $composableBuilder(
+    column: $table.ceilingConstructionId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get floorBoundary => $composableBuilder(
+    column: $table.floorBoundary,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get ceilingBoundary => $composableBuilder(
+    column: $table.ceilingBoundary,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get floorUnheatedCorrectionFactor => $composableBuilder(
+    column: $table.floorUnheatedCorrectionFactor,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get ceilingUnheatedCorrectionFactor =>
+      $composableBuilder(
+        column: $table.ceilingUnheatedCorrectionFactor,
+        builder: (column) => ColumnFilters(column),
+      );
 
   $$FloorsTableFilterComposer get floorId {
     final $$FloorsTableFilterComposer composer = $composerBuilder(
@@ -8301,6 +8737,38 @@ class $$RoomsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get floorConstructionId => $composableBuilder(
+    column: $table.floorConstructionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get ceilingConstructionId => $composableBuilder(
+    column: $table.ceilingConstructionId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get floorBoundary => $composableBuilder(
+    column: $table.floorBoundary,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get ceilingBoundary => $composableBuilder(
+    column: $table.ceilingBoundary,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get floorUnheatedCorrectionFactor =>
+      $composableBuilder(
+        column: $table.floorUnheatedCorrectionFactor,
+        builder: (column) => ColumnOrderings(column),
+      );
+
+  ColumnOrderings<double> get ceilingUnheatedCorrectionFactor =>
+      $composableBuilder(
+        column: $table.ceilingUnheatedCorrectionFactor,
+        builder: (column) => ColumnOrderings(column),
+      );
+
   $$FloorsTableOrderingComposer get floorId {
     final $$FloorsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -8354,6 +8822,38 @@ class $$RoomsTableAnnotationComposer
     column: $table.polygonJson,
     builder: (column) => column,
   );
+
+  GeneratedColumn<String> get floorConstructionId => $composableBuilder(
+    column: $table.floorConstructionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get ceilingConstructionId => $composableBuilder(
+    column: $table.ceilingConstructionId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get floorBoundary => $composableBuilder(
+    column: $table.floorBoundary,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get ceilingBoundary => $composableBuilder(
+    column: $table.ceilingBoundary,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get floorUnheatedCorrectionFactor =>
+      $composableBuilder(
+        column: $table.floorUnheatedCorrectionFactor,
+        builder: (column) => column,
+      );
+
+  GeneratedColumn<double> get ceilingUnheatedCorrectionFactor =>
+      $composableBuilder(
+        column: $table.ceilingUnheatedCorrectionFactor,
+        builder: (column) => column,
+      );
 
   $$FloorsTableAnnotationComposer get floorId {
     final $$FloorsTableAnnotationComposer composer = $composerBuilder(
@@ -8493,6 +8993,14 @@ class $$RoomsTableTableManager
                 Value<double> targetTempC = const Value.absent(),
                 Value<double> airChangeRate = const Value.absent(),
                 Value<String> polygonJson = const Value.absent(),
+                Value<String?> floorConstructionId = const Value.absent(),
+                Value<String?> ceilingConstructionId = const Value.absent(),
+                Value<String> floorBoundary = const Value.absent(),
+                Value<String> ceilingBoundary = const Value.absent(),
+                Value<double?> floorUnheatedCorrectionFactor =
+                    const Value.absent(),
+                Value<double?> ceilingUnheatedCorrectionFactor =
+                    const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RoomsCompanion(
                 id: id,
@@ -8501,6 +9009,13 @@ class $$RoomsTableTableManager
                 targetTempC: targetTempC,
                 airChangeRate: airChangeRate,
                 polygonJson: polygonJson,
+                floorConstructionId: floorConstructionId,
+                ceilingConstructionId: ceilingConstructionId,
+                floorBoundary: floorBoundary,
+                ceilingBoundary: ceilingBoundary,
+                floorUnheatedCorrectionFactor: floorUnheatedCorrectionFactor,
+                ceilingUnheatedCorrectionFactor:
+                    ceilingUnheatedCorrectionFactor,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -8511,6 +9026,14 @@ class $$RoomsTableTableManager
                 Value<double> targetTempC = const Value.absent(),
                 Value<double> airChangeRate = const Value.absent(),
                 Value<String> polygonJson = const Value.absent(),
+                Value<String?> floorConstructionId = const Value.absent(),
+                Value<String?> ceilingConstructionId = const Value.absent(),
+                Value<String> floorBoundary = const Value.absent(),
+                Value<String> ceilingBoundary = const Value.absent(),
+                Value<double?> floorUnheatedCorrectionFactor =
+                    const Value.absent(),
+                Value<double?> ceilingUnheatedCorrectionFactor =
+                    const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RoomsCompanion.insert(
                 id: id,
@@ -8519,6 +9042,13 @@ class $$RoomsTableTableManager
                 targetTempC: targetTempC,
                 airChangeRate: airChangeRate,
                 polygonJson: polygonJson,
+                floorConstructionId: floorConstructionId,
+                ceilingConstructionId: ceilingConstructionId,
+                floorBoundary: floorBoundary,
+                ceilingBoundary: ceilingBoundary,
+                floorUnheatedCorrectionFactor: floorUnheatedCorrectionFactor,
+                ceilingUnheatedCorrectionFactor:
+                    ceilingUnheatedCorrectionFactor,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

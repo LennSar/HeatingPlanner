@@ -82,6 +82,420 @@ Future<void> showWallConstructionEditor(
   );
 }
 
+/// Opens the construction editor for a floor or ceiling slab.
+///
+/// [constructionId] is the existing construction to load, or null
+/// to create a new one. [title] is displayed in the dialog header.
+/// [onSaved] is called with the construction ID after the user saves.
+Future<void> showSlabConstructionEditor(
+  BuildContext context, {
+  String? constructionId,
+  required String title,
+  required void Function(String constructionId) onSaved,
+}) {
+  return showDialog<void>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => _SlabConstructionDialog(
+      constructionId: constructionId,
+      title: title,
+      onSaved: onSaved,
+    ),
+  );
+}
+
+// ---------------------------------------------------------------
+// Slab construction dialog (floor / ceiling variant)
+// ---------------------------------------------------------------
+
+class _SlabConstructionDialog extends ConsumerStatefulWidget {
+  const _SlabConstructionDialog({
+    required this.constructionId,
+    required this.title,
+    required this.onSaved,
+  });
+
+  final String? constructionId;
+  final String title;
+  final void Function(String constructionId) onSaved;
+
+  @override
+  ConsumerState<_SlabConstructionDialog> createState() =>
+      _SlabConstructionDialogState();
+}
+
+class _SlabConstructionDialogState
+    extends ConsumerState<_SlabConstructionDialog> {
+  late WallConstruction _construction;
+  late List<MaterialLayer> _layers;
+  late TextEditingController _nameCtrl;
+  late TextEditingController _rsiCtrl;
+  late TextEditingController _rseCtrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFromState();
+  }
+
+  void _loadFromState() {
+    final state = ref.read(editorStateProvider);
+    final cid = widget.constructionId;
+
+    if (cid != null) {
+      final existing =
+          state.constructions.where((c) => c.id == cid).firstOrNull;
+      if (existing != null) {
+        _construction = existing;
+        _layers = state.materialLayers
+            .where((l) => l.constructionId == cid)
+            .toList()
+          ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+        _nameCtrl =
+            TextEditingController(text: _construction.name);
+        _rsiCtrl = TextEditingController(
+          text: _construction.rsi.toStringAsFixed(2),
+        );
+        _rseCtrl = TextEditingController(
+          text: _construction.rse.toStringAsFixed(2),
+        );
+        return;
+      }
+    }
+
+    _construction = WallConstruction(
+      id: IdGenerator.newId(),
+      name: widget.title,
+    );
+    _layers = [];
+    _nameCtrl = TextEditingController(text: widget.title);
+    _rsiCtrl = TextEditingController(text: '0.13');
+    _rseCtrl = TextEditingController(text: '0.04');
+  }
+
+  @override
+  void dispose() {
+    _nameCtrl.dispose();
+    _rsiCtrl.dispose();
+    _rseCtrl.dispose();
+    super.dispose();
+  }
+
+  double get _rsi =>
+      double.tryParse(_rsiCtrl.text) ?? _construction.rsi;
+  double get _rse =>
+      double.tryParse(_rseCtrl.text) ?? _construction.rse;
+  List<double> get _thicknesses =>
+      _layers.map((l) => l.thicknessMm).toList();
+  List<double> get _lambdas =>
+      _layers.map((l) => l.thermalConductivity).toList();
+
+  double get _uVal => ThermalEngine.uValue(
+        layerThicknessesMm: _thicknesses,
+        layerLambdas: _lambdas,
+        rsi: _rsi,
+        rse: _rse,
+      );
+
+  double get _rTotal => ThermalEngine.totalResistance(
+        layerThicknessesMm: _thicknesses,
+        layerLambdas: _lambdas,
+        rsi: _rsi,
+        rse: _rse,
+      );
+
+  List<double> get _tempProfile => ThermalEngine.temperatureProfile(
+        layerThicknessesMm: _thicknesses,
+        layerLambdas: _lambdas,
+        rsi: _rsi,
+        rse: _rse,
+        tIndoorC: 20.0,
+        tOutdoorC: -12.0,
+      );
+
+  void _addLayer() {
+    final mat = _kMats.first;
+    setState(() {
+      _layers = [
+        ..._layers,
+        MaterialLayer(
+          id: IdGenerator.newId(),
+          constructionId: _construction.id,
+          sortOrder: _layers.length,
+          materialId: mat.id,
+          thicknessMm: 100.0,
+          thermalConductivity: mat.lambda,
+          density: mat.density,
+          specificHeat: mat.specificHeat,
+        ),
+      ];
+    });
+  }
+
+  void _removeLayer(int index) {
+    setState(() {
+      final list = List<MaterialLayer>.from(_layers)
+        ..removeAt(index);
+      _layers = list
+          .asMap()
+          .entries
+          .map((e) => e.value.copyWith(sortOrder: e.key))
+          .toList();
+    });
+  }
+
+  void _onReorder(int oldIndex, int newIndex) {
+    setState(() {
+      if (newIndex > oldIndex) newIndex--;
+      final list = List<MaterialLayer>.from(_layers);
+      list.insert(newIndex, list.removeAt(oldIndex));
+      _layers = list
+          .asMap()
+          .entries
+          .map((e) => e.value.copyWith(sortOrder: e.key))
+          .toList();
+    });
+  }
+
+  void _updateLayer(int index, MaterialLayer updated) {
+    setState(() {
+      final list = List<MaterialLayer>.from(_layers);
+      list[index] = updated.copyWith(sortOrder: index);
+      _layers = list;
+    });
+  }
+
+  Future<void> _pickMaterial(int index) async {
+    final mat = await _showMaterialPicker(context);
+    if (mat == null || !mounted) return;
+    _updateLayer(
+      index,
+      _layers[index].copyWith(
+        materialId: mat.id,
+        thermalConductivity: mat.lambda,
+        density: mat.density,
+        specificHeat: mat.specificHeat,
+      ),
+    );
+  }
+
+  void _save() {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) return;
+    final rsi = double.tryParse(_rsiCtrl.text) ?? 0.13;
+    final rse = double.tryParse(_rseCtrl.text) ?? 0.04;
+    final updated = _construction.copyWith(
+      name: name,
+      rsi: rsi,
+      rse: rse,
+    );
+    final notifier = ref.read(editorStateProvider.notifier);
+    final state = ref.read(editorStateProvider);
+    final isNew =
+        !state.constructions.any((c) => c.id == updated.id);
+    if (isNew) {
+      notifier.addConstruction(updated);
+    } else {
+      notifier.updateConstruction(updated);
+    }
+    notifier.replaceLayersForConstruction(updated.id, _layers);
+    widget.onSaved(updated.id);
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    final uVal = _uVal;
+    final rTotal = _rTotal;
+    final profile = _tempProfile;
+
+    return Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(
+          maxWidth: 660,
+          maxHeight: 700,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(Spacing.md),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // ---- Title row ----
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      widget.title,
+                      style: textTheme.headlineMedium,
+                    ),
+                  ),
+                  FilledButton(
+                    onPressed: _save,
+                    child: const Text('Save'),
+                  ),
+                  const SizedBox(width: Spacing.sm),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.of(context).pop(),
+                    visualDensity: VisualDensity.compact,
+                  ),
+                ],
+              ),
+              const SizedBox(height: Spacing.sm),
+
+              // ---- Name field ----
+              TextField(
+                controller: _nameCtrl,
+                decoration: const InputDecoration(
+                  labelText: 'Construction name',
+                  isDense: true,
+                ),
+                style: textTheme.bodyLarge,
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: Spacing.sm),
+
+              // ---- U-value summary ----
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: Spacing.md,
+                  vertical: Spacing.sm,
+                ),
+                decoration: BoxDecoration(
+                  color: colorScheme.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      uVal.isNaN
+                          ? 'U-Value: —'
+                          : 'U  ${uVal.toStringAsFixed(3)}'
+                              ' W/(m²K)',
+                      style: textTheme.headlineSmall?.copyWith(
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                    const Spacer(),
+                    Text(
+                      rTotal.isNaN
+                          ? 'R: —'
+                          : 'R  ${rTotal.toStringAsFixed(3)}'
+                              ' m²K/W',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: Spacing.sm),
+
+              // ---- Layer stack ----
+              Text(
+                'Layer Stack  (outside \u2192 inside)',
+                style: textTheme.headlineSmall,
+              ),
+              const SizedBox(height: Spacing.xs),
+              SizedBox(
+                height: 220,
+                child: ReorderableListView.builder(
+                  buildDefaultDragHandles: false,
+                  itemCount: _layers.length,
+                  onReorder: _onReorder,
+                  footer: Padding(
+                    padding: const EdgeInsets.only(
+                      top: Spacing.xs,
+                    ),
+                    child: TextButton.icon(
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Layer'),
+                      onPressed: _addLayer,
+                    ),
+                  ),
+                  itemBuilder: (context, i) {
+                    final layer = _layers[i];
+                    final mat = _kMats
+                        .where((m) => m.id == layer.materialId)
+                        .firstOrNull;
+                    return _LayerRow(
+                      key: ValueKey(layer.id),
+                      index: i,
+                      layer: layer,
+                      materialName: mat?.name ?? 'Unknown',
+                      onPickMaterial: () => _pickMaterial(i),
+                      onThicknessChanged: (v) => _updateLayer(
+                        i,
+                        layer.copyWith(thicknessMm: v),
+                      ),
+                      onLambdaChanged: (v) => _updateLayer(
+                        i,
+                        layer.copyWith(thermalConductivity: v),
+                      ),
+                      onDelete: () => _removeLayer(i),
+                    );
+                  },
+                ),
+              ),
+
+              const Divider(height: Spacing.md),
+
+              // ---- Temperature profile ----
+              if (profile.length >= 2) ...[
+                Text(
+                  'Temperature Profile  '
+                  '(20\u00B0C \u2192 \u221212\u00B0C)',
+                  style: textTheme.bodySmall,
+                ),
+                const SizedBox(height: Spacing.xs),
+                SizedBox(
+                  height: 48,
+                  child: CustomPaint(
+                    painter: _TempProfilePainter(
+                      profile: profile,
+                      textColor: colorScheme.onSurface,
+                    ),
+                    size: Size.infinite,
+                  ),
+                ),
+                const SizedBox(height: Spacing.sm),
+              ],
+
+              // ---- Surface resistances ----
+              Row(
+                children: [
+                  Text(
+                    'Surface resistances (m\u00B2K/W):',
+                    style: textTheme.bodySmall,
+                  ),
+                  const Spacer(),
+                  _ResistanceField(
+                    label: 'Rsi',
+                    controller: _rsiCtrl,
+                    onChanged: (_) => setState(() {}),
+                  ),
+                  const SizedBox(width: Spacing.md),
+                  _ResistanceField(
+                    label: 'Rse',
+                    controller: _rseCtrl,
+                    onChanged: (_) => setState(() {}),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 // ---------------------------------------------------------------
 // Dialog widget
 // ---------------------------------------------------------------
