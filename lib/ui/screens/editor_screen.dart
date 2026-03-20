@@ -270,41 +270,49 @@ class _Toolbar extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const SizedBox(height: Spacing.sm),
-          // Drawing tools
-          for (final entry in _toolEntries)
-            Tooltip(
-              message: entry.label,
-              preferBelow: false,
-              waitDuration: const Duration(
-                milliseconds: 500,
-              ),
-              child: Material(
-                color: selectedTool == entry.tool
-                    ? primary.withValues(alpha: 0.15)
-                    : Colors.transparent,
-                child: InkWell(
-                  onTap: () => onToolSelected(entry.tool),
-                  child: SizedBox(
-                    width: toolbarWidth,
-                    height: toolbarWidth,
-                    child: Icon(
-                      entry.icon,
-                      size: isCompact ? 20 : 22,
-                      color: selectedTool == entry.tool
-                          ? primary
-                          : Theme.of(context)
-                              .colorScheme
-                              .onSurfaceVariant,
+          // Scrollable drawing tools — never overflows when
+          // the window is shorter than the full tool list.
+          Expanded(
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  const SizedBox(height: Spacing.sm),
+                  for (final entry in _toolEntries)
+                    Tooltip(
+                      message: entry.label,
+                      preferBelow: false,
+                      waitDuration: const Duration(
+                        milliseconds: 500,
+                      ),
+                      child: Material(
+                        color: selectedTool == entry.tool
+                            ? primary.withValues(alpha: 0.15)
+                            : Colors.transparent,
+                        child: InkWell(
+                          onTap: () =>
+                              onToolSelected(entry.tool),
+                          child: SizedBox(
+                            width: toolbarWidth,
+                            height: toolbarWidth,
+                            child: Icon(
+                              entry.icon,
+                              size: isCompact ? 20 : 22,
+                              color: selectedTool == entry.tool
+                                  ? primary
+                                  : Theme.of(context)
+                                      .colorScheme
+                                      .onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
+                ],
               ),
             ),
+          ),
 
-          const Spacer(),
-
-          // Separator
+          // Bottom group — always visible regardless of height.
           Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: Spacing.sm,

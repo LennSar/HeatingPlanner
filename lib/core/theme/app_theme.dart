@@ -49,6 +49,9 @@ class HeatingPlannerColors
     required this.gridDot,
     required this.selectionHighlight,
     required this.hoverHighlight,
+    required this.errorRed,
+    required this.warningAmber,
+    required this.infoBlue,
   });
 
   /// Default light-theme colour set.
@@ -68,6 +71,9 @@ class HeatingPlannerColors
       gridDot: Color(0xFFD1D5DB),
       selectionHighlight: Color(0xFF2E86C1),
       hoverHighlight: Color(0xFF2E86C1),
+      errorRed: Color(0xFFDC2626),
+      warningAmber: Color(0xFFF59E0B),
+      infoBlue: Color(0xFF3B82F6),
     );
   }
 
@@ -113,6 +119,15 @@ class HeatingPlannerColors
   /// Hover highlight (use with 20% opacity).
   final Color hoverHighlight;
 
+  /// Error severity badge colour (UI/UX §3.1).
+  final Color errorRed;
+
+  /// Warning severity badge colour (UI/UX §3.1).
+  final Color warningAmber;
+
+  /// Info severity badge colour (UI/UX §3.1).
+  final Color infoBlue;
+
   @override
   HeatingPlannerColors copyWith({
     Color? wallFill,
@@ -129,6 +144,9 @@ class HeatingPlannerColors
     Color? gridDot,
     Color? selectionHighlight,
     Color? hoverHighlight,
+    Color? errorRed,
+    Color? warningAmber,
+    Color? infoBlue,
   }) {
     return HeatingPlannerColors(
       wallFill: wallFill ?? this.wallFill,
@@ -147,6 +165,9 @@ class HeatingPlannerColors
           selectionHighlight ?? this.selectionHighlight,
       hoverHighlight:
           hoverHighlight ?? this.hoverHighlight,
+      errorRed: errorRed ?? this.errorRed,
+      warningAmber: warningAmber ?? this.warningAmber,
+      infoBlue: infoBlue ?? this.infoBlue,
     );
   }
 
@@ -191,6 +212,15 @@ class HeatingPlannerColors
         other.hoverHighlight,
         t,
       )!,
+      errorRed:
+          Color.lerp(errorRed, other.errorRed, t)!,
+      warningAmber: Color.lerp(
+        warningAmber,
+        other.warningAmber,
+        t,
+      )!,
+      infoBlue:
+          Color.lerp(infoBlue, other.infoBlue, t)!,
     );
   }
 }

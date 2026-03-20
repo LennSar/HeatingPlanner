@@ -198,7 +198,7 @@ class _RoomPropertiesState
         .where((w) => w.roomId == widget.roomId)
         .length;
 
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(Spacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
