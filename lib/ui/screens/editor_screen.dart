@@ -7,6 +7,7 @@ import '../../platform/keyboard_shortcuts.dart';
 import '../canvas/canvas_controller.dart';
 import '../canvas/floor_plan_canvas.dart';
 import '../dialogs/project_settings_dialog.dart';
+import '../panels/performance_dashboard.dart';
 import '../panels/properties_panel.dart';
 import '../providers/editor_state_provider.dart';
 import '../../validation/validation_service.dart';
@@ -47,6 +48,8 @@ class EditorScreen extends ConsumerStatefulWidget {
 class _EditorScreenState
     extends ConsumerState<EditorScreen> {
   bool _propertiesPanelVisible = true;
+  bool _dashboardVisible = false;
+  int _dashboardInitialTab = 0;
 
   @override
   void initState() {
@@ -84,6 +87,14 @@ class _EditorScreenState
                         .read(selectedToolProvider.notifier)
                         .select(tool);
                   },
+                  onToggleDashboard: () {
+                    setState(() {
+                      _dashboardVisible =
+                          !_dashboardVisible;
+                      _dashboardInitialTab = 0;
+                    });
+                  },
+                  dashboardVisible: _dashboardVisible,
                 ),
 
                 // Canvas fills remaining space
@@ -97,6 +108,18 @@ class _EditorScreenState
                         : PropertiesPanel.widthMedium,
                     child: const PropertiesPanel(),
                   ),
+
+                // Performance dashboard panel (desktop only)
+                if (!isTablet && _dashboardVisible)
+                  SizedBox(
+                    width: width >= 1200
+                        ? PerformanceDashboard.widthLarge
+                        : PerformanceDashboard.widthMedium,
+                    child: PerformanceDashboardPanel(
+                      key: ValueKey(_dashboardInitialTab),
+                      initialIndex: _dashboardInitialTab,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -107,6 +130,12 @@ class _EditorScreenState
               setState(() {
                 _propertiesPanelVisible =
                     !_propertiesPanelVisible;
+              });
+            },
+            onOpenWarnings: () {
+              setState(() {
+                _dashboardVisible = true;
+                _dashboardInitialTab = 2;
               });
             },
           ),
@@ -163,11 +192,15 @@ class _Toolbar extends StatelessWidget {
     required this.isCompact,
     required this.selectedTool,
     required this.onToolSelected,
+    required this.onToggleDashboard,
+    required this.dashboardVisible,
   });
 
   final bool isCompact;
   final DrawingTool selectedTool;
   final ValueChanged<DrawingTool> onToolSelected;
+  final VoidCallback onToggleDashboard;
+  final bool dashboardVisible;
 
   static const _toolEntries = [
     _ToolEntry(DrawingTool.select, Icons.near_me, 'Select'),
@@ -283,20 +316,22 @@ class _Toolbar extends StatelessWidget {
           Tooltip(
             message: 'Dashboard',
             child: Material(
-              color: Colors.transparent,
+              color: dashboardVisible
+                  ? primary.withValues(alpha: 0.15)
+                  : Colors.transparent,
               child: InkWell(
-                onTap: () {
-                  // TODO(frontend): toggle performance dashboard.
-                },
+                onTap: onToggleDashboard,
                 child: SizedBox(
                   width: toolbarWidth,
                   height: toolbarWidth,
                   child: Icon(
                     Icons.bar_chart,
                     size: isCompact ? 20 : 22,
-                    color: Theme.of(context)
-                        .colorScheme
-                        .onSurfaceVariant,
+                    color: dashboardVisible
+                        ? primary
+                        : Theme.of(context)
+                            .colorScheme
+                            .onSurfaceVariant,
                   ),
                 ),
               ),
@@ -346,9 +381,13 @@ class _ToolEntry {
 // ----------------------------------------------------------
 
 class _StatusBar extends ConsumerWidget {
-  const _StatusBar({required this.onTogglePanel});
+  const _StatusBar({
+    required this.onTogglePanel,
+    required this.onOpenWarnings,
+  });
 
   final VoidCallback onTogglePanel;
+  final VoidCallback onOpenWarnings;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -419,18 +458,29 @@ class _StatusBar extends ConsumerWidget {
 
             const Spacer(),
 
-            // Warnings
-            Icon(
-              Icons.warning_amber_rounded,
-              size: 14,
-              color: warningCount > 0
-                  ? colors.zoneYellow
-                  : Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-            const SizedBox(width: Spacing.xs),
-            Text(
-              '$warningCount warning${warningCount == 1 ? '' : 's'}',
-              style: textTheme.bodySmall,
+            // Warnings — tappable to open dashboard
+            InkWell(
+              onTap: onOpenWarnings,
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.warning_amber_rounded,
+                    size: 14,
+                    color: warningCount > 0
+                        ? colors.zoneYellow
+                        : Theme.of(context)
+                            .colorScheme
+                            .onSurfaceVariant,
+                  ),
+                  const SizedBox(width: Spacing.xs),
+                  Text(
+                    '$warningCount warning'
+                    '${warningCount == 1 ? '' : 's'}',
+                    style: textTheme.bodySmall,
+                  ),
+                ],
+              ),
             ),
             const SizedBox(width: Spacing.md),
 
