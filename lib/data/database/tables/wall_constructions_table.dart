@@ -7,6 +7,10 @@ class WallConstructions extends Table {
   RealColumn get rsi => real().withDefault(const Constant(0.13))();
   RealColumn get rse => real().withDefault(const Constant(0.04))();
 
+  /// 1 = preset, 0 = regular construction.
+  IntColumn get isPreset =>
+      integer().withDefault(const Constant(0))();
+
   @override
   Set<Column> get primaryKey => {id};
 }

@@ -22,6 +22,14 @@ abstract class WallConstruction with _$WallConstruction {
 
     /// Exterior surface resistance in m²·K/W (default per ISO 6946).
     @Default(0.04) double rse,
+
+    /// Whether this construction is a saved user preset.
+    ///
+    /// Presets are stored in the same table and shown in the
+    /// "Load preset" picker inside the construction editor.
+    /// Loading a preset always deep-copies all layers so edits
+    /// never mutate the saved preset.
+    @Default(false) bool isPreset,
   }) = _WallConstruction;
 
   factory WallConstruction.fromJson(Map<String, dynamic> json) =>

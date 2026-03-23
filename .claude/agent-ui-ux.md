@@ -361,6 +361,7 @@ When a wall segment is selected, three circular drag handles appear on the wall:
 ```
 ┌──────────────────────────────────────────────────────┐
 │  Wall Construction: Exterior Wall South    [Save] [✕] │
+│                         [⬆ Save as preset] [⬇ Load ▾] │
 ├──────────────────────────────────────────────────────┤
 │                                                        │
 │  U-Value: 0.283 W/(m²K)          R: 3.534 m²K/W      │
@@ -398,6 +399,25 @@ When a wall segment is selected, three circular drag handles appear on the wall:
 - Bar width is proportional to layer thickness, providing intuitive visual feedback.
 - U-value and temperature profile update in real time on every change.
 - "Add Layer" inserts a new empty layer at the bottom (inside face). User can drag to reposition.
+
+**Preset buttons (second row in title area):**
+
+- **"⬆ Save as preset"** — always enabled. Tapping opens a small inline dialog:
+  - Text field pre-filled with the current construction name.
+  - "Save" / "Cancel" buttons.
+  - On confirm: saves a copy of the current in-editor construction (with its
+    current layers) as a named preset (`isPreset = true`). Does not close the
+    editor or affect the wall being edited.
+
+- **"⬇ Load"** — disabled (greyed out) when no presets exist; shows a dropdown
+  arrow to signal it opens a list.
+  - Tapping shows a popup menu listing all saved presets by name, each with its
+    U-value in secondary text (e.g. "Exterior Wall 200mm EPS — U 0.18 W/(m²K)").
+  - Selecting a preset **replaces the current in-editor layer stack** with a
+    deep copy of that preset's layers (new UUIDs). The construction name field
+    is also replaced with the preset name. The user must still press "Save" to
+    apply the loaded construction to the wall.
+  - Loading does not modify the saved preset — it is always a copy.
 
 ### 5.8 Performance Dashboard
 

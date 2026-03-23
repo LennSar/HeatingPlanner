@@ -65,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -132,6 +132,12 @@ class AppDatabase extends _$AppDatabase {
             await m.database.customStatement(
               'ALTER TABLE rooms ADD COLUMN '
               'ceiling_adjacent_temp_c REAL',
+            );
+          }
+          if (from < 9) {
+            await m.database.customStatement(
+              'ALTER TABLE wall_constructions ADD COLUMN '
+              'is_preset INTEGER NOT NULL DEFAULT 0',
             );
           }
         },

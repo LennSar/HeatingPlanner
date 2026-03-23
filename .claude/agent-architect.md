@@ -409,6 +409,13 @@ The DB schema change is a migration adding 6 new nullable columns to `rooms`
 | name | String | 1-200 chars | required |
 | rsi | double | m²K/W | 0.13 |
 | rse | double | m²K/W | 0.04 |
+| isPreset | bool | — | false |
+
+`isPreset = true` marks the construction as a saved user preset visible in the
+"Load preset" picker inside the construction editor. Presets are stored in the
+same `wall_constructions` table. When the user loads a preset, a **deep copy**
+(new UUID for the construction + new UUIDs for all layers) is made into the
+current wall's construction — edits to one wall never mutate the saved preset.
 
 **MaterialLayer**
 | Field | Type | Constraint | Default |

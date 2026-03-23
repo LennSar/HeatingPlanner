@@ -75,6 +75,7 @@ WallConstruction _constructionFromRow($db.WallConstruction row) {
     name: row.name,
     rsi: row.rsi,
     rse: row.rse,
+    isPreset: row.isPreset == 1,
   );
 }
 
@@ -101,6 +102,7 @@ $db.WallConstructionsCompanion _constructionToCompanion(
     name: Value(construction.name),
     rsi: Value(construction.rsi),
     rse: Value(construction.rse),
+    isPreset: Value(construction.isPreset ? 1 : 0),
   );
 }
 

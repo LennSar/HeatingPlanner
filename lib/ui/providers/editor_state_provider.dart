@@ -532,6 +532,43 @@ class EditorStateNotifier extends Notifier<EditorState> {
     unawaited(deleteLayer(dao, layerId));
   }
 
+  /// Save a deep copy of [constructionId] as a named preset.
+  ///
+  /// Creates a new [WallConstruction] with a fresh UUID, [presetName]
+  /// as its name, `isPreset = true`, and the same rsi/rse as the
+  /// original. All layers are deep-copied with new UUIDs pointing at
+  /// the new construction ID. The preset is persisted immediately;
+  /// the original construction is not modified.
+  void saveConstructionAsPreset(
+    String constructionId,
+    String presetName,
+  ) {
+    final original = state.constructions
+        .where((c) => c.id == constructionId)
+        .firstOrNull;
+    if (original == null) return;
+
+    final newId = IdGenerator.newId();
+    final preset = original.copyWith(
+      id: newId,
+      name: presetName,
+      isPreset: true,
+    );
+
+    final copiedLayers = state.materialLayers
+        .where((l) => l.constructionId == constructionId)
+        .map(
+          (l) => l.copyWith(
+            id: IdGenerator.newId(),
+            constructionId: newId,
+          ),
+        )
+        .toList();
+
+    addConstruction(preset);
+    replaceLayersForConstruction(newId, copiedLayers);
+  }
+
   /// Replace all layers for a construction atomically.
   ///
   /// Used when saving the wall construction editor so that

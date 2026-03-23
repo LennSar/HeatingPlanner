@@ -279,6 +279,137 @@ class _SlabConstructionDialogState
     );
   }
 
+  Future<void> _saveAsPreset() async {
+    final initialName = _nameCtrl.text.trim();
+    final nameCtrl =
+        TextEditingController(text: initialName);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Save as preset'),
+        content: TextField(
+          controller: nameCtrl,
+          decoration: const InputDecoration(
+            labelText: 'Preset name',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    nameCtrl.dispose();
+    if (confirmed != true || !mounted) return;
+    final presetName = nameCtrl.text.trim();
+    if (presetName.isEmpty) return;
+
+    final notifier = ref.read(editorStateProvider.notifier);
+    final editorState = ref.read(editorStateProvider);
+    final isNew = !editorState.constructions
+        .any((c) => c.id == _construction.id);
+    final rsi = double.tryParse(_rsiCtrl.text) ?? 0.13;
+    final rse = double.tryParse(_rseCtrl.text) ?? 0.04;
+    final current = _construction.copyWith(
+        name: _nameCtrl.text.trim(), rsi: rsi, rse: rse);
+    if (isNew) {
+      notifier.addConstruction(current);
+    } else {
+      notifier.updateConstruction(current);
+    }
+    notifier.replaceLayersForConstruction(
+        current.id, _layers);
+
+    notifier.saveConstructionAsPreset(
+        _construction.id, presetName);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Saved as preset')),
+    );
+  }
+
+  Future<void> _loadPreset() async {
+    final presets = ref
+        .read(editorStateProvider)
+        .constructions
+        .where((c) => c.isPreset)
+        .toList();
+    if (presets.isEmpty) return;
+
+    final selected = await showDialog<WallConstruction>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Load preset'),
+        children: presets.map((p) {
+          final layers = ref
+              .read(editorStateProvider)
+              .materialLayers
+              .where((l) => l.constructionId == p.id)
+              .toList();
+          final thicknesses =
+              layers.map((l) => l.thicknessMm).toList();
+          final lambdas =
+              layers.map((l) => l.thermalConductivity).toList();
+          final u = ThermalEngine.uValue(
+            layerThicknessesMm: thicknesses,
+            layerLambdas: lambdas,
+            rsi: p.rsi,
+            rse: p.rse,
+          );
+          final uLabel = u.isNaN
+              ? '—'
+              : '${u.toStringAsFixed(3)} W/(m²K)';
+          return SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop(p),
+            child: ListTile(
+              title: Text(p.name),
+              subtitle: Text('U = $uLabel'),
+              dense: true,
+            ),
+          );
+        }).toList(),
+      ),
+    );
+    if (selected == null || !mounted) return;
+
+    final srcLayers = ref
+        .read(editorStateProvider)
+        .materialLayers
+        .where((l) => l.constructionId == selected.id)
+        .toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+    final newId = _construction.id;
+    setState(() {
+      _construction = selected.copyWith(
+        id: newId,
+        isPreset: false,
+      );
+      _layers = srcLayers
+          .asMap()
+          .entries
+          .map(
+            (e) => e.value.copyWith(
+              id: IdGenerator.newId(),
+              constructionId: newId,
+              sortOrder: e.key,
+            ),
+          )
+          .toList();
+      _nameCtrl.text = selected.name;
+      _rsiCtrl.text = selected.rsi.toStringAsFixed(2);
+      _rseCtrl.text = selected.rse.toStringAsFixed(2);
+    });
+  }
+
   void _save() {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) return;
@@ -323,7 +454,6 @@ class _SlabConstructionDialogState
         child: Padding(
           padding: const EdgeInsets.all(Spacing.md),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ---- Title row ----
@@ -346,6 +476,16 @@ class _SlabConstructionDialogState
                     visualDensity: VisualDensity.compact,
                   ),
                 ],
+              ),
+
+              // ---- Preset row ----
+              _PresetRow(
+                onSaveAsPreset: _saveAsPreset,
+                onLoadPreset: _loadPreset,
+                hasPresets: ref
+                    .watch(editorStateProvider)
+                    .constructions
+                    .any((c) => c.isPreset),
               ),
               const SizedBox(height: Spacing.sm),
 
@@ -403,8 +543,7 @@ class _SlabConstructionDialogState
                 style: textTheme.headlineSmall,
               ),
               const SizedBox(height: Spacing.xs),
-              SizedBox(
-                height: 220,
+              Flexible(
                 child: ReorderableListView.builder(
                   buildDefaultDragHandles: false,
                   itemCount: _layers.length,
@@ -671,6 +810,140 @@ class _WallConstructionDialogState
     );
   }
 
+  Future<void> _saveAsPreset() async {
+    final initialName = _nameCtrl.text.trim();
+    final nameCtrl =
+        TextEditingController(text: initialName);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Save as preset'),
+        content: TextField(
+          controller: nameCtrl,
+          decoration: const InputDecoration(
+            labelText: 'Preset name',
+          ),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    nameCtrl.dispose();
+    if (confirmed != true || !mounted) return;
+    final presetName = nameCtrl.text.trim();
+    if (presetName.isEmpty) return;
+
+    // Ensure the current construction exists in state so the
+    // notifier can find it for the deep copy.
+    final notifier = ref.read(editorStateProvider.notifier);
+    final editorState = ref.read(editorStateProvider);
+    final isNew = !editorState.constructions
+        .any((c) => c.id == _construction.id);
+    final rsi = double.tryParse(_rsiCtrl.text) ?? 0.13;
+    final rse = double.tryParse(_rseCtrl.text) ?? 0.04;
+    final current =
+        _construction.copyWith(name: _nameCtrl.text.trim(),
+        rsi: rsi, rse: rse);
+    if (isNew) {
+      notifier.addConstruction(current);
+    } else {
+      notifier.updateConstruction(current);
+    }
+    notifier.replaceLayersForConstruction(
+        current.id, _layers);
+
+    notifier.saveConstructionAsPreset(
+        _construction.id, presetName);
+
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Saved as preset')),
+    );
+  }
+
+  Future<void> _loadPreset() async {
+    final presets = ref
+        .read(editorStateProvider)
+        .constructions
+        .where((c) => c.isPreset)
+        .toList();
+    if (presets.isEmpty) return;
+
+    final selected = await showDialog<WallConstruction>(
+      context: context,
+      builder: (ctx) => SimpleDialog(
+        title: const Text('Load preset'),
+        children: presets.map((p) {
+          final layers = ref
+              .read(editorStateProvider)
+              .materialLayers
+              .where((l) => l.constructionId == p.id)
+              .toList();
+          final thicknesses =
+              layers.map((l) => l.thicknessMm).toList();
+          final lambdas =
+              layers.map((l) => l.thermalConductivity).toList();
+          final u = ThermalEngine.uValue(
+            layerThicknessesMm: thicknesses,
+            layerLambdas: lambdas,
+            rsi: p.rsi,
+            rse: p.rse,
+          );
+          final uLabel = u.isNaN
+              ? '—'
+              : '${u.toStringAsFixed(3)} W/(m²K)';
+          return SimpleDialogOption(
+            onPressed: () => Navigator.of(ctx).pop(p),
+            child: ListTile(
+              title: Text(p.name),
+              subtitle: Text('U = $uLabel'),
+              dense: true,
+            ),
+          );
+        }).toList(),
+      ),
+    );
+    if (selected == null || !mounted) return;
+
+    final srcLayers = ref
+        .read(editorStateProvider)
+        .materialLayers
+        .where((l) => l.constructionId == selected.id)
+        .toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+
+    final newId = _construction.id;
+    setState(() {
+      _construction = selected.copyWith(
+        id: newId,
+        isPreset: false,
+      );
+      _layers = srcLayers
+          .asMap()
+          .entries
+          .map(
+            (e) => e.value.copyWith(
+              id: IdGenerator.newId(),
+              constructionId: newId,
+              sortOrder: e.key,
+            ),
+          )
+          .toList();
+      _nameCtrl.text = selected.name;
+      _rsiCtrl.text = selected.rsi.toStringAsFixed(2);
+      _rseCtrl.text = selected.rse.toStringAsFixed(2);
+    });
+  }
+
   void _save() {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) return;
@@ -726,7 +999,6 @@ class _WallConstructionDialogState
         child: Padding(
           padding: const EdgeInsets.all(Spacing.md),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ---- Title row ----
@@ -749,6 +1021,16 @@ class _WallConstructionDialogState
                     visualDensity: VisualDensity.compact,
                   ),
                 ],
+              ),
+
+              // ---- Preset row ----
+              _PresetRow(
+                onSaveAsPreset: _saveAsPreset,
+                onLoadPreset: _loadPreset,
+                hasPresets: ref
+                    .watch(editorStateProvider)
+                    .constructions
+                    .any((c) => c.isPreset),
               ),
               const SizedBox(height: Spacing.sm),
 
@@ -804,8 +1086,7 @@ class _WallConstructionDialogState
                 style: textTheme.headlineSmall,
               ),
               const SizedBox(height: Spacing.xs),
-              SizedBox(
-                height: 220,
+              Flexible(
                 child: ReorderableListView.builder(
                   buildDefaultDragHandles: false,
                   itemCount: _layers.length,
@@ -1201,6 +1482,50 @@ class _TempProfilePainter extends CustomPainter {
   @override
   bool shouldRepaint(_TempProfilePainter old) =>
       old.profile != profile || old.textColor != textColor;
+}
+
+// ---------------------------------------------------------------
+// Preset action row
+// ---------------------------------------------------------------
+
+/// A compact row with "Save as preset" and "Load ▾" buttons.
+///
+/// [onLoadPreset] button is disabled when [hasPresets] is false.
+class _PresetRow extends StatelessWidget {
+  const _PresetRow({
+    required this.onSaveAsPreset,
+    required this.onLoadPreset,
+    required this.hasPresets,
+  });
+
+  final VoidCallback onSaveAsPreset;
+  final VoidCallback onLoadPreset;
+  final bool hasPresets;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        TextButton.icon(
+          icon: const Icon(Icons.upload, size: 16),
+          label: const Text('Save as preset'),
+          onPressed: onSaveAsPreset,
+          style: TextButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+          ),
+        ),
+        const SizedBox(width: Spacing.sm),
+        TextButton.icon(
+          icon: const Icon(Icons.download, size: 16),
+          label: const Text('Load'),
+          onPressed: hasPresets ? onLoadPreset : null,
+          style: TextButton.styleFrom(
+            visualDensity: VisualDensity.compact,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 // ---------------------------------------------------------------

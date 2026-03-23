@@ -1684,8 +1684,20 @@ class $WallConstructionsTable extends WallConstructions
     requiredDuringInsert: false,
     defaultValue: const Constant(0.04),
   );
+  static const VerificationMeta _isPresetMeta = const VerificationMeta(
+    'isPreset',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, name, rsi, rse];
+  late final GeneratedColumn<int> isPreset = GeneratedColumn<int>(
+    'is_preset',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, rsi, rse, isPreset];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1723,6 +1735,12 @@ class $WallConstructionsTable extends WallConstructions
         rse.isAcceptableOrUnknown(data['rse']!, _rseMeta),
       );
     }
+    if (data.containsKey('is_preset')) {
+      context.handle(
+        _isPresetMeta,
+        isPreset.isAcceptableOrUnknown(data['is_preset']!, _isPresetMeta),
+      );
+    }
     return context;
   }
 
@@ -1748,6 +1766,10 @@ class $WallConstructionsTable extends WallConstructions
         DriftSqlType.double,
         data['${effectivePrefix}rse'],
       )!,
+      isPreset: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}is_preset'],
+      )!,
     );
   }
 
@@ -1763,11 +1785,15 @@ class WallConstruction extends DataClass
   final String name;
   final double rsi;
   final double rse;
+
+  /// 1 = preset, 0 = regular construction.
+  final int isPreset;
   const WallConstruction({
     required this.id,
     required this.name,
     required this.rsi,
     required this.rse,
+    required this.isPreset,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1776,6 +1802,7 @@ class WallConstruction extends DataClass
     map['name'] = Variable<String>(name);
     map['rsi'] = Variable<double>(rsi);
     map['rse'] = Variable<double>(rse);
+    map['is_preset'] = Variable<int>(isPreset);
     return map;
   }
 
@@ -1785,6 +1812,7 @@ class WallConstruction extends DataClass
       name: Value(name),
       rsi: Value(rsi),
       rse: Value(rse),
+      isPreset: Value(isPreset),
     );
   }
 
@@ -1798,6 +1826,7 @@ class WallConstruction extends DataClass
       name: serializer.fromJson<String>(json['name']),
       rsi: serializer.fromJson<double>(json['rsi']),
       rse: serializer.fromJson<double>(json['rse']),
+      isPreset: serializer.fromJson<int>(json['isPreset']),
     );
   }
   @override
@@ -1808,6 +1837,7 @@ class WallConstruction extends DataClass
       'name': serializer.toJson<String>(name),
       'rsi': serializer.toJson<double>(rsi),
       'rse': serializer.toJson<double>(rse),
+      'isPreset': serializer.toJson<int>(isPreset),
     };
   }
 
@@ -1816,11 +1846,13 @@ class WallConstruction extends DataClass
     String? name,
     double? rsi,
     double? rse,
+    int? isPreset,
   }) => WallConstruction(
     id: id ?? this.id,
     name: name ?? this.name,
     rsi: rsi ?? this.rsi,
     rse: rse ?? this.rse,
+    isPreset: isPreset ?? this.isPreset,
   );
   WallConstruction copyWithCompanion(WallConstructionsCompanion data) {
     return WallConstruction(
@@ -1828,6 +1860,7 @@ class WallConstruction extends DataClass
       name: data.name.present ? data.name.value : this.name,
       rsi: data.rsi.present ? data.rsi.value : this.rsi,
       rse: data.rse.present ? data.rse.value : this.rse,
+      isPreset: data.isPreset.present ? data.isPreset.value : this.isPreset,
     );
   }
 
@@ -1837,13 +1870,14 @@ class WallConstruction extends DataClass
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('rsi: $rsi, ')
-          ..write('rse: $rse')
+          ..write('rse: $rse, ')
+          ..write('isPreset: $isPreset')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, rsi, rse);
+  int get hashCode => Object.hash(id, name, rsi, rse, isPreset);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -1851,7 +1885,8 @@ class WallConstruction extends DataClass
           other.id == this.id &&
           other.name == this.name &&
           other.rsi == this.rsi &&
-          other.rse == this.rse);
+          other.rse == this.rse &&
+          other.isPreset == this.isPreset);
 }
 
 class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
@@ -1859,12 +1894,14 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
   final Value<String> name;
   final Value<double> rsi;
   final Value<double> rse;
+  final Value<int> isPreset;
   final Value<int> rowid;
   const WallConstructionsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.rsi = const Value.absent(),
     this.rse = const Value.absent(),
+    this.isPreset = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   WallConstructionsCompanion.insert({
@@ -1872,6 +1909,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
     required String name,
     this.rsi = const Value.absent(),
     this.rse = const Value.absent(),
+    this.isPreset = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name);
@@ -1880,6 +1918,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
     Expression<String>? name,
     Expression<double>? rsi,
     Expression<double>? rse,
+    Expression<int>? isPreset,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1887,6 +1926,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
       if (name != null) 'name': name,
       if (rsi != null) 'rsi': rsi,
       if (rse != null) 'rse': rse,
+      if (isPreset != null) 'is_preset': isPreset,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1896,6 +1936,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
     Value<String>? name,
     Value<double>? rsi,
     Value<double>? rse,
+    Value<int>? isPreset,
     Value<int>? rowid,
   }) {
     return WallConstructionsCompanion(
@@ -1903,6 +1944,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
       name: name ?? this.name,
       rsi: rsi ?? this.rsi,
       rse: rse ?? this.rse,
+      isPreset: isPreset ?? this.isPreset,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1922,6 +1964,9 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
     if (rse.present) {
       map['rse'] = Variable<double>(rse.value);
     }
+    if (isPreset.present) {
+      map['is_preset'] = Variable<int>(isPreset.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -1935,6 +1980,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
           ..write('name: $name, ')
           ..write('rsi: $rsi, ')
           ..write('rse: $rse, ')
+          ..write('isPreset: $isPreset, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -9164,6 +9210,7 @@ typedef $$WallConstructionsTableCreateCompanionBuilder =
       required String name,
       Value<double> rsi,
       Value<double> rse,
+      Value<int> isPreset,
       Value<int> rowid,
     });
 typedef $$WallConstructionsTableUpdateCompanionBuilder =
@@ -9172,6 +9219,7 @@ typedef $$WallConstructionsTableUpdateCompanionBuilder =
       Value<String> name,
       Value<double> rsi,
       Value<double> rse,
+      Value<int> isPreset,
       Value<int> rowid,
     });
 
@@ -9260,6 +9308,11 @@ class $$WallConstructionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get isPreset => $composableBuilder(
+    column: $table.isPreset,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> wallSegmentsRefs(
     Expression<bool> Function($$WallSegmentsTableFilterComposer f) f,
   ) {
@@ -9339,6 +9392,11 @@ class $$WallConstructionsTableOrderingComposer
     column: $table.rse,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get isPreset => $composableBuilder(
+    column: $table.isPreset,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$WallConstructionsTableAnnotationComposer
@@ -9361,6 +9419,9 @@ class $$WallConstructionsTableAnnotationComposer
 
   GeneratedColumn<double> get rse =>
       $composableBuilder(column: $table.rse, builder: (column) => column);
+
+  GeneratedColumn<int> get isPreset =>
+      $composableBuilder(column: $table.isPreset, builder: (column) => column);
 
   Expression<T> wallSegmentsRefs<T extends Object>(
     Expression<T> Function($$WallSegmentsTableAnnotationComposer a) f,
@@ -9453,12 +9514,14 @@ class $$WallConstructionsTableTableManager
                 Value<String> name = const Value.absent(),
                 Value<double> rsi = const Value.absent(),
                 Value<double> rse = const Value.absent(),
+                Value<int> isPreset = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => WallConstructionsCompanion(
                 id: id,
                 name: name,
                 rsi: rsi,
                 rse: rse,
+                isPreset: isPreset,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9467,12 +9530,14 @@ class $$WallConstructionsTableTableManager
                 required String name,
                 Value<double> rsi = const Value.absent(),
                 Value<double> rse = const Value.absent(),
+                Value<int> isPreset = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => WallConstructionsCompanion.insert(
                 id: id,
                 name: name,
                 rsi: rsi,
                 rse: rse,
+                isPreset: isPreset,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
