@@ -22,6 +22,11 @@ class ProjectDao extends DatabaseAccessor<AppDatabase>
   Stream<Project> watchById(String id) =>
       (select(projects)..where((t) => t.id.equals(id))).watchSingle();
 
+  /// Reactive stream for a single project by [id], or null if absent.
+  Stream<Project?> watchByIdNullable(String id) =>
+      (select(projects)..where((t) => t.id.equals(id)))
+          .watchSingleOrNull();
+
   /// Inserts or replaces a project row.
   Future<void> upsert(ProjectsCompanion companion) =>
       into(projects).insertOnConflictUpdate(companion);
