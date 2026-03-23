@@ -131,32 +131,39 @@ class ThermalEngine {
   }
 
   /// Temperature correction factor for floor or ceiling boundary
-  /// conditions.
+  /// conditions (EN 12831 §6.3.3).
   ///
   /// | [BoundaryCondition] | Factor |
   /// |---------------------|--------|
   /// | exterior            | 1.0 (direct outdoor contact) |
   /// | ground              | [groundCorrectionFactorDefault] = 0.6 |
-  /// | unheatedSpace       | [unheatedCorrectionFactor] (caller-supplied) |
-  /// | interior            | 0.0 (no heat loss) |
+  /// | unheatedSpace       | (T_room − T_adjacent)/(T_room − T_outdoor) |
+  /// | interior            | (T_room − T_adjacent)/(T_room − T_outdoor) |
   ///
-  /// Returns [double.nan] if [condition] is
-  /// [BoundaryCondition.unheatedSpace] and [unheatedCorrectionFactor]
-  /// is null.
+  /// [tAdjacentC] is required for [BoundaryCondition.unheatedSpace] and
+  /// [BoundaryCondition.interior]; callers must resolve null to the
+  /// appropriate project-level default before calling. Returns
+  /// [double.nan] when [tAdjacentC] is null for those conditions, or
+  /// when T_room == T_outdoor (division by zero).
   static double boundaryCorrectionFactor({
     required BoundaryCondition condition,
-    double? unheatedCorrectionFactor,
+    required double tRoomC,
+    required double tOutdoorC,
+    double? tAdjacentC,
   }) {
     switch (condition) {
       case BoundaryCondition.exterior:
         return 1.0;
       case BoundaryCondition.ground:
         return groundCorrectionFactorDefault;
-      case BoundaryCondition.interior:
-        return 0.0;
       case BoundaryCondition.unheatedSpace:
-        if (unheatedCorrectionFactor == null) return double.nan;
-        return unheatedCorrectionFactor;
+      case BoundaryCondition.interior:
+        if (tAdjacentC == null) return double.nan;
+        return interiorCorrectionFactor(
+          tThisRoomC: tRoomC,
+          tAdjacentRoomC: tAdjacentC,
+          tOutdoorC: tOutdoorC,
+        );
     }
   }
 

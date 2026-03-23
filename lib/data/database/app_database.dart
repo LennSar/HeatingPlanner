@@ -65,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 7;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -113,13 +113,25 @@ class AppDatabase extends _$AppDatabase {
             await m.addColumn(rooms, rooms.ceilingConstructionId);
             await m.addColumn(rooms, rooms.floorBoundary);
             await m.addColumn(rooms, rooms.ceilingBoundary);
-            await m.addColumn(
-              rooms,
-              rooms.floorUnheatedCorrectionFactor,
+            // These columns were renamed in schema v8; added here via
+            // raw SQL so the Dart table class doesn't need them.
+            await m.database.customStatement(
+              'ALTER TABLE rooms ADD COLUMN '
+              'floor_unheated_correction_factor REAL',
             );
-            await m.addColumn(
-              rooms,
-              rooms.ceilingUnheatedCorrectionFactor,
+            await m.database.customStatement(
+              'ALTER TABLE rooms ADD COLUMN '
+              'ceiling_unheated_correction_factor REAL',
+            );
+          }
+          if (from < 8) {
+            await m.database.customStatement(
+              'ALTER TABLE rooms ADD COLUMN '
+              'floor_adjacent_temp_c REAL',
+            );
+            await m.database.customStatement(
+              'ALTER TABLE rooms ADD COLUMN '
+              'ceiling_adjacent_temp_c REAL',
             );
           }
         },

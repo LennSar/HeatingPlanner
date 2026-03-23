@@ -49,6 +49,8 @@ final roomHeatDemandProvider =
 
   final tOutdoor = ref.watch(designOutdoorTempCProvider);
   final tThis = room.targetTempC;
+  final tUnheatedDefault = ref.watch(unheatedSpaceTempCProvider);
+  final tIndoorDefault = ref.watch(defaultIndoorTempCProvider);
 
   // Ceiling height: read from floor, fall back to 2600 mm.
   final ceilingHeightMm = ref
@@ -185,10 +187,15 @@ final roomHeatDemandProvider =
     final uFloor =
         ref.watch(uValueProvider(room.floorConstructionId!));
     if (!uFloor.isNaN) {
+      final tFloorAdjacent = room.floorAdjacentTempC ??
+          (room.floorBoundary == BoundaryCondition.interior
+              ? tIndoorDefault
+              : tUnheatedDefault);
       final fFloor = ThermalEngine.boundaryCorrectionFactor(
         condition: room.floorBoundary,
-        unheatedCorrectionFactor:
-            room.floorUnheatedCorrectionFactor,
+        tRoomC: tThis,
+        tOutdoorC: tOutdoor,
+        tAdjacentC: tFloorAdjacent,
       );
       if (!fFloor.isNaN) {
         final qFloor = ThermalEngine.transmissionLoss(
@@ -210,10 +217,15 @@ final roomHeatDemandProvider =
     final uCeiling =
         ref.watch(uValueProvider(room.ceilingConstructionId!));
     if (!uCeiling.isNaN) {
+      final tCeilingAdjacent = room.ceilingAdjacentTempC ??
+          (room.ceilingBoundary == BoundaryCondition.interior
+              ? tIndoorDefault
+              : tUnheatedDefault);
       final fCeiling = ThermalEngine.boundaryCorrectionFactor(
         condition: room.ceilingBoundary,
-        unheatedCorrectionFactor:
-            room.ceilingUnheatedCorrectionFactor,
+        tRoomC: tThis,
+        tOutdoorC: tOutdoor,
+        tAdjacentC: tCeilingAdjacent,
       );
       if (!fCeiling.isNaN) {
         final qCeiling = ThermalEngine.transmissionLoss(

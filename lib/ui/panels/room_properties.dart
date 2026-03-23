@@ -6,7 +6,6 @@ import '../../calculation/engines/thermal_engine.dart';
 import '../../calculation/providers/heat_demand_providers.dart';
 import '../../calculation/providers/project_settings_provider.dart';
 import '../../calculation/providers/u_value_providers.dart';
-import '../../core/constants/thermal_defaults.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/room.dart';
@@ -488,6 +487,10 @@ class _RoomPropertiesState
       tOutdoorC: tOutdoor,
     );
 
+    final tUnheatedDefault =
+        ref.read(unheatedSpaceTempCProvider);
+    final tIndoorDefault = ref.read(defaultIndoorTempCProvider);
+
     // Floor transmission loss (inline from editorState).
     double? qFloor;
     if (room.floorConstructionId != null && areaM2 > 0) {
@@ -512,11 +515,16 @@ class _RoomPropertiesState
             rse: floorConstruction.rse,
           );
           if (!uFloor.isNaN) {
+            final tFloorAdj = room.floorAdjacentTempC ??
+                (room.floorBoundary == BoundaryCondition.interior
+                    ? tIndoorDefault
+                    : tUnheatedDefault);
             final fFloor =
                 ThermalEngine.boundaryCorrectionFactor(
               condition: room.floorBoundary,
-              unheatedCorrectionFactor:
-                  room.floorUnheatedCorrectionFactor,
+              tRoomC: tIndoor,
+              tOutdoorC: tOutdoor,
+              tAdjacentC: tFloorAdj,
             );
             if (!fFloor.isNaN) {
               final loss = ThermalEngine.transmissionLoss(
@@ -558,11 +566,16 @@ class _RoomPropertiesState
             rse: ceilConstruction.rse,
           );
           if (!uCeiling.isNaN) {
+            final tCeilAdj = room.ceilingAdjacentTempC ??
+                (room.ceilingBoundary == BoundaryCondition.interior
+                    ? tIndoorDefault
+                    : tUnheatedDefault);
             final fCeiling =
                 ThermalEngine.boundaryCorrectionFactor(
               condition: room.ceilingBoundary,
-              unheatedCorrectionFactor:
-                  room.ceilingUnheatedCorrectionFactor,
+              tRoomC: tIndoor,
+              tOutdoorC: tOutdoor,
+              tAdjacentC: tCeilAdj,
             );
             if (!fCeiling.isNaN) {
               final loss = ThermalEngine.transmissionLoss(
@@ -872,44 +885,30 @@ String? _roomDemandMissingPrereqs(Room room, EditorState state) {
 // Envelope — Floor & Ceiling section
 // ================================================================
 
-/// Dropdown option combining display label, BoundaryCondition value,
-/// and the default correction factor to pre-fill.
+/// Dropdown option combining display label and [BoundaryCondition].
 @immutable
 class _BoundaryOption {
   const _BoundaryOption({
     required this.label,
     required this.condition,
-    required this.presetFactor,
   });
 
   final String label;
   final BoundaryCondition condition;
-
-  /// The factor pre-filled when this option is selected.
-  /// Double.nan for conditions with a fixed, non-configurable factor.
-  final double presetFactor;
 }
 
 const _kFloorOptions = <_BoundaryOption>[
   _BoundaryOption(
     label: 'Ground (slab on grade)',
     condition: BoundaryCondition.ground,
-    presetFactor: groundCorrectionFactorDefault,
   ),
   _BoundaryOption(
-    label: 'Unheated basement / garage',
+    label: 'Unheated space (basement / garage / crawlspace)',
     condition: BoundaryCondition.unheatedSpace,
-    presetFactor: unheatedBasementCorrectionFactor,
   ),
   _BoundaryOption(
-    label: 'Unheated crawlspace',
-    condition: BoundaryCondition.unheatedSpace,
-    presetFactor: unheatedCrawlspaceCorrectionFactor,
-  ),
-  _BoundaryOption(
-    label: 'Adjacent heated room',
+    label: 'Adjacent heated room (floor above another room)',
     condition: BoundaryCondition.interior,
-    presetFactor: 0.0,
   ),
 ];
 
@@ -917,49 +916,22 @@ const _kCeilingOptions = <_BoundaryOption>[
   _BoundaryOption(
     label: 'Exterior / Roof',
     condition: BoundaryCondition.exterior,
-    presetFactor: 1.0,
   ),
   _BoundaryOption(
-    label: 'Unheated attic',
+    label: 'Unheated space (attic / garage / crawlspace)',
     condition: BoundaryCondition.unheatedSpace,
-    presetFactor: unheatedAtticCorrectionFactor,
   ),
   _BoundaryOption(
-    label: 'Unheated basement / garage',
-    condition: BoundaryCondition.unheatedSpace,
-    presetFactor: unheatedBasementCorrectionFactor,
-  ),
-  _BoundaryOption(
-    label: 'Unheated crawlspace',
-    condition: BoundaryCondition.unheatedSpace,
-    presetFactor: unheatedCrawlspaceCorrectionFactor,
-  ),
-  _BoundaryOption(
-    label: 'Adjacent heated room',
+    label: 'Adjacent heated room (ceiling below another room)',
     condition: BoundaryCondition.interior,
-    presetFactor: 0.0,
   ),
 ];
 
-/// Returns the label from [options] matching [condition] and [factor].
-///
-/// For [BoundaryCondition.unheatedSpace], also matches the stored
-/// factor against the option's preset (within 0.01 tolerance).
-/// Falls back to the first matching condition label.
+/// Returns the label from [options] matching [condition].
 String _boundaryLabel(
   List<_BoundaryOption> options,
   BoundaryCondition condition,
-  double? factor,
 ) {
-  if (condition == BoundaryCondition.unheatedSpace) {
-    for (final opt in options) {
-      if (opt.condition != BoundaryCondition.unheatedSpace) {
-        continue;
-      }
-      if (factor == null) return opt.label;
-      if ((opt.presetFactor - factor).abs() < 0.01) return opt.label;
-    }
-  }
   return options
       .firstWhere(
         (o) => o.condition == condition,
@@ -986,8 +958,6 @@ class _EnvelopeSection extends ConsumerStatefulWidget {
 
 class _EnvelopeSectionState
     extends ConsumerState<_EnvelopeSection> {
-  Room? _roomAtFloorSliderStart;
-  Room? _roomAtCeilingSliderStart;
 
   void _updateRoom(Room updated) {
     ref.read(editorStateProvider.notifier).updateRoom(updated);
@@ -996,14 +966,11 @@ class _EnvelopeSectionState
   void _onFloorBoundaryChanged(String label) {
     final opt =
         _kFloorOptions.firstWhere((o) => o.label == label);
-    final room = widget.room;
     _updateRoom(
-      room.copyWith(
+      widget.room.copyWith(
         floorBoundary: opt.condition,
-        floorUnheatedCorrectionFactor:
-            opt.condition == BoundaryCondition.unheatedSpace
-                ? opt.presetFactor
-                : null,
+        // Clear the per-room override so the project default applies.
+        floorAdjacentTempC: null,
       ),
     );
   }
@@ -1011,14 +978,10 @@ class _EnvelopeSectionState
   void _onCeilingBoundaryChanged(String label) {
     final opt =
         _kCeilingOptions.firstWhere((o) => o.label == label);
-    final room = widget.room;
     _updateRoom(
-      room.copyWith(
+      widget.room.copyWith(
         ceilingBoundary: opt.condition,
-        ceilingUnheatedCorrectionFactor:
-            opt.condition == BoundaryCondition.unheatedSpace
-                ? opt.presetFactor
-                : null,
+        ceilingAdjacentTempC: null,
       ),
     );
   }
@@ -1054,12 +1017,10 @@ class _EnvelopeSectionState
     final floorLabel = _boundaryLabel(
       _kFloorOptions,
       room.floorBoundary,
-      room.floorUnheatedCorrectionFactor,
     );
     final ceilingLabel = _boundaryLabel(
       _kCeilingOptions,
       room.ceilingBoundary,
-      room.ceilingUnheatedCorrectionFactor,
     );
 
     final floorConstruction = room.floorConstructionId == null
@@ -1110,34 +1071,13 @@ class _EnvelopeSectionState
           textTheme: textTheme,
         ),
         const SizedBox(height: Spacing.xs),
-        _correctionFactorRow(
+        _adjacentTempRow(
           context: context,
           condition: room.floorBoundary,
-          factor: room.floorUnheatedCorrectionFactor,
+          adjacentTempC: room.floorAdjacentTempC,
           onChanged: (v) => _updateRoom(
-            room.copyWith(floorUnheatedCorrectionFactor: v),
+            room.copyWith(floorAdjacentTempC: v),
           ),
-          onChangeStart: () {
-            _roomAtFloorSliderStart = room;
-          },
-          onChangeEnd: (v) {
-            final start = _roomAtFloorSliderStart;
-            _roomAtFloorSliderStart = null;
-            if (start != null &&
-                start.floorUnheatedCorrectionFactor != v) {
-              ref.read(undoRedoProvider).execute(
-                    _UpdateRoomCommand(
-                      oldRoom: start,
-                      newRoom: start.copyWith(
-                        floorUnheatedCorrectionFactor: v,
-                      ),
-                      update: ref
-                          .read(editorStateProvider.notifier)
-                          .updateRoom,
-                    ),
-                  );
-            }
-          },
           textTheme: textTheme,
         ),
         const SizedBox(height: Spacing.sm),
@@ -1162,34 +1102,13 @@ class _EnvelopeSectionState
           textTheme: textTheme,
         ),
         const SizedBox(height: Spacing.xs),
-        _correctionFactorRow(
+        _adjacentTempRow(
           context: context,
           condition: room.ceilingBoundary,
-          factor: room.ceilingUnheatedCorrectionFactor,
+          adjacentTempC: room.ceilingAdjacentTempC,
           onChanged: (v) => _updateRoom(
-            room.copyWith(ceilingUnheatedCorrectionFactor: v),
+            room.copyWith(ceilingAdjacentTempC: v),
           ),
-          onChangeStart: () {
-            _roomAtCeilingSliderStart = room;
-          },
-          onChangeEnd: (v) {
-            final start = _roomAtCeilingSliderStart;
-            _roomAtCeilingSliderStart = null;
-            if (start != null &&
-                start.ceilingUnheatedCorrectionFactor != v) {
-              ref.read(undoRedoProvider).execute(
-                    _UpdateRoomCommand(
-                      oldRoom: start,
-                      newRoom: start.copyWith(
-                        ceilingUnheatedCorrectionFactor: v,
-                      ),
-                      update: ref
-                          .read(editorStateProvider.notifier)
-                          .updateRoom,
-                    ),
-                  );
-            }
-          },
           textTheme: textTheme,
         ),
         const SizedBox(height: Spacing.xs),
@@ -1278,71 +1197,73 @@ class _EnvelopeSectionState
     );
   }
 
-  Widget _correctionFactorRow({
+  /// Renders an adjacent-space temperature row.
+  ///
+  /// Shown only for [BoundaryCondition.unheatedSpace] and
+  /// [BoundaryCondition.interior]. For other conditions returns
+  /// [SizedBox.shrink].
+  ///
+  /// Displays the per-room override when set, or the project default
+  /// as hint text. A reset button clears the override back to null.
+  Widget _adjacentTempRow({
     required BuildContext context,
     required BoundaryCondition condition,
-    required double? factor,
-    required void Function(double) onChanged,
-    required VoidCallback onChangeStart,
-    required void Function(double) onChangeEnd,
+    required double? adjacentTempC,
+    required void Function(double?) onChanged,
     required TextTheme textTheme,
   }) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    if (condition != BoundaryCondition.unheatedSpace) {
-      final fixedValue =
-          condition == BoundaryCondition.exterior
-              ? 1.0
-              : condition == BoundaryCondition.ground
-                  ? groundCorrectionFactorDefault
-                  : 0.0;
-      return Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text('Correction f.', style: textTheme.bodyMedium),
-          Text(
-            fixedValue.toStringAsFixed(2),
-            style: textTheme.bodyMedium?.copyWith(
-              fontWeight: FontWeight.w600,
-              color: colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      );
+    if (condition == BoundaryCondition.exterior ||
+        condition == BoundaryCondition.ground) {
+      return const SizedBox.shrink();
     }
 
-    final current =
-        factor ?? unheatedBasementCorrectionFactor;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+    final tUnheated = ref.read(unheatedSpaceTempCProvider);
+    final tIndoor = ref.read(defaultIndoorTempCProvider);
+    final projectDefault = condition == BoundaryCondition.interior
+        ? tIndoor
+        : tUnheated;
+
+    final label = condition == BoundaryCondition.interior
+        ? 'Adjacent room temp.'
+        : 'Unheated space temp.';
+
+    final controller = TextEditingController(
+      text: adjacentTempC?.toStringAsFixed(1) ?? '',
+    );
+
+    return Row(
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Correction f.',
-              style: textTheme.bodyMedium,
+        Expanded(
+          child: TextField(
+            controller: controller,
+            keyboardType: const TextInputType.numberWithOptions(
+              decimal: true,
+              signed: true,
             ),
-            Text(
-              current.toStringAsFixed(2),
-              style: textTheme.bodyMedium?.copyWith(
-                fontWeight: FontWeight.w600,
-              ),
+            decoration: InputDecoration(
+              labelText: label,
+              hintText: '${projectDefault.toStringAsFixed(1)} (default)',
+              suffixText: '\u00B0C',
+              isDense: true,
             ),
-          ],
-        ),
-        SizedBox(
-          width: double.infinity,
-          child: Slider(
-            value: current,
-            min: 0.0,
-            max: 1.0,
-            divisions: 20,
-            onChangeStart: (_) => onChangeStart(),
-            onChanged: onChanged,
-            onChangeEnd: onChangeEnd,
+            style: textTheme.bodyMedium,
+            onSubmitted: (raw) {
+              final parsed = double.tryParse(raw);
+              onChanged(parsed);
+            },
           ),
         ),
+        if (adjacentTempC != null)
+          IconButton(
+            icon: const Icon(Icons.refresh, size: 16),
+            tooltip: 'Reset to project default',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(
+              minWidth: 32,
+              minHeight: 32,
+            ),
+            onPressed: () => onChanged(null),
+          ),
       ],
     );
   }

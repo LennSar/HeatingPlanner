@@ -48,15 +48,21 @@ abstract class Room with _$Room {
     @Default(BoundaryCondition.exterior)
     BoundaryCondition ceilingBoundary,
 
-    /// User-supplied correction factor (0.0–1.0) for floor, when
-    /// [floorBoundary] == [BoundaryCondition.unheatedSpace].
-    /// Null means the engine will return NaN (user must set it).
-    double? floorUnheatedCorrectionFactor,
+    /// Per-room adjacent temperature (°C) for the floor boundary.
+    ///
+    /// Used when [floorBoundary] is [BoundaryCondition.unheatedSpace] or
+    /// [BoundaryCondition.interior]. Null means the project-level default
+    /// is used (unheatedSpaceTempC for unheated, defaultIndoorTempC for
+    /// interior).
+    double? floorAdjacentTempC,
 
-    /// User-supplied correction factor (0.0–1.0) for ceiling, when
-    /// [ceilingBoundary] == [BoundaryCondition.unheatedSpace].
-    /// Null means the engine will return NaN (user must set it).
-    double? ceilingUnheatedCorrectionFactor,
+    /// Per-room adjacent temperature (°C) for the ceiling boundary.
+    ///
+    /// Used when [ceilingBoundary] is [BoundaryCondition.unheatedSpace] or
+    /// [BoundaryCondition.interior]. Null means the project-level default
+    /// is used (unheatedSpaceTempC for unheated, defaultIndoorTempC for
+    /// interior).
+    double? ceilingAdjacentTempC,
   }) = _Room;
 
   factory Room.fromJson(Map<String, dynamic> json) => _$RoomFromJson(json);

@@ -28,13 +28,19 @@ mixin _$Room {
 /// Null = not assigned.
  String? get ceilingConstructionId;/// Boundary condition below the floor slab.
  BoundaryCondition get floorBoundary;/// Boundary condition above the ceiling slab.
- BoundaryCondition get ceilingBoundary;/// User-supplied correction factor (0.0–1.0) for floor, when
-/// [floorBoundary] == [BoundaryCondition.unheatedSpace].
-/// Null means the engine will return NaN (user must set it).
- double? get floorUnheatedCorrectionFactor;/// User-supplied correction factor (0.0–1.0) for ceiling, when
-/// [ceilingBoundary] == [BoundaryCondition.unheatedSpace].
-/// Null means the engine will return NaN (user must set it).
- double? get ceilingUnheatedCorrectionFactor;
+ BoundaryCondition get ceilingBoundary;/// Per-room adjacent temperature (°C) for the floor boundary.
+///
+/// Used when [floorBoundary] is [BoundaryCondition.unheatedSpace] or
+/// [BoundaryCondition.interior]. Null means the project-level default
+/// is used (unheatedSpaceTempC for unheated, defaultIndoorTempC for
+/// interior).
+ double? get floorAdjacentTempC;/// Per-room adjacent temperature (°C) for the ceiling boundary.
+///
+/// Used when [ceilingBoundary] is [BoundaryCondition.unheatedSpace] or
+/// [BoundaryCondition.interior]. Null means the project-level default
+/// is used (unheatedSpaceTempC for unheated, defaultIndoorTempC for
+/// interior).
+ double? get ceilingAdjacentTempC;
 /// Create a copy of Room
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -47,16 +53,16 @@ $RoomCopyWith<Room> get copyWith => _$RoomCopyWithImpl<Room>(this as Room, _$ide
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Room&&(identical(other.id, id) || other.id == id)&&(identical(other.floorId, floorId) || other.floorId == floorId)&&(identical(other.name, name) || other.name == name)&&(identical(other.targetTempC, targetTempC) || other.targetTempC == targetTempC)&&(identical(other.airChangeRate, airChangeRate) || other.airChangeRate == airChangeRate)&&const DeepCollectionEquality().equals(other.polygon, polygon)&&(identical(other.floorConstructionId, floorConstructionId) || other.floorConstructionId == floorConstructionId)&&(identical(other.ceilingConstructionId, ceilingConstructionId) || other.ceilingConstructionId == ceilingConstructionId)&&(identical(other.floorBoundary, floorBoundary) || other.floorBoundary == floorBoundary)&&(identical(other.ceilingBoundary, ceilingBoundary) || other.ceilingBoundary == ceilingBoundary)&&(identical(other.floorUnheatedCorrectionFactor, floorUnheatedCorrectionFactor) || other.floorUnheatedCorrectionFactor == floorUnheatedCorrectionFactor)&&(identical(other.ceilingUnheatedCorrectionFactor, ceilingUnheatedCorrectionFactor) || other.ceilingUnheatedCorrectionFactor == ceilingUnheatedCorrectionFactor));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Room&&(identical(other.id, id) || other.id == id)&&(identical(other.floorId, floorId) || other.floorId == floorId)&&(identical(other.name, name) || other.name == name)&&(identical(other.targetTempC, targetTempC) || other.targetTempC == targetTempC)&&(identical(other.airChangeRate, airChangeRate) || other.airChangeRate == airChangeRate)&&const DeepCollectionEquality().equals(other.polygon, polygon)&&(identical(other.floorConstructionId, floorConstructionId) || other.floorConstructionId == floorConstructionId)&&(identical(other.ceilingConstructionId, ceilingConstructionId) || other.ceilingConstructionId == ceilingConstructionId)&&(identical(other.floorBoundary, floorBoundary) || other.floorBoundary == floorBoundary)&&(identical(other.ceilingBoundary, ceilingBoundary) || other.ceilingBoundary == ceilingBoundary)&&(identical(other.floorAdjacentTempC, floorAdjacentTempC) || other.floorAdjacentTempC == floorAdjacentTempC)&&(identical(other.ceilingAdjacentTempC, ceilingAdjacentTempC) || other.ceilingAdjacentTempC == ceilingAdjacentTempC));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,floorId,name,targetTempC,airChangeRate,const DeepCollectionEquality().hash(polygon),floorConstructionId,ceilingConstructionId,floorBoundary,ceilingBoundary,floorUnheatedCorrectionFactor,ceilingUnheatedCorrectionFactor);
+int get hashCode => Object.hash(runtimeType,id,floorId,name,targetTempC,airChangeRate,const DeepCollectionEquality().hash(polygon),floorConstructionId,ceilingConstructionId,floorBoundary,ceilingBoundary,floorAdjacentTempC,ceilingAdjacentTempC);
 
 @override
 String toString() {
-  return 'Room(id: $id, floorId: $floorId, name: $name, targetTempC: $targetTempC, airChangeRate: $airChangeRate, polygon: $polygon, floorConstructionId: $floorConstructionId, ceilingConstructionId: $ceilingConstructionId, floorBoundary: $floorBoundary, ceilingBoundary: $ceilingBoundary, floorUnheatedCorrectionFactor: $floorUnheatedCorrectionFactor, ceilingUnheatedCorrectionFactor: $ceilingUnheatedCorrectionFactor)';
+  return 'Room(id: $id, floorId: $floorId, name: $name, targetTempC: $targetTempC, airChangeRate: $airChangeRate, polygon: $polygon, floorConstructionId: $floorConstructionId, ceilingConstructionId: $ceilingConstructionId, floorBoundary: $floorBoundary, ceilingBoundary: $ceilingBoundary, floorAdjacentTempC: $floorAdjacentTempC, ceilingAdjacentTempC: $ceilingAdjacentTempC)';
 }
 
 
@@ -67,7 +73,7 @@ abstract mixin class $RoomCopyWith<$Res>  {
   factory $RoomCopyWith(Room value, $Res Function(Room) _then) = _$RoomCopyWithImpl;
 @useResult
 $Res call({
- String id, String floorId, String name, double targetTempC, double airChangeRate, List<Point2D> polygon, String? floorConstructionId, String? ceilingConstructionId, BoundaryCondition floorBoundary, BoundaryCondition ceilingBoundary, double? floorUnheatedCorrectionFactor, double? ceilingUnheatedCorrectionFactor
+ String id, String floorId, String name, double targetTempC, double airChangeRate, List<Point2D> polygon, String? floorConstructionId, String? ceilingConstructionId, BoundaryCondition floorBoundary, BoundaryCondition ceilingBoundary, double? floorAdjacentTempC, double? ceilingAdjacentTempC
 });
 
 
@@ -84,7 +90,7 @@ class _$RoomCopyWithImpl<$Res>
 
 /// Create a copy of Room
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? floorId = null,Object? name = null,Object? targetTempC = null,Object? airChangeRate = null,Object? polygon = null,Object? floorConstructionId = freezed,Object? ceilingConstructionId = freezed,Object? floorBoundary = null,Object? ceilingBoundary = null,Object? floorUnheatedCorrectionFactor = freezed,Object? ceilingUnheatedCorrectionFactor = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? floorId = null,Object? name = null,Object? targetTempC = null,Object? airChangeRate = null,Object? polygon = null,Object? floorConstructionId = freezed,Object? ceilingConstructionId = freezed,Object? floorBoundary = null,Object? ceilingBoundary = null,Object? floorAdjacentTempC = freezed,Object? ceilingAdjacentTempC = freezed,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,floorId: null == floorId ? _self.floorId : floorId // ignore: cast_nullable_to_non_nullable
@@ -96,8 +102,8 @@ as List<Point2D>,floorConstructionId: freezed == floorConstructionId ? _self.flo
 as String?,ceilingConstructionId: freezed == ceilingConstructionId ? _self.ceilingConstructionId : ceilingConstructionId // ignore: cast_nullable_to_non_nullable
 as String?,floorBoundary: null == floorBoundary ? _self.floorBoundary : floorBoundary // ignore: cast_nullable_to_non_nullable
 as BoundaryCondition,ceilingBoundary: null == ceilingBoundary ? _self.ceilingBoundary : ceilingBoundary // ignore: cast_nullable_to_non_nullable
-as BoundaryCondition,floorUnheatedCorrectionFactor: freezed == floorUnheatedCorrectionFactor ? _self.floorUnheatedCorrectionFactor : floorUnheatedCorrectionFactor // ignore: cast_nullable_to_non_nullable
-as double?,ceilingUnheatedCorrectionFactor: freezed == ceilingUnheatedCorrectionFactor ? _self.ceilingUnheatedCorrectionFactor : ceilingUnheatedCorrectionFactor // ignore: cast_nullable_to_non_nullable
+as BoundaryCondition,floorAdjacentTempC: freezed == floorAdjacentTempC ? _self.floorAdjacentTempC : floorAdjacentTempC // ignore: cast_nullable_to_non_nullable
+as double?,ceilingAdjacentTempC: freezed == ceilingAdjacentTempC ? _self.ceilingAdjacentTempC : ceilingAdjacentTempC // ignore: cast_nullable_to_non_nullable
 as double?,
   ));
 }
@@ -183,10 +189,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String floorId,  String name,  double targetTempC,  double airChangeRate,  List<Point2D> polygon,  String? floorConstructionId,  String? ceilingConstructionId,  BoundaryCondition floorBoundary,  BoundaryCondition ceilingBoundary,  double? floorUnheatedCorrectionFactor,  double? ceilingUnheatedCorrectionFactor)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String floorId,  String name,  double targetTempC,  double airChangeRate,  List<Point2D> polygon,  String? floorConstructionId,  String? ceilingConstructionId,  BoundaryCondition floorBoundary,  BoundaryCondition ceilingBoundary,  double? floorAdjacentTempC,  double? ceilingAdjacentTempC)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Room() when $default != null:
-return $default(_that.id,_that.floorId,_that.name,_that.targetTempC,_that.airChangeRate,_that.polygon,_that.floorConstructionId,_that.ceilingConstructionId,_that.floorBoundary,_that.ceilingBoundary,_that.floorUnheatedCorrectionFactor,_that.ceilingUnheatedCorrectionFactor);case _:
+return $default(_that.id,_that.floorId,_that.name,_that.targetTempC,_that.airChangeRate,_that.polygon,_that.floorConstructionId,_that.ceilingConstructionId,_that.floorBoundary,_that.ceilingBoundary,_that.floorAdjacentTempC,_that.ceilingAdjacentTempC);case _:
   return orElse();
 
 }
@@ -204,10 +210,10 @@ return $default(_that.id,_that.floorId,_that.name,_that.targetTempC,_that.airCha
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String floorId,  String name,  double targetTempC,  double airChangeRate,  List<Point2D> polygon,  String? floorConstructionId,  String? ceilingConstructionId,  BoundaryCondition floorBoundary,  BoundaryCondition ceilingBoundary,  double? floorUnheatedCorrectionFactor,  double? ceilingUnheatedCorrectionFactor)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String floorId,  String name,  double targetTempC,  double airChangeRate,  List<Point2D> polygon,  String? floorConstructionId,  String? ceilingConstructionId,  BoundaryCondition floorBoundary,  BoundaryCondition ceilingBoundary,  double? floorAdjacentTempC,  double? ceilingAdjacentTempC)  $default,) {final _that = this;
 switch (_that) {
 case _Room():
-return $default(_that.id,_that.floorId,_that.name,_that.targetTempC,_that.airChangeRate,_that.polygon,_that.floorConstructionId,_that.ceilingConstructionId,_that.floorBoundary,_that.ceilingBoundary,_that.floorUnheatedCorrectionFactor,_that.ceilingUnheatedCorrectionFactor);case _:
+return $default(_that.id,_that.floorId,_that.name,_that.targetTempC,_that.airChangeRate,_that.polygon,_that.floorConstructionId,_that.ceilingConstructionId,_that.floorBoundary,_that.ceilingBoundary,_that.floorAdjacentTempC,_that.ceilingAdjacentTempC);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -224,10 +230,10 @@ return $default(_that.id,_that.floorId,_that.name,_that.targetTempC,_that.airCha
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String floorId,  String name,  double targetTempC,  double airChangeRate,  List<Point2D> polygon,  String? floorConstructionId,  String? ceilingConstructionId,  BoundaryCondition floorBoundary,  BoundaryCondition ceilingBoundary,  double? floorUnheatedCorrectionFactor,  double? ceilingUnheatedCorrectionFactor)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String floorId,  String name,  double targetTempC,  double airChangeRate,  List<Point2D> polygon,  String? floorConstructionId,  String? ceilingConstructionId,  BoundaryCondition floorBoundary,  BoundaryCondition ceilingBoundary,  double? floorAdjacentTempC,  double? ceilingAdjacentTempC)?  $default,) {final _that = this;
 switch (_that) {
 case _Room() when $default != null:
-return $default(_that.id,_that.floorId,_that.name,_that.targetTempC,_that.airChangeRate,_that.polygon,_that.floorConstructionId,_that.ceilingConstructionId,_that.floorBoundary,_that.ceilingBoundary,_that.floorUnheatedCorrectionFactor,_that.ceilingUnheatedCorrectionFactor);case _:
+return $default(_that.id,_that.floorId,_that.name,_that.targetTempC,_that.airChangeRate,_that.polygon,_that.floorConstructionId,_that.ceilingConstructionId,_that.floorBoundary,_that.ceilingBoundary,_that.floorAdjacentTempC,_that.ceilingAdjacentTempC);case _:
   return null;
 
 }
@@ -239,7 +245,7 @@ return $default(_that.id,_that.floorId,_that.name,_that.targetTempC,_that.airCha
 @JsonSerializable()
 
 class _Room implements Room {
-  const _Room({required this.id, required this.floorId, required this.name, this.targetTempC = 20.0, this.airChangeRate = 0.5, final  List<Point2D> polygon = const [], this.floorConstructionId, this.ceilingConstructionId, this.floorBoundary = BoundaryCondition.ground, this.ceilingBoundary = BoundaryCondition.exterior, this.floorUnheatedCorrectionFactor, this.ceilingUnheatedCorrectionFactor}): _polygon = polygon;
+  const _Room({required this.id, required this.floorId, required this.name, this.targetTempC = 20.0, this.airChangeRate = 0.5, final  List<Point2D> polygon = const [], this.floorConstructionId, this.ceilingConstructionId, this.floorBoundary = BoundaryCondition.ground, this.ceilingBoundary = BoundaryCondition.exterior, this.floorAdjacentTempC, this.ceilingAdjacentTempC}): _polygon = polygon;
   factory _Room.fromJson(Map<String, dynamic> json) => _$RoomFromJson(json);
 
 /// UUID v4 primary key.
@@ -273,14 +279,20 @@ class _Room implements Room {
 @override@JsonKey() final  BoundaryCondition floorBoundary;
 /// Boundary condition above the ceiling slab.
 @override@JsonKey() final  BoundaryCondition ceilingBoundary;
-/// User-supplied correction factor (0.0–1.0) for floor, when
-/// [floorBoundary] == [BoundaryCondition.unheatedSpace].
-/// Null means the engine will return NaN (user must set it).
-@override final  double? floorUnheatedCorrectionFactor;
-/// User-supplied correction factor (0.0–1.0) for ceiling, when
-/// [ceilingBoundary] == [BoundaryCondition.unheatedSpace].
-/// Null means the engine will return NaN (user must set it).
-@override final  double? ceilingUnheatedCorrectionFactor;
+/// Per-room adjacent temperature (°C) for the floor boundary.
+///
+/// Used when [floorBoundary] is [BoundaryCondition.unheatedSpace] or
+/// [BoundaryCondition.interior]. Null means the project-level default
+/// is used (unheatedSpaceTempC for unheated, defaultIndoorTempC for
+/// interior).
+@override final  double? floorAdjacentTempC;
+/// Per-room adjacent temperature (°C) for the ceiling boundary.
+///
+/// Used when [ceilingBoundary] is [BoundaryCondition.unheatedSpace] or
+/// [BoundaryCondition.interior]. Null means the project-level default
+/// is used (unheatedSpaceTempC for unheated, defaultIndoorTempC for
+/// interior).
+@override final  double? ceilingAdjacentTempC;
 
 /// Create a copy of Room
 /// with the given fields replaced by the non-null parameter values.
@@ -295,16 +307,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Room&&(identical(other.id, id) || other.id == id)&&(identical(other.floorId, floorId) || other.floorId == floorId)&&(identical(other.name, name) || other.name == name)&&(identical(other.targetTempC, targetTempC) || other.targetTempC == targetTempC)&&(identical(other.airChangeRate, airChangeRate) || other.airChangeRate == airChangeRate)&&const DeepCollectionEquality().equals(other._polygon, _polygon)&&(identical(other.floorConstructionId, floorConstructionId) || other.floorConstructionId == floorConstructionId)&&(identical(other.ceilingConstructionId, ceilingConstructionId) || other.ceilingConstructionId == ceilingConstructionId)&&(identical(other.floorBoundary, floorBoundary) || other.floorBoundary == floorBoundary)&&(identical(other.ceilingBoundary, ceilingBoundary) || other.ceilingBoundary == ceilingBoundary)&&(identical(other.floorUnheatedCorrectionFactor, floorUnheatedCorrectionFactor) || other.floorUnheatedCorrectionFactor == floorUnheatedCorrectionFactor)&&(identical(other.ceilingUnheatedCorrectionFactor, ceilingUnheatedCorrectionFactor) || other.ceilingUnheatedCorrectionFactor == ceilingUnheatedCorrectionFactor));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Room&&(identical(other.id, id) || other.id == id)&&(identical(other.floorId, floorId) || other.floorId == floorId)&&(identical(other.name, name) || other.name == name)&&(identical(other.targetTempC, targetTempC) || other.targetTempC == targetTempC)&&(identical(other.airChangeRate, airChangeRate) || other.airChangeRate == airChangeRate)&&const DeepCollectionEquality().equals(other._polygon, _polygon)&&(identical(other.floorConstructionId, floorConstructionId) || other.floorConstructionId == floorConstructionId)&&(identical(other.ceilingConstructionId, ceilingConstructionId) || other.ceilingConstructionId == ceilingConstructionId)&&(identical(other.floorBoundary, floorBoundary) || other.floorBoundary == floorBoundary)&&(identical(other.ceilingBoundary, ceilingBoundary) || other.ceilingBoundary == ceilingBoundary)&&(identical(other.floorAdjacentTempC, floorAdjacentTempC) || other.floorAdjacentTempC == floorAdjacentTempC)&&(identical(other.ceilingAdjacentTempC, ceilingAdjacentTempC) || other.ceilingAdjacentTempC == ceilingAdjacentTempC));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,floorId,name,targetTempC,airChangeRate,const DeepCollectionEquality().hash(_polygon),floorConstructionId,ceilingConstructionId,floorBoundary,ceilingBoundary,floorUnheatedCorrectionFactor,ceilingUnheatedCorrectionFactor);
+int get hashCode => Object.hash(runtimeType,id,floorId,name,targetTempC,airChangeRate,const DeepCollectionEquality().hash(_polygon),floorConstructionId,ceilingConstructionId,floorBoundary,ceilingBoundary,floorAdjacentTempC,ceilingAdjacentTempC);
 
 @override
 String toString() {
-  return 'Room(id: $id, floorId: $floorId, name: $name, targetTempC: $targetTempC, airChangeRate: $airChangeRate, polygon: $polygon, floorConstructionId: $floorConstructionId, ceilingConstructionId: $ceilingConstructionId, floorBoundary: $floorBoundary, ceilingBoundary: $ceilingBoundary, floorUnheatedCorrectionFactor: $floorUnheatedCorrectionFactor, ceilingUnheatedCorrectionFactor: $ceilingUnheatedCorrectionFactor)';
+  return 'Room(id: $id, floorId: $floorId, name: $name, targetTempC: $targetTempC, airChangeRate: $airChangeRate, polygon: $polygon, floorConstructionId: $floorConstructionId, ceilingConstructionId: $ceilingConstructionId, floorBoundary: $floorBoundary, ceilingBoundary: $ceilingBoundary, floorAdjacentTempC: $floorAdjacentTempC, ceilingAdjacentTempC: $ceilingAdjacentTempC)';
 }
 
 
@@ -315,7 +327,7 @@ abstract mixin class _$RoomCopyWith<$Res> implements $RoomCopyWith<$Res> {
   factory _$RoomCopyWith(_Room value, $Res Function(_Room) _then) = __$RoomCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String floorId, String name, double targetTempC, double airChangeRate, List<Point2D> polygon, String? floorConstructionId, String? ceilingConstructionId, BoundaryCondition floorBoundary, BoundaryCondition ceilingBoundary, double? floorUnheatedCorrectionFactor, double? ceilingUnheatedCorrectionFactor
+ String id, String floorId, String name, double targetTempC, double airChangeRate, List<Point2D> polygon, String? floorConstructionId, String? ceilingConstructionId, BoundaryCondition floorBoundary, BoundaryCondition ceilingBoundary, double? floorAdjacentTempC, double? ceilingAdjacentTempC
 });
 
 
@@ -332,7 +344,7 @@ class __$RoomCopyWithImpl<$Res>
 
 /// Create a copy of Room
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? floorId = null,Object? name = null,Object? targetTempC = null,Object? airChangeRate = null,Object? polygon = null,Object? floorConstructionId = freezed,Object? ceilingConstructionId = freezed,Object? floorBoundary = null,Object? ceilingBoundary = null,Object? floorUnheatedCorrectionFactor = freezed,Object? ceilingUnheatedCorrectionFactor = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? floorId = null,Object? name = null,Object? targetTempC = null,Object? airChangeRate = null,Object? polygon = null,Object? floorConstructionId = freezed,Object? ceilingConstructionId = freezed,Object? floorBoundary = null,Object? ceilingBoundary = null,Object? floorAdjacentTempC = freezed,Object? ceilingAdjacentTempC = freezed,}) {
   return _then(_Room(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,floorId: null == floorId ? _self.floorId : floorId // ignore: cast_nullable_to_non_nullable
@@ -344,8 +356,8 @@ as List<Point2D>,floorConstructionId: freezed == floorConstructionId ? _self.flo
 as String?,ceilingConstructionId: freezed == ceilingConstructionId ? _self.ceilingConstructionId : ceilingConstructionId // ignore: cast_nullable_to_non_nullable
 as String?,floorBoundary: null == floorBoundary ? _self.floorBoundary : floorBoundary // ignore: cast_nullable_to_non_nullable
 as BoundaryCondition,ceilingBoundary: null == ceilingBoundary ? _self.ceilingBoundary : ceilingBoundary // ignore: cast_nullable_to_non_nullable
-as BoundaryCondition,floorUnheatedCorrectionFactor: freezed == floorUnheatedCorrectionFactor ? _self.floorUnheatedCorrectionFactor : floorUnheatedCorrectionFactor // ignore: cast_nullable_to_non_nullable
-as double?,ceilingUnheatedCorrectionFactor: freezed == ceilingUnheatedCorrectionFactor ? _self.ceilingUnheatedCorrectionFactor : ceilingUnheatedCorrectionFactor // ignore: cast_nullable_to_non_nullable
+as BoundaryCondition,floorAdjacentTempC: freezed == floorAdjacentTempC ? _self.floorAdjacentTempC : floorAdjacentTempC // ignore: cast_nullable_to_non_nullable
+as double?,ceilingAdjacentTempC: freezed == ceilingAdjacentTempC ? _self.ceilingAdjacentTempC : ceilingAdjacentTempC // ignore: cast_nullable_to_non_nullable
 as double?,
   ));
 }

@@ -15,6 +15,7 @@ class ProjectSettings {
     this.designOutdoorTempC = -12.0,
     this.defaultIndoorTempC = 20.0,
     this.floorHeightMm = 2600,
+    this.unheatedSpaceTempC = 10.0,
   });
 
   /// Outdoor design temperature (°C). Valid range: −50 to +10.
@@ -26,11 +27,19 @@ class ProjectSettings {
   /// Default floor-to-ceiling height in mm. Range: 2000 to 6000.
   final int floorHeightMm;
 
+  /// Default temperature of unheated adjacent spaces (°C). Range: 0 to 25.
+  ///
+  /// Used as the [BoundaryCondition.unheatedSpace] adjacent temperature when
+  /// no per-room override is set. Also serves as the default for
+  /// [BoundaryCondition.interior] floor/ceiling when no override is set.
+  final double unheatedSpaceTempC;
+
   /// Returns a copy with updated fields.
   ProjectSettings copyWith({
     double? designOutdoorTempC,
     double? defaultIndoorTempC,
     int? floorHeightMm,
+    double? unheatedSpaceTempC,
   }) {
     return ProjectSettings(
       designOutdoorTempC:
@@ -38,6 +47,8 @@ class ProjectSettings {
       defaultIndoorTempC:
           defaultIndoorTempC ?? this.defaultIndoorTempC,
       floorHeightMm: floorHeightMm ?? this.floorHeightMm,
+      unheatedSpaceTempC:
+          unheatedSpaceTempC ?? this.unheatedSpaceTempC,
     );
   }
 }
@@ -66,6 +77,13 @@ class ProjectSettingsNotifier
   void setFloorHeightMm(int value) {
     state = state.copyWith(
       floorHeightMm: value.clamp(2000, 6000),
+    );
+  }
+
+  /// Set the default unheated space temperature (clamped to 0…25 °C).
+  void setUnheatedSpaceTempC(double value) {
+    state = state.copyWith(
+      unheatedSpaceTempC: value.clamp(0.0, 25.0),
     );
   }
 }
@@ -102,4 +120,13 @@ final defaultIndoorTempCProvider = Provider<double>(
 /// project summary panel.
 final floorHeightMmProvider = Provider<int>(
   (ref) => ref.watch(projectSettingsProvider).floorHeightMm,
+);
+
+/// Default temperature of unheated adjacent spaces (°C).
+///
+/// Used as the fallback [BoundaryCondition.unheatedSpace] adjacent
+/// temperature when no per-room override is set.
+final unheatedSpaceTempCProvider = Provider<double>(
+  (ref) =>
+      ref.watch(projectSettingsProvider).unheatedSpaceTempC,
 );

@@ -29,13 +29,13 @@ class Rooms extends Table {
   TextColumn get ceilingBoundary =>
       text().withDefault(const Constant('exterior'))();
 
-  /// User-supplied correction factor for unheated floor boundary
-  /// (0.0–1.0).
-  RealColumn get floorUnheatedCorrectionFactor => real().nullable()();
+  /// Per-room adjacent temperature (°C) for the floor boundary.
+  /// Null = use project-level default.
+  RealColumn get floorAdjacentTempC => real().nullable()();
 
-  /// User-supplied correction factor for unheated ceiling boundary
-  /// (0.0–1.0).
-  RealColumn get ceilingUnheatedCorrectionFactor => real().nullable()();
+  /// Per-room adjacent temperature (°C) for the ceiling boundary.
+  /// Null = use project-level default.
+  RealColumn get ceilingAdjacentTempC => real().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

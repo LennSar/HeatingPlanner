@@ -179,10 +179,8 @@ Room _roomFromRow($db.Room row) {
         BoundaryCondition.values.byName(row.floorBoundary),
     ceilingBoundary:
         BoundaryCondition.values.byName(row.ceilingBoundary),
-    floorUnheatedCorrectionFactor:
-        row.floorUnheatedCorrectionFactor,
-    ceilingUnheatedCorrectionFactor:
-        row.ceilingUnheatedCorrectionFactor,
+    floorAdjacentTempC: row.floorAdjacentTempC,
+    ceilingAdjacentTempC: row.ceilingAdjacentTempC,
   );
 }
 
@@ -247,10 +245,8 @@ $db.RoomsCompanion _roomToCompanion(Room room) {
     ceilingConstructionId: Value(room.ceilingConstructionId),
     floorBoundary: Value(room.floorBoundary.name),
     ceilingBoundary: Value(room.ceilingBoundary.name),
-    floorUnheatedCorrectionFactor:
-        Value(room.floorUnheatedCorrectionFactor),
-    ceilingUnheatedCorrectionFactor:
-        Value(room.ceilingUnheatedCorrectionFactor),
+    floorAdjacentTempC: Value(room.floorAdjacentTempC),
+    ceilingAdjacentTempC: Value(room.ceilingAdjacentTempC),
   );
 }
 

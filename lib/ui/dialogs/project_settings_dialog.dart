@@ -42,6 +42,7 @@ class _ProjectSettingsDialogState
   late TextEditingController _outdoorController;
   late TextEditingController _indoorController;
   late TextEditingController _heightController;
+  late TextEditingController _unheatedController;
 
   @override
   void initState() {
@@ -56,6 +57,9 @@ class _ProjectSettingsDialogState
     _heightController = TextEditingController(
       text: settings.floorHeightMm.toString(),
     );
+    _unheatedController = TextEditingController(
+      text: settings.unheatedSpaceTempC.toStringAsFixed(1),
+    );
   }
 
   @override
@@ -63,6 +67,7 @@ class _ProjectSettingsDialogState
     _outdoorController.dispose();
     _indoorController.dispose();
     _heightController.dispose();
+    _unheatedController.dispose();
     super.dispose();
   }
 
@@ -101,6 +106,24 @@ class _ProjectSettingsDialogState
     final clamped = parsed.clamp(15.0, 30.0);
     if (clamped != parsed) {
       _indoorController.text = clamped.toStringAsFixed(1);
+    }
+  }
+
+  void _applyUnheated(String raw) {
+    final parsed = double.tryParse(raw);
+    if (parsed == null) {
+      _unheatedController.text = ref
+          .read(projectSettingsProvider)
+          .unheatedSpaceTempC
+          .toStringAsFixed(1);
+      return;
+    }
+    ref
+        .read(projectSettingsProvider.notifier)
+        .setUnheatedSpaceTempC(parsed);
+    final clamped = parsed.clamp(0.0, 25.0);
+    if (clamped != parsed) {
+      _unheatedController.text = clamped.toStringAsFixed(1);
     }
   }
 
@@ -151,6 +174,12 @@ class _ProjectSettingsDialogState
     if (_heightController.text != heightText &&
         !_heightController.selection.isValid) {
       _heightController.text = heightText;
+    }
+    final unheatedText =
+        settings.unheatedSpaceTempC.toStringAsFixed(1);
+    if (_unheatedController.text != unheatedText &&
+        !_unheatedController.selection.isValid) {
+      _unheatedController.text = unheatedText;
     }
 
     return Dialog(
@@ -289,6 +318,41 @@ class _ProjectSettingsDialogState
                 },
                 onFieldSubmitted: _applyHeight,
                 rangeLabel: '2000 to 6000 mm',
+              ),
+
+              const SizedBox(height: Spacing.lg),
+              const Divider(),
+              const SizedBox(height: Spacing.md),
+
+              // ── Unheated space temperature ──────────────────
+              Text(
+                'Unheated Space Temperature',
+                style: textTheme.headlineSmall,
+              ),
+              const SizedBox(height: Spacing.xs),
+              Text(
+                'Default temperature used for unheated basements, '
+                'attics, and adjacent unheated spaces.',
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: Spacing.sm),
+              _TempRow(
+                controller: _unheatedController,
+                sliderValue: settings.unheatedSpaceTempC,
+                min: 0.0,
+                max: 25.0,
+                divisions: 25,
+                onSliderChanged: (v) {
+                  ref
+                      .read(projectSettingsProvider.notifier)
+                      .setUnheatedSpaceTempC(v);
+                  _unheatedController.text =
+                      v.toStringAsFixed(1);
+                },
+                onFieldSubmitted: _applyUnheated,
+                rangeLabel: '0 to 25 °C',
               ),
 
               const SizedBox(height: Spacing.lg),

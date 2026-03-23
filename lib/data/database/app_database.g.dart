@@ -967,23 +967,23 @@ class $RoomsTable extends Rooms with TableInfo<$RoomsTable, Room> {
     requiredDuringInsert: false,
     defaultValue: const Constant('exterior'),
   );
-  static const VerificationMeta _floorUnheatedCorrectionFactorMeta =
-      const VerificationMeta('floorUnheatedCorrectionFactor');
+  static const VerificationMeta _floorAdjacentTempCMeta =
+      const VerificationMeta('floorAdjacentTempC');
   @override
-  late final GeneratedColumn<double> floorUnheatedCorrectionFactor =
+  late final GeneratedColumn<double> floorAdjacentTempC =
       GeneratedColumn<double>(
-        'floor_unheated_correction_factor',
+        'floor_adjacent_temp_c',
         aliasedName,
         true,
         type: DriftSqlType.double,
         requiredDuringInsert: false,
       );
-  static const VerificationMeta _ceilingUnheatedCorrectionFactorMeta =
-      const VerificationMeta('ceilingUnheatedCorrectionFactor');
+  static const VerificationMeta _ceilingAdjacentTempCMeta =
+      const VerificationMeta('ceilingAdjacentTempC');
   @override
-  late final GeneratedColumn<double> ceilingUnheatedCorrectionFactor =
+  late final GeneratedColumn<double> ceilingAdjacentTempC =
       GeneratedColumn<double>(
-        'ceiling_unheated_correction_factor',
+        'ceiling_adjacent_temp_c',
         aliasedName,
         true,
         type: DriftSqlType.double,
@@ -1001,8 +1001,8 @@ class $RoomsTable extends Rooms with TableInfo<$RoomsTable, Room> {
     ceilingConstructionId,
     floorBoundary,
     ceilingBoundary,
-    floorUnheatedCorrectionFactor,
-    ceilingUnheatedCorrectionFactor,
+    floorAdjacentTempC,
+    ceilingAdjacentTempC,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -1100,21 +1100,21 @@ class $RoomsTable extends Rooms with TableInfo<$RoomsTable, Room> {
         ),
       );
     }
-    if (data.containsKey('floor_unheated_correction_factor')) {
+    if (data.containsKey('floor_adjacent_temp_c')) {
       context.handle(
-        _floorUnheatedCorrectionFactorMeta,
-        floorUnheatedCorrectionFactor.isAcceptableOrUnknown(
-          data['floor_unheated_correction_factor']!,
-          _floorUnheatedCorrectionFactorMeta,
+        _floorAdjacentTempCMeta,
+        floorAdjacentTempC.isAcceptableOrUnknown(
+          data['floor_adjacent_temp_c']!,
+          _floorAdjacentTempCMeta,
         ),
       );
     }
-    if (data.containsKey('ceiling_unheated_correction_factor')) {
+    if (data.containsKey('ceiling_adjacent_temp_c')) {
       context.handle(
-        _ceilingUnheatedCorrectionFactorMeta,
-        ceilingUnheatedCorrectionFactor.isAcceptableOrUnknown(
-          data['ceiling_unheated_correction_factor']!,
-          _ceilingUnheatedCorrectionFactorMeta,
+        _ceilingAdjacentTempCMeta,
+        ceilingAdjacentTempC.isAcceptableOrUnknown(
+          data['ceiling_adjacent_temp_c']!,
+          _ceilingAdjacentTempCMeta,
         ),
       );
     }
@@ -1167,13 +1167,13 @@ class $RoomsTable extends Rooms with TableInfo<$RoomsTable, Room> {
         DriftSqlType.string,
         data['${effectivePrefix}ceiling_boundary'],
       )!,
-      floorUnheatedCorrectionFactor: attachedDatabase.typeMapping.read(
+      floorAdjacentTempC: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
-        data['${effectivePrefix}floor_unheated_correction_factor'],
+        data['${effectivePrefix}floor_adjacent_temp_c'],
       ),
-      ceilingUnheatedCorrectionFactor: attachedDatabase.typeMapping.read(
+      ceilingAdjacentTempC: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
-        data['${effectivePrefix}ceiling_unheated_correction_factor'],
+        data['${effectivePrefix}ceiling_adjacent_temp_c'],
       ),
     );
   }
@@ -1206,13 +1206,13 @@ class Room extends DataClass implements Insertable<Room> {
   /// Boundary condition above the ceiling slab (stored as enum name).
   final String ceilingBoundary;
 
-  /// User-supplied correction factor for unheated floor boundary
-  /// (0.0–1.0).
-  final double? floorUnheatedCorrectionFactor;
+  /// Per-room adjacent temperature (°C) for the floor boundary.
+  /// Null = use project-level default.
+  final double? floorAdjacentTempC;
 
-  /// User-supplied correction factor for unheated ceiling boundary
-  /// (0.0–1.0).
-  final double? ceilingUnheatedCorrectionFactor;
+  /// Per-room adjacent temperature (°C) for the ceiling boundary.
+  /// Null = use project-level default.
+  final double? ceilingAdjacentTempC;
   const Room({
     required this.id,
     required this.floorId,
@@ -1224,8 +1224,8 @@ class Room extends DataClass implements Insertable<Room> {
     this.ceilingConstructionId,
     required this.floorBoundary,
     required this.ceilingBoundary,
-    this.floorUnheatedCorrectionFactor,
-    this.ceilingUnheatedCorrectionFactor,
+    this.floorAdjacentTempC,
+    this.ceilingAdjacentTempC,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -1244,15 +1244,11 @@ class Room extends DataClass implements Insertable<Room> {
     }
     map['floor_boundary'] = Variable<String>(floorBoundary);
     map['ceiling_boundary'] = Variable<String>(ceilingBoundary);
-    if (!nullToAbsent || floorUnheatedCorrectionFactor != null) {
-      map['floor_unheated_correction_factor'] = Variable<double>(
-        floorUnheatedCorrectionFactor,
-      );
+    if (!nullToAbsent || floorAdjacentTempC != null) {
+      map['floor_adjacent_temp_c'] = Variable<double>(floorAdjacentTempC);
     }
-    if (!nullToAbsent || ceilingUnheatedCorrectionFactor != null) {
-      map['ceiling_unheated_correction_factor'] = Variable<double>(
-        ceilingUnheatedCorrectionFactor,
-      );
+    if (!nullToAbsent || ceilingAdjacentTempC != null) {
+      map['ceiling_adjacent_temp_c'] = Variable<double>(ceilingAdjacentTempC);
     }
     return map;
   }
@@ -1273,14 +1269,12 @@ class Room extends DataClass implements Insertable<Room> {
           : Value(ceilingConstructionId),
       floorBoundary: Value(floorBoundary),
       ceilingBoundary: Value(ceilingBoundary),
-      floorUnheatedCorrectionFactor:
-          floorUnheatedCorrectionFactor == null && nullToAbsent
+      floorAdjacentTempC: floorAdjacentTempC == null && nullToAbsent
           ? const Value.absent()
-          : Value(floorUnheatedCorrectionFactor),
-      ceilingUnheatedCorrectionFactor:
-          ceilingUnheatedCorrectionFactor == null && nullToAbsent
+          : Value(floorAdjacentTempC),
+      ceilingAdjacentTempC: ceilingAdjacentTempC == null && nullToAbsent
           ? const Value.absent()
-          : Value(ceilingUnheatedCorrectionFactor),
+          : Value(ceilingAdjacentTempC),
     );
   }
 
@@ -1304,11 +1298,11 @@ class Room extends DataClass implements Insertable<Room> {
       ),
       floorBoundary: serializer.fromJson<String>(json['floorBoundary']),
       ceilingBoundary: serializer.fromJson<String>(json['ceilingBoundary']),
-      floorUnheatedCorrectionFactor: serializer.fromJson<double?>(
-        json['floorUnheatedCorrectionFactor'],
+      floorAdjacentTempC: serializer.fromJson<double?>(
+        json['floorAdjacentTempC'],
       ),
-      ceilingUnheatedCorrectionFactor: serializer.fromJson<double?>(
-        json['ceilingUnheatedCorrectionFactor'],
+      ceilingAdjacentTempC: serializer.fromJson<double?>(
+        json['ceilingAdjacentTempC'],
       ),
     );
   }
@@ -1328,12 +1322,8 @@ class Room extends DataClass implements Insertable<Room> {
       ),
       'floorBoundary': serializer.toJson<String>(floorBoundary),
       'ceilingBoundary': serializer.toJson<String>(ceilingBoundary),
-      'floorUnheatedCorrectionFactor': serializer.toJson<double?>(
-        floorUnheatedCorrectionFactor,
-      ),
-      'ceilingUnheatedCorrectionFactor': serializer.toJson<double?>(
-        ceilingUnheatedCorrectionFactor,
-      ),
+      'floorAdjacentTempC': serializer.toJson<double?>(floorAdjacentTempC),
+      'ceilingAdjacentTempC': serializer.toJson<double?>(ceilingAdjacentTempC),
     };
   }
 
@@ -1348,8 +1338,8 @@ class Room extends DataClass implements Insertable<Room> {
     Value<String?> ceilingConstructionId = const Value.absent(),
     String? floorBoundary,
     String? ceilingBoundary,
-    Value<double?> floorUnheatedCorrectionFactor = const Value.absent(),
-    Value<double?> ceilingUnheatedCorrectionFactor = const Value.absent(),
+    Value<double?> floorAdjacentTempC = const Value.absent(),
+    Value<double?> ceilingAdjacentTempC = const Value.absent(),
   }) => Room(
     id: id ?? this.id,
     floorId: floorId ?? this.floorId,
@@ -1365,12 +1355,12 @@ class Room extends DataClass implements Insertable<Room> {
         : this.ceilingConstructionId,
     floorBoundary: floorBoundary ?? this.floorBoundary,
     ceilingBoundary: ceilingBoundary ?? this.ceilingBoundary,
-    floorUnheatedCorrectionFactor: floorUnheatedCorrectionFactor.present
-        ? floorUnheatedCorrectionFactor.value
-        : this.floorUnheatedCorrectionFactor,
-    ceilingUnheatedCorrectionFactor: ceilingUnheatedCorrectionFactor.present
-        ? ceilingUnheatedCorrectionFactor.value
-        : this.ceilingUnheatedCorrectionFactor,
+    floorAdjacentTempC: floorAdjacentTempC.present
+        ? floorAdjacentTempC.value
+        : this.floorAdjacentTempC,
+    ceilingAdjacentTempC: ceilingAdjacentTempC.present
+        ? ceilingAdjacentTempC.value
+        : this.ceilingAdjacentTempC,
   );
   Room copyWithCompanion(RoomsCompanion data) {
     return Room(
@@ -1398,13 +1388,12 @@ class Room extends DataClass implements Insertable<Room> {
       ceilingBoundary: data.ceilingBoundary.present
           ? data.ceilingBoundary.value
           : this.ceilingBoundary,
-      floorUnheatedCorrectionFactor: data.floorUnheatedCorrectionFactor.present
-          ? data.floorUnheatedCorrectionFactor.value
-          : this.floorUnheatedCorrectionFactor,
-      ceilingUnheatedCorrectionFactor:
-          data.ceilingUnheatedCorrectionFactor.present
-          ? data.ceilingUnheatedCorrectionFactor.value
-          : this.ceilingUnheatedCorrectionFactor,
+      floorAdjacentTempC: data.floorAdjacentTempC.present
+          ? data.floorAdjacentTempC.value
+          : this.floorAdjacentTempC,
+      ceilingAdjacentTempC: data.ceilingAdjacentTempC.present
+          ? data.ceilingAdjacentTempC.value
+          : this.ceilingAdjacentTempC,
     );
   }
 
@@ -1421,12 +1410,8 @@ class Room extends DataClass implements Insertable<Room> {
           ..write('ceilingConstructionId: $ceilingConstructionId, ')
           ..write('floorBoundary: $floorBoundary, ')
           ..write('ceilingBoundary: $ceilingBoundary, ')
-          ..write(
-            'floorUnheatedCorrectionFactor: $floorUnheatedCorrectionFactor, ',
-          )
-          ..write(
-            'ceilingUnheatedCorrectionFactor: $ceilingUnheatedCorrectionFactor',
-          )
+          ..write('floorAdjacentTempC: $floorAdjacentTempC, ')
+          ..write('ceilingAdjacentTempC: $ceilingAdjacentTempC')
           ..write(')'))
         .toString();
   }
@@ -1443,8 +1428,8 @@ class Room extends DataClass implements Insertable<Room> {
     ceilingConstructionId,
     floorBoundary,
     ceilingBoundary,
-    floorUnheatedCorrectionFactor,
-    ceilingUnheatedCorrectionFactor,
+    floorAdjacentTempC,
+    ceilingAdjacentTempC,
   );
   @override
   bool operator ==(Object other) =>
@@ -1460,10 +1445,8 @@ class Room extends DataClass implements Insertable<Room> {
           other.ceilingConstructionId == this.ceilingConstructionId &&
           other.floorBoundary == this.floorBoundary &&
           other.ceilingBoundary == this.ceilingBoundary &&
-          other.floorUnheatedCorrectionFactor ==
-              this.floorUnheatedCorrectionFactor &&
-          other.ceilingUnheatedCorrectionFactor ==
-              this.ceilingUnheatedCorrectionFactor);
+          other.floorAdjacentTempC == this.floorAdjacentTempC &&
+          other.ceilingAdjacentTempC == this.ceilingAdjacentTempC);
 }
 
 class RoomsCompanion extends UpdateCompanion<Room> {
@@ -1477,8 +1460,8 @@ class RoomsCompanion extends UpdateCompanion<Room> {
   final Value<String?> ceilingConstructionId;
   final Value<String> floorBoundary;
   final Value<String> ceilingBoundary;
-  final Value<double?> floorUnheatedCorrectionFactor;
-  final Value<double?> ceilingUnheatedCorrectionFactor;
+  final Value<double?> floorAdjacentTempC;
+  final Value<double?> ceilingAdjacentTempC;
   final Value<int> rowid;
   const RoomsCompanion({
     this.id = const Value.absent(),
@@ -1491,8 +1474,8 @@ class RoomsCompanion extends UpdateCompanion<Room> {
     this.ceilingConstructionId = const Value.absent(),
     this.floorBoundary = const Value.absent(),
     this.ceilingBoundary = const Value.absent(),
-    this.floorUnheatedCorrectionFactor = const Value.absent(),
-    this.ceilingUnheatedCorrectionFactor = const Value.absent(),
+    this.floorAdjacentTempC = const Value.absent(),
+    this.ceilingAdjacentTempC = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   RoomsCompanion.insert({
@@ -1506,8 +1489,8 @@ class RoomsCompanion extends UpdateCompanion<Room> {
     this.ceilingConstructionId = const Value.absent(),
     this.floorBoundary = const Value.absent(),
     this.ceilingBoundary = const Value.absent(),
-    this.floorUnheatedCorrectionFactor = const Value.absent(),
-    this.ceilingUnheatedCorrectionFactor = const Value.absent(),
+    this.floorAdjacentTempC = const Value.absent(),
+    this.ceilingAdjacentTempC = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        floorId = Value(floorId),
@@ -1523,8 +1506,8 @@ class RoomsCompanion extends UpdateCompanion<Room> {
     Expression<String>? ceilingConstructionId,
     Expression<String>? floorBoundary,
     Expression<String>? ceilingBoundary,
-    Expression<double>? floorUnheatedCorrectionFactor,
-    Expression<double>? ceilingUnheatedCorrectionFactor,
+    Expression<double>? floorAdjacentTempC,
+    Expression<double>? ceilingAdjacentTempC,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -1540,10 +1523,10 @@ class RoomsCompanion extends UpdateCompanion<Room> {
         'ceiling_construction_id': ceilingConstructionId,
       if (floorBoundary != null) 'floor_boundary': floorBoundary,
       if (ceilingBoundary != null) 'ceiling_boundary': ceilingBoundary,
-      if (floorUnheatedCorrectionFactor != null)
-        'floor_unheated_correction_factor': floorUnheatedCorrectionFactor,
-      if (ceilingUnheatedCorrectionFactor != null)
-        'ceiling_unheated_correction_factor': ceilingUnheatedCorrectionFactor,
+      if (floorAdjacentTempC != null)
+        'floor_adjacent_temp_c': floorAdjacentTempC,
+      if (ceilingAdjacentTempC != null)
+        'ceiling_adjacent_temp_c': ceilingAdjacentTempC,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -1559,8 +1542,8 @@ class RoomsCompanion extends UpdateCompanion<Room> {
     Value<String?>? ceilingConstructionId,
     Value<String>? floorBoundary,
     Value<String>? ceilingBoundary,
-    Value<double?>? floorUnheatedCorrectionFactor,
-    Value<double?>? ceilingUnheatedCorrectionFactor,
+    Value<double?>? floorAdjacentTempC,
+    Value<double?>? ceilingAdjacentTempC,
     Value<int>? rowid,
   }) {
     return RoomsCompanion(
@@ -1575,11 +1558,8 @@ class RoomsCompanion extends UpdateCompanion<Room> {
           ceilingConstructionId ?? this.ceilingConstructionId,
       floorBoundary: floorBoundary ?? this.floorBoundary,
       ceilingBoundary: ceilingBoundary ?? this.ceilingBoundary,
-      floorUnheatedCorrectionFactor:
-          floorUnheatedCorrectionFactor ?? this.floorUnheatedCorrectionFactor,
-      ceilingUnheatedCorrectionFactor:
-          ceilingUnheatedCorrectionFactor ??
-          this.ceilingUnheatedCorrectionFactor,
+      floorAdjacentTempC: floorAdjacentTempC ?? this.floorAdjacentTempC,
+      ceilingAdjacentTempC: ceilingAdjacentTempC ?? this.ceilingAdjacentTempC,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -1621,14 +1601,12 @@ class RoomsCompanion extends UpdateCompanion<Room> {
     if (ceilingBoundary.present) {
       map['ceiling_boundary'] = Variable<String>(ceilingBoundary.value);
     }
-    if (floorUnheatedCorrectionFactor.present) {
-      map['floor_unheated_correction_factor'] = Variable<double>(
-        floorUnheatedCorrectionFactor.value,
-      );
+    if (floorAdjacentTempC.present) {
+      map['floor_adjacent_temp_c'] = Variable<double>(floorAdjacentTempC.value);
     }
-    if (ceilingUnheatedCorrectionFactor.present) {
-      map['ceiling_unheated_correction_factor'] = Variable<double>(
-        ceilingUnheatedCorrectionFactor.value,
+    if (ceilingAdjacentTempC.present) {
+      map['ceiling_adjacent_temp_c'] = Variable<double>(
+        ceilingAdjacentTempC.value,
       );
     }
     if (rowid.present) {
@@ -1650,12 +1628,8 @@ class RoomsCompanion extends UpdateCompanion<Room> {
           ..write('ceilingConstructionId: $ceilingConstructionId, ')
           ..write('floorBoundary: $floorBoundary, ')
           ..write('ceilingBoundary: $ceilingBoundary, ')
-          ..write(
-            'floorUnheatedCorrectionFactor: $floorUnheatedCorrectionFactor, ',
-          )
-          ..write(
-            'ceilingUnheatedCorrectionFactor: $ceilingUnheatedCorrectionFactor, ',
-          )
+          ..write('floorAdjacentTempC: $floorAdjacentTempC, ')
+          ..write('ceilingAdjacentTempC: $ceilingAdjacentTempC, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -8437,8 +8411,8 @@ typedef $$RoomsTableCreateCompanionBuilder =
       Value<String?> ceilingConstructionId,
       Value<String> floorBoundary,
       Value<String> ceilingBoundary,
-      Value<double?> floorUnheatedCorrectionFactor,
-      Value<double?> ceilingUnheatedCorrectionFactor,
+      Value<double?> floorAdjacentTempC,
+      Value<double?> ceilingAdjacentTempC,
       Value<int> rowid,
     });
 typedef $$RoomsTableUpdateCompanionBuilder =
@@ -8453,8 +8427,8 @@ typedef $$RoomsTableUpdateCompanionBuilder =
       Value<String?> ceilingConstructionId,
       Value<String> floorBoundary,
       Value<String> ceilingBoundary,
-      Value<double?> floorUnheatedCorrectionFactor,
-      Value<double?> ceilingUnheatedCorrectionFactor,
+      Value<double?> floorAdjacentTempC,
+      Value<double?> ceilingAdjacentTempC,
       Value<int> rowid,
     });
 
@@ -8593,16 +8567,15 @@ class $$RoomsTableFilterComposer extends Composer<_$AppDatabase, $RoomsTable> {
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<double> get floorUnheatedCorrectionFactor => $composableBuilder(
-    column: $table.floorUnheatedCorrectionFactor,
+  ColumnFilters<double> get floorAdjacentTempC => $composableBuilder(
+    column: $table.floorAdjacentTempC,
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<double> get ceilingUnheatedCorrectionFactor =>
-      $composableBuilder(
-        column: $table.ceilingUnheatedCorrectionFactor,
-        builder: (column) => ColumnFilters(column),
-      );
+  ColumnFilters<double> get ceilingAdjacentTempC => $composableBuilder(
+    column: $table.ceilingAdjacentTempC,
+    builder: (column) => ColumnFilters(column),
+  );
 
   $$FloorsTableFilterComposer get floorId {
     final $$FloorsTableFilterComposer composer = $composerBuilder(
@@ -8757,17 +8730,15 @@ class $$RoomsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<double> get floorUnheatedCorrectionFactor =>
-      $composableBuilder(
-        column: $table.floorUnheatedCorrectionFactor,
-        builder: (column) => ColumnOrderings(column),
-      );
+  ColumnOrderings<double> get floorAdjacentTempC => $composableBuilder(
+    column: $table.floorAdjacentTempC,
+    builder: (column) => ColumnOrderings(column),
+  );
 
-  ColumnOrderings<double> get ceilingUnheatedCorrectionFactor =>
-      $composableBuilder(
-        column: $table.ceilingUnheatedCorrectionFactor,
-        builder: (column) => ColumnOrderings(column),
-      );
+  ColumnOrderings<double> get ceilingAdjacentTempC => $composableBuilder(
+    column: $table.ceilingAdjacentTempC,
+    builder: (column) => ColumnOrderings(column),
+  );
 
   $$FloorsTableOrderingComposer get floorId {
     final $$FloorsTableOrderingComposer composer = $composerBuilder(
@@ -8843,17 +8814,15 @@ class $$RoomsTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<double> get floorUnheatedCorrectionFactor =>
-      $composableBuilder(
-        column: $table.floorUnheatedCorrectionFactor,
-        builder: (column) => column,
-      );
+  GeneratedColumn<double> get floorAdjacentTempC => $composableBuilder(
+    column: $table.floorAdjacentTempC,
+    builder: (column) => column,
+  );
 
-  GeneratedColumn<double> get ceilingUnheatedCorrectionFactor =>
-      $composableBuilder(
-        column: $table.ceilingUnheatedCorrectionFactor,
-        builder: (column) => column,
-      );
+  GeneratedColumn<double> get ceilingAdjacentTempC => $composableBuilder(
+    column: $table.ceilingAdjacentTempC,
+    builder: (column) => column,
+  );
 
   $$FloorsTableAnnotationComposer get floorId {
     final $$FloorsTableAnnotationComposer composer = $composerBuilder(
@@ -8997,10 +8966,8 @@ class $$RoomsTableTableManager
                 Value<String?> ceilingConstructionId = const Value.absent(),
                 Value<String> floorBoundary = const Value.absent(),
                 Value<String> ceilingBoundary = const Value.absent(),
-                Value<double?> floorUnheatedCorrectionFactor =
-                    const Value.absent(),
-                Value<double?> ceilingUnheatedCorrectionFactor =
-                    const Value.absent(),
+                Value<double?> floorAdjacentTempC = const Value.absent(),
+                Value<double?> ceilingAdjacentTempC = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RoomsCompanion(
                 id: id,
@@ -9013,9 +8980,8 @@ class $$RoomsTableTableManager
                 ceilingConstructionId: ceilingConstructionId,
                 floorBoundary: floorBoundary,
                 ceilingBoundary: ceilingBoundary,
-                floorUnheatedCorrectionFactor: floorUnheatedCorrectionFactor,
-                ceilingUnheatedCorrectionFactor:
-                    ceilingUnheatedCorrectionFactor,
+                floorAdjacentTempC: floorAdjacentTempC,
+                ceilingAdjacentTempC: ceilingAdjacentTempC,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9030,10 +8996,8 @@ class $$RoomsTableTableManager
                 Value<String?> ceilingConstructionId = const Value.absent(),
                 Value<String> floorBoundary = const Value.absent(),
                 Value<String> ceilingBoundary = const Value.absent(),
-                Value<double?> floorUnheatedCorrectionFactor =
-                    const Value.absent(),
-                Value<double?> ceilingUnheatedCorrectionFactor =
-                    const Value.absent(),
+                Value<double?> floorAdjacentTempC = const Value.absent(),
+                Value<double?> ceilingAdjacentTempC = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => RoomsCompanion.insert(
                 id: id,
@@ -9046,9 +9010,8 @@ class $$RoomsTableTableManager
                 ceilingConstructionId: ceilingConstructionId,
                 floorBoundary: floorBoundary,
                 ceilingBoundary: ceilingBoundary,
-                floorUnheatedCorrectionFactor: floorUnheatedCorrectionFactor,
-                ceilingUnheatedCorrectionFactor:
-                    ceilingUnheatedCorrectionFactor,
+                floorAdjacentTempC: floorAdjacentTempC,
+                ceilingAdjacentTempC: ceilingAdjacentTempC,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
