@@ -182,20 +182,30 @@ class _ProjectSettingsDialogState
       _unheatedController.text = unheatedText;
     }
 
+    final screenHeight = MediaQuery.sizeOf(context).height;
+
     return Dialog(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
       ),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 400),
-        child: Padding(
-          padding: const EdgeInsets.all(Spacing.lg),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Title row
-              Row(
+        constraints: BoxConstraints(
+          maxWidth: 400,
+          // Never taller than 90 % of the screen.
+          maxHeight: screenHeight * 0.90,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // ── Fixed title row (never scrolls) ──────────────
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                Spacing.lg,
+                Spacing.lg,
+                Spacing.sm,
+                Spacing.md,
+              ),
+              child: Row(
                 children: [
                   Expanded(
                     child: Text(
@@ -205,7 +215,8 @@ class _ProjectSettingsDialogState
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
-                    onPressed: () => Navigator.of(context).pop(),
+                    onPressed: () =>
+                        Navigator.of(context).pop(),
                     tooltip: 'Close',
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(
@@ -215,158 +226,196 @@ class _ProjectSettingsDialogState
                   ),
                 ],
               ),
-              const SizedBox(height: Spacing.lg),
+            ),
+            // ── Scrollable body ───────────────────────────────
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(
+                  Spacing.lg,
+                  0,
+                  Spacing.lg,
+                  Spacing.lg,
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // ── Design outdoor temperature ──────────
+                    Text(
+                      'Design Outdoor Temperature',
+                      style: textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: Spacing.xs),
+                    Text(
+                      'Used in all heat-demand calculations'
+                      ' (EN 12831).',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: Spacing.sm),
+                    _TempRow(
+                      controller: _outdoorController,
+                      sliderValue:
+                          settings.designOutdoorTempC,
+                      min: -50.0,
+                      max: 10.0,
+                      divisions: 60,
+                      onSliderChanged: (v) {
+                        ref
+                            .read(
+                              projectSettingsProvider
+                                  .notifier,
+                            )
+                            .setDesignOutdoorTempC(v);
+                        _outdoorController.text =
+                            v.toStringAsFixed(1);
+                      },
+                      onFieldSubmitted: _applyOutdoor,
+                      rangeLabel: '−50 to +10 °C',
+                    ),
 
-              // ── Design outdoor temperature ──────────────────
-              Text(
-                'Design Outdoor Temperature',
-                style: textTheme.headlineSmall,
-              ),
-              const SizedBox(height: Spacing.xs),
-              Text(
-                'Used in all heat-demand calculations (EN 12831).',
-                style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
+                    const SizedBox(height: Spacing.lg),
+                    const Divider(),
+                    const SizedBox(height: Spacing.md),
+
+                    // ── Default indoor temperature ───────────
+                    Text(
+                      'Default Indoor Temperature',
+                      style: textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: Spacing.xs),
+                    Text(
+                      'Applied to new rooms when they are'
+                      ' created.',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: Spacing.sm),
+                    _TempRow(
+                      controller: _indoorController,
+                      sliderValue:
+                          settings.defaultIndoorTempC,
+                      min: 15.0,
+                      max: 30.0,
+                      divisions: 30,
+                      onSliderChanged: (v) {
+                        ref
+                            .read(
+                              projectSettingsProvider
+                                  .notifier,
+                            )
+                            .setDefaultIndoorTempC(v);
+                        _indoorController.text =
+                            v.toStringAsFixed(1);
+                      },
+                      onFieldSubmitted: _applyIndoor,
+                      rangeLabel: '15 to 30 °C',
+                    ),
+
+                    const SizedBox(height: Spacing.lg),
+                    const Divider(),
+                    const SizedBox(height: Spacing.md),
+
+                    // ── Default room height ──────────────────
+                    Text(
+                      'Default Room Height',
+                      style: textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: Spacing.xs),
+                    Text(
+                      'Used as the default height for wall'
+                      ' heating zones.',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: Spacing.sm),
+                    _HeightRow(
+                      controller: _heightController,
+                      sliderValue: settings.floorHeightMm,
+                      onSliderChanged: (v) {
+                        final oldHeight = ref
+                            .read(projectSettingsProvider)
+                            .floorHeightMm;
+                        ref
+                            .read(
+                              projectSettingsProvider
+                                  .notifier,
+                            )
+                            .setFloorHeightMm(v);
+                        _heightController.text =
+                            v.toString();
+                        ref
+                            .read(
+                              editorStateProvider.notifier,
+                            )
+                            .updateWallZoneHeightsForFloor(
+                              oldHeight,
+                              v,
+                            );
+                      },
+                      onFieldSubmitted: _applyHeight,
+                      rangeLabel: '2000 to 6000 mm',
+                    ),
+
+                    const SizedBox(height: Spacing.lg),
+                    const Divider(),
+                    const SizedBox(height: Spacing.md),
+
+                    // ── Unheated space temperature ───────────
+                    Text(
+                      'Unheated Space Temperature',
+                      style: textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: Spacing.xs),
+                    Text(
+                      'Default temperature used for unheated'
+                      ' basements, attics, and adjacent'
+                      ' unheated spaces.',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: Spacing.sm),
+                    _TempRow(
+                      controller: _unheatedController,
+                      sliderValue:
+                          settings.unheatedSpaceTempC,
+                      min: 0.0,
+                      max: 25.0,
+                      divisions: 25,
+                      onSliderChanged: (v) {
+                        ref
+                            .read(
+                              projectSettingsProvider
+                                  .notifier,
+                            )
+                            .setUnheatedSpaceTempC(v);
+                        _unheatedController.text =
+                            v.toStringAsFixed(1);
+                      },
+                      onFieldSubmitted: _applyUnheated,
+                      rangeLabel: '0 to 25 °C',
+                    ),
+
+                    const SizedBox(height: Spacing.lg),
+
+                    // Close button
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton(
+                        onPressed: () =>
+                            Navigator.of(context).pop(),
+                        child: const Text('Close'),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              const SizedBox(height: Spacing.sm),
-              _TempRow(
-                controller: _outdoorController,
-                sliderValue: settings.designOutdoorTempC,
-                min: -50.0,
-                max: 10.0,
-                divisions: 60,
-                onSliderChanged: (v) {
-                  ref
-                      .read(projectSettingsProvider.notifier)
-                      .setDesignOutdoorTempC(v);
-                  _outdoorController.text =
-                      v.toStringAsFixed(1);
-                },
-                onFieldSubmitted: _applyOutdoor,
-                rangeLabel: '−50 to +10 °C',
-              ),
-
-              const SizedBox(height: Spacing.lg),
-              const Divider(),
-              const SizedBox(height: Spacing.md),
-
-              // ── Default indoor temperature ──────────────────
-              Text(
-                'Default Indoor Temperature',
-                style: textTheme.headlineSmall,
-              ),
-              const SizedBox(height: Spacing.xs),
-              Text(
-                'Applied to new rooms when they are created.',
-                style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: Spacing.sm),
-              _TempRow(
-                controller: _indoorController,
-                sliderValue: settings.defaultIndoorTempC,
-                min: 15.0,
-                max: 30.0,
-                divisions: 30,
-                onSliderChanged: (v) {
-                  ref
-                      .read(projectSettingsProvider.notifier)
-                      .setDefaultIndoorTempC(v);
-                  _indoorController.text =
-                      v.toStringAsFixed(1);
-                },
-                onFieldSubmitted: _applyIndoor,
-                rangeLabel: '15 to 30 °C',
-              ),
-
-              const SizedBox(height: Spacing.lg),
-              const Divider(),
-              const SizedBox(height: Spacing.md),
-
-              // ── Default room height ─────────────────────────
-              Text(
-                'Default Room Height',
-                style: textTheme.headlineSmall,
-              ),
-              const SizedBox(height: Spacing.xs),
-              Text(
-                'Used as the default height for wall heating zones.',
-                style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: Spacing.sm),
-              _HeightRow(
-                controller: _heightController,
-                sliderValue: settings.floorHeightMm,
-                onSliderChanged: (v) {
-                  final oldHeight = ref
-                      .read(projectSettingsProvider)
-                      .floorHeightMm;
-                  ref
-                      .read(projectSettingsProvider.notifier)
-                      .setFloorHeightMm(v);
-                  _heightController.text = v.toString();
-                  ref
-                      .read(editorStateProvider.notifier)
-                      .updateWallZoneHeightsForFloor(
-                        oldHeight,
-                        v,
-                      );
-                },
-                onFieldSubmitted: _applyHeight,
-                rangeLabel: '2000 to 6000 mm',
-              ),
-
-              const SizedBox(height: Spacing.lg),
-              const Divider(),
-              const SizedBox(height: Spacing.md),
-
-              // ── Unheated space temperature ──────────────────
-              Text(
-                'Unheated Space Temperature',
-                style: textTheme.headlineSmall,
-              ),
-              const SizedBox(height: Spacing.xs),
-              Text(
-                'Default temperature used for unheated basements, '
-                'attics, and adjacent unheated spaces.',
-                style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: Spacing.sm),
-              _TempRow(
-                controller: _unheatedController,
-                sliderValue: settings.unheatedSpaceTempC,
-                min: 0.0,
-                max: 25.0,
-                divisions: 25,
-                onSliderChanged: (v) {
-                  ref
-                      .read(projectSettingsProvider.notifier)
-                      .setUnheatedSpaceTempC(v);
-                  _unheatedController.text =
-                      v.toStringAsFixed(1);
-                },
-                onFieldSubmitted: _applyUnheated,
-                rangeLabel: '0 to 25 °C',
-              ),
-
-              const SizedBox(height: Spacing.lg),
-
-              // Close button
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('Close'),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
