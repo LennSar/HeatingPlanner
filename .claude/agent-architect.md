@@ -37,6 +37,7 @@ dependencies:
   archive: ^3.6.0
   collection: ^1.18.0
   logging: ^1.2.0
+  shared_preferences: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -163,7 +164,9 @@ lib/
 │   ├── building_repository.dart
 │   ├── construction_repository.dart
 │   ├── material_repository.dart
-│   └── heating_repository.dart
+│   ├── heating_repository.dart
+│   ├── save_state_notifier.dart    # SaveState model + StateNotifier + debounced .hsp export
+│   └── app_preferences.dart        # lastOpenedProjectId, canvasZoom/pan, AppPreferences DAO
 │
 ├── calculation/
 │   ├── engines/                           # Pure static functions — no state, no I/O
@@ -555,6 +558,8 @@ Use `@riverpod` annotation with code generation. Every provider is defined in th
 | `canvasTransformProvider` | StateNotifierProvider | — | Matrix4 | canvas_controller.dart |
 | `selectedElementProvider` | StateProvider | — | (String type, String id)? | editor_screen.dart |
 | `validationResultsProvider` | Provider.family | projectId | List\<ValidationResult\> | validation_service.dart |
+| `saveStateProvider` | StateNotifierProvider | — | SaveState | save_state_notifier.dart |
+| `lastOpenedProjectIdProvider` | StateProvider | — | String? | app_preferences.dart |
 
 ### 6.3 Invalidation Cascade
 
@@ -596,11 +601,86 @@ Each DAO exposes:
 - `Future<void> update(T entity)`
 - `Future<void> delete(String id)`
 
-### 7.3 Auto-Save
+### 7.3 Two-Tier Persistence Model
 
-Debounce: 60 seconds after last change. Implemented as a global listener on the ProviderContainer that tracks write operations. Fires `projectRepository.save()`.
+HeatingPlanner uses two distinct persistence layers. Understanding both is critical for any implementation involving data mutation.
 
-### 7.4 Project File Format (.hsp)
+**Tier 1 — Drift/SQLite (always-on, immediate)**
+
+Every call to a DAO `insert`, `update`, or `delete` method commits to the local SQLite database synchronously within the Drift transaction. There is no write buffer, no deferred flush, and no separate "save" step for Drift writes. This means:
+
+- Drawing a wall, placing a window, adjusting tube spacing, editing a layer thickness — all persist to SQLite the moment the repository call returns.
+- If the app crashes or is force-quit, **zero project data is lost**. The SQLite file always reflects the most recent committed state.
+- When the app relaunches, it reopens the same SQLite database and all entities are immediately available through the reactive stream providers.
+
+**All repository methods must write immediately** — no batching, buffering, or "commit on save" patterns in the repository layer. Each mutation is an independent Drift transaction.
+
+**Tier 2 — `.hsp` Portable File (manual + debounced export)**
+
+The `.hsp` file is a gzip-compressed JSON snapshot of the entire project (format in §7.4). It exists for:
+- Portability: copy a project between devices or share with a colleague.
+- Backup: an independent copy outside the app's SQLite file.
+- The "Save" and "Save As" menu actions both write this file.
+
+The `.hsp` file is **not** the source of truth during editing — the SQLite database is. The `.hsp` is a point-in-time export.
+
+### 7.4 Dirty State and Auto-Export
+
+**Dirty state** tracks whether the in-database project state has diverged from the last `.hsp` export (or has never been exported). This is distinct from "unsaved data" — all data is always saved in SQLite.
+
+#### `SaveStateNotifier`
+
+Define a `SaveStateNotifier` in `lib/repositories/save_state_notifier.dart`:
+
+```dart
+@freezed
+class SaveState with _$SaveState {
+  const factory SaveState({
+    required bool isDirty,           // true = in-DB changes not yet in .hsp
+    required DateTime? lastExportedAt, // null = never exported to .hsp
+    required String? lastExportPath,   // null = never exported or path unknown
+    required bool isAutoExporting,   // true during background .hsp write
+  }) = _SaveState;
+}
+```
+
+The notifier **sets `isDirty = true`** on every successful repository write operation (any insert/update/delete). It **clears `isDirty = false`** when an `.hsp` export completes successfully.
+
+Provider registration in §6.2: `saveStateProvider → StateNotifierProvider<SaveStateNotifier, SaveState>`.
+
+#### Auto-Export Debounce
+
+When the project has been previously exported to an `.hsp` file (i.e., `lastExportPath != null`), the `SaveStateNotifier` schedules a debounced auto-export:
+
+- Debounce window: **3 seconds** after the last mutation.
+- On fire: write the current SQLite project state to the same `.hsp` path.
+- While writing: set `isAutoExporting = true`.
+- On success: clear `isDirty`, update `lastExportedAt`.
+- On failure (disk full, permission error): log the error, keep `isDirty = true`, show a persistent status bar warning.
+
+**If the project has never been exported** (new project or opened from SQLite without a file path): the debounced auto-export does NOT fire. The user must trigger "Save As" manually to establish a file path. After that, auto-export activates.
+
+#### Session Continuity (no `.hsp` required)
+
+The app does not require the user to ever export to `.hsp` in order to preserve their work. On every launch, the app queries `AppDatabase` for the most recently modified project and re-opens it directly from SQLite. The user's session is restored without any file interaction.
+
+**`AppPreferences`** — a simple key-value store (using `shared_preferences` or a single-row Drift table `app_preferences`) tracks:
+
+| Key | Value | Purpose |
+|-----|-------|---------|
+| `lastOpenedProjectId` | String (UUID) or null | Which project to reopen on next launch |
+| `lastOpenedFloorId` | String (UUID) or null | Which floor was active |
+| `canvasZoom` | double | Last zoom level per project |
+| `canvasPanX`, `canvasPanY` | double | Last pan offset per project |
+
+On app startup:
+1. Read `lastOpenedProjectId`.
+2. If a valid project exists in SQLite with that ID → open it directly, skip the project list.
+3. If not found (deleted, first launch) → show Project List Screen.
+
+Provider: `lastOpenedProjectIdProvider → StateProvider<String?>` persisted to `AppPreferences`.
+
+### 7.5 Project File Format (.hsp)
 
 Gzip-compressed JSON. Structure:
 
@@ -688,3 +768,6 @@ Before any PR is merged, the architect verifies:
 - [ ] Zero lint warnings
 - [ ] Doc comments on all public APIs
 - [ ] No direct repository imports from UI layer
+- [ ] Every repository write calls `ref.read(saveStateProvider.notifier).markDirty()` — or the notifier is wired to intercept via a repository mixin
+- [ ] No repository method buffers writes — every DAO call is an immediate Drift transaction
+- [ ] `lastOpenedProjectId` updated whenever a project is opened or created

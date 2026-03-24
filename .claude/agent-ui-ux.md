@@ -171,7 +171,7 @@ The entry screen. Shows all saved projects as cards in a grid (desktop: 3-4 colu
 **Status Bar** (bottom, 32px height):
 - Left: current zoom percentage
 - Centre: mouse/touch coordinates in mm
-- Right: warning count (clickable → opens warnings list), room count
+- Right: save state indicator (see §12), warning count (clickable → opens warnings list), room count
 
 ### 4.3 Tablet Layout Adaptations
 
@@ -717,6 +717,101 @@ Ceiling
 
 ---
 
+## 12. Save, Autosave & Session Restore
+
+### 12.1 Two-Tier Persistence — User-Facing Mental Model
+
+HeatingPlanner never loses work. The app continuously saves all project data to its internal database the moment any change is made — drawing a wall, adjusting a temperature, editing a layer. The user never needs to press Save to avoid losing data.
+
+"Save" (Ctrl/Cmd + S) and "Save As" (Ctrl/Cmd + Shift + S) are about exporting to a portable `.hsp` file — useful for sharing between devices, sending to a colleague, or creating a backup outside the app.
+
+**This distinction must be communicated clearly in the UI.** Do not use language like "unsaved changes" without qualifying that data is safe in the app.
+
+### 12.2 Save State Indicator (Status Bar)
+
+The right side of the status bar shows a compact save indicator. Three states:
+
+| Situation | Indicator | Tooltip on hover |
+|-----------|-----------|-----------------|
+| Project never exported to `.hsp` | (nothing) | — |
+| All changes reflected in `.hsp` | "✓ Saved" in `onSurfaceSecondary` | "All changes saved to file" |
+| Changes made since last `.hsp` export | ● (amber dot, 6px) | "File export out of date — press Ctrl+S to update" |
+| Auto-export in progress | ⟳ spinning (12px) + "Saving…" | "Saving to file…" |
+| Auto-export failed | ⚠ amber icon | "Could not save to file — check disk space or permissions" |
+
+The indicator appears only when the project has a file path. New projects or projects opened directly from the app database show no indicator (they are always fully safe without a file).
+
+### 12.3 Window Title
+
+On desktop, the window title format is:
+
+```
+{ProjectName} — HeatingPlanner          ← clean state or no .hsp
+{ProjectName} ● — HeatingPlanner        ← .hsp out of date
+{ProjectName} — HeatingPlanner (Saving…)← auto-export running
+```
+
+The ● indicator mirrors the status bar dot. It follows the platform convention (macOS uses a dot in the close button; this supplements that with visible text).
+
+### 12.4 Manual Save Flows
+
+**Ctrl/Cmd + S — Save to existing file:**
+- If the project already has a file path: silently overwrites. Status bar shows "✓ Saved" for 2 seconds then reverts to normal state.
+- If no file path yet: opens a "Save As" file picker dialog.
+
+**Ctrl/Cmd + Shift + S — Save As:**
+- Always opens a file picker.
+- Default filename: `{ProjectName}.hsp`
+- Filter: `*.hsp` files.
+- On confirm: exports and establishes the new path as the auto-export target.
+- On cancel: no change.
+
+**File menu → Save / Save As:** same as shortcuts above.
+
+### 12.5 Quit / Close with Unsaved File Export
+
+When the user closes the window or quits the app while the `.hsp` is out of date:
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  Unsaved export file                                      │
+│                                                           │
+│  "{ProjectName}" has changes not yet written to the       │
+│  .hsp export file. Your project is safely stored in the   │
+│  app — this only affects the portable file.               │
+│                                                           │
+│  [ Save File and Quit ]   [ Quit Anyway ]   [ Cancel ]   │
+└──────────────────────────────────────────────────────────┘
+```
+
+- "Save File and Quit": export `.hsp` then close. Show brief progress spinner.
+- "Quit Anyway": close without exporting. All data remains safe in the database.
+- "Cancel": dismiss dialog, return to the app.
+
+If the project has **never** been exported to a file (no path set), close without any dialog — there is nothing to warn about.
+
+### 12.6 App Startup — Session Restore
+
+On every launch, the app remembers the last open project and reopens it directly:
+
+1. **Last project found in database → open it directly.** Skip the project list screen. The canvas restores to the same zoom and pan position the user left. No loading dialog — show the editor immediately with the Drift stream providing data.
+2. **First launch / last project deleted → show Project List Screen.** Same as current behaviour.
+3. **Project list screen → tap a project → open it** and remember it as the new last-opened project.
+
+There is no "restoring session…" splash screen or notification — the restoration is seamless. The editor opens and data loads through the normal reactive providers.
+
+### 12.7 Autosave Feedback (In-Session)
+
+The autosave to `.hsp` is silent and background. Do not interrupt the user with toasts or dialogs for successful autosaves. Only surface feedback for:
+
+- **Success:** status bar indicator transitions cleanly from ● to ✓.
+- **Failure:** amber ⚠ icon in status bar + tooltip. Does not interrupt editing.
+- **Manual save shortcut:** show "✓ Saved" text in status bar for 2 seconds as a tactile confirmation.
+
+**Never** block the canvas or show a full-screen loading state for any save operation.
+
+---
+
 ## 11. Usability Review Checklist
 
 The UI/UX Designer reviews every frontend PR against these criteria:
@@ -734,3 +829,9 @@ The UI/UX Designer reviews every frontend PR against these criteria:
 - [ ] Confirmation dialog shown for destructive actions
 - [ ] Real-time feedback: values update within 200ms of change
 - [ ] Platform fidelity: desktop uses mouse conventions, tablet uses touch conventions
+- [ ] Save state indicator present in status bar when project has a file path
+- [ ] Window title shows ● when `.hsp` is out of date
+- [ ] Quit dialog uses the correct wording (data is safe, only file is at risk)
+- [ ] App opens directly to last project on relaunch (no project list if a last project exists)
+- [ ] Manual save (Ctrl+S) shows "✓ Saved" confirmation for 2 seconds
+- [ ] Auto-export failures surface in status bar without blocking canvas

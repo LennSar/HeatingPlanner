@@ -527,7 +527,153 @@ class UndoRedoService extends StateNotifier<UndoRedoState> {
 
 ---
 
-## 8. Export Implementation
+## 8. Save State & AutoSave
+
+### 8.1 SaveStateNotifier Wiring
+
+Every repository write must notify the `SaveStateNotifier`. Use a repository mixin so no DAO call is ever missed:
+
+```dart
+/// Mix into every repository class that performs write operations.
+mixin SaveStateMixin {
+  Ref get ref;  // must be provided by the concrete repository
+
+  /// Call this immediately after every successful DAO insert/update/delete.
+  void markDirty() => ref.read(saveStateProvider.notifier).markDirty();
+}
+```
+
+Example in `BuildingRepository`:
+
+```dart
+class BuildingRepository with SaveStateMixin {
+  BuildingRepository(this.ref, this._dao);
+
+  @override
+  final Ref ref;
+  final BuildingDao _dao;
+
+  Future<void> addWallSegment(WallSegment wall) async {
+    await _dao.insert(wall);
+    markDirty();
+  }
+  // ... same pattern for every mutating method
+}
+```
+
+**Scope:** All repository classes — `ProjectRepository`, `BuildingRepository`, `ConstructionRepository`, `HeatingRepository`. The `MaterialRepository` (seed data inserts) does NOT call `markDirty` for built-in material inserts; only for user-created custom materials.
+
+### 8.2 Save State Indicator Widget
+
+**File:** `lib/ui/widgets/save_state_indicator.dart`
+
+A compact widget placed in the status bar and/or the window title. Shows the current save status without interrupting the user.
+
+| State | Visual |
+|-------|--------|
+| `isDirty = false, isAutoExporting = false` | "Saved" in `onSurfaceSecondary` colour, check icon |
+| `isDirty = true, isAutoExporting = false` | Unsaved dot (●) in `warningAmber`, no text on status bar (to keep it compact); tooltip: "Changes not yet saved to file" |
+| `isAutoExporting = true` | Spinning micro-indicator (12px), "Saving…" text |
+| `lastExportPath == null` | No indicator (user has not set up file export — all data is safe in the database) |
+
+```dart
+class SaveStateIndicator extends ConsumerWidget {
+  const SaveStateIndicator({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(saveStateProvider);
+    if (state.lastExportPath == null) return const SizedBox.shrink();
+    if (state.isAutoExporting) return _Saving();
+    if (state.isDirty) return _UnsavedDot();
+    return _Saved();
+  }
+}
+```
+
+### 8.3 Manual Save Actions
+
+**Ctrl/Cmd + S — Save:**
+- If `lastExportPath != null`: write `.hsp` to the same path immediately (bypasses debounce). Show "Saved" confirmation in status bar for 2 seconds.
+- If `lastExportPath == null`: behave as Save As (open file picker).
+
+**Ctrl/Cmd + Shift + S — Save As:**
+- Open `FilePicker.saveFile()` with filter `*.hsp`.
+- On path selected: write `.hsp`, update `lastExportPath` in `SaveState`, clear `isDirty`.
+- On cancel: do nothing.
+
+Both actions are wired through `KeyboardShortcuts` and the desktop menu `File` menu. The `Actions` widget maps `SaveIntent` and `SaveAsIntent` to the above logic via the `SaveStateNotifier`.
+
+### 8.4 App Close / Window Destroy Handler
+
+**File:** `lib/platform/desktop_menu.dart` (close handling) and `lib/app.dart` (lifecycle)
+
+On desktop (macOS/Windows/Linux), intercept the window close event:
+
+```dart
+// In app.dart — use window_manager or equivalent platform channel
+windowManager.setPreventClose(true);
+windowManager.addListener(_AppWindowListener(ref));
+
+class _AppWindowListener extends WindowListener {
+  _AppWindowListener(this.ref);
+  final WidgetRef ref;
+
+  @override
+  Future<void> onWindowClose() async {
+    final state = ref.read(saveStateProvider);
+    if (state.isDirty && state.lastExportPath != null) {
+      // Show confirmation dialog
+      final choice = await showUnsavedChangesDialog(ref.context);
+      // choice: SaveAndQuit, QuitWithoutSaving, Cancel
+      if (choice == UnsavedChoice.saveAndQuit) {
+        await ref.read(saveStateProvider.notifier).exportNow();
+        windowManager.destroy();
+      } else if (choice == UnsavedChoice.quitWithoutSaving) {
+        windowManager.destroy();
+      }
+      // Cancel: do nothing — window stays open
+    } else {
+      windowManager.destroy();  // always safe — all data is in SQLite
+    }
+  }
+}
+```
+
+> **Note:** Even if the user quits without saving the `.hsp` file, **no project data is lost** — SQLite always holds the complete current state. The confirmation dialog is about the portable `.hsp` file only, not about data safety. The dialog wording must reflect this: "You have unsaved changes to your export file. Your project is safely stored in the app — this only affects the .hsp file."
+
+On tablet (iOS/Android), use `AppLifecycleListener` to trigger the auto-export immediately when the app moves to background:
+
+```dart
+AppLifecycleListener(
+  onInactive: () => ref.read(saveStateProvider.notifier).exportNow(),
+);
+```
+
+### 8.5 Startup — Session Restore
+
+**File:** `lib/app.dart` / `lib/ui/screens/project_list_screen.dart`
+
+On app launch, before showing any screen:
+
+```dart
+final lastId = ref.read(lastOpenedProjectIdProvider);
+if (lastId != null) {
+  final project = await ref.read(projectRepositoryProvider).findById(lastId);
+  if (project != null) {
+    // Navigate directly to EditorScreen for this project
+    return EditorScreen(projectId: lastId);
+  }
+}
+// Fallback: show project list
+return ProjectListScreen();
+```
+
+When opening a project (from project list or file import), immediately write `lastOpenedProjectId` to `AppPreferences`.
+
+---
+
+## 9. Export Implementation
 
 ### 8.1 PDF Report
 
@@ -556,7 +702,7 @@ Use `StringBuffer` with comma-separated values. UTF-8 encoding. BOM for Excel co
 
 ---
 
-## 9. Frontend Code Review Checklist
+## 10. Frontend Code Review Checklist
 
 Before submitting work for review:
 
@@ -573,3 +719,8 @@ Before submitting work for review:
 - [ ] Keyboard shortcuts wrapped in `Shortcuts` + `Actions` (not raw `RawKeyboardListener`)
 - [ ] Responsive layout tested at 600dp breakpoint
 - [ ] Doc comments on all public widgets and methods
+- [ ] Every repository write calls `markDirty()` via `SaveStateMixin`
+- [ ] `SaveStateIndicator` present in the status bar
+- [ ] Window close handler wired; confirmation dialog wording mentions SQLite safety
+- [ ] `lastOpenedProjectId` written to `AppPreferences` on project open/create
+- [ ] Startup correctly restores last session (or shows project list if no last project)
