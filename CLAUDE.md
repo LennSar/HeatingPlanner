@@ -12,6 +12,7 @@ This project uses role-specific instruction files. **Before writing any code, re
 
 | File | Role | Read When |
 |------|------|-----------|
+| `.claude/agent-prompt.md` | Prompt generation, requirements discussion, spec maintenance | GENERATING prompts for other agents, discussing requirements, updating spec files. **Never use this agent for writing code.** |
 | `.claude/agent-architect.md` | Data models, directory structure, state management, provider contracts, coding standards | ANY structural work, model changes, new providers, code review |
 | `.claude/agent-hvac.md` | Calculation engines, formulas, physical constants, material database, EN standards | ANY calculation or formula work, constant definitions, material data |
 | `.claude/agent-ui-ux.md` | Interaction specs, design tokens, wireframes, platform patterns, accessibility | ANY UI layout, interaction flow, visual design, responsive behavior |
