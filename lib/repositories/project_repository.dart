@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../data/database/app_database.dart' as $db;
 import '../data/database/daos/project_dao.dart';
 import '../data/models/project.dart';
+import 'save_state_notifier.dart';
 
 // ── DAO provider ──────────────────────────────────────────────────────────────
 
@@ -65,6 +66,39 @@ Project _projectFromRow($db.Project row) {
     location: location,
   );
 }
+
+// ── Repository class ──────────────────────────────────────────────────────────
+
+/// Class-based repository for [Project] entities.
+///
+/// Mixes in [SaveStateMixin] so that every successful write marks the
+/// in-database state as dirty relative to the last `.hsp` export.
+class ProjectRepository with SaveStateMixin {
+  /// Creates a [ProjectRepository] backed by [ref].
+  ProjectRepository(this.ref);
+
+  @override
+  final Ref ref;
+
+  ProjectDao get _dao => ref.read(projectDaoProvider);
+
+  /// Inserts or replaces [project] and marks dirty.
+  Future<void> upsertProject(Project project) async {
+    await _dao.upsert(_projectToCompanion(project));
+    markProjectDirty();
+  }
+
+  /// Deletes the project with [id] and marks dirty.
+  Future<void> deleteProject(String id) async {
+    await _dao.deleteById(id);
+    markProjectDirty();
+  }
+}
+
+/// Provides the singleton [ProjectRepository].
+final projectRepositoryProvider = Provider<ProjectRepository>(
+  (ref) => ProjectRepository(ref),
+);
 
 // ── Model → Companion mapping ─────────────────────────────────────────────────
 

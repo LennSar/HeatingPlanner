@@ -8,6 +8,7 @@ import '../data/database/daos/heating_dao.dart';
 import '../data/models/distributor.dart';
 import '../data/models/enums.dart';
 import '../data/models/flooring_material.dart';
+import 'save_state_notifier.dart';
 import '../data/models/heating_circuit.dart';
 import '../data/models/heating_zone.dart';
 import '../data/models/point2d.dart';
@@ -365,3 +366,84 @@ String _encodePointList(List<Point2D> points) {
 String _encodePoint(Point2D point) {
   return jsonEncode(point.toJson());
 }
+
+// ── Repository class ──────────────────────────────────────────────────────────
+
+/// Class-based repository for heating entities (zones, tube types, flooring
+/// materials, distributors, circuits).
+///
+/// Mixes in [SaveStateMixin] so every successful write marks dirty.
+class HeatingRepository with SaveStateMixin {
+  /// Creates a [HeatingRepository] backed by [ref].
+  HeatingRepository(this.ref);
+
+  @override
+  final Ref ref;
+
+  HeatingDao get _dao => ref.read(heatingDaoProvider);
+
+  /// Inserts or replaces [zone] and marks dirty.
+  Future<void> upsertHeatingZone(HeatingZone zone) async {
+    await _dao.upsertZone(_zoneToCompanion(zone));
+    markProjectDirty();
+  }
+
+  /// Deletes the heating zone with [id] and marks dirty.
+  Future<void> deleteHeatingZone(String id) async {
+    await _dao.deleteZone(id);
+    markProjectDirty();
+  }
+
+  /// Inserts or replaces [tube] and marks dirty.
+  Future<void> upsertTubeType(TubeType tube) async {
+    await _dao.upsertTubeType(_tubeTypeToCompanion(tube));
+    markProjectDirty();
+  }
+
+  /// Deletes the tube type with [id] and marks dirty.
+  Future<void> deleteTubeType(String id) async {
+    await _dao.deleteTubeType(id);
+    markProjectDirty();
+  }
+
+  /// Inserts or replaces [material] and marks dirty.
+  Future<void> upsertFlooringMaterial(FlooringMaterial material) async {
+    await _dao.upsertFlooringMaterial(_flooringMaterialToCompanion(material));
+    markProjectDirty();
+  }
+
+  /// Deletes the flooring material with [id] and marks dirty.
+  Future<void> deleteFlooringMaterial(String id) async {
+    await _dao.deleteFlooringMaterial(id);
+    markProjectDirty();
+  }
+
+  /// Inserts or replaces [distributor] and marks dirty.
+  Future<void> upsertDistributor(Distributor distributor) async {
+    await _dao.upsertDistributor(_distributorToCompanion(distributor));
+    markProjectDirty();
+  }
+
+  /// Deletes the distributor with [id] and marks dirty.
+  Future<void> deleteDistributor(String id) async {
+    await _dao.deleteDistributor(id);
+    markProjectDirty();
+  }
+
+  /// Inserts or replaces [circuit] and marks dirty.
+  Future<void> upsertHeatingCircuit(HeatingCircuit circuit) async {
+    await _dao.upsertCircuit(_circuitToCompanion(circuit));
+    markProjectDirty();
+  }
+
+  /// Deletes the heating circuit with [id] and marks dirty.
+  Future<void> deleteHeatingCircuit(String id) async {
+    await _dao.deleteCircuit(id);
+    markProjectDirty();
+  }
+}
+
+/// Provides the singleton [HeatingRepository].
+final heatingRepositoryProvider = Provider<HeatingRepository>(
+  (ref) => HeatingRepository(ref),
+);

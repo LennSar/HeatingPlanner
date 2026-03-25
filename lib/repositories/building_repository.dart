@@ -12,6 +12,7 @@ import '../data/models/point2d.dart';
 import '../data/models/room.dart';
 import '../data/models/wall_segment.dart';
 import '../data/models/window_element.dart';
+import 'save_state_notifier.dart';
 
 // ── DAO provider ──────────────────────────────────────────────────────────────
 
@@ -309,3 +310,84 @@ String _encodePointList(List<Point2D> points) {
 String _encodePoint(Point2D point) {
   return jsonEncode(point.toJson());
 }
+
+// ── Repository class ──────────────────────────────────────────────────────────
+
+/// Class-based repository for building entities (floors, rooms, wall segments,
+/// windows, doors).
+///
+/// Mixes in [SaveStateMixin] so every successful write marks dirty.
+class BuildingRepository with SaveStateMixin {
+  /// Creates a [BuildingRepository] backed by [ref].
+  BuildingRepository(this.ref);
+
+  @override
+  final Ref ref;
+
+  BuildingDao get _dao => ref.read(buildingDaoProvider);
+
+  /// Inserts or replaces [floor] and marks dirty.
+  Future<void> upsertFloor(Floor floor, String projectId) async {
+    await _dao.upsertFloor(_floorToCompanion(floor, projectId));
+    markProjectDirty();
+  }
+
+  /// Deletes the floor with [id] and marks dirty.
+  Future<void> deleteFloor(String id) async {
+    await _dao.deleteFloor(id);
+    markProjectDirty();
+  }
+
+  /// Inserts or replaces [room] and marks dirty.
+  Future<void> upsertRoom(Room room) async {
+    await _dao.upsertRoom(_roomToCompanion(room));
+    markProjectDirty();
+  }
+
+  /// Deletes the room with [id] and marks dirty.
+  Future<void> deleteRoom(String id) async {
+    await _dao.deleteRoom(id);
+    markProjectDirty();
+  }
+
+  /// Inserts or replaces [wall] and marks dirty.
+  Future<void> upsertWallSegment(WallSegment wall) async {
+    await _dao.upsertWallSegment(_wallSegmentToCompanion(wall));
+    markProjectDirty();
+  }
+
+  /// Deletes the wall segment with [id] and marks dirty.
+  Future<void> deleteWallSegment(String id) async {
+    await _dao.deleteWallSegment(id);
+    markProjectDirty();
+  }
+
+  /// Inserts or replaces [window] and marks dirty.
+  Future<void> upsertWindow(WindowElement window) async {
+    await _dao.upsertWindow(_windowToCompanion(window));
+    markProjectDirty();
+  }
+
+  /// Deletes the window with [id] and marks dirty.
+  Future<void> deleteWindow(String id) async {
+    await _dao.deleteWindow(id);
+    markProjectDirty();
+  }
+
+  /// Inserts or replaces [door] and marks dirty.
+  Future<void> upsertDoor(Door door) async {
+    await _dao.upsertDoor(_doorToCompanion(door));
+    markProjectDirty();
+  }
+
+  /// Deletes the door with [id] and marks dirty.
+  Future<void> deleteDoor(String id) async {
+    await _dao.deleteDoor(id);
+    markProjectDirty();
+  }
+}
+
+/// Provides the singleton [BuildingRepository].
+final buildingRepositoryProvider = Provider<BuildingRepository>(
+  (ref) => BuildingRepository(ref),
+);

@@ -5,6 +5,7 @@ import '../data/database/app_database.dart' as $db;
 import '../data/database/daos/construction_dao.dart';
 import '../data/models/material_layer.dart';
 import '../data/models/wall_construction.dart';
+import 'save_state_notifier.dart';
 
 // ── DAO provider ──────────────────────────────────────────────────────────────
 
@@ -118,3 +119,47 @@ $db.MaterialLayersCompanion _layerToCompanion(MaterialLayer layer) {
     specificHeat: Value(layer.specificHeat),
   );
 }
+
+// ── Repository class ──────────────────────────────────────────────────────────
+
+/// Class-based repository for construction and layer entities.
+///
+/// Mixes in [SaveStateMixin] so every successful write marks dirty.
+class ConstructionRepository with SaveStateMixin {
+  /// Creates a [ConstructionRepository] backed by [ref].
+  ConstructionRepository(this.ref);
+
+  @override
+  final Ref ref;
+
+  ConstructionDao get _dao => ref.read(constructionDaoProvider);
+
+  /// Inserts or replaces [construction] and marks dirty.
+  Future<void> upsertConstruction(WallConstruction construction) async {
+    await _dao.upsertConstruction(_constructionToCompanion(construction));
+    markProjectDirty();
+  }
+
+  /// Deletes the construction with [id] and marks dirty.
+  Future<void> deleteConstruction(String id) async {
+    await _dao.deleteConstruction(id);
+    markProjectDirty();
+  }
+
+  /// Inserts or replaces [layer] and marks dirty.
+  Future<void> upsertLayer(MaterialLayer layer) async {
+    await _dao.upsertLayer(_layerToCompanion(layer));
+    markProjectDirty();
+  }
+
+  /// Deletes the layer with [id] and marks dirty.
+  Future<void> deleteLayer(String id) async {
+    await _dao.deleteLayer(id);
+    markProjectDirty();
+  }
+}
+
+/// Provides the singleton [ConstructionRepository].
+final constructionRepositoryProvider = Provider<ConstructionRepository>(
+  (ref) => ConstructionRepository(ref),
+);
