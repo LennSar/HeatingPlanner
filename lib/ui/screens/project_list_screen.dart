@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/id_generator.dart';
 import '../../data/models/project.dart';
+import '../../repositories/app_preferences.dart';
 import '../../repositories/project_repository.dart';
 import 'editor_screen.dart';
 
@@ -59,6 +62,9 @@ class ProjectListScreen extends ConsumerWidget {
     if (result == null) return;
     final dao = ref.read(projectDaoProvider);
     await upsertProject(dao, result);
+    unawaited(
+      ref.read(lastOpenedProjectIdProvider.notifier).set(result.id),
+    );
     if (!context.mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -116,11 +122,11 @@ class _ProjectCard extends ConsumerWidget {
     final theme = Theme.of(context);
 
     return GestureDetector(
-      onTap: () => _openProject(context),
+      onTap: () => _openProject(context, ref),
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: () => _openProject(context),
+          onTap: () => _openProject(context, ref),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -176,7 +182,10 @@ class _ProjectCard extends ConsumerWidget {
     );
   }
 
-  void _openProject(BuildContext context) {
+  void _openProject(BuildContext context, WidgetRef ref) {
+    unawaited(
+      ref.read(lastOpenedProjectIdProvider.notifier).set(project.id),
+    );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => EditorScreen(projectId: project.id),
