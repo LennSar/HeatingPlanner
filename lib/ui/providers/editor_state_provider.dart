@@ -7,6 +7,7 @@ import '../../calculation/engines/geometry_engine.dart';
 import '../../repositories/building_repository.dart';
 import '../../repositories/construction_repository.dart';
 import '../../repositories/heating_repository.dart';
+import '../../repositories/project_repository.dart';
 import '../../core/utils/id_generator.dart';
 import '../../data/models/distributor.dart';
 import '../../data/models/door.dart';
@@ -796,3 +797,17 @@ final currentProjectIdProvider =
     NotifierProvider<CurrentProjectIdNotifier, String>(
   CurrentProjectIdNotifier.new,
 );
+
+/// Display name of the currently open project.
+///
+/// Derived from [currentProjectIdProvider] → [projectProvider].
+/// Returns `'HeatingPlanner'` while the project is loading or no
+/// project is open, so callers always receive a valid non-empty string.
+final currentProjectNameProvider = Provider<String>((ref) {
+  final projectId = ref.watch(currentProjectIdProvider);
+  if (projectId.isEmpty) return 'HeatingPlanner';
+  return ref
+      .watch(projectProvider(projectId))
+      .whenOrNull(data: (p) => p?.name) ??
+      'HeatingPlanner';
+});

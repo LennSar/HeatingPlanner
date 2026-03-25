@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../data/models/enums.dart';
 import '../../platform/keyboard_shortcuts.dart';
+import '../../repositories/save_state_notifier.dart';
 import '../canvas/canvas_controller.dart';
 import '../canvas/floor_plan_canvas.dart';
 import '../dialogs/project_settings_dialog.dart';
 import '../panels/performance_dashboard.dart';
 import '../panels/properties_panel.dart';
 import '../providers/editor_state_provider.dart';
+import '../widgets/save_state_indicator.dart';
 import '../../validation/validation_service.dart';
 
 /// Notifier for the active drawing tool.
@@ -64,8 +67,35 @@ class _EditorScreenState
     });
   }
 
+  /// Computes the desktop window title from the project name and save state.
+  ///
+  /// Format matches agent-ui-ux.md §12.3:
+  /// - Clean / no path: `{name} — HeatingPlanner`
+  /// - Dirty:           `{name} ● — HeatingPlanner`
+  /// - Saving:          `{name} — HeatingPlanner (Saving…)`
+  static String _windowTitle(String projectName, SaveState s) {
+    if (s.isAutoExporting) return '$projectName — HeatingPlanner (Saving…)';
+    if (s.isDirty && s.lastExportPath != null) {
+      return '$projectName ● — HeatingPlanner';
+    }
+    return '$projectName — HeatingPlanner';
+  }
+
   @override
   Widget build(BuildContext context) {
+    // Keep the desktop window title in sync with save state.
+    final saveState = ref.watch(saveStateProvider);
+    final projectName = ref.watch(currentProjectNameProvider);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      SystemChrome.setApplicationSwitcherDescription(
+        ApplicationSwitcherDescription(
+          label: _windowTitle(projectName, saveState),
+          primaryColor: 0,
+        ),
+      );
+    });
+
     final width = MediaQuery.sizeOf(context).width;
     final isTablet = width < 600;
 
@@ -490,6 +520,10 @@ class _StatusBar extends ConsumerWidget {
                 ],
               ),
             ),
+            const SizedBox(width: Spacing.md),
+
+            // Save state indicator
+            const SaveStateIndicator(),
             const SizedBox(width: Spacing.md),
 
             // Room count
