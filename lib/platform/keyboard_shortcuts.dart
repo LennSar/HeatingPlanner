@@ -1,8 +1,12 @@
+import 'dart:async';
+
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/enums.dart';
+import '../repositories/save_state_notifier.dart';
 import '../ui/canvas/canvas_controller.dart';
 import '../ui/canvas/floor_plan_canvas.dart';
 import '../ui/canvas/tools/undo_redo_service.dart';
@@ -72,6 +76,20 @@ class RotateOrRoutePipeIntent extends Intent {
   const RotateOrRoutePipeIntent();
 }
 
+/// Save the current project to its existing `.hsp` path (Ctrl/Cmd+S).
+///
+/// If no path has been established yet, behaves as [SaveAsIntent].
+class SaveIntent extends Intent {
+  /// Creates a [SaveIntent].
+  const SaveIntent();
+}
+
+/// Save the current project to a user-chosen `.hsp` path (Ctrl/Cmd+Shift+S).
+class SaveAsIntent extends Intent {
+  /// Creates a [SaveAsIntent].
+  const SaveAsIntent();
+}
+
 // ----------------------------------------------------------
 // Shortcut map
 // ----------------------------------------------------------
@@ -135,6 +153,17 @@ final Map<ShortcutActivator, Intent> editorShortcuts = {
     LogicalKeyboardKey.digit0,
     control: true,
   ): const ZoomToFitIntent(),
+
+  // File
+  const SingleActivator(
+    LogicalKeyboardKey.keyS,
+    control: true,
+  ): const SaveIntent(),
+  const SingleActivator(
+    LogicalKeyboardKey.keyS,
+    control: true,
+    shift: true,
+  ): const SaveAsIntent(),
 };
 
 /// Wraps [child] with [Shortcuts] and [Actions] for the
@@ -267,6 +296,29 @@ class EditorShortcuts extends ConsumerWidget {
               return null;
             },
           ),
+          SaveIntent: CallbackAction<SaveIntent>(
+            onInvoke: (_) {
+              final notifier =
+                  ref.read(saveStateProvider.notifier);
+              if (ref.read(saveStateProvider).lastExportPath !=
+                  null) {
+                unawaited(notifier.exportNow());
+              } else {
+                unawaited(_pickAndSaveAs(notifier));
+              }
+              return null;
+            },
+          ),
+          SaveAsIntent: CallbackAction<SaveAsIntent>(
+            onInvoke: (_) {
+              unawaited(
+                _pickAndSaveAs(
+                  ref.read(saveStateProvider.notifier),
+                ),
+              );
+              return null;
+            },
+          ),
         },
         child: Focus(
           autofocus: true,
@@ -275,4 +327,19 @@ class EditorShortcuts extends ConsumerWidget {
       ),
     );
   }
+}
+
+// ── Save helpers ───────────────────────────────────────────────────────────────
+
+/// Opens a save-file dialog and delegates to [SaveStateNotifier.saveAs].
+///
+/// Does nothing if the user dismisses the dialog.
+Future<void> _pickAndSaveAs(SaveStateNotifier notifier) async {
+  final path = await FilePicker.platform.saveFile(
+    dialogTitle: 'Save Project As',
+    fileName: 'project.hsp',
+    allowedExtensions: ['hsp'],
+    type: FileType.custom,
+  );
+  if (path != null) await notifier.saveAs(path);
 }

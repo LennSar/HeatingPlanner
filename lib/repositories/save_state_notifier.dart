@@ -1,5 +1,16 @@
+import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
+import 'package:archive/archive.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:logging/logging.dart';
+
+import '../data/database/app_database.dart' as $db;
+import 'app_preferences.dart';
+import 'hsp_exporter.dart';
 
 part 'save_state_notifier.freezed.dart';
 
@@ -36,29 +47,105 @@ abstract class SaveState with _$SaveState {
 
 /// Manages [SaveState] for the currently open project.
 ///
-/// Repositories call [markDirty] after every successful write. The `.hsp`
-/// export mechanism (debounced auto-export and manual Save/Save-As) calls
-/// [clearDirty] on completion.
+/// Repositories call [markDirty] after every successful write, which
+/// sets [SaveState.isDirty] and schedules a debounced [exportNow] (3 s)
+/// whenever [SaveState.lastExportPath] is non-null.
+///
+/// [exportNow] and [saveAs] drive the `.hsp` write directly and can also be
+/// invoked from keyboard shortcuts or the File menu without waiting for the
+/// debounce to fire.
 class SaveStateNotifier extends Notifier<SaveState> {
+  static final _log = Logger('SaveStateNotifier');
+
+  Timer? _debounce;
+
   @override
-  SaveState build() => const SaveState(
-        isDirty: false,
-        lastExportedAt: null,
-        lastExportPath: null,
-        isAutoExporting: false,
-      );
+  SaveState build() {
+    ref.onDispose(() => _debounce?.cancel());
+    return const SaveState(
+      isDirty: false,
+      lastExportedAt: null,
+      lastExportPath: null,
+      isAutoExporting: false,
+    );
+  }
 
   /// Marks the project as dirty — in-database state has changed since the
   /// last `.hsp` export.
+  ///
+  /// If [SaveState.lastExportPath] is set, schedules a debounced [exportNow]
+  /// 3 seconds after the last [markDirty] call (cancels any pending timer).
   void markDirty() {
     if (!state.isDirty) {
       state = state.copyWith(isDirty: true);
+    }
+    if (state.lastExportPath != null) {
+      _debounce?.cancel();
+      _debounce = Timer(
+        const Duration(seconds: 3),
+        () => unawaited(exportNow()),
+      );
     }
   }
 
   /// Clears the dirty flag after a successful `.hsp` export.
   void clearDirty() {
     state = state.copyWith(isDirty: false);
+  }
+
+  /// Writes the current project state to [SaveState.lastExportPath].
+  ///
+  /// - Cancels any pending debounce timer.
+  /// - Sets [SaveState.isAutoExporting] to `true` during the write.
+  /// - On success: clears [SaveState.isDirty] and updates
+  ///   [SaveState.lastExportedAt].
+  /// - On failure: logs the error and leaves [SaveState.isDirty] `true`.
+  ///
+  /// Does nothing if [SaveState.lastExportPath] is `null`.
+  Future<void> exportNow() async {
+    final path = state.lastExportPath;
+    if (path == null) return;
+
+    _debounce?.cancel();
+    _debounce = null;
+
+    state = state.copyWith(isAutoExporting: true);
+
+    try {
+      final projectId =
+          ref.read(lastOpenedProjectIdProvider).asData?.value;
+      if (projectId == null) {
+        state = state.copyWith(isAutoExporting: false);
+        return;
+      }
+
+      final exporter = HspExporter(ref.read($db.appDatabaseProvider));
+      final snapshot = await exporter.buildSnapshot(projectId);
+
+      final jsonBytes = utf8.encode(jsonEncode(snapshot));
+      final compressed = const GZipEncoder().encode(jsonBytes);
+
+      await File(path).writeAsBytes(Uint8List.fromList(compressed));
+
+      state = state.copyWith(
+        isDirty: false,
+        lastExportedAt: DateTime.now(),
+        isAutoExporting: false,
+      );
+    } catch (e, st) {
+      _log.severe('HSP export to "$path" failed', e, st);
+      state = state.copyWith(isAutoExporting: false);
+      // isDirty intentionally left true — UI can react to the persisted flag.
+    }
+  }
+
+  /// Sets [SaveState.lastExportPath] to [path] and immediately calls
+  /// [exportNow].
+  ///
+  /// Use this for the "Save As" action where the user has chosen a new path.
+  Future<void> saveAs(String path) async {
+    state = state.copyWith(lastExportPath: path);
+    await exportNow();
   }
 }
 
