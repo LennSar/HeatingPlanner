@@ -88,6 +88,12 @@ class ProjectRepository with SaveStateMixin {
     markProjectDirty();
   }
 
+  /// Returns the [Project] with [id], or `null` if it does not exist.
+  Future<Project?> findById(String id) async {
+    final row = await _dao.findById(id);
+    return row == null ? null : _projectFromRow(row);
+  }
+
   /// Deletes the project with [id] and marks dirty.
   Future<void> deleteProject(String id) async {
     await _dao.deleteById(id);

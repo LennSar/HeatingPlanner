@@ -24,7 +24,7 @@ final _startupProjectIdProvider =
     FutureProvider.autoDispose<String?>((ref) async {
   final id = await ref.read(lastOpenedProjectIdProvider.future);
   if (id == null) return null;
-  final project = await ref.read(projectProvider(id).future);
+  final project = await ref.read(projectRepositoryProvider).findById(id);
   return project != null ? id : null;
 });
 

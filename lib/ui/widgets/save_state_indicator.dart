@@ -74,8 +74,7 @@ class _UnsavedDot extends StatelessWidget {
         Theme.of(context).extension<HeatingPlannerColors>()!;
 
     return Tooltip(
-      message:
-          'File export out of date — press Ctrl+S to update',
+      message: 'Changes not yet saved to file',
       child: Container(
         width: 6,
         height: 6,

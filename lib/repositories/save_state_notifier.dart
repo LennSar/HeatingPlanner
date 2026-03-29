@@ -88,8 +88,10 @@ class SaveStateNotifier extends Notifier<SaveState> {
     }
   }
 
-  /// Clears the dirty flag after a successful `.hsp` export.
+  /// Clears the dirty flag and cancels any pending debounce timer.
   void clearDirty() {
+    _debounce?.cancel();
+    _debounce = null;
     state = state.copyWith(isDirty: false);
   }
 

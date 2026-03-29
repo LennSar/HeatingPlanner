@@ -27,6 +27,10 @@ class ProjectDao extends DatabaseAccessor<AppDatabase>
       (select(projects)..where((t) => t.id.equals(id)))
           .watchSingleOrNull();
 
+  /// One-shot fetch for a single project by [id], or null if absent.
+  Future<Project?> findById(String id) =>
+      (select(projects)..where((t) => t.id.equals(id))).getSingleOrNull();
+
   /// Inserts or replaces a project row.
   Future<void> upsert(ProjectsCompanion companion) =>
       into(projects).insertOnConflictUpdate(companion);
