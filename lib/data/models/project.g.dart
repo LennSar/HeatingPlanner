@@ -26,6 +26,8 @@ _Project _$ProjectFromJson(Map<String, dynamic> json) => _Project(
   modifiedAt: DateTime.parse(json['modifiedAt'] as String),
   designOutdoorTempC: (json['designOutdoorTempC'] as num?)?.toDouble() ?? -12.0,
   defaultIndoorTempC: (json['defaultIndoorTempC'] as num?)?.toDouble() ?? 20.0,
+  floorHeightMm: (json['floorHeightMm'] as num?)?.toInt() ?? 2600,
+  unheatedSpaceTempC: (json['unheatedSpaceTempC'] as num?)?.toDouble() ?? 10.0,
   location: json['location'] == null
       ? null
       : GeoLocation.fromJson(json['location'] as Map<String, dynamic>),
@@ -38,5 +40,7 @@ Map<String, dynamic> _$ProjectToJson(_Project instance) => <String, dynamic>{
   'modifiedAt': instance.modifiedAt.toIso8601String(),
   'designOutdoorTempC': instance.designOutdoorTempC,
   'defaultIndoorTempC': instance.defaultIndoorTempC,
+  'floorHeightMm': instance.floorHeightMm,
+  'unheatedSpaceTempC': instance.unheatedSpaceTempC,
   'location': instance.location,
 };

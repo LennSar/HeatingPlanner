@@ -63,6 +63,8 @@ Project _projectFromRow($db.Project row) {
     modifiedAt: row.modifiedAt,
     designOutdoorTempC: row.designOutdoorTempC,
     defaultIndoorTempC: row.defaultIndoorTempC,
+    floorHeightMm: row.floorHeightMm,
+    unheatedSpaceTempC: row.unheatedSpaceTempC,
     location: location,
   );
 }
@@ -106,6 +108,27 @@ final projectRepositoryProvider = Provider<ProjectRepository>(
   (ref) => ProjectRepository(ref),
 );
 
+// ── Current project ID ────────────────────────────────────────────────────────
+
+/// Stores the ID of the project currently open in the editor.
+///
+/// Set by [EditorScreen] on creation so that project-scoped providers
+/// can be parameterised without threading the ID through every widget.
+/// Empty string when no project is open.
+class CurrentProjectIdNotifier extends Notifier<String> {
+  @override
+  String build() => '';
+
+  /// Update the active project ID.
+  void set(String id) => state = id;
+}
+
+/// Provider for the active project ID.
+final currentProjectIdProvider =
+    NotifierProvider<CurrentProjectIdNotifier, String>(
+  CurrentProjectIdNotifier.new,
+);
+
 // ── Model → Companion mapping ─────────────────────────────────────────────────
 
 $db.ProjectsCompanion _projectToCompanion(Project p) {
@@ -118,6 +141,8 @@ $db.ProjectsCompanion _projectToCompanion(Project p) {
     modifiedAt: Value(p.modifiedAt),
     designOutdoorTempC: Value(p.designOutdoorTempC),
     defaultIndoorTempC: Value(p.defaultIndoorTempC),
+    floorHeightMm: Value(p.floorHeightMm),
+    unheatedSpaceTempC: Value(p.unheatedSpaceTempC),
     locationJson: Value(locationJson),
   );
 }

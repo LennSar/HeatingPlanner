@@ -7,6 +7,7 @@ import '../../data/models/enums.dart';
 import '../../platform/keyboard_shortcuts.dart';
 import '../../repositories/app_preferences.dart';
 import '../../repositories/building_repository.dart';
+import '../../repositories/project_repository.dart';
 import '../../repositories/save_state_notifier.dart';
 import '../canvas/canvas_controller.dart';
 import '../canvas/floor_plan_canvas.dart';

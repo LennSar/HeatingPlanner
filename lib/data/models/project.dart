@@ -40,6 +40,12 @@ abstract class Project with _$Project {
     /// Default indoor target temperature in °C (applied to new rooms).
     @Default(20.0) double defaultIndoorTempC,
 
+    /// Default floor-to-ceiling height in mm (2000–6000).
+    @Default(2600) int floorHeightMm,
+
+    /// Default temperature of unheated adjacent spaces in °C (0–25).
+    @Default(10.0) double unheatedSpaceTempC,
+
     /// Optional geographic location used for climate data lookup.
     GeoLocation? location,
   }) = _Project;

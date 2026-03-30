@@ -290,7 +290,9 @@ mixin _$Project {
  DateTime get createdAt;/// Timestamp of the last modification.
  DateTime get modifiedAt;/// Outdoor design temperature in °C for heat-demand calculations.
  double get designOutdoorTempC;/// Default indoor target temperature in °C (applied to new rooms).
- double get defaultIndoorTempC;/// Optional geographic location used for climate data lookup.
+ double get defaultIndoorTempC;/// Default floor-to-ceiling height in mm (2000–6000).
+ int get floorHeightMm;/// Default temperature of unheated adjacent spaces in °C (0–25).
+ double get unheatedSpaceTempC;/// Optional geographic location used for climate data lookup.
  GeoLocation? get location;
 /// Create a copy of Project
 /// with the given fields replaced by the non-null parameter values.
@@ -304,16 +306,16 @@ $ProjectCopyWith<Project> get copyWith => _$ProjectCopyWithImpl<Project>(this as
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Project&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.modifiedAt, modifiedAt) || other.modifiedAt == modifiedAt)&&(identical(other.designOutdoorTempC, designOutdoorTempC) || other.designOutdoorTempC == designOutdoorTempC)&&(identical(other.defaultIndoorTempC, defaultIndoorTempC) || other.defaultIndoorTempC == defaultIndoorTempC)&&(identical(other.location, location) || other.location == location));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Project&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.modifiedAt, modifiedAt) || other.modifiedAt == modifiedAt)&&(identical(other.designOutdoorTempC, designOutdoorTempC) || other.designOutdoorTempC == designOutdoorTempC)&&(identical(other.defaultIndoorTempC, defaultIndoorTempC) || other.defaultIndoorTempC == defaultIndoorTempC)&&(identical(other.floorHeightMm, floorHeightMm) || other.floorHeightMm == floorHeightMm)&&(identical(other.unheatedSpaceTempC, unheatedSpaceTempC) || other.unheatedSpaceTempC == unheatedSpaceTempC)&&(identical(other.location, location) || other.location == location));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,createdAt,modifiedAt,designOutdoorTempC,defaultIndoorTempC,location);
+int get hashCode => Object.hash(runtimeType,id,name,createdAt,modifiedAt,designOutdoorTempC,defaultIndoorTempC,floorHeightMm,unheatedSpaceTempC,location);
 
 @override
 String toString() {
-  return 'Project(id: $id, name: $name, createdAt: $createdAt, modifiedAt: $modifiedAt, designOutdoorTempC: $designOutdoorTempC, defaultIndoorTempC: $defaultIndoorTempC, location: $location)';
+  return 'Project(id: $id, name: $name, createdAt: $createdAt, modifiedAt: $modifiedAt, designOutdoorTempC: $designOutdoorTempC, defaultIndoorTempC: $defaultIndoorTempC, floorHeightMm: $floorHeightMm, unheatedSpaceTempC: $unheatedSpaceTempC, location: $location)';
 }
 
 
@@ -324,7 +326,7 @@ abstract mixin class $ProjectCopyWith<$Res>  {
   factory $ProjectCopyWith(Project value, $Res Function(Project) _then) = _$ProjectCopyWithImpl;
 @useResult
 $Res call({
- String id, String name, DateTime createdAt, DateTime modifiedAt, double designOutdoorTempC, double defaultIndoorTempC, GeoLocation? location
+ String id, String name, DateTime createdAt, DateTime modifiedAt, double designOutdoorTempC, double defaultIndoorTempC, int floorHeightMm, double unheatedSpaceTempC, GeoLocation? location
 });
 
 
@@ -341,7 +343,7 @@ class _$ProjectCopyWithImpl<$Res>
 
 /// Create a copy of Project
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? createdAt = null,Object? modifiedAt = null,Object? designOutdoorTempC = null,Object? defaultIndoorTempC = null,Object? location = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? createdAt = null,Object? modifiedAt = null,Object? designOutdoorTempC = null,Object? defaultIndoorTempC = null,Object? floorHeightMm = null,Object? unheatedSpaceTempC = null,Object? location = freezed,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -349,6 +351,8 @@ as String,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: 
 as DateTime,modifiedAt: null == modifiedAt ? _self.modifiedAt : modifiedAt // ignore: cast_nullable_to_non_nullable
 as DateTime,designOutdoorTempC: null == designOutdoorTempC ? _self.designOutdoorTempC : designOutdoorTempC // ignore: cast_nullable_to_non_nullable
 as double,defaultIndoorTempC: null == defaultIndoorTempC ? _self.defaultIndoorTempC : defaultIndoorTempC // ignore: cast_nullable_to_non_nullable
+as double,floorHeightMm: null == floorHeightMm ? _self.floorHeightMm : floorHeightMm // ignore: cast_nullable_to_non_nullable
+as int,unheatedSpaceTempC: null == unheatedSpaceTempC ? _self.unheatedSpaceTempC : unheatedSpaceTempC // ignore: cast_nullable_to_non_nullable
 as double,location: freezed == location ? _self.location : location // ignore: cast_nullable_to_non_nullable
 as GeoLocation?,
   ));
@@ -447,10 +451,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  DateTime createdAt,  DateTime modifiedAt,  double designOutdoorTempC,  double defaultIndoorTempC,  GeoLocation? location)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  DateTime createdAt,  DateTime modifiedAt,  double designOutdoorTempC,  double defaultIndoorTempC,  int floorHeightMm,  double unheatedSpaceTempC,  GeoLocation? location)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Project() when $default != null:
-return $default(_that.id,_that.name,_that.createdAt,_that.modifiedAt,_that.designOutdoorTempC,_that.defaultIndoorTempC,_that.location);case _:
+return $default(_that.id,_that.name,_that.createdAt,_that.modifiedAt,_that.designOutdoorTempC,_that.defaultIndoorTempC,_that.floorHeightMm,_that.unheatedSpaceTempC,_that.location);case _:
   return orElse();
 
 }
@@ -468,10 +472,10 @@ return $default(_that.id,_that.name,_that.createdAt,_that.modifiedAt,_that.desig
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  DateTime createdAt,  DateTime modifiedAt,  double designOutdoorTempC,  double defaultIndoorTempC,  GeoLocation? location)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  DateTime createdAt,  DateTime modifiedAt,  double designOutdoorTempC,  double defaultIndoorTempC,  int floorHeightMm,  double unheatedSpaceTempC,  GeoLocation? location)  $default,) {final _that = this;
 switch (_that) {
 case _Project():
-return $default(_that.id,_that.name,_that.createdAt,_that.modifiedAt,_that.designOutdoorTempC,_that.defaultIndoorTempC,_that.location);case _:
+return $default(_that.id,_that.name,_that.createdAt,_that.modifiedAt,_that.designOutdoorTempC,_that.defaultIndoorTempC,_that.floorHeightMm,_that.unheatedSpaceTempC,_that.location);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -488,10 +492,10 @@ return $default(_that.id,_that.name,_that.createdAt,_that.modifiedAt,_that.desig
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  DateTime createdAt,  DateTime modifiedAt,  double designOutdoorTempC,  double defaultIndoorTempC,  GeoLocation? location)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  DateTime createdAt,  DateTime modifiedAt,  double designOutdoorTempC,  double defaultIndoorTempC,  int floorHeightMm,  double unheatedSpaceTempC,  GeoLocation? location)?  $default,) {final _that = this;
 switch (_that) {
 case _Project() when $default != null:
-return $default(_that.id,_that.name,_that.createdAt,_that.modifiedAt,_that.designOutdoorTempC,_that.defaultIndoorTempC,_that.location);case _:
+return $default(_that.id,_that.name,_that.createdAt,_that.modifiedAt,_that.designOutdoorTempC,_that.defaultIndoorTempC,_that.floorHeightMm,_that.unheatedSpaceTempC,_that.location);case _:
   return null;
 
 }
@@ -503,7 +507,7 @@ return $default(_that.id,_that.name,_that.createdAt,_that.modifiedAt,_that.desig
 @JsonSerializable()
 
 class _Project implements Project {
-  const _Project({required this.id, required this.name, required this.createdAt, required this.modifiedAt, this.designOutdoorTempC = -12.0, this.defaultIndoorTempC = 20.0, this.location});
+  const _Project({required this.id, required this.name, required this.createdAt, required this.modifiedAt, this.designOutdoorTempC = -12.0, this.defaultIndoorTempC = 20.0, this.floorHeightMm = 2600, this.unheatedSpaceTempC = 10.0, this.location});
   factory _Project.fromJson(Map<String, dynamic> json) => _$ProjectFromJson(json);
 
 /// UUID v4 primary key.
@@ -518,6 +522,10 @@ class _Project implements Project {
 @override@JsonKey() final  double designOutdoorTempC;
 /// Default indoor target temperature in °C (applied to new rooms).
 @override@JsonKey() final  double defaultIndoorTempC;
+/// Default floor-to-ceiling height in mm (2000–6000).
+@override@JsonKey() final  int floorHeightMm;
+/// Default temperature of unheated adjacent spaces in °C (0–25).
+@override@JsonKey() final  double unheatedSpaceTempC;
 /// Optional geographic location used for climate data lookup.
 @override final  GeoLocation? location;
 
@@ -534,16 +542,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Project&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.modifiedAt, modifiedAt) || other.modifiedAt == modifiedAt)&&(identical(other.designOutdoorTempC, designOutdoorTempC) || other.designOutdoorTempC == designOutdoorTempC)&&(identical(other.defaultIndoorTempC, defaultIndoorTempC) || other.defaultIndoorTempC == defaultIndoorTempC)&&(identical(other.location, location) || other.location == location));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Project&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.modifiedAt, modifiedAt) || other.modifiedAt == modifiedAt)&&(identical(other.designOutdoorTempC, designOutdoorTempC) || other.designOutdoorTempC == designOutdoorTempC)&&(identical(other.defaultIndoorTempC, defaultIndoorTempC) || other.defaultIndoorTempC == defaultIndoorTempC)&&(identical(other.floorHeightMm, floorHeightMm) || other.floorHeightMm == floorHeightMm)&&(identical(other.unheatedSpaceTempC, unheatedSpaceTempC) || other.unheatedSpaceTempC == unheatedSpaceTempC)&&(identical(other.location, location) || other.location == location));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,createdAt,modifiedAt,designOutdoorTempC,defaultIndoorTempC,location);
+int get hashCode => Object.hash(runtimeType,id,name,createdAt,modifiedAt,designOutdoorTempC,defaultIndoorTempC,floorHeightMm,unheatedSpaceTempC,location);
 
 @override
 String toString() {
-  return 'Project(id: $id, name: $name, createdAt: $createdAt, modifiedAt: $modifiedAt, designOutdoorTempC: $designOutdoorTempC, defaultIndoorTempC: $defaultIndoorTempC, location: $location)';
+  return 'Project(id: $id, name: $name, createdAt: $createdAt, modifiedAt: $modifiedAt, designOutdoorTempC: $designOutdoorTempC, defaultIndoorTempC: $defaultIndoorTempC, floorHeightMm: $floorHeightMm, unheatedSpaceTempC: $unheatedSpaceTempC, location: $location)';
 }
 
 
@@ -554,7 +562,7 @@ abstract mixin class _$ProjectCopyWith<$Res> implements $ProjectCopyWith<$Res> {
   factory _$ProjectCopyWith(_Project value, $Res Function(_Project) _then) = __$ProjectCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String name, DateTime createdAt, DateTime modifiedAt, double designOutdoorTempC, double defaultIndoorTempC, GeoLocation? location
+ String id, String name, DateTime createdAt, DateTime modifiedAt, double designOutdoorTempC, double defaultIndoorTempC, int floorHeightMm, double unheatedSpaceTempC, GeoLocation? location
 });
 
 
@@ -571,7 +579,7 @@ class __$ProjectCopyWithImpl<$Res>
 
 /// Create a copy of Project
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? createdAt = null,Object? modifiedAt = null,Object? designOutdoorTempC = null,Object? defaultIndoorTempC = null,Object? location = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? createdAt = null,Object? modifiedAt = null,Object? designOutdoorTempC = null,Object? defaultIndoorTempC = null,Object? floorHeightMm = null,Object? unheatedSpaceTempC = null,Object? location = freezed,}) {
   return _then(_Project(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -579,6 +587,8 @@ as String,createdAt: null == createdAt ? _self.createdAt : createdAt // ignore: 
 as DateTime,modifiedAt: null == modifiedAt ? _self.modifiedAt : modifiedAt // ignore: cast_nullable_to_non_nullable
 as DateTime,designOutdoorTempC: null == designOutdoorTempC ? _self.designOutdoorTempC : designOutdoorTempC // ignore: cast_nullable_to_non_nullable
 as double,defaultIndoorTempC: null == defaultIndoorTempC ? _self.defaultIndoorTempC : defaultIndoorTempC // ignore: cast_nullable_to_non_nullable
+as double,floorHeightMm: null == floorHeightMm ? _self.floorHeightMm : floorHeightMm // ignore: cast_nullable_to_non_nullable
+as int,unheatedSpaceTempC: null == unheatedSpaceTempC ? _self.unheatedSpaceTempC : unheatedSpaceTempC // ignore: cast_nullable_to_non_nullable
 as double,location: freezed == location ? _self.location : location // ignore: cast_nullable_to_non_nullable
 as GeoLocation?,
   ));

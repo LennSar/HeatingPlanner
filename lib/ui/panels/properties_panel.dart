@@ -5,6 +5,7 @@ import '../../calculation/engines/geometry_engine.dart';
 import '../../calculation/engines/thermal_engine.dart';
 import '../../calculation/providers/heat_demand_providers.dart';
 import '../../core/theme/app_theme.dart';
+import '../../repositories/project_repository.dart';
 import '../providers/editor_state_provider.dart';
 import '../providers/selection_provider.dart';
 import 'circuit_properties.dart';

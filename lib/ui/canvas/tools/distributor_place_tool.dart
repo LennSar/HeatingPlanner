@@ -105,7 +105,7 @@ class DistributorPlaceTool extends CanvasTool {
   void _placeNew(Point2D position) {
     final d = Distributor(
       id: IdGenerator.newId(),
-      floorId: 'preview',
+      floorId: callbacks.currentFloorId,
       position: position,
       rotationDeg: _ghostRotationDeg,
     );
@@ -138,7 +138,7 @@ class DistributorPlaceTool extends CanvasTool {
   void _replaceNew(Distributor existing, Point2D position) {
     final d = Distributor(
       id: IdGenerator.newId(),
-      floorId: 'preview',
+      floorId: callbacks.currentFloorId,
       position: position,
     );
     undoRedo.execute(

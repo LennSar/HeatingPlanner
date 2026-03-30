@@ -328,6 +328,10 @@ class _FloorPlanCanvasState
 
   // ---- Default IDs (from seeded data in HeatingDao.seedDefaults) ----
 
+  @override
+  String get currentFloorId =>
+      ref.read(currentFloorIdProvider);
+
   /// First available tube type ID (PE-Xa 16×2, seeded default).
   static const _defaultTubeTypeId =
       '10000000-0000-4000-8000-000000000001';
@@ -395,7 +399,7 @@ class _FloorPlanCanvasState
       final roomId = IdGenerator.newId();
       final room = Room(
         id: roomId,
-        floorId: 'preview',
+        floorId: currentFloorId,
         name: name,
         polygon: polygon,
       );

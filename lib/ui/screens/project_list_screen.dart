@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/id_generator.dart';
+import '../../data/models/floor.dart';
 import '../../data/models/project.dart';
 import '../../repositories/app_preferences.dart';
+import '../../repositories/building_repository.dart';
 import '../../repositories/project_repository.dart';
 import 'editor_screen.dart';
 
@@ -62,6 +64,12 @@ class ProjectListScreen extends ConsumerWidget {
     if (result == null) return;
     final dao = ref.read(projectDaoProvider);
     await upsertProject(dao, result);
+    final buildingDao = ref.read(buildingDaoProvider);
+    final floor = Floor(
+      id: IdGenerator.newId(),
+      name: 'Ground Floor',
+    );
+    await upsertFloor(buildingDao, floor, result.id);
     unawaited(
       ref.read(lastOpenedProjectIdProvider.notifier).set(result.id),
     );

@@ -124,6 +124,12 @@ abstract class EditorCallbacks {
 
   // ---- Default IDs ----
 
+  /// UUID of the floor currently active in the editor.
+  ///
+  /// Used by tools when creating entities that must carry a
+  /// [floorId] foreign key (rooms, distributors).
+  String get currentFloorId;
+
   /// ID of the first available tube type (from seeded data).
   ///
   /// Used by [ZoneDrawTool] when creating a zone with defaults.

@@ -76,6 +76,30 @@ class $ProjectsTable extends Projects with TableInfo<$ProjectsTable, Project> {
         requiredDuringInsert: false,
         defaultValue: const Constant(20.0),
       );
+  static const VerificationMeta _floorHeightMmMeta = const VerificationMeta(
+    'floorHeightMm',
+  );
+  @override
+  late final GeneratedColumn<int> floorHeightMm = GeneratedColumn<int>(
+    'floor_height_mm',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(2600),
+  );
+  static const VerificationMeta _unheatedSpaceTempCMeta =
+      const VerificationMeta('unheatedSpaceTempC');
+  @override
+  late final GeneratedColumn<double> unheatedSpaceTempC =
+      GeneratedColumn<double>(
+        'unheated_space_temp_c',
+        aliasedName,
+        false,
+        type: DriftSqlType.double,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(10.0),
+      );
   static const VerificationMeta _locationJsonMeta = const VerificationMeta(
     'locationJson',
   );
@@ -95,6 +119,8 @@ class $ProjectsTable extends Projects with TableInfo<$ProjectsTable, Project> {
     modifiedAt,
     designOutdoorTempC,
     defaultIndoorTempC,
+    floorHeightMm,
+    unheatedSpaceTempC,
     locationJson,
   ];
   @override
@@ -156,6 +182,24 @@ class $ProjectsTable extends Projects with TableInfo<$ProjectsTable, Project> {
         ),
       );
     }
+    if (data.containsKey('floor_height_mm')) {
+      context.handle(
+        _floorHeightMmMeta,
+        floorHeightMm.isAcceptableOrUnknown(
+          data['floor_height_mm']!,
+          _floorHeightMmMeta,
+        ),
+      );
+    }
+    if (data.containsKey('unheated_space_temp_c')) {
+      context.handle(
+        _unheatedSpaceTempCMeta,
+        unheatedSpaceTempC.isAcceptableOrUnknown(
+          data['unheated_space_temp_c']!,
+          _unheatedSpaceTempCMeta,
+        ),
+      );
+    }
     if (data.containsKey('location_json')) {
       context.handle(
         _locationJsonMeta,
@@ -198,6 +242,14 @@ class $ProjectsTable extends Projects with TableInfo<$ProjectsTable, Project> {
         DriftSqlType.double,
         data['${effectivePrefix}default_indoor_temp_c'],
       )!,
+      floorHeightMm: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}floor_height_mm'],
+      )!,
+      unheatedSpaceTempC: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}unheated_space_temp_c'],
+      )!,
       locationJson: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}location_json'],
@@ -218,6 +270,8 @@ class Project extends DataClass implements Insertable<Project> {
   final DateTime modifiedAt;
   final double designOutdoorTempC;
   final double defaultIndoorTempC;
+  final int floorHeightMm;
+  final double unheatedSpaceTempC;
 
   /// Serialised JSON blob for the optional GeoLocation.
   final String? locationJson;
@@ -228,6 +282,8 @@ class Project extends DataClass implements Insertable<Project> {
     required this.modifiedAt,
     required this.designOutdoorTempC,
     required this.defaultIndoorTempC,
+    required this.floorHeightMm,
+    required this.unheatedSpaceTempC,
     this.locationJson,
   });
   @override
@@ -239,6 +295,8 @@ class Project extends DataClass implements Insertable<Project> {
     map['modified_at'] = Variable<DateTime>(modifiedAt);
     map['design_outdoor_temp_c'] = Variable<double>(designOutdoorTempC);
     map['default_indoor_temp_c'] = Variable<double>(defaultIndoorTempC);
+    map['floor_height_mm'] = Variable<int>(floorHeightMm);
+    map['unheated_space_temp_c'] = Variable<double>(unheatedSpaceTempC);
     if (!nullToAbsent || locationJson != null) {
       map['location_json'] = Variable<String>(locationJson);
     }
@@ -253,6 +311,8 @@ class Project extends DataClass implements Insertable<Project> {
       modifiedAt: Value(modifiedAt),
       designOutdoorTempC: Value(designOutdoorTempC),
       defaultIndoorTempC: Value(defaultIndoorTempC),
+      floorHeightMm: Value(floorHeightMm),
+      unheatedSpaceTempC: Value(unheatedSpaceTempC),
       locationJson: locationJson == null && nullToAbsent
           ? const Value.absent()
           : Value(locationJson),
@@ -275,6 +335,10 @@ class Project extends DataClass implements Insertable<Project> {
       defaultIndoorTempC: serializer.fromJson<double>(
         json['defaultIndoorTempC'],
       ),
+      floorHeightMm: serializer.fromJson<int>(json['floorHeightMm']),
+      unheatedSpaceTempC: serializer.fromJson<double>(
+        json['unheatedSpaceTempC'],
+      ),
       locationJson: serializer.fromJson<String?>(json['locationJson']),
     );
   }
@@ -288,6 +352,8 @@ class Project extends DataClass implements Insertable<Project> {
       'modifiedAt': serializer.toJson<DateTime>(modifiedAt),
       'designOutdoorTempC': serializer.toJson<double>(designOutdoorTempC),
       'defaultIndoorTempC': serializer.toJson<double>(defaultIndoorTempC),
+      'floorHeightMm': serializer.toJson<int>(floorHeightMm),
+      'unheatedSpaceTempC': serializer.toJson<double>(unheatedSpaceTempC),
       'locationJson': serializer.toJson<String?>(locationJson),
     };
   }
@@ -299,6 +365,8 @@ class Project extends DataClass implements Insertable<Project> {
     DateTime? modifiedAt,
     double? designOutdoorTempC,
     double? defaultIndoorTempC,
+    int? floorHeightMm,
+    double? unheatedSpaceTempC,
     Value<String?> locationJson = const Value.absent(),
   }) => Project(
     id: id ?? this.id,
@@ -307,6 +375,8 @@ class Project extends DataClass implements Insertable<Project> {
     modifiedAt: modifiedAt ?? this.modifiedAt,
     designOutdoorTempC: designOutdoorTempC ?? this.designOutdoorTempC,
     defaultIndoorTempC: defaultIndoorTempC ?? this.defaultIndoorTempC,
+    floorHeightMm: floorHeightMm ?? this.floorHeightMm,
+    unheatedSpaceTempC: unheatedSpaceTempC ?? this.unheatedSpaceTempC,
     locationJson: locationJson.present ? locationJson.value : this.locationJson,
   );
   Project copyWithCompanion(ProjectsCompanion data) {
@@ -323,6 +393,12 @@ class Project extends DataClass implements Insertable<Project> {
       defaultIndoorTempC: data.defaultIndoorTempC.present
           ? data.defaultIndoorTempC.value
           : this.defaultIndoorTempC,
+      floorHeightMm: data.floorHeightMm.present
+          ? data.floorHeightMm.value
+          : this.floorHeightMm,
+      unheatedSpaceTempC: data.unheatedSpaceTempC.present
+          ? data.unheatedSpaceTempC.value
+          : this.unheatedSpaceTempC,
       locationJson: data.locationJson.present
           ? data.locationJson.value
           : this.locationJson,
@@ -338,6 +414,8 @@ class Project extends DataClass implements Insertable<Project> {
           ..write('modifiedAt: $modifiedAt, ')
           ..write('designOutdoorTempC: $designOutdoorTempC, ')
           ..write('defaultIndoorTempC: $defaultIndoorTempC, ')
+          ..write('floorHeightMm: $floorHeightMm, ')
+          ..write('unheatedSpaceTempC: $unheatedSpaceTempC, ')
           ..write('locationJson: $locationJson')
           ..write(')'))
         .toString();
@@ -351,6 +429,8 @@ class Project extends DataClass implements Insertable<Project> {
     modifiedAt,
     designOutdoorTempC,
     defaultIndoorTempC,
+    floorHeightMm,
+    unheatedSpaceTempC,
     locationJson,
   );
   @override
@@ -363,6 +443,8 @@ class Project extends DataClass implements Insertable<Project> {
           other.modifiedAt == this.modifiedAt &&
           other.designOutdoorTempC == this.designOutdoorTempC &&
           other.defaultIndoorTempC == this.defaultIndoorTempC &&
+          other.floorHeightMm == this.floorHeightMm &&
+          other.unheatedSpaceTempC == this.unheatedSpaceTempC &&
           other.locationJson == this.locationJson);
 }
 
@@ -373,6 +455,8 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
   final Value<DateTime> modifiedAt;
   final Value<double> designOutdoorTempC;
   final Value<double> defaultIndoorTempC;
+  final Value<int> floorHeightMm;
+  final Value<double> unheatedSpaceTempC;
   final Value<String?> locationJson;
   final Value<int> rowid;
   const ProjectsCompanion({
@@ -382,6 +466,8 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     this.modifiedAt = const Value.absent(),
     this.designOutdoorTempC = const Value.absent(),
     this.defaultIndoorTempC = const Value.absent(),
+    this.floorHeightMm = const Value.absent(),
+    this.unheatedSpaceTempC = const Value.absent(),
     this.locationJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -392,6 +478,8 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     required DateTime modifiedAt,
     this.designOutdoorTempC = const Value.absent(),
     this.defaultIndoorTempC = const Value.absent(),
+    this.floorHeightMm = const Value.absent(),
+    this.unheatedSpaceTempC = const Value.absent(),
     this.locationJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -405,6 +493,8 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     Expression<DateTime>? modifiedAt,
     Expression<double>? designOutdoorTempC,
     Expression<double>? defaultIndoorTempC,
+    Expression<int>? floorHeightMm,
+    Expression<double>? unheatedSpaceTempC,
     Expression<String>? locationJson,
     Expression<int>? rowid,
   }) {
@@ -417,6 +507,9 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
         'design_outdoor_temp_c': designOutdoorTempC,
       if (defaultIndoorTempC != null)
         'default_indoor_temp_c': defaultIndoorTempC,
+      if (floorHeightMm != null) 'floor_height_mm': floorHeightMm,
+      if (unheatedSpaceTempC != null)
+        'unheated_space_temp_c': unheatedSpaceTempC,
       if (locationJson != null) 'location_json': locationJson,
       if (rowid != null) 'rowid': rowid,
     });
@@ -429,6 +522,8 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     Value<DateTime>? modifiedAt,
     Value<double>? designOutdoorTempC,
     Value<double>? defaultIndoorTempC,
+    Value<int>? floorHeightMm,
+    Value<double>? unheatedSpaceTempC,
     Value<String?>? locationJson,
     Value<int>? rowid,
   }) {
@@ -439,6 +534,8 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
       modifiedAt: modifiedAt ?? this.modifiedAt,
       designOutdoorTempC: designOutdoorTempC ?? this.designOutdoorTempC,
       defaultIndoorTempC: defaultIndoorTempC ?? this.defaultIndoorTempC,
+      floorHeightMm: floorHeightMm ?? this.floorHeightMm,
+      unheatedSpaceTempC: unheatedSpaceTempC ?? this.unheatedSpaceTempC,
       locationJson: locationJson ?? this.locationJson,
       rowid: rowid ?? this.rowid,
     );
@@ -465,6 +562,12 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     if (defaultIndoorTempC.present) {
       map['default_indoor_temp_c'] = Variable<double>(defaultIndoorTempC.value);
     }
+    if (floorHeightMm.present) {
+      map['floor_height_mm'] = Variable<int>(floorHeightMm.value);
+    }
+    if (unheatedSpaceTempC.present) {
+      map['unheated_space_temp_c'] = Variable<double>(unheatedSpaceTempC.value);
+    }
     if (locationJson.present) {
       map['location_json'] = Variable<String>(locationJson.value);
     }
@@ -483,6 +586,8 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
           ..write('modifiedAt: $modifiedAt, ')
           ..write('designOutdoorTempC: $designOutdoorTempC, ')
           ..write('defaultIndoorTempC: $defaultIndoorTempC, ')
+          ..write('floorHeightMm: $floorHeightMm, ')
+          ..write('unheatedSpaceTempC: $unheatedSpaceTempC, ')
           ..write('locationJson: $locationJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -7610,6 +7715,8 @@ typedef $$ProjectsTableCreateCompanionBuilder =
       required DateTime modifiedAt,
       Value<double> designOutdoorTempC,
       Value<double> defaultIndoorTempC,
+      Value<int> floorHeightMm,
+      Value<double> unheatedSpaceTempC,
       Value<String?> locationJson,
       Value<int> rowid,
     });
@@ -7621,6 +7728,8 @@ typedef $$ProjectsTableUpdateCompanionBuilder =
       Value<DateTime> modifiedAt,
       Value<double> designOutdoorTempC,
       Value<double> defaultIndoorTempC,
+      Value<int> floorHeightMm,
+      Value<double> unheatedSpaceTempC,
       Value<String?> locationJson,
       Value<int> rowid,
     });
@@ -7685,6 +7794,16 @@ class $$ProjectsTableFilterComposer
 
   ColumnFilters<double> get defaultIndoorTempC => $composableBuilder(
     column: $table.defaultIndoorTempC,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get floorHeightMm => $composableBuilder(
+    column: $table.floorHeightMm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get unheatedSpaceTempC => $composableBuilder(
+    column: $table.unheatedSpaceTempC,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7758,6 +7877,16 @@ class $$ProjectsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get floorHeightMm => $composableBuilder(
+    column: $table.floorHeightMm,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get unheatedSpaceTempC => $composableBuilder(
+    column: $table.unheatedSpaceTempC,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get locationJson => $composableBuilder(
     column: $table.locationJson,
     builder: (column) => ColumnOrderings(column),
@@ -7794,6 +7923,16 @@ class $$ProjectsTableAnnotationComposer
 
   GeneratedColumn<double> get defaultIndoorTempC => $composableBuilder(
     column: $table.defaultIndoorTempC,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get floorHeightMm => $composableBuilder(
+    column: $table.floorHeightMm,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get unheatedSpaceTempC => $composableBuilder(
+    column: $table.unheatedSpaceTempC,
     builder: (column) => column,
   );
 
@@ -7862,6 +8001,8 @@ class $$ProjectsTableTableManager
                 Value<DateTime> modifiedAt = const Value.absent(),
                 Value<double> designOutdoorTempC = const Value.absent(),
                 Value<double> defaultIndoorTempC = const Value.absent(),
+                Value<int> floorHeightMm = const Value.absent(),
+                Value<double> unheatedSpaceTempC = const Value.absent(),
                 Value<String?> locationJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProjectsCompanion(
@@ -7871,6 +8012,8 @@ class $$ProjectsTableTableManager
                 modifiedAt: modifiedAt,
                 designOutdoorTempC: designOutdoorTempC,
                 defaultIndoorTempC: defaultIndoorTempC,
+                floorHeightMm: floorHeightMm,
+                unheatedSpaceTempC: unheatedSpaceTempC,
                 locationJson: locationJson,
                 rowid: rowid,
               ),
@@ -7882,6 +8025,8 @@ class $$ProjectsTableTableManager
                 required DateTime modifiedAt,
                 Value<double> designOutdoorTempC = const Value.absent(),
                 Value<double> defaultIndoorTempC = const Value.absent(),
+                Value<int> floorHeightMm = const Value.absent(),
+                Value<double> unheatedSpaceTempC = const Value.absent(),
                 Value<String?> locationJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProjectsCompanion.insert(
@@ -7891,6 +8036,8 @@ class $$ProjectsTableTableManager
                 modifiedAt: modifiedAt,
                 designOutdoorTempC: designOutdoorTempC,
                 defaultIndoorTempC: defaultIndoorTempC,
+                floorHeightMm: floorHeightMm,
+                unheatedSpaceTempC: unheatedSpaceTempC,
                 locationJson: locationJson,
                 rowid: rowid,
               ),

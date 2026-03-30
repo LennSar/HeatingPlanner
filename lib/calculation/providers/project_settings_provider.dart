@@ -1,13 +1,15 @@
+import 'dart:async' show unawaited;
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-/// In-memory project-level settings that drive heat-demand calculations.
+import '../../repositories/project_repository.dart';
+import '../../repositories/save_state_notifier.dart';
+
+/// In-memory snapshot of the four project-level settings fields that
+/// drive heat-demand and zone-output calculations.
 ///
-/// Acts as the authoritative source for [designOutdoorTempCProvider],
-/// [defaultIndoorTempCProvider], and [floorHeightMmProvider] while the
-/// database repository is a stub.
-/// When the project repository is wired (Phase ≥ 2) this notifier will be
-/// initialised from the persisted [Project] and changes will be saved back.
+/// Derived from the persisted [Project] via [projectSettingsProvider].
 @immutable
 class ProjectSettings {
   /// Creates a [ProjectSettings] with the given values.
@@ -54,16 +56,44 @@ class ProjectSettings {
 }
 
 /// Manages [ProjectSettings] for the currently active project.
+///
+/// [build] derives its state from the persisted [Project] via
+/// [projectProvider], so the settings are always in sync with
+/// SQLite.  Each setter updates the in-memory state optimistically
+/// and immediately writes the updated [Project] back via
+/// [ProjectRepository.upsertProject].
 class ProjectSettingsNotifier
-    extends Notifier<ProjectSettings> {
+    extends Notifier<ProjectSettings>
+    with SaveStateMixin {
   @override
-  ProjectSettings build() => const ProjectSettings();
+  ProjectSettings build() {
+    final projectId = ref.watch(currentProjectIdProvider);
+    if (projectId.isEmpty) return const ProjectSettings();
+
+    return ref
+            .watch(projectProvider(projectId))
+            .whenOrNull(
+              data: (project) => project == null
+                  ? null
+                  : ProjectSettings(
+                      designOutdoorTempC:
+                          project.designOutdoorTempC,
+                      defaultIndoorTempC:
+                          project.defaultIndoorTempC,
+                      floorHeightMm: project.floorHeightMm,
+                      unheatedSpaceTempC:
+                          project.unheatedSpaceTempC,
+                    ),
+            ) ??
+        const ProjectSettings();
+  }
 
   /// Set the outdoor design temperature (clamped to −50…+10 °C).
   void setDesignOutdoorTempC(double value) {
     state = state.copyWith(
       designOutdoorTempC: value.clamp(-50.0, 10.0),
     );
+    _persist();
   }
 
   /// Set the default indoor temperature (clamped to 15…30 °C).
@@ -71,6 +101,7 @@ class ProjectSettingsNotifier
     state = state.copyWith(
       defaultIndoorTempC: value.clamp(15.0, 30.0),
     );
+    _persist();
   }
 
   /// Set the default floor height (clamped to 2000…6000 mm).
@@ -78,6 +109,7 @@ class ProjectSettingsNotifier
     state = state.copyWith(
       floorHeightMm: value.clamp(2000, 6000),
     );
+    _persist();
   }
 
   /// Set the default unheated space temperature (clamped to 0…25 °C).
@@ -85,47 +117,63 @@ class ProjectSettingsNotifier
     state = state.copyWith(
       unheatedSpaceTempC: value.clamp(0.0, 25.0),
     );
+    _persist();
+  }
+
+  // ── Private helpers ────────────────────────────────────────────────────────
+
+  /// Writes the current [state] back to the [Project] row in SQLite.
+  ///
+  /// No-op when no project is open or the project has not yet loaded.
+  void _persist() {
+    final projectId = ref.read(currentProjectIdProvider);
+    if (projectId.isEmpty) return;
+    final project =
+        ref.read(projectProvider(projectId)).asData?.value;
+    if (project == null) return;
+
+    final updated = project.copyWith(
+      designOutdoorTempC: state.designOutdoorTempC,
+      defaultIndoorTempC: state.defaultIndoorTempC,
+      floorHeightMm: state.floorHeightMm,
+      unheatedSpaceTempC: state.unheatedSpaceTempC,
+      modifiedAt: DateTime.now(),
+    );
+    unawaited(
+      ref.read(projectRepositoryProvider).upsertProject(updated),
+    );
+    markProjectDirty();
   }
 }
 
 /// Provider for in-memory project-level temperature settings.
+///
+/// Automatically reflects the persisted [Project] for the currently
+/// open project.  Widgets read this provider instead of [projectProvider]
+/// so that calculation providers re-evaluate whenever a setting changes.
 final projectSettingsProvider =
     NotifierProvider<ProjectSettingsNotifier, ProjectSettings>(
   ProjectSettingsNotifier.new,
 );
 
 /// Outdoor design temperature (°C) used in heat-demand calculations.
-///
-/// Derived from [projectSettingsProvider]. When the project repository is
-/// wired, this will instead watch the persisted
-/// [Project.designOutdoorTempC].
 final designOutdoorTempCProvider = Provider<double>(
   (ref) =>
       ref.watch(projectSettingsProvider).designOutdoorTempC,
 );
 
 /// Default indoor temperature for new rooms (°C).
-///
-/// Derived from [projectSettingsProvider]. Use when creating a new room
-/// to pre-fill its target temperature.
 final defaultIndoorTempCProvider = Provider<double>(
   (ref) =>
       ref.watch(projectSettingsProvider).defaultIndoorTempC,
 );
 
 /// Default floor-to-ceiling height (mm).
-///
-/// Derived from [projectSettingsProvider]. Used as the default
-/// [HeatingZone.heightMm] for wall heating zones and for the
-/// project summary panel.
 final floorHeightMmProvider = Provider<int>(
   (ref) => ref.watch(projectSettingsProvider).floorHeightMm,
 );
 
 /// Default temperature of unheated adjacent spaces (°C).
-///
-/// Used as the fallback [BoundaryCondition.unheatedSpace] adjacent
-/// temperature when no per-room override is set.
 final unheatedSpaceTempCProvider = Provider<double>(
   (ref) =>
       ref.watch(projectSettingsProvider).unheatedSpaceTempC,

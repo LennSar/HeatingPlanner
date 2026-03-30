@@ -8,6 +8,8 @@ class Projects extends Table {
   DateTimeColumn get modifiedAt => dateTime()();
   RealColumn get designOutdoorTempC => real().withDefault(const Constant(-12.0))();
   RealColumn get defaultIndoorTempC => real().withDefault(const Constant(20.0))();
+  IntColumn get floorHeightMm => integer().withDefault(const Constant(2600))();
+  RealColumn get unheatedSpaceTempC => real().withDefault(const Constant(10.0))();
   /// Serialised JSON blob for the optional GeoLocation.
   TextColumn get locationJson => text().nullable()();
 
