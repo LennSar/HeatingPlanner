@@ -39,6 +39,14 @@ class HeatingDao extends DatabaseAccessor<AppDatabase>
       (select(heatingZones)..where((t) => t.id.equals(id)))
           .watchSingle();
 
+  /// All heating zones for any of [roomIds] — one-shot fetch.
+  Future<List<HeatingZone>> getZonesForRooms(List<String> roomIds) {
+    if (roomIds.isEmpty) return Future.value([]);
+    return (select(heatingZones)
+          ..where((t) => t.roomId.isIn(roomIds)))
+        .get();
+  }
+
   /// Inserts or replaces a heating-zone row.
   Future<void> upsertZone(HeatingZonesCompanion companion) =>
       into(heatingZones).insertOnConflictUpdate(companion);
@@ -104,6 +112,11 @@ class HeatingDao extends DatabaseAccessor<AppDatabase>
       (select(distributors)..where((t) => t.id.equals(id)))
           .watchSingle();
 
+  /// The distributor for [floorId], or null — one-shot fetch.
+  Future<Distributor?> getDistributorForFloor(String floorId) =>
+      (select(distributors)..where((t) => t.floorId.equals(floorId)))
+          .getSingleOrNull();
+
   /// Inserts or replaces a distributor row.
   Future<void> upsertDistributor(DistributorsCompanion companion) =>
       into(distributors).insertOnConflictUpdate(companion);
@@ -124,6 +137,14 @@ class HeatingDao extends DatabaseAccessor<AppDatabase>
   Stream<HeatingCircuit> watchCircuitById(String id) =>
       (select(heatingCircuits)..where((t) => t.id.equals(id)))
           .watchSingle();
+
+  /// All circuits for [distributorId] — one-shot fetch.
+  Future<List<HeatingCircuit>> getCircuitsForDistributor(
+    String distributorId,
+  ) =>
+      (select(heatingCircuits)
+            ..where((t) => t.distributorId.equals(distributorId)))
+          .get();
 
   /// Inserts or replaces a heating-circuit row.
   Future<void> upsertCircuit(HeatingCircuitsCompanion companion) =>

@@ -382,6 +382,28 @@ class HeatingRepository with SaveStateMixin {
 
   HeatingDao get _dao => ref.read(heatingDaoProvider);
 
+  /// Returns the [Distributor] on [floorId], or null.
+  Future<Distributor?> getDistributorForFloor(String floorId) async {
+    final row = await _dao.getDistributorForFloor(floorId);
+    return row == null ? null : _distributorFromRow(row);
+  }
+
+  /// Returns all [HeatingZone]s for any of [roomIds].
+  Future<List<HeatingZone>> getZonesForRooms(
+    List<String> roomIds,
+  ) async {
+    final rows = await _dao.getZonesForRooms(roomIds);
+    return rows.map(_zoneFromRow).toList();
+  }
+
+  /// Returns all [HeatingCircuit]s attached to [distributorId].
+  Future<List<HeatingCircuit>> getCircuitsForDistributor(
+    String distributorId,
+  ) async {
+    final rows = await _dao.getCircuitsForDistributor(distributorId);
+    return rows.map(_circuitFromRow).toList();
+  }
+
   /// Inserts or replaces [zone] and marks dirty.
   Future<void> upsertHeatingZone(HeatingZone zone) async {
     await _dao.upsertZone(_zoneToCompanion(zone));

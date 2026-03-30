@@ -31,6 +31,12 @@ class ConstructionDao extends DatabaseAccessor<AppDatabase>
           .watch()
           .map((list) => list.isEmpty ? null : list.first);
 
+  /// All wall constructions ordered by name — one-shot fetch.
+  Future<List<WallConstruction>> getAllConstructions() =>
+      (select(wallConstructions)
+            ..orderBy([(t) => OrderingTerm.asc(t.name)]))
+          .get();
+
   /// Inserts or replaces a wall-construction row.
   Future<void> upsertConstruction(WallConstructionsCompanion companion) =>
       into(wallConstructions).insertOnConflictUpdate(companion);
@@ -47,6 +53,10 @@ class ConstructionDao extends DatabaseAccessor<AppDatabase>
             ..where((t) => t.constructionId.equals(constructionId))
             ..orderBy([(t) => OrderingTerm.asc(t.sortOrder)]))
           .watch();
+
+  /// All material layers — one-shot fetch.
+  Future<List<MaterialLayer>> getAllLayers() =>
+      select(materialLayers).get();
 
   /// Inserts or replaces a material-layer row.
   Future<void> upsertLayer(MaterialLayersCompanion companion) =>

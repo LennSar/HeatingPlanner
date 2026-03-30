@@ -5,6 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/enums.dart';
 import '../../platform/keyboard_shortcuts.dart';
+import '../../repositories/app_preferences.dart';
+import '../../repositories/building_repository.dart';
 import '../../repositories/save_state_notifier.dart';
 import '../canvas/canvas_controller.dart';
 import '../canvas/floor_plan_canvas.dart';
@@ -57,13 +59,37 @@ class _EditorScreenState
   @override
   void initState() {
     super.initState();
-    // Defer the provider mutation to after the first frame so
-    // that it does not fire while the widget tree is still
-    // building (which Riverpod disallows).
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref
-          .read(currentProjectIdProvider.notifier)
-          .set(widget.projectId);
+    // Defer provider mutations to after the first frame so that they
+    // do not fire while the widget tree is still building (Riverpod
+    // disallows mid-build writes). The floor load is awaited inside
+    // the callback so state is ready before the canvas first paints.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      ref.read(currentProjectIdProvider.notifier).set(widget.projectId);
+
+      final prefs = ref.read(appPreferencesProvider);
+      final bRepo = ref.read(buildingRepositoryProvider);
+
+      final floors =
+          await bRepo.getFloorsForProject(widget.projectId);
+      if (floors.isEmpty || !mounted) return;
+
+      final savedFloorId = await prefs.getLastOpenedFloorId();
+      if (!mounted) return;
+
+      // Use the saved floor if it belongs to this project; otherwise
+      // fall back to the first floor (lowest level).
+      final floorId =
+          floors.any((f) => f.id == savedFloorId)
+              ? savedFloorId!
+              : floors.first.id;
+
+      await ref
+          .read(editorStateProvider.notifier)
+          .initFromFloor(floorId);
+      if (!mounted) return;
+
+      ref.read(currentFloorIdProvider.notifier).set(floorId);
+      await prefs.setLastOpenedFloorId(floorId);
     });
   }
 

@@ -326,6 +326,36 @@ class BuildingRepository with SaveStateMixin {
 
   BuildingDao get _dao => ref.read(buildingDaoProvider);
 
+  /// Returns all [Floor]s for [projectId] ordered by level.
+  Future<List<Floor>> getFloorsForProject(String projectId) async {
+    final rows = await _dao.getFloorsForProject(projectId);
+    return rows.map(_floorFromRow).toList();
+  }
+
+  /// Returns all [Room]s on [floorId].
+  Future<List<Room>> getRoomsForFloor(String floorId) async {
+    final rows = await _dao.getRoomsForFloor(floorId);
+    return rows.map(_roomFromRow).toList();
+  }
+
+  /// Returns all [WallSegment]s on [floorId] (across all rooms).
+  Future<List<WallSegment>> getWallSegmentsForFloor(String floorId) async {
+    final rows = await _dao.getWallSegmentsForFloor(floorId);
+    return rows.map(_wallSegmentFromRow).toList();
+  }
+
+  /// Returns all [WindowElement]s on [floorId].
+  Future<List<WindowElement>> getWindowsForFloor(String floorId) async {
+    final rows = await _dao.getWindowsForFloor(floorId);
+    return rows.map(_windowFromRow).toList();
+  }
+
+  /// Returns all [Door]s on [floorId].
+  Future<List<Door>> getDoorsForFloor(String floorId) async {
+    final rows = await _dao.getDoorsForFloor(floorId);
+    return rows.map(_doorFromRow).toList();
+  }
+
   /// Inserts or replaces [floor] and marks dirty.
   Future<void> upsertFloor(Floor floor, String projectId) async {
     await _dao.upsertFloor(_floorToCompanion(floor, projectId));

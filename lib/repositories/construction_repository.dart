@@ -134,6 +134,18 @@ class ConstructionRepository with SaveStateMixin {
 
   ConstructionDao get _dao => ref.read(constructionDaoProvider);
 
+  /// Returns all [WallConstruction]s.
+  Future<List<WallConstruction>> getAllConstructions() async {
+    final rows = await _dao.getAllConstructions();
+    return rows.map(_constructionFromRow).toList();
+  }
+
+  /// Returns all [MaterialLayer]s.
+  Future<List<MaterialLayer>> getAllLayers() async {
+    final rows = await _dao.getAllLayers();
+    return rows.map(_layerFromRow).toList();
+  }
+
   /// Inserts or replaces [construction] and marks dirty.
   Future<void> upsertConstruction(WallConstruction construction) async {
     await _dao.upsertConstruction(_constructionToCompanion(construction));

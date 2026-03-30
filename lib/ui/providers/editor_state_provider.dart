@@ -8,6 +8,7 @@ import '../../repositories/building_repository.dart';
 import '../../repositories/construction_repository.dart';
 import '../../repositories/heating_repository.dart';
 import '../../repositories/project_repository.dart';
+import '../../repositories/save_state_notifier.dart';
 import '../../core/utils/id_generator.dart';
 import '../../data/models/distributor.dart';
 import '../../data/models/door.dart';
@@ -106,9 +107,50 @@ class EditorState {
 
 /// Manages in-memory wall, room, opening, and construction
 /// state for the editor canvas.
-class EditorStateNotifier extends Notifier<EditorState> {
+class EditorStateNotifier extends Notifier<EditorState>
+    with SaveStateMixin {
   @override
   EditorState build() => const EditorState();
+
+  // ---- Startup restore ----
+
+  /// Loads all floor data from the database and replaces the editor state
+  /// in one atomic [state] assignment.
+  ///
+  /// Called on startup (session restore) and whenever the user switches
+  /// to a different floor.
+  Future<void> initFromFloor(String floorId) async {
+    final bRepo = ref.read(buildingRepositoryProvider);
+    final hRepo = ref.read(heatingRepositoryProvider);
+    final cRepo = ref.read(constructionRepositoryProvider);
+
+    final rooms = await bRepo.getRoomsForFloor(floorId);
+    final walls = await bRepo.getWallSegmentsForFloor(floorId);
+    final windows = await bRepo.getWindowsForFloor(floorId);
+    final doors = await bRepo.getDoorsForFloor(floorId);
+
+    final distributor = await hRepo.getDistributorForFloor(floorId);
+    final roomIds = rooms.map((r) => r.id).toList();
+    final zones = await hRepo.getZonesForRooms(roomIds);
+    final circuits = distributor == null
+        ? <HeatingCircuit>[]
+        : await hRepo.getCircuitsForDistributor(distributor.id);
+
+    final constructions = await cRepo.getAllConstructions();
+    final materialLayers = await cRepo.getAllLayers();
+
+    state = EditorState(
+      walls: walls,
+      rooms: rooms,
+      windows: windows,
+      doors: doors,
+      zones: zones,
+      circuits: circuits,
+      distributor: distributor,
+      constructions: constructions,
+      materialLayers: materialLayers,
+    );
+  }
 
   // ---- Walls ----
 
@@ -120,6 +162,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     if (wall.roomId.isNotEmpty) {
       final dao = ref.read(buildingDaoProvider);
       unawaited(upsertWallSegment(dao, wall));
+      markProjectDirty();
     }
   }
 
@@ -133,6 +176,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     if (wall.roomId.isNotEmpty) {
       final dao = ref.read(buildingDaoProvider);
       unawaited(upsertWallSegment(dao, wall));
+      markProjectDirty();
     }
   }
 
@@ -145,6 +189,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(buildingDaoProvider);
     unawaited(deleteWallSegment(dao, wallId));
+    markProjectDirty();
   }
 
   /// Clear roomId on all walls that reference [roomId].
@@ -166,6 +211,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
       for (final w in toDelete) {
         unawaited(deleteWallSegment(dao, w.id));
       }
+      markProjectDirty();
     }
   }
 
@@ -186,6 +232,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     for (final w in updated.where((w) => wallIds.contains(w.id))) {
       unawaited(upsertWallSegment(dao, w));
     }
+    markProjectDirty();
   }
 
   // ---- Rooms ----
@@ -197,6 +244,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(buildingDaoProvider);
     unawaited(upsertRoom(dao, room));
+    markProjectDirty();
   }
 
   /// Update an existing room.
@@ -208,6 +256,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(buildingDaoProvider);
     unawaited(upsertRoom(dao, room));
+    markProjectDirty();
   }
 
   /// Remove a room by ID.
@@ -219,6 +268,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(buildingDaoProvider);
     unawaited(deleteRoom(dao, roomId));
+    markProjectDirty();
   }
 
   // ---- Walls batch operations ----
@@ -250,6 +300,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(buildingDaoProvider);
     unawaited(upsertWindow(dao, window));
+    markProjectDirty();
   }
 
   /// Replace a window with the same ID.
@@ -261,6 +312,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(buildingDaoProvider);
     unawaited(upsertWindow(dao, window));
+    markProjectDirty();
   }
 
   /// Remove a window by ID.
@@ -272,6 +324,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(buildingDaoProvider);
     unawaited(deleteWindow(dao, windowId));
+    markProjectDirty();
   }
 
   /// Remove all windows on a given wall segment.
@@ -289,6 +342,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
       for (final w in toDelete) {
         unawaited(deleteWindow(dao, w.id));
       }
+      markProjectDirty();
     }
   }
 
@@ -301,6 +355,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(buildingDaoProvider);
     unawaited(upsertDoor(dao, door));
+    markProjectDirty();
   }
 
   /// Replace a door with the same ID.
@@ -312,6 +367,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(buildingDaoProvider);
     unawaited(upsertDoor(dao, door));
+    markProjectDirty();
   }
 
   /// Remove a door by ID.
@@ -323,6 +379,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(buildingDaoProvider);
     unawaited(deleteDoor(dao, doorId));
+    markProjectDirty();
   }
 
   /// Remove all doors on a given wall segment.
@@ -340,6 +397,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
       for (final d in toDelete) {
         unawaited(deleteDoor(dao, d.id));
       }
+      markProjectDirty();
     }
   }
 
@@ -352,6 +410,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(heatingDaoProvider);
     unawaited(upsertHeatingZone(dao, zone));
+    markProjectDirty();
   }
 
   /// Replace a heating zone with the same ID.
@@ -363,6 +422,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(heatingDaoProvider);
     unawaited(upsertHeatingZone(dao, zone));
+    markProjectDirty();
   }
 
   /// Updates wall heating zones whose [HeatingZone.heightMm] equals
@@ -393,6 +453,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
       for (final z in changed) {
         unawaited(upsertHeatingZone(dao, z));
       }
+      markProjectDirty();
     }
   }
 
@@ -405,6 +466,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(heatingDaoProvider);
     unawaited(deleteHeatingZone(dao, zoneId));
+    markProjectDirty();
   }
 
   // ---- Circuits ----
@@ -416,6 +478,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(heatingDaoProvider);
     unawaited(upsertHeatingCircuit(dao, circuit));
+    markProjectDirty();
   }
 
   /// Replace a heating circuit with the same ID.
@@ -427,6 +490,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(heatingDaoProvider);
     unawaited(upsertHeatingCircuit(dao, circuit));
+    markProjectDirty();
   }
 
   // ---- Distributor ----
@@ -436,6 +500,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     state = state.copyWith(distributor: d);
     final dao = ref.read(heatingDaoProvider);
     unawaited(upsertDistributor(dao, d));
+    markProjectDirty();
   }
 
   /// Replace the existing distributor with an updated copy.
@@ -443,6 +508,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     state = state.copyWith(distributor: d);
     final dao = ref.read(heatingDaoProvider);
     unawaited(upsertDistributor(dao, d));
+    markProjectDirty();
   }
 
   /// Remove the distributor.
@@ -452,6 +518,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     if (id != null) {
       final dao = ref.read(heatingDaoProvider);
       unawaited(deleteDistributor(dao, id));
+      markProjectDirty();
     }
   }
 
@@ -467,6 +534,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(constructionDaoProvider);
     unawaited(upsertConstruction(dao, construction));
+    markProjectDirty();
   }
 
   /// Replace a construction with the same ID.
@@ -482,6 +550,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(constructionDaoProvider);
     unawaited(upsertConstruction(dao, construction));
+    markProjectDirty();
   }
 
   /// Remove a construction by ID (and its layers).
@@ -498,6 +567,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(constructionDaoProvider);
     unawaited(deleteConstruction(dao, constructionId));
+    markProjectDirty();
   }
 
   // ---- Material layers ----
@@ -509,6 +579,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(constructionDaoProvider);
     unawaited(upsertLayer(dao, layer));
+    markProjectDirty();
   }
 
   /// Replace a material layer with the same ID.
@@ -520,6 +591,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(constructionDaoProvider);
     unawaited(upsertLayer(dao, layer));
+    markProjectDirty();
   }
 
   /// Remove a material layer by ID.
@@ -531,6 +603,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     );
     final dao = ref.read(constructionDaoProvider);
     unawaited(deleteLayer(dao, layerId));
+    markProjectDirty();
   }
 
   /// Save a deep copy of [constructionId] as a named preset.
@@ -588,6 +661,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     for (final l in newLayers) {
       unawaited(upsertLayer(dao, l));
     }
+    markProjectDirty();
   }
 
   // ---- Composite mutations ----
@@ -651,6 +725,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
       for (final w in addedPersisted) {
         unawaited(upsertWallSegment(dao, w));
       }
+      markProjectDirty();
     }
   }
 
@@ -711,6 +786,7 @@ class EditorStateNotifier extends Notifier<EditorState> {
     for (final w in toPersist) {
       unawaited(upsertWallSegment(dao, w));
     }
+    markProjectDirty();
   }
 
   /// Next suggested room number.
@@ -796,6 +872,23 @@ class CurrentProjectIdNotifier extends Notifier<String> {
 final currentProjectIdProvider =
     NotifierProvider<CurrentProjectIdNotifier, String>(
   CurrentProjectIdNotifier.new,
+);
+
+/// Manages the ID of the floor currently displayed in the editor.
+class CurrentFloorIdNotifier extends Notifier<String> {
+  @override
+  String build() => '';
+
+  /// Update the active floor ID.
+  void set(String id) => state = id;
+}
+
+/// Provider for the active floor ID.
+///
+/// Set by [EditorScreen] once the floor is resolved on startup.
+final currentFloorIdProvider =
+    NotifierProvider<CurrentFloorIdNotifier, String>(
+  CurrentFloorIdNotifier.new,
 );
 
 /// Display name of the currently open project.
