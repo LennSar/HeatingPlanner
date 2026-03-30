@@ -27,6 +27,13 @@ class BuildingDao extends DatabaseAccessor<AppDatabase>
             ..orderBy([(t) => OrderingTerm.asc(t.level)]))
           .watch();
 
+  /// All floors for [projectId] ordered by [level] — one-shot fetch.
+  Future<List<Floor>> getFloorsForProject(String projectId) =>
+      (select(floors)
+            ..where((t) => t.projectId.equals(projectId))
+            ..orderBy([(t) => OrderingTerm.asc(t.level)]))
+          .get();
+
   /// Inserts or replaces a floor row.
   Future<void> upsertFloor(FloorsCompanion companion) =>
       into(floors).insertOnConflictUpdate(companion);
@@ -57,6 +64,10 @@ class BuildingDao extends DatabaseAccessor<AppDatabase>
           .watch()
           .map((list) => list.isEmpty ? null : list.first);
 
+  /// All rooms for [floorId] — one-shot fetch.
+  Future<List<Room>> getRoomsForFloor(String floorId) =>
+      (select(rooms)..where((t) => t.floorId.equals(floorId))).get();
+
   /// Inserts or replaces a room row.
   Future<void> upsertRoom(RoomsCompanion companion) =>
       into(rooms).insertOnConflictUpdate(companion);
@@ -70,6 +81,14 @@ class BuildingDao extends DatabaseAccessor<AppDatabase>
   /// All wall segments for [roomId].
   Stream<List<WallSegment>> watchWallSegments(String roomId) =>
       (select(wallSegments)..where((t) => t.roomId.equals(roomId))).watch();
+
+  /// All wall segments for any room on [floorId] — one-shot fetch.
+  Future<List<WallSegment>> getWallSegmentsForFloor(String floorId) {
+    final q = select(wallSegments).join(
+      [innerJoin(rooms, rooms.id.equalsExp(wallSegments.roomId))],
+    )..where(rooms.floorId.equals(floorId));
+    return q.map((row) => row.readTable(wallSegments)).get();
+  }
 
   /// Inserts or replaces a wall-segment row.
   Future<void> upsertWallSegment(WallSegmentsCompanion companion) =>
@@ -87,6 +106,16 @@ class BuildingDao extends DatabaseAccessor<AppDatabase>
             ..where((t) => t.wallSegmentId.equals(wallSegmentId)))
           .watch();
 
+  /// All windows on any wall segment on [floorId] — one-shot fetch.
+  Future<List<Window>> getWindowsForFloor(String floorId) {
+    final q = select(windows).join([
+      innerJoin(wallSegments,
+          wallSegments.id.equalsExp(windows.wallSegmentId)),
+      innerJoin(rooms, rooms.id.equalsExp(wallSegments.roomId)),
+    ])..where(rooms.floorId.equals(floorId));
+    return q.map((row) => row.readTable(windows)).get();
+  }
+
   /// Inserts or replaces a window row.
   Future<void> upsertWindow(WindowsCompanion companion) =>
       into(windows).insertOnConflictUpdate(companion);
@@ -102,6 +131,16 @@ class BuildingDao extends DatabaseAccessor<AppDatabase>
       (select(doors)
             ..where((t) => t.wallSegmentId.equals(wallSegmentId)))
           .watch();
+
+  /// All doors on any wall segment on [floorId] — one-shot fetch.
+  Future<List<Door>> getDoorsForFloor(String floorId) {
+    final q = select(doors).join([
+      innerJoin(wallSegments,
+          wallSegments.id.equalsExp(doors.wallSegmentId)),
+      innerJoin(rooms, rooms.id.equalsExp(wallSegments.roomId)),
+    ])..where(rooms.floorId.equals(floorId));
+    return q.map((row) => row.readTable(doors)).get();
+  }
 
   /// Inserts or replaces a door row.
   Future<void> upsertDoor(DoorsCompanion companion) =>

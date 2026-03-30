@@ -154,12 +154,17 @@ class HspExporter {
     ).toJson();
   }
 
-  Map<String, dynamic> _floorJson($db.Floor row) => Floor(
-        id: row.id,
-        name: row.name,
-        level: row.level,
-        heightMm: row.heightMm,
-      ).toJson();
+  Map<String, dynamic> _floorJson($db.Floor row) {
+    final json = Floor(
+      id: row.id,
+      name: row.name,
+      level: row.level,
+      heightMm: row.heightMm,
+    ).toJson();
+    // projectId is not part of the Floor domain model (it is a DB-level FK).
+    // Inject it explicitly so that the importer can reconstruct the FK link.
+    return {...json, 'projectId': row.projectId};
+  }
 
   Map<String, dynamic> _roomJson($db.Room row) => Room(
         id: row.id,

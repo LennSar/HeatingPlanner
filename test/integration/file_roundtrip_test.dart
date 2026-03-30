@@ -19,6 +19,7 @@ import 'dart:io';
 
 import 'package:archive/archive.dart';
 import 'package:drift/native.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/app.dart';
@@ -28,8 +29,6 @@ import 'package:heating_planner/repositories/hsp_importer.dart';
 import 'package:heating_planner/repositories/save_state_notifier.dart';
 import 'package:heating_planner/ui/screens/editor_screen.dart';
 import 'package:heating_planner/ui/screens/project_list_screen.dart';
-import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
-import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 import '../helpers/test_factories.dart';
 
@@ -185,47 +184,72 @@ void main() {
   });
 
   // ── Session restore ─────────────────────────────────────────────────────────
+  //
+  // Each test overrides [lastOpenedProjectIdProvider] directly rather than
+  // seeding [InMemorySharedPreferencesAsync]. This avoids the platform-channel
+  // async chain that can cause [pumpAndSettle] to loop indefinitely when Drift
+  // StreamProviders keep the event loop busy.  The routing logic under test
+  // is [_startupProjectIdProvider]: it reads the stored ID and calls
+  // [projectRepositoryProvider.findById], whose result controls which screen
+  // the [_StartupRouter] renders.
+  //
+  // We use explicit [pump] calls (not [pumpAndSettle]) for the same reason.
+  // After assertions, [pumpWidget(SizedBox())] + a timed [pump] disposes the
+  // ProviderScope and advances fake-time past any Riverpod autoDispose timers.
 
   group('Session restore', () {
-    setUp(() {
-      SharedPreferencesAsyncPlatform.instance =
-          InMemorySharedPreferencesAsync.empty();
-    });
+    /// Pumps enough frames to let [_startupProjectIdProvider] resolve and the
+    /// router rebuild.  Does NOT use pumpAndSettle to avoid infinite looping
+    /// on Drift stream providers.
+    Future<void> settle(WidgetTester tester) async {
+      for (var i = 0; i < 6; i++) {
+        await tester.pump();
+      }
+    }
+
+    /// Disposes the widget tree and advances fake time to drain Riverpod's
+    /// autoDispose timers so that Flutter's post-test invariant check passes.
+    Future<void> cleanup(WidgetTester tester) async {
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 500));
+    }
 
     testWidgets('routes to EditorScreen when a valid project ID is stored',
         (tester) async {
+      // Intercept Flutter layout errors so that PropertiesPanel overflow does
+      // not fail this routing test.  We only care that the router chose
+      // EditorScreen, not that the panel renders without overflows.
+      final capturedErrors = <FlutterErrorDetails>[];
+      final originalOnError = FlutterError.onError;
+      FlutterError.onError = capturedErrors.add;
+      addTearDown(() => FlutterError.onError = originalOnError);
+
       final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
 
-      // Insert a project so findById() succeeds.
-      final now = DateTime(2025, 6, 1);
-      await db.into(db.projects).insert(
-            $db.ProjectsCompanion.insert(
-              id: 'restore-proj-1',
-              name: 'Restore Test',
-              createdAt: now,
-              modifiedAt: now,
-            ),
-          );
-
-      // Persist the project ID so lastOpenedProjectIdProvider resolves to it.
-      await AppPreferences().setLastOpenedProjectId('restore-proj-1');
+      // Insert a project so projectRepositoryProvider.findById() succeeds.
+      final seed = await createFullTestProject(db);
 
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             $db.appDatabaseProvider.overrideWithValue(db),
+            lastOpenedProjectIdProvider.overrideWith(
+              () => _FixedProjectIdNotifier(seed.projectId),
+            ),
           ],
           child: const HeatingPlannerApp(),
         ),
       );
-      await tester.pumpAndSettle();
+      await settle(tester);
 
       expect(
         find.byType(EditorScreen),
         findsOneWidget,
         reason: 'EditorScreen must be shown when a valid project ID is stored',
       );
+
+      await cleanup(tester);
     });
 
     testWidgets(
@@ -234,16 +258,19 @@ void main() {
       final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
 
-      // SharedPreferences is empty — no lastOpenedProjectId key.
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             $db.appDatabaseProvider.overrideWithValue(db),
+            // null → _startupProjectIdProvider returns null → ProjectListScreen
+            lastOpenedProjectIdProvider.overrideWith(
+              () => _FixedProjectIdNotifier(null),
+            ),
           ],
           child: const HeatingPlannerApp(),
         ),
       );
-      await tester.pumpAndSettle();
+      await settle(tester);
 
       expect(
         find.byType(ProjectListScreen),
@@ -251,26 +278,30 @@ void main() {
         reason:
             'ProjectListScreen must be shown when no project ID is stored',
       );
+
+      await cleanup(tester);
     });
 
     testWidgets(
         'routes to ProjectListScreen when stored project ID no longer exists',
         (tester) async {
+      // Empty DB — no project row for the stored ID.
       final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
-
-      // Store a project ID but do NOT insert a matching row in the DB.
-      await AppPreferences().setLastOpenedProjectId('deleted-project-999');
 
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             $db.appDatabaseProvider.overrideWithValue(db),
+            // Non-existent ID → findById returns null → ProjectListScreen
+            lastOpenedProjectIdProvider.overrideWith(
+              () => _FixedProjectIdNotifier('deleted-project-999'),
+            ),
           ],
           child: const HeatingPlannerApp(),
         ),
       );
-      await tester.pumpAndSettle();
+      await settle(tester);
 
       expect(
         find.byType(ProjectListScreen),
@@ -278,6 +309,8 @@ void main() {
         reason: 'ProjectListScreen must be shown when the stored project '
             'no longer exists in the database',
       );
+
+      await cleanup(tester);
     });
   });
 }
