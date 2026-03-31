@@ -108,6 +108,9 @@ abstract class EditorCallbacks {
   /// Replace an existing heating circuit (same ID).
   void updateCircuit(HeatingCircuit circuit);
 
+  /// Remove all heating circuits from editor state and persist the deletes.
+  void clearAllCircuits();
+
   /// All heating circuits currently in the editor.
   List<HeatingCircuit> get currentCircuits;
 

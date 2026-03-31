@@ -4,6 +4,8 @@ import 'package:flutter/gestures.dart';
 
 import '../../../core/utils/id_generator.dart';
 import '../../../data/models/distributor.dart';
+import '../../../data/models/heating_circuit.dart';
+import '../../../data/models/heating_zone.dart';
 import '../../../data/models/point2d.dart';
 import '../painters/interaction_data.dart';
 import 'editor_callbacks.dart';
@@ -121,13 +123,25 @@ class DistributorPlaceTool extends CanvasTool {
 
   /// Move the existing distributor to [position], preserving all
   /// other properties (temperatures, pump head).
+  ///
+  /// All existing circuits are torn down and every zone's [circuitId]
+  /// is cleared, matching the behaviour of [_replaceNew]. The entire
+  /// operation is wrapped in a single [_UpdateDistributorCommand] so
+  /// it can be undone as one action.
   void _moveExisting(Distributor existing, Point2D position) {
     final updated = existing.copyWith(position: position);
+    final snapshotCircuits =
+        List<HeatingCircuit>.of(callbacks.currentCircuits);
+    final snapshotZones =
+        List<HeatingZone>.of(callbacks.currentZones);
     undoRedo.execute(
       _UpdateDistributorCommand(
         oldDistributor: existing,
         newDistributor: updated,
         update: callbacks.updateDistributor,
+        callbacks: callbacks,
+        snapshotCircuits: snapshotCircuits,
+        snapshotZones: snapshotZones,
       ),
     );
     callbacks.selectElement('distributor', updated.id);
@@ -177,26 +191,52 @@ class _PlaceDistributorCommand extends Command {
   void undo() => remove();
 }
 
-/// Command: move or update an existing distributor in-place.
+/// Command: move an existing distributor in-place, tearing down all
+/// circuits and disconnecting every zone's [circuitId].
+///
+/// Snapshots of circuits and zones are captured before execution so
+/// the operation can be fully reversed as a single undo step.
 class _UpdateDistributorCommand extends Command {
   _UpdateDistributorCommand({
     required this.oldDistributor,
     required this.newDistributor,
     required this.update,
+    required this.callbacks,
+    required this.snapshotCircuits,
+    required this.snapshotZones,
   });
 
   final Distributor oldDistributor;
   final Distributor newDistributor;
   final void Function(Distributor) update;
+  final EditorCallbacks callbacks;
+  final List<HeatingCircuit> snapshotCircuits;
+  final List<HeatingZone> snapshotZones;
 
   @override
   String get label => 'Move distributor';
 
   @override
-  void execute() => update(newDistributor);
+  void execute() {
+    update(newDistributor);
+    callbacks.clearAllCircuits();
+    for (final zone in callbacks.currentZones) {
+      if (zone.circuitId != null) {
+        callbacks.updateZone(zone.copyWith(circuitId: null));
+      }
+    }
+  }
 
   @override
-  void undo() => update(oldDistributor);
+  void undo() {
+    update(oldDistributor);
+    for (final circuit in snapshotCircuits) {
+      callbacks.commitCircuit(circuit);
+    }
+    for (final zone in snapshotZones) {
+      callbacks.updateZone(zone);
+    }
+  }
 }
 
 /// Command: replace an existing distributor with a fresh one.

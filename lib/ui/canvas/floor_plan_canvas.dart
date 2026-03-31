@@ -323,6 +323,11 @@ class _FloorPlanCanvasState
   }
 
   @override
+  void clearAllCircuits() {
+    ref.read(editorStateProvider.notifier).clearAllCircuits();
+  }
+
+  @override
   List<HeatingCircuit> get currentCircuits =>
       ref.read(editorStateProvider).circuits;
 
