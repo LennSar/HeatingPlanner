@@ -15,6 +15,8 @@ class Distributors extends Table {
       real().withDefault(const Constant(28.0))();
   /// Optional rated pump capacity entered by the user (Pa).
   RealColumn get pumpCapacityPa => real().nullable()();
+  IntColumn get widthMm => integer().withDefault(const Constant(500))();
+  IntColumn get rotationDeg => integer().withDefault(const Constant(0))();
 
   @override
   Set<Column> get primaryKey => {id};

@@ -9,6 +9,39 @@ import '../engines/hydraulic_engine.dart';
 import 'flow_rate_providers.dart';
 import 'tube_length_providers.dart';
 
+/// Flow velocity inside the tube for a circuit (m/s).
+///
+/// Extracts the velocity step from the Darcy-Weisbach pipeline so the
+/// result is available to the UI without duplicating the calculation.
+///
+/// Returns [double.nan] while any upstream data is loading or when
+/// inputs are otherwise invalid (zero flow, unknown tube type).
+final flowVelocityProvider =
+    Provider.family<double, String>((ref, circuitId) {
+  final flowRateKgH = ref.watch(flowRateProvider(circuitId));
+  if (flowRateKgH.isNaN) return double.nan;
+
+  final circuit =
+      ref.watch(circuitByIdProvider(circuitId)).asData?.value;
+  if (circuit == null) return double.nan;
+
+  final zone =
+      ref
+          .watch(zoneByIdProvider(circuit.heatingZoneId))
+          .asData
+          ?.value;
+  if (zone == null) return double.nan;
+
+  final tubeType =
+      ref.watch(tubeTypeByIdProvider(zone.tubeTypeId)).asData?.value;
+  if (tubeType == null) return double.nan;
+
+  return HydraulicEngine.flowVelocity(
+    massFlowRateKgH: flowRateKgH,
+    innerDiameterMm: tubeType.innerDiameterMm,
+  );
+});
+
 /// Total pressure loss for a circuit (Pa) — full Darcy-Weisbach pipeline.
 ///
 /// Pipeline:

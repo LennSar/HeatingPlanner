@@ -246,6 +246,8 @@ Distributor _distributorFromRow($db.Distributor row) {
     supplyTempC: row.supplyTempC,
     returnTempC: row.returnTempC,
     pumpCapacityPa: row.pumpCapacityPa,
+    widthMm: row.widthMm,
+    rotationDeg: row.rotationDeg,
   );
 }
 
@@ -321,6 +323,8 @@ $db.DistributorsCompanion _distributorToCompanion(
     supplyTempC: Value(distributor.supplyTempC),
     returnTempC: Value(distributor.returnTempC),
     pumpCapacityPa: Value(distributor.pumpCapacityPa),
+    widthMm: Value(distributor.widthMm),
+    rotationDeg: Value(distributor.rotationDeg),
   );
 }
 

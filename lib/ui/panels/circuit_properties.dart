@@ -58,6 +58,8 @@ class CircuitProperties extends ConsumerWidget {
         zoneM.isNaN ? double.nan : supplyM + returnM + zoneM;
 
     final flowRateKgH = ref.watch(flowRateProvider(circuitId));
+    final flowVelocityMs =
+        ref.watch(flowVelocityProvider(circuitId));
     final pressureLossPa =
         ref.watch(pressureLossProvider(circuitId)).asData?.value ??
             double.nan;
@@ -145,7 +147,13 @@ class CircuitProperties extends ConsumerWidget {
                 : '\u2014',
             textTheme,
           ),
-          _infoRow('Flow velocity', '\u2014', textTheme),
+          _infoRow(
+            'Flow velocity',
+            !flowVelocityMs.isNaN && flowVelocityMs > 0
+                ? '${flowVelocityMs.toStringAsFixed(2)} m/s'
+                : '\u2014',
+            textTheme,
+          ),
           _infoRow(
             'Pressure loss',
             !pressureLossPa.isNaN && pressureLossPa > 0

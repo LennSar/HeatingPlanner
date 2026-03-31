@@ -6586,6 +6586,30 @@ class $DistributorsTable extends Distributors
     type: DriftSqlType.double,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _widthMmMeta = const VerificationMeta(
+    'widthMm',
+  );
+  @override
+  late final GeneratedColumn<int> widthMm = GeneratedColumn<int>(
+    'width_mm',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(500),
+  );
+  static const VerificationMeta _rotationDegMeta = const VerificationMeta(
+    'rotationDeg',
+  );
+  @override
+  late final GeneratedColumn<int> rotationDeg = GeneratedColumn<int>(
+    'rotation_deg',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -6594,6 +6618,8 @@ class $DistributorsTable extends Distributors
     supplyTempC,
     returnTempC,
     pumpCapacityPa,
+    widthMm,
+    rotationDeg,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -6658,6 +6684,21 @@ class $DistributorsTable extends Distributors
         ),
       );
     }
+    if (data.containsKey('width_mm')) {
+      context.handle(
+        _widthMmMeta,
+        widthMm.isAcceptableOrUnknown(data['width_mm']!, _widthMmMeta),
+      );
+    }
+    if (data.containsKey('rotation_deg')) {
+      context.handle(
+        _rotationDegMeta,
+        rotationDeg.isAcceptableOrUnknown(
+          data['rotation_deg']!,
+          _rotationDegMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -6691,6 +6732,14 @@ class $DistributorsTable extends Distributors
         DriftSqlType.double,
         data['${effectivePrefix}pump_capacity_pa'],
       ),
+      widthMm: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}width_mm'],
+      )!,
+      rotationDeg: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}rotation_deg'],
+      )!,
     );
   }
 
@@ -6711,6 +6760,8 @@ class Distributor extends DataClass implements Insertable<Distributor> {
 
   /// Optional rated pump capacity entered by the user (Pa).
   final double? pumpCapacityPa;
+  final int widthMm;
+  final int rotationDeg;
   const Distributor({
     required this.id,
     required this.floorId,
@@ -6718,6 +6769,8 @@ class Distributor extends DataClass implements Insertable<Distributor> {
     required this.supplyTempC,
     required this.returnTempC,
     this.pumpCapacityPa,
+    required this.widthMm,
+    required this.rotationDeg,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -6730,6 +6783,8 @@ class Distributor extends DataClass implements Insertable<Distributor> {
     if (!nullToAbsent || pumpCapacityPa != null) {
       map['pump_capacity_pa'] = Variable<double>(pumpCapacityPa);
     }
+    map['width_mm'] = Variable<int>(widthMm);
+    map['rotation_deg'] = Variable<int>(rotationDeg);
     return map;
   }
 
@@ -6743,6 +6798,8 @@ class Distributor extends DataClass implements Insertable<Distributor> {
       pumpCapacityPa: pumpCapacityPa == null && nullToAbsent
           ? const Value.absent()
           : Value(pumpCapacityPa),
+      widthMm: Value(widthMm),
+      rotationDeg: Value(rotationDeg),
     );
   }
 
@@ -6758,6 +6815,8 @@ class Distributor extends DataClass implements Insertable<Distributor> {
       supplyTempC: serializer.fromJson<double>(json['supplyTempC']),
       returnTempC: serializer.fromJson<double>(json['returnTempC']),
       pumpCapacityPa: serializer.fromJson<double?>(json['pumpCapacityPa']),
+      widthMm: serializer.fromJson<int>(json['widthMm']),
+      rotationDeg: serializer.fromJson<int>(json['rotationDeg']),
     );
   }
   @override
@@ -6770,6 +6829,8 @@ class Distributor extends DataClass implements Insertable<Distributor> {
       'supplyTempC': serializer.toJson<double>(supplyTempC),
       'returnTempC': serializer.toJson<double>(returnTempC),
       'pumpCapacityPa': serializer.toJson<double?>(pumpCapacityPa),
+      'widthMm': serializer.toJson<int>(widthMm),
+      'rotationDeg': serializer.toJson<int>(rotationDeg),
     };
   }
 
@@ -6780,6 +6841,8 @@ class Distributor extends DataClass implements Insertable<Distributor> {
     double? supplyTempC,
     double? returnTempC,
     Value<double?> pumpCapacityPa = const Value.absent(),
+    int? widthMm,
+    int? rotationDeg,
   }) => Distributor(
     id: id ?? this.id,
     floorId: floorId ?? this.floorId,
@@ -6789,6 +6852,8 @@ class Distributor extends DataClass implements Insertable<Distributor> {
     pumpCapacityPa: pumpCapacityPa.present
         ? pumpCapacityPa.value
         : this.pumpCapacityPa,
+    widthMm: widthMm ?? this.widthMm,
+    rotationDeg: rotationDeg ?? this.rotationDeg,
   );
   Distributor copyWithCompanion(DistributorsCompanion data) {
     return Distributor(
@@ -6806,6 +6871,10 @@ class Distributor extends DataClass implements Insertable<Distributor> {
       pumpCapacityPa: data.pumpCapacityPa.present
           ? data.pumpCapacityPa.value
           : this.pumpCapacityPa,
+      widthMm: data.widthMm.present ? data.widthMm.value : this.widthMm,
+      rotationDeg: data.rotationDeg.present
+          ? data.rotationDeg.value
+          : this.rotationDeg,
     );
   }
 
@@ -6817,7 +6886,9 @@ class Distributor extends DataClass implements Insertable<Distributor> {
           ..write('positionJson: $positionJson, ')
           ..write('supplyTempC: $supplyTempC, ')
           ..write('returnTempC: $returnTempC, ')
-          ..write('pumpCapacityPa: $pumpCapacityPa')
+          ..write('pumpCapacityPa: $pumpCapacityPa, ')
+          ..write('widthMm: $widthMm, ')
+          ..write('rotationDeg: $rotationDeg')
           ..write(')'))
         .toString();
   }
@@ -6830,6 +6901,8 @@ class Distributor extends DataClass implements Insertable<Distributor> {
     supplyTempC,
     returnTempC,
     pumpCapacityPa,
+    widthMm,
+    rotationDeg,
   );
   @override
   bool operator ==(Object other) =>
@@ -6840,7 +6913,9 @@ class Distributor extends DataClass implements Insertable<Distributor> {
           other.positionJson == this.positionJson &&
           other.supplyTempC == this.supplyTempC &&
           other.returnTempC == this.returnTempC &&
-          other.pumpCapacityPa == this.pumpCapacityPa);
+          other.pumpCapacityPa == this.pumpCapacityPa &&
+          other.widthMm == this.widthMm &&
+          other.rotationDeg == this.rotationDeg);
 }
 
 class DistributorsCompanion extends UpdateCompanion<Distributor> {
@@ -6850,6 +6925,8 @@ class DistributorsCompanion extends UpdateCompanion<Distributor> {
   final Value<double> supplyTempC;
   final Value<double> returnTempC;
   final Value<double?> pumpCapacityPa;
+  final Value<int> widthMm;
+  final Value<int> rotationDeg;
   final Value<int> rowid;
   const DistributorsCompanion({
     this.id = const Value.absent(),
@@ -6858,6 +6935,8 @@ class DistributorsCompanion extends UpdateCompanion<Distributor> {
     this.supplyTempC = const Value.absent(),
     this.returnTempC = const Value.absent(),
     this.pumpCapacityPa = const Value.absent(),
+    this.widthMm = const Value.absent(),
+    this.rotationDeg = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   DistributorsCompanion.insert({
@@ -6867,6 +6946,8 @@ class DistributorsCompanion extends UpdateCompanion<Distributor> {
     this.supplyTempC = const Value.absent(),
     this.returnTempC = const Value.absent(),
     this.pumpCapacityPa = const Value.absent(),
+    this.widthMm = const Value.absent(),
+    this.rotationDeg = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        floorId = Value(floorId),
@@ -6878,6 +6959,8 @@ class DistributorsCompanion extends UpdateCompanion<Distributor> {
     Expression<double>? supplyTempC,
     Expression<double>? returnTempC,
     Expression<double>? pumpCapacityPa,
+    Expression<int>? widthMm,
+    Expression<int>? rotationDeg,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -6887,6 +6970,8 @@ class DistributorsCompanion extends UpdateCompanion<Distributor> {
       if (supplyTempC != null) 'supply_temp_c': supplyTempC,
       if (returnTempC != null) 'return_temp_c': returnTempC,
       if (pumpCapacityPa != null) 'pump_capacity_pa': pumpCapacityPa,
+      if (widthMm != null) 'width_mm': widthMm,
+      if (rotationDeg != null) 'rotation_deg': rotationDeg,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -6898,6 +6983,8 @@ class DistributorsCompanion extends UpdateCompanion<Distributor> {
     Value<double>? supplyTempC,
     Value<double>? returnTempC,
     Value<double?>? pumpCapacityPa,
+    Value<int>? widthMm,
+    Value<int>? rotationDeg,
     Value<int>? rowid,
   }) {
     return DistributorsCompanion(
@@ -6907,6 +6994,8 @@ class DistributorsCompanion extends UpdateCompanion<Distributor> {
       supplyTempC: supplyTempC ?? this.supplyTempC,
       returnTempC: returnTempC ?? this.returnTempC,
       pumpCapacityPa: pumpCapacityPa ?? this.pumpCapacityPa,
+      widthMm: widthMm ?? this.widthMm,
+      rotationDeg: rotationDeg ?? this.rotationDeg,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -6932,6 +7021,12 @@ class DistributorsCompanion extends UpdateCompanion<Distributor> {
     if (pumpCapacityPa.present) {
       map['pump_capacity_pa'] = Variable<double>(pumpCapacityPa.value);
     }
+    if (widthMm.present) {
+      map['width_mm'] = Variable<int>(widthMm.value);
+    }
+    if (rotationDeg.present) {
+      map['rotation_deg'] = Variable<int>(rotationDeg.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -6947,6 +7042,8 @@ class DistributorsCompanion extends UpdateCompanion<Distributor> {
           ..write('supplyTempC: $supplyTempC, ')
           ..write('returnTempC: $returnTempC, ')
           ..write('pumpCapacityPa: $pumpCapacityPa, ')
+          ..write('widthMm: $widthMm, ')
+          ..write('rotationDeg: $rotationDeg, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -13839,6 +13936,8 @@ typedef $$DistributorsTableCreateCompanionBuilder =
       Value<double> supplyTempC,
       Value<double> returnTempC,
       Value<double?> pumpCapacityPa,
+      Value<int> widthMm,
+      Value<int> rotationDeg,
       Value<int> rowid,
     });
 typedef $$DistributorsTableUpdateCompanionBuilder =
@@ -13849,6 +13948,8 @@ typedef $$DistributorsTableUpdateCompanionBuilder =
       Value<double> supplyTempC,
       Value<double> returnTempC,
       Value<double?> pumpCapacityPa,
+      Value<int> widthMm,
+      Value<int> rotationDeg,
       Value<int> rowid,
     });
 
@@ -13929,6 +14030,16 @@ class $$DistributorsTableFilterComposer
 
   ColumnFilters<double> get pumpCapacityPa => $composableBuilder(
     column: $table.pumpCapacityPa,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get widthMm => $composableBuilder(
+    column: $table.widthMm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get rotationDeg => $composableBuilder(
+    column: $table.rotationDeg,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -14015,6 +14126,16 @@ class $$DistributorsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get widthMm => $composableBuilder(
+    column: $table.widthMm,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get rotationDeg => $composableBuilder(
+    column: $table.rotationDeg,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$FloorsTableOrderingComposer get floorId {
     final $$FloorsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -14068,6 +14189,14 @@ class $$DistributorsTableAnnotationComposer
 
   GeneratedColumn<double> get pumpCapacityPa => $composableBuilder(
     column: $table.pumpCapacityPa,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get widthMm =>
+      $composableBuilder(column: $table.widthMm, builder: (column) => column);
+
+  GeneratedColumn<int> get rotationDeg => $composableBuilder(
+    column: $table.rotationDeg,
     builder: (column) => column,
   );
 
@@ -14154,6 +14283,8 @@ class $$DistributorsTableTableManager
                 Value<double> supplyTempC = const Value.absent(),
                 Value<double> returnTempC = const Value.absent(),
                 Value<double?> pumpCapacityPa = const Value.absent(),
+                Value<int> widthMm = const Value.absent(),
+                Value<int> rotationDeg = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DistributorsCompanion(
                 id: id,
@@ -14162,6 +14293,8 @@ class $$DistributorsTableTableManager
                 supplyTempC: supplyTempC,
                 returnTempC: returnTempC,
                 pumpCapacityPa: pumpCapacityPa,
+                widthMm: widthMm,
+                rotationDeg: rotationDeg,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -14172,6 +14305,8 @@ class $$DistributorsTableTableManager
                 Value<double> supplyTempC = const Value.absent(),
                 Value<double> returnTempC = const Value.absent(),
                 Value<double?> pumpCapacityPa = const Value.absent(),
+                Value<int> widthMm = const Value.absent(),
+                Value<int> rotationDeg = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => DistributorsCompanion.insert(
                 id: id,
@@ -14180,6 +14315,8 @@ class $$DistributorsTableTableManager
                 supplyTempC: supplyTempC,
                 returnTempC: returnTempC,
                 pumpCapacityPa: pumpCapacityPa,
+                widthMm: widthMm,
+                rotationDeg: rotationDeg,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

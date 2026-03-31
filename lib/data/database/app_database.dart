@@ -65,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 10;
+  int get schemaVersion => 11;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -143,6 +143,16 @@ class AppDatabase extends _$AppDatabase {
           if (from < 10) {
             await m.addColumn(projects, projects.floorHeightMm);
             await m.addColumn(projects, projects.unheatedSpaceTempC);
+          }
+          if (from < 11) {
+            await m.database.customStatement(
+              'ALTER TABLE distributors ADD COLUMN '
+              'width_mm INTEGER NOT NULL DEFAULT 500',
+            );
+            await m.database.customStatement(
+              'ALTER TABLE distributors ADD COLUMN '
+              'rotation_deg INTEGER NOT NULL DEFAULT 0',
+            );
           }
         },
       );
