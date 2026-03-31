@@ -2,6 +2,7 @@ import 'dart:math' show min, max;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../calculation/engines/geometry_engine.dart';
 import '../calculation/providers/heat_output_providers.dart';
 import '../calculation/providers/hydraulic_balance_providers.dart';
 import '../calculation/providers/tube_length_providers.dart';
@@ -32,6 +33,7 @@ import '../ui/providers/editor_state_provider.dart';
 /// - **VR-02** EN 1264 surface temperature limit exceeded.
 /// - **VR-03** Heating circuit tube length exceeds hydraulic maximum.
 /// - **VR-04** Heating zone not connected to any circuit.
+/// - **VR-05** Circuit supply route not connected to the distributor.
 final validationResultsProvider =
     Provider.family<List<ValidationResult>, String>(
   (ref, projectId) {
@@ -41,6 +43,7 @@ final validationResultsProvider =
     results.addAll(_surfaceTempResults(ref));
     results.addAll(_circuitLengthResults(ref));
     results.addAll(_unconnectedZoneResults(ref));
+    results.addAll(_disconnectedCircuitResults(ref));
     // Sort: errors before warnings before info.
     results.sort(
       (a, b) => a.severity.index.compareTo(b.severity.index),
@@ -266,6 +269,53 @@ List<ValidationResult> _circuitLengthResults(Ref ref) {
               'for ${outerDiamMm.toStringAsFixed(0)} mm OD tube.',
           suggestedFix: 'Split the zone into two smaller zones with '
               'separate circuits.',
+        ),
+      );
+    }
+  }
+
+  return results;
+}
+
+// ── Rule VR-05: Circuit supply route not connected to distributor ─────────────
+
+/// Returns [ValidationResult]s for [HeatingCircuit]s whose supply route is
+/// either empty or does not start within 50 mm of the distributor's position.
+///
+/// A circuit whose [HeatingCircuit.supplyRoutePath] is empty has no drawn
+/// route at all. A circuit whose first supply-route point is more than 50 mm
+/// from [state.distributor.position] was drawn independently and is not
+/// physically connected to the manifold.
+///
+/// If no distributor exists on the floor every circuit fails this check,
+/// because there is no manifold to connect to.
+List<ValidationResult> _disconnectedCircuitResults(Ref ref) {
+  final state = ref.watch(editorStateProvider);
+  final distributor = state.distributor;
+  final results = <ValidationResult>[];
+
+  for (final circuit in state.circuits) {
+    final bool disconnected;
+    if (distributor == null || circuit.supplyRoutePath.isEmpty) {
+      disconnected = true;
+    } else {
+      final dist = GeometryEngine.distanceMm(
+        circuit.supplyRoutePath.first,
+        distributor.position,
+      );
+      disconnected = dist > 50.0;
+    }
+
+    if (disconnected) {
+      results.add(
+        ValidationResult(
+          severity: WarningSeverity.error,
+          elementId: circuit.id,
+          elementType: 'circuit',
+          message: 'Circuit supply route is not connected to the '
+              'distributor.',
+          suggestedFix: 'Use the Route Pipe tool to redraw this circuit '
+              'from the distributor.',
         ),
       );
     }
