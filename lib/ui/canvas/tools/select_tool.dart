@@ -671,6 +671,8 @@ class SelectTool extends CanvasTool {
       _deleteSelectedDoor();
     } else if (_selectedDistributor) {
       _deleteSelectedDistributor();
+    } else if (_selectedCircuit != null) {
+      _deleteSelectedCircuit();
     } else if (_selectedZone != null) {
       _deleteSelectedZone();
     } else if (_selectedWall != null) {
@@ -1558,6 +1560,24 @@ class SelectTool extends CanvasTool {
       add: callbacks.commitDoor,
     ));
     _selectedDoor = null;
+    callbacks.selectElement(null, null);
+    onStateChanged();
+  }
+
+  void _deleteSelectedCircuit() {
+    final circuit = _selectedCircuit!;
+    // Snapshot the zone that is currently connected so undo can restore it.
+    final connectedZone = callbacks.currentZones
+        .where((z) => z.circuitId == circuit.id)
+        .firstOrNull;
+    undoRedo.execute(_DeleteCircuitCommand(
+      circuit: circuit,
+      connectedZone: connectedZone,
+      remove: callbacks.removeCircuit,
+      add: callbacks.commitCircuit,
+      updateZone: callbacks.updateZone,
+    ));
+    _selectedCircuit = null;
     callbacks.selectElement(null, null);
     onStateChanged();
   }
@@ -2504,6 +2524,37 @@ class _DeleteDoorCommand extends Command {
 
   @override
   void undo() => add(door);
+}
+
+/// Command: delete a heating circuit and disconnect its zone.
+class _DeleteCircuitCommand extends Command {
+  _DeleteCircuitCommand({
+    required this.circuit,
+    required this.connectedZone,
+    required this.remove,
+    required this.add,
+    required this.updateZone,
+  });
+
+  final HeatingCircuit circuit;
+  final HeatingZone? connectedZone;
+  final void Function(String) remove;
+  final void Function(HeatingCircuit) add;
+  final void Function(HeatingZone) updateZone;
+
+  @override
+  String get label => 'Delete circuit';
+
+  @override
+  void execute() => remove(circuit.id);
+
+  @override
+  void undo() {
+    add(circuit);
+    if (connectedZone != null) {
+      updateZone(connectedZone!);
+    }
+  }
 }
 
 /// Command: delete a heating zone.

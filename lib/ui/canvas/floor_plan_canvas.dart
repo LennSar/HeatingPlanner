@@ -323,6 +323,17 @@ class _FloorPlanCanvasState
   }
 
   @override
+  void removeCircuit(String circuitId) {
+    final notifier = ref.read(editorStateProvider.notifier);
+    notifier.removeCircuit(circuitId);
+    for (final zone in ref.read(editorStateProvider).zones) {
+      if (zone.circuitId == circuitId) {
+        notifier.updateZone(zone.copyWith(circuitId: null));
+      }
+    }
+  }
+
+  @override
   void clearAllCircuits() {
     ref.read(editorStateProvider.notifier).clearAllCircuits();
   }

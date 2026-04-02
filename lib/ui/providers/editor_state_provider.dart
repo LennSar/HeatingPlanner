@@ -481,6 +481,18 @@ class EditorStateNotifier extends Notifier<EditorState>
     markProjectDirty();
   }
 
+  /// Remove a heating circuit by ID.
+  void removeCircuit(String circuitId) {
+    state = state.copyWith(
+      circuits: state.circuits
+          .where((c) => c.id != circuitId)
+          .toList(),
+    );
+    final dao = ref.read(heatingDaoProvider);
+    unawaited(deleteHeatingCircuit(dao, circuitId));
+    markProjectDirty();
+  }
+
   /// Remove all heating circuits (e.g. when the distributor is moved).
   void clearAllCircuits() {
     final ids = state.circuits.map((c) => c.id).toList();

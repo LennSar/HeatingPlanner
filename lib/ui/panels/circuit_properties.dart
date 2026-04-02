@@ -11,6 +11,7 @@ import '../../data/models/enums.dart';
 import '../../data/models/heating_circuit.dart';
 import '../../data/models/point2d.dart';
 import '../providers/editor_state_provider.dart';
+import '../providers/selection_provider.dart';
 
 /// Properties panel for a selected [HeatingCircuit].
 ///
@@ -167,6 +168,42 @@ class CircuitProperties extends ConsumerWidget {
                 ? '${heatOutputW.round()} W'
                 : '\u2014',
             textTheme,
+          ),
+
+          const Divider(height: Spacing.xl),
+
+          // ── Delete ───────────────────────────────────────────────
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton(
+              style: OutlinedButton.styleFrom(
+                foregroundColor:
+                    Theme.of(context).colorScheme.error,
+                side: BorderSide(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+              onPressed: () {
+                ref
+                    .read(editorStateProvider.notifier)
+                    .removeCircuit(circuitId);
+                for (final zone in ref
+                    .read(editorStateProvider)
+                    .zones) {
+                  if (zone.circuitId == circuitId) {
+                    ref
+                        .read(editorStateProvider.notifier)
+                        .updateZone(
+                          zone.copyWith(circuitId: null),
+                        );
+                  }
+                }
+                ref
+                    .read(selectedElementProvider.notifier)
+                    .select(null);
+              },
+              child: const Text('Delete circuit'),
+            ),
           ),
         ],
       ),

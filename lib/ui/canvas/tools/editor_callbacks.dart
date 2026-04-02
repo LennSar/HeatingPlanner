@@ -108,6 +108,10 @@ abstract class EditorCallbacks {
   /// Replace an existing heating circuit (same ID).
   void updateCircuit(HeatingCircuit circuit);
 
+  /// Remove a heating circuit by ID, persist the delete, and disconnect
+  /// any zone whose [circuitId] matches.
+  void removeCircuit(String circuitId);
+
   /// Remove all heating circuits from editor state and persist the deletes.
   void clearAllCircuits();
 
