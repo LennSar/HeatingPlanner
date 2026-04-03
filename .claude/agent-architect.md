@@ -557,6 +557,7 @@ Use `@riverpod` annotation with code generation. Every provider is defined in th
 | `selectedToolProvider` | StateProvider | — | DrawingTool | editor_screen.dart |
 | `canvasTransformProvider` | StateNotifierProvider | — | Matrix4 | canvas_controller.dart |
 | `selectedElementProvider` | StateProvider | — | (String type, String id)? | editor_screen.dart |
+| `hoveredElementProvider` | NotifierProvider | — | SelectedElement? | selection_provider.dart |
 | `validationResultsProvider` | Provider.family | projectId | List\<ValidationResult\> | validation_service.dart |
 | `saveStateProvider` | StateNotifierProvider | — | SaveState | save_state_notifier.dart |
 | `lastOpenedProjectIdProvider` | StateProvider | — | String? | app_preferences.dart |

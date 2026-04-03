@@ -467,16 +467,24 @@ Opens as a right-side panel (desktop) or full-screen overlay (tablet). Contains 
 ┌──────────────────────────────────────────────────────┐
 │  ⚠ Warnings (3)                        [Filter ▾]    │
 │                                                       │
-│  🔴 Circuit 2: supply route incomplete                │
+│  🔴 Circuit 2: supply route incomplete          [←]  │  ← hover highlights element on canvas
 │     → Connect supply pipe from distributor to zone    │
 │                                                       │
-│  🟡 Kitchen: heat output 350W < demand 380W           │
+│  🟡 Kitchen: heat output 350W < demand 380W     [←]  │
 │     → Reduce tube spacing or increase supply temp     │
 │                                                       │
 │  🔵 Circuit 1: length 95m near max (120m for 16mm)   │
 │     → Consider splitting into two zones               │
 └──────────────────────────────────────────────────────┘
 ```
+
+**Hover-to-highlight interaction:**
+- Wrapping each warning row in a `MouseRegion` (desktop) detects pointer enter/exit.
+- On pointer enter: set `hoveredElementProvider` to `SelectedElement(type: result.elementType, id: result.elementId)`.
+- On pointer exit: clear `hoveredElementProvider` to null.
+- The canvas painters read `hoveredElementProvider` and draw a 2px `hoverHighlight` colour outline (at 60% opacity) around the matching element. The highlight applies to walls, zones, circuits, and the distributor; rooms are highlighted by outlining all their walls.
+- The hover highlight is purely visual — it does not change the selection (`selectedElementProvider`) and does not open the properties panel.
+- On tablet (no hover): a long-press on the warning row triggers the same highlight for 2 seconds, then clears.
 
 ---
 
