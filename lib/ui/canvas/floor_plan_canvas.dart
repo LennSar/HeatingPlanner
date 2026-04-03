@@ -597,6 +597,28 @@ class _FloorPlanCanvasState
         continue;
       }
 
+      // Priority 1b: circuit route not connected to the distributor
+      // (mirrors VR-05). Catches the case where the distributor was
+      // moved but circuitId was not yet cleared, leaving the zone
+      // with a stale circuit reference whose route no longer reaches
+      // the manifold.
+      final circuit = editorState.circuits
+          .where((c) => c.id == zone.circuitId)
+          .firstOrNull;
+      final distributor = editorState.distributor;
+      final bool routeConnected = circuit != null &&
+          circuit.supplyRoutePath.isNotEmpty &&
+          distributor != null &&
+          GeometryEngine.distanceMm(
+                circuit.supplyRoutePath.first,
+                distributor.position,
+              ) <=
+              50.0;
+      if (!routeConnected) {
+        zoneStates[zone.id] = ZoneColorState.unconnected;
+        continue;
+      }
+
       // Priority 2: room demand is NaN (incomplete data, e.g. an
       // exterior wall has no construction) → grey.  This check MUST
       // come before the output check so that a valid output value
