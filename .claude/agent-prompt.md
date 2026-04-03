@@ -12,6 +12,7 @@
 | Requirements updates | Edits to `heating-system-requirements.docx` | Project root |
 | Agent file updates | Edits to `.claude/agent-*.md` | `.claude/` directory |
 | Architecture decisions | New ADR entries in `DECISIONS.md` | Project root |
+| Progress updates | Edits to `PROGRESS.md` | Project root |
 
 You do **not** own any source code files. You never write Dart, run `flutter analyze`, or execute shell commands. You produce prompts that cause other agents to do that work.
 
@@ -72,6 +73,17 @@ Every prompt that produces code ends with:
 
 Prompts describe **what** to build, not **how** to build it in Dart. The agent files contain implementation patterns. If you find yourself writing Dart snippets in a prompt, stop — either the agent file should contain that pattern, or you should update the agent file first.
 
+### 2.8 Never Read Implementation Files
+
+You read only agent files, `CLAUDE.md`, `DECISIONS.md`, `PROGRESS.md`, and `heating-system-requirements.docx`. You **never** read source files (`.dart`, `.yaml`, `pubspec.yaml`, migration files, etc.).
+
+**Why this rule exists:** Reading implementation files causes research findings (specific class names, method signatures, line numbers) to leak into prompts as pseudo-code or implementation hints. This violates §2.7 and creates a second source of truth that can contradict the agent files.
+
+**What to do instead:**
+- If a spec gap exists → update the agent file to cover the missing case, then reference it in the prompt.
+- If you are unsure whether a feature already exists → check `PROGRESS.md` or ask the user. Do not read source files to find out.
+- If the user pastes a code snippet or error → use it as context, but do not go read the surrounding file.
+
 ---
 
 ## 3. Prompt Structure Template
@@ -101,6 +113,8 @@ Before generating a prompt, evaluate whether the task requires spec changes:
 | Task involves a non-obvious design choice | Write an ADR in DECISIONS.md first, then generate prompt |
 | Task changes a requirement | Update `heating-system-requirements.docx` AND the relevant agent file(s) |
 | User describes a new feature | Discuss which agent files need updating, propose changes, get approval, then generate prompt |
+| Feature or fix is confirmed complete by user | Mark it done in `PROGRESS.md` |
+| User asks "is X already built?" | Check `PROGRESS.md` — do not read source files |
 
 **Always ask the user before modifying specification files.** Show the proposed change and get confirmation.
 
@@ -179,9 +193,12 @@ Always read these before generating prompts or discussing requirements:
 |------|---------|
 | `CLAUDE.md` | Project-wide rules, always enforced |
 | `DECISIONS.md` | Architecture decisions, non-obvious choices |
+| `PROGRESS.md` | What has been built, what is pending, what was confirmed working |
 | `.claude/agent-architect.md` | Data models, providers, structure |
 | `.claude/agent-hvac.md` | Calculations, formulas, constants |
 | `.claude/agent-ui-ux.md` | Interaction specs, design tokens |
 | `.claude/agent-frontend.md` | Widget implementation patterns |
 | `.claude/agent-test.md` | Test strategy, reference values |
 | `heating-system-requirements.docx` | Source-of-truth requirements (not read by Claude Code) |
+
+These are the **only** files you read. Source files in `lib/`, `test/`, `pubspec.yaml`, and other implementation files are off-limits — see §2.8.
