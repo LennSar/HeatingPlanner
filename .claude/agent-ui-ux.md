@@ -208,18 +208,29 @@ At viewport width < 600dp:
 
 **Trigger:** User selects the Wall tool from the toolbar.
 
-**Desktop flow:**
+**Desktop flow — single wall mode (default):**
 1. Cursor changes to crosshair.
 2. User clicks point A → a "ghost" wall line follows the cursor from A.
 3. Length annotation appears next to the ghost line, updating in real time.
-4. If Shift held: angle snaps to 0°/45°/90° from point A.
-5. Point snaps to grid unless Ctrl held (free placement).
+4. If **Shift** held: angle constrains to **0° or 90° only** (horizontal/vertical). The ghost line snaps to whichever axis is closer to the current cursor position. A dashed guideline indicates the constrained axis (see §6.3).
+5. Point snaps to grid unless **Alt** held (free placement, no grid snap).
 6. If cursor is within 10px of an existing wall endpoint: snap indicator appears (green dot).
 7. User clicks point B → wall is committed. Tool remains active for next wall.
 8. Press Escape or select another tool to exit.
 
+**Desktop flow — rectangle mode (Ctrl held):**
+1. User presses and holds **Ctrl** while the Wall tool is active.
+2. Cursor changes to a rectangle crosshair icon.
+3. User clicks and drags from corner A to corner B (opposite corner of the rectangle).
+4. A ghost rectangle preview shows all four walls as the user drags. Width and height annotations appear on the preview edges, updating in real time.
+5. On release: four wall segments are created and auto-connected at their endpoints, forming a closed rectangle.
+6. Room auto-detection triggers immediately (see below) — the "New room detected" dialog appears.
+7. Releasing Ctrl returns to single-wall mode.
+8. Minimum rectangle size: both width and height must be ≥ 100mm. If either is smaller, discard and show toast: "Rectangle too small (min 100×100mm)".
+
 **Tablet flow:**
-- Same logic but tap instead of click. No Shift/Ctrl — use toggle buttons in toolbar for angular snap and free placement.
+- Single-wall mode: tap instead of click. No Shift/Ctrl modifier keys — use toggle buttons in the active-tool bar for ortho-snap (H/V only) and free placement.
+- Rectangle mode: a dedicated rectangle button in the active-tool bar switches to rectangle mode. Tap corner A, then tap corner B to commit.
 
 **Validation on commit:**
 - Wall length must be ≥ 100mm. If shorter, show transient toast: "Wall too short (min 100mm)" and discard.
@@ -530,7 +541,7 @@ Opens as a right-side panel (desktop) or full-screen overlay (tablet). Contains 
 | Grid snap | Green dot at snap point, 6px diameter |
 | Endpoint snap | Green circle at endpoint, 8px diameter, 2px stroke |
 | Midpoint snap | Green diamond at midpoint, 8px |
-| Angular snap (45°/90°) | Dashed guideline along snap angle, extends 200px |
+| Ortho snap (0°/90°) | Dashed guideline along the constrained axis, extends 200px |
 | Wall alignment snap | Dashed blue guideline along the aligned axis |
 
 ---
@@ -690,6 +701,9 @@ Ceiling
 | Escape | Cancel tool / deselect | Editor |
 | V | Select tool | Editor |
 | W | Wall draw tool | Editor |
+| Shift (hold, Wall tool) | Constrain to horizontal/vertical only (0°/90°) | Wall tool active |
+| Ctrl (hold, Wall tool) | Rectangle mode — drag corner to corner to place 4 walls | Wall tool active |
+| Alt (hold, Wall tool) | Free placement — disable grid snap | Wall tool active |
 | N | Window place tool | Editor (N for "wiNdow" — W is taken) |
 | D | Door place tool | Editor |
 | H | Heating zone tool | Editor |

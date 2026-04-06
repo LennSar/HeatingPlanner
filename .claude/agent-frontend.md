@@ -290,6 +290,20 @@ abstract class CanvasTool {
 
 The active tool is determined by `ref.watch(selectedToolProvider)`. The canvas delegates all input events to the active tool instance.
 
+#### WallDrawTool — modifier key behaviour
+
+`WallDrawTool` tracks three modifier flags updated via `onKeyEvent` (both key-down and key-up):
+
+| Modifier | Flag | Effect |
+|----------|------|--------|
+| **Shift** | `_orthoSnap` | Constrain ghost-line endpoint to 0° or 90° from the anchor point. Pick the axis (H or V) closest to the raw cursor position. Show dashed axis guideline via `InteractionPainterData`. |
+| **Ctrl** | `_rectMode` | Switch to rectangle mode. `onDragStart` records corner A; `onDragUpdate` shows ghost rectangle preview; `onDragEnd` commits four wall segments and triggers room auto-detection. Ortho snap and endpoint snap still apply to the drag endpoint. |
+| **Alt** | `_freePlacement` | Disable grid snap for the current point (pass raw world coordinate to commit). |
+
+Modifier flags are independent — `_orthoSnap` and `_freePlacement` may both be active (ortho still applies). `_rectMode` is independent of both.
+
+`getInteractionData` must return the ghost rectangle preview (4 line segments) when `_rectMode` is active and a drag is in progress. Width and height annotations must update each frame. When `_orthoSnap` is active, include the dashed axis guideline in the returned data.
+
 ### 4.5 Snapping Implementation
 
 Implement snapping in a `SnapService` utility class consumed by all tools.

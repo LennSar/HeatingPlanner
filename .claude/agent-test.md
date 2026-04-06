@@ -396,6 +396,32 @@ testWidgets('wall draw tool cancels on Escape', (tester) async {
   // Start drawing (one tap), then send Escape key
   // Verify no wall was created
 });
+
+testWidgets('wall draw tool Shift constrains to horizontal', (tester) async {
+  // Anchor at (0, 0), move cursor to (300, 50) with Shift held
+  // Verify ghost endpoint is constrained to (300, 0) — horizontal axis wins
+});
+
+testWidgets('wall draw tool Shift constrains to vertical', (tester) async {
+  // Anchor at (0, 0), move cursor to (50, 300) with Shift held
+  // Verify ghost endpoint is constrained to (0, 300) — vertical axis wins
+});
+
+testWidgets('wall draw tool Ctrl+drag creates four walls', (tester) async {
+  // Hold Ctrl, drag from (0, 0) to (2000, 1000)
+  // Verify four WallSegments created forming a closed rectangle
+  // Verify room auto-detection dialog appears
+});
+
+testWidgets('wall draw tool Ctrl+drag rectangle too small discards', (tester) async {
+  // Hold Ctrl, drag from (0, 0) to (50, 50) — both dimensions < 100mm
+  // Verify no walls created and toast shown
+});
+
+testWidgets('wall draw tool Alt disables grid snap', (tester) async {
+  // Alt held, tap at off-grid position (123, 456)
+  // Verify committed point is exactly (123, 456) — no grid rounding
+});
 ```
 
 ### 6.3 Dashboard Tests
