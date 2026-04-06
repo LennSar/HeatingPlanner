@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:fl_chart/fl_chart.dart';
@@ -16,6 +17,7 @@ import '../../data/models/heating_zone.dart';
 import '../../data/models/validation_result.dart';
 import '../../validation/validation_service.dart';
 import '../providers/editor_state_provider.dart';
+import '../providers/selection_provider.dart';
 import '../widgets/severity_badge.dart';
 
 // ---------------------------------------------------------------------------
@@ -279,20 +281,41 @@ class _FilterDropdown extends StatelessWidget {
 // Single warning row
 // ---------------------------------------------------------------------------
 
-class _WarningRow extends StatefulWidget {
+class _WarningRow extends ConsumerStatefulWidget {
   const _WarningRow({required this.result});
 
   final ValidationResult result;
 
   @override
-  State<_WarningRow> createState() => _WarningRowState();
+  ConsumerState<_WarningRow> createState() => _WarningRowState();
 }
 
-class _WarningRowState extends State<_WarningRow> {
+class _WarningRowState extends ConsumerState<_WarningRow> {
   bool _expanded = false;
 
-  bool get _expandable =>
-      widget.result.suggestedFix != null;
+  /// Timer used for the tablet long-press highlight (2 s auto-clear).
+  Timer? _longPressTimer;
+
+  bool get _expandable => widget.result.suggestedFix != null;
+
+  void _highlight() {
+    ref.read(hoveredElementProvider.notifier).set(
+          SelectedElement(
+            type: widget.result.elementType,
+            id: widget.result.elementId,
+          ),
+        );
+  }
+
+  void _clearHighlight() {
+    ref.read(hoveredElementProvider.notifier).clear();
+  }
+
+  @override
+  void dispose() {
+    _longPressTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -301,10 +324,19 @@ class _WarningRowState extends State<_WarningRow> {
     final onSurfaceSecondary =
         Theme.of(context).colorScheme.onSurfaceVariant;
 
-    return InkWell(
+    final rowContent = InkWell(
       onTap: _expandable
           ? () => setState(() => _expanded = !_expanded)
           : null,
+      onLongPress: () {
+        // Tablet fallback: highlight for 2 s, then auto-clear.
+        _longPressTimer?.cancel();
+        _highlight();
+        _longPressTimer = Timer(
+          const Duration(seconds: 2),
+          _clearHighlight,
+        );
+      },
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: Spacing.md,
@@ -316,14 +348,10 @@ class _WarningRowState extends State<_WarningRow> {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                SeverityBadge.label(
-                  severity: result.severity,
-                ),
+                SeverityBadge.label(severity: result.severity),
                 const SizedBox(width: Spacing.sm),
-                Text(
-                  result.elementType,
-                  style: textTheme.bodySmall,
-                ),
+                Text(result.elementType,
+                    style: textTheme.bodySmall),
                 const Spacer(),
                 if (_expandable)
                   Icon(
@@ -336,16 +364,11 @@ class _WarningRowState extends State<_WarningRow> {
               ],
             ),
             const SizedBox(height: Spacing.xs),
-            Text(
-              result.message,
-              style: textTheme.bodyMedium,
-            ),
+            Text(result.message, style: textTheme.bodyMedium),
             if (_expanded && result.suggestedFix != null) ...[
               const SizedBox(height: Spacing.xs),
               Padding(
-                padding: const EdgeInsets.only(
-                  left: Spacing.md,
-                ),
+                padding: const EdgeInsets.only(left: Spacing.md),
                 child: Text(
                   result.suggestedFix!,
                   style: textTheme.bodySmall,
@@ -355,6 +378,13 @@ class _WarningRowState extends State<_WarningRow> {
           ],
         ),
       ),
+    );
+
+    // Desktop: wrap in MouseRegion for pointer enter/exit.
+    return MouseRegion(
+      onEnter: (_) => _highlight(),
+      onExit: (_) => _clearHighlight(),
+      child: rowContent,
     );
   }
 }

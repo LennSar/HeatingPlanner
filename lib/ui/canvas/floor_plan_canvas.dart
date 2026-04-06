@@ -14,8 +14,8 @@ import '../../data/models/room.dart';
 import '../../data/models/door.dart';
 import '../../data/models/wall_segment.dart';
 import '../../data/models/window_element.dart';
-import '../panels/properties_panel.dart';
 import '../providers/editor_state_provider.dart';
+import '../providers/selection_provider.dart';
 import '../screens/editor_screen.dart';
 import 'canvas_controller.dart';
 import 'painters/annotation_painter.dart';
@@ -582,6 +582,7 @@ class _FloorPlanCanvasState
     _ensureToolsInitialised();
     final canvasState = ref.watch(canvasControllerProvider);
     final editorState = ref.watch(editorStateProvider);
+    final hoveredElement = ref.watch(hoveredElementProvider);
     final colors = Theme.of(context)
         .extension<HeatingPlannerColors>()!;
     final onSurface =
@@ -914,6 +915,7 @@ class _FloorPlanCanvasState
                       circuits: editorState.circuits,
                       distributor: editorState.distributor,
                       interactionData: _interactionData,
+                      hoveredElement: hoveredElement,
                     ),
                   ),
                 ),
@@ -987,6 +989,7 @@ class _CanvasCompositePainter extends CustomPainter {
     this.distributor,
     this.hoverWorldPoint,
     this.interactionData,
+    this.hoveredElement,
   });
 
   final Matrix4 transform;
@@ -1003,6 +1006,7 @@ class _CanvasCompositePainter extends CustomPainter {
   final List<HeatingCircuit> circuits;
   final Distributor? distributor;
   final InteractionData? interactionData;
+  final SelectedElement? hoveredElement;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1073,7 +1077,103 @@ class _CanvasCompositePainter extends CustomPainter {
       interactionData: interactionData,
     ).paint(canvas, size);
 
+    // Layer 8: Hover highlight from warning-row hover (§5.8).
+    _paintHoverHighlight(canvas);
+
     canvas.restore();
+  }
+
+  /// Draws a 2px [hoverHighlight]-coloured outline (60 % opacity) around
+  /// the element identified by [hoveredElement], matching the spec §5.8.
+  ///
+  /// Element types handled: wall, zone, circuit, distributor.
+  /// Rooms are highlighted by outlining every wall whose roomId matches.
+  void _paintHoverHighlight(Canvas canvas) {
+    final hovered = hoveredElement;
+    if (hovered == null) return;
+
+    // The canvas is in world-coordinate space. strokeWidth must be in world mm.
+    // Target 8 screen pixels so the stroke is visible at all zoom levels.
+    final scale = transform.storage[0]; // px per mm
+    final strokeWidthMm = scale > 0.0 ? 8.0 / scale : 80.0;
+
+    const fillColor = Color(0x55FF0000);
+    const strokeColor = Color(0xCCFF0000);
+
+    final fillPaint = Paint()
+      ..color = fillColor
+      ..style = PaintingStyle.fill;
+
+    final strokePaint = Paint()
+      ..color = strokeColor
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidthMm
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    switch (hovered.type) {
+      case 'wall':
+        final wall = walls.where((w) => w.id == hovered.id).firstOrNull;
+        if (wall != null) {
+          canvas.drawLine(
+            Offset(wall.startPoint.x, wall.startPoint.y),
+            Offset(wall.endPoint.x, wall.endPoint.y),
+            strokePaint,
+          );
+        }
+      case 'room':
+        for (final wall in walls.where((w) => w.roomId == hovered.id)) {
+          canvas.drawLine(
+            Offset(wall.startPoint.x, wall.startPoint.y),
+            Offset(wall.endPoint.x, wall.endPoint.y),
+            strokePaint,
+          );
+        }
+      case 'zone':
+        final zone = zones.where((z) => z.id == hovered.id).firstOrNull;
+        if (zone != null && zone.polygon.length >= 3) {
+          final path = Path()
+            ..moveTo(zone.polygon.first.x, zone.polygon.first.y);
+          for (var i = 1; i < zone.polygon.length; i++) {
+            path.lineTo(zone.polygon[i].x, zone.polygon[i].y);
+          }
+          path.close();
+          canvas.drawPath(path, fillPaint);
+          canvas.drawPath(path, strokePaint);
+        }
+      case 'circuit':
+        final circuit =
+            circuits.where((c) => c.id == hovered.id).firstOrNull;
+        if (circuit != null) {
+          for (final pts in [
+            circuit.supplyRoutePath,
+            circuit.returnRoutePath,
+          ]) {
+            if (pts.length < 2) continue;
+            final path = Path()..moveTo(pts.first.x, pts.first.y);
+            for (var i = 1; i < pts.length; i++) {
+              path.lineTo(pts[i].x, pts[i].y);
+            }
+            canvas.drawPath(path, strokePaint);
+          }
+        }
+      case 'distributor':
+        if (distributor != null && distributor!.id == hovered.id) {
+          final d = distributor!;
+          final bodyRect = Rect.fromCenter(
+            center: Offset(d.position.x, d.position.y),
+            width: d.widthMm.toDouble(),
+            height: 240.0,
+          );
+          canvas.save();
+          canvas.translate(d.position.x, d.position.y);
+          canvas.rotate(d.rotationDeg * 3.141592653589793 / 180.0);
+          canvas.translate(-d.position.x, -d.position.y);
+          canvas.drawRect(bodyRect, fillPaint);
+          canvas.drawRect(bodyRect, strokePaint);
+          canvas.restore();
+        }
+    }
   }
 
   @override
