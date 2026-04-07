@@ -303,6 +303,23 @@ enum RoutePhase {
   returnLine,
 }
 
+/// Ghost rectangle shown while drawing walls with Ctrl+drag.
+///
+/// Produced by [WallDrawTool] in rect mode ([_rectMode] active).
+/// [InteractionPainter] draws the outline of the prospective
+/// room rectangle.
+@immutable
+class RectDrawData extends InteractionData {
+  /// Creates [RectDrawData] from two opposite corners.
+  const RectDrawData({required this.corner1, required this.corner2});
+
+  /// First corner of the rectangle (world mm, drag start).
+  final Point2D corner1;
+
+  /// Opposite corner of the rectangle (world mm, current cursor).
+  final Point2D corner2;
+}
+
 /// Data produced by [RouteDrawTool] during circuit routing.
 ///
 /// Emitted each frame so [InteractionPainter] can render:

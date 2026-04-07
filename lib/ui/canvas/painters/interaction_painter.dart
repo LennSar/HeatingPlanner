@@ -170,6 +170,12 @@ class InteractionPainter extends CustomPainter {
             rotationDeg,
           );
           _drawWallHandles(canvas, handles, activeHandleIndex);
+        case RectDrawData(:final corner1, :final corner2):
+          _drawRectGhost(
+            canvas,
+            Offset(corner1.x, corner1.y),
+            Offset(corner2.x, corner2.y),
+          );
         case RouteDrawData(
               :final phase,
               :final supplyPoints,
@@ -431,6 +437,17 @@ class InteractionPainter extends CustomPainter {
           ..strokeWidth = 5.0,
       );
     }
+  }
+
+  void _drawRectGhost(Canvas canvas, Offset corner1, Offset corner2) {
+    final paint = Paint()
+      ..color = const Color(0xFF2563EB).withValues(alpha: 0.6)
+      ..strokeWidth = 1.5
+      ..style = PaintingStyle.stroke;
+    canvas.drawRect(
+      Rect.fromPoints(corner1, corner2),
+      paint,
+    );
   }
 
   void _drawCrosshair(Canvas canvas) {
