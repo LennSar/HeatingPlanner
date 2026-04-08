@@ -655,10 +655,12 @@ class _RoomPropertiesState
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Text(
-              'Total Heat Demand',
-              style: textTheme.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w600,
+            Flexible(
+              child: Text(
+                'Total Heat Demand',
+                style: textTheme.bodyLarge?.copyWith(
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
             if (totalDemandW.isNaN && demandTooltip != null)
@@ -845,7 +847,7 @@ Widget _readOnlyRow(
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: textTheme.bodyMedium),
+        Flexible(child: Text(label, style: textTheme.bodyMedium)),
         valueWidget,
       ],
     ),

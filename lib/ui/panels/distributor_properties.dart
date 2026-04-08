@@ -308,7 +308,7 @@ class _SectionLabel extends StatelessWidget {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: textTheme.bodyMedium),
+        Flexible(child: Text(label, style: textTheme.bodyMedium)),
         Text(
           unit,
           style: textTheme.bodySmall?.copyWith(
@@ -379,7 +379,7 @@ Widget _infoRow(
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: textTheme.bodyMedium),
+        Flexible(child: Text(label, style: textTheme.bodyMedium)),
         Text(
           value,
           style: textTheme.bodyMedium?.copyWith(

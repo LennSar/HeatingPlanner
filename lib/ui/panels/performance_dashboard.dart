@@ -217,12 +217,15 @@ class _WarningsHeader extends StatelessWidget {
       ),
       child: Row(
         children: [
-          Text(
-            'Warnings ($count)',
-            style:
-                Theme.of(context).textTheme.headlineSmall,
+          Flexible(
+            child: Text(
+              'Warnings ($count)',
+              style:
+                  Theme.of(context).textTheme.headlineSmall,
+              overflow: TextOverflow.ellipsis,
+            ),
           ),
-          const Spacer(),
+          const SizedBox(width: Spacing.sm),
           _FilterDropdown(
             value: filter,
             onChanged: onFilterChanged,
