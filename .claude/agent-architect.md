@@ -561,6 +561,7 @@ Use `@riverpod` annotation with code generation. Every provider is defined in th
 | `validationResultsProvider` | Provider.family | projectId | List\<ValidationResult\> | validation_service.dart |
 | `saveStateProvider` | StateNotifierProvider | — | SaveState | save_state_notifier.dart |
 | `lastOpenedProjectIdProvider` | StateProvider | — | String? | app_preferences.dart |
+| `gridSpacingMmProvider` | NotifierProvider | — | int | app_preferences.dart |
 
 ### 6.3 Invalidation Cascade
 
@@ -673,6 +674,7 @@ The app does not require the user to ever export to `.hsp` in order to preserve 
 | `lastOpenedFloorId` | String (UUID) or null | Which floor was active |
 | `canvasZoom` | double | Last zoom level per project |
 | `canvasPanX`, `canvasPanY` | double | Last pan offset per project |
+| `gridSpacingMm` | int (default: 100) | Drawing grid spacing in mm — one of: 5, 10, 25, 50, 100 |
 
 On app startup:
 1. Read `lastOpenedProjectId`.

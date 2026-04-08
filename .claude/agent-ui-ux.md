@@ -717,7 +717,25 @@ Ceiling
 
 ---
 
-## 9. Responsive Breakpoints
+## 9. Settings Screen
+
+Accessible from the overflow menu (⋮) on tablet, and from the app menu bar on desktop. A simple scrollable form — no tabs at this stage.
+
+### 9.1 General Settings
+
+| Field | Control | Values | Default |
+|-------|---------|--------|---------|
+| Drawing grid size | Dropdown | 5mm / 10mm / 25mm / 50mm / 100| 100mm |
+
+**Behaviour:**
+- Changing the grid size takes effect immediately on the canvas — no Apply button.
+- The selected value is persisted in `AppPreferences` (`gridSpacingMm`) and restored on next launch.
+- The dropdown label shows the value with its unit: "100 mm", "25 mm", etc.
+- Setting is global (not per-project).
+
+---
+
+## 10. Responsive Breakpoints
 
 | Breakpoint | Width | Layout Changes |
 |-----------|-------|---------------|
@@ -728,7 +746,7 @@ Ceiling
 
 ---
 
-## 10. Accessibility Requirements
+## 11. Accessibility Requirements
 
 - All interactive elements must have semantic labels for screen readers.
 - Colour is never the sole indicator of status — always pair with text or icon (e.g., zone adequacy uses colour + text label).
@@ -739,7 +757,7 @@ Ceiling
 
 ---
 
-## 12. Save, Autosave & Session Restore
+## 13. Save, Autosave & Session Restore
 
 ### 12.1 Two-Tier Persistence — User-Facing Mental Model
 
@@ -834,7 +852,7 @@ The autosave to `.hsp` is silent and background. Do not interrupt the user with 
 
 ---
 
-## 11. Usability Review Checklist
+## 12. Usability Review Checklist
 
 The UI/UX Designer reviews every frontend PR against these criteria:
 
