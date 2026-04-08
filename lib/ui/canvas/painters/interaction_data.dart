@@ -70,6 +70,8 @@ class GhostLineData extends InteractionData {
     required this.currentPoint,
     this.snapIndicator,
     this.snapType,
+    this.orthoGuidelineStart,
+    this.orthoGuidelineEnd,
   });
 
   /// Fixed start of the ghost line (world mm).
@@ -83,6 +85,19 @@ class GhostLineData extends InteractionData {
 
   /// Type of snap ('endpoint', 'wallPoint', or 'grid').
   final String? snapType;
+
+  /// Start of the dashed ortho-constraint guideline (world mm).
+  ///
+  /// Non-null when Shift is held (ortho-snap active). Extends along
+  /// the constrained axis (H or V) from well before the anchor to
+  /// well past it, so the line visually spans the canvas.
+  final Point2D? orthoGuidelineStart;
+
+  /// End of the dashed ortho-constraint guideline (world mm).
+  ///
+  /// Pair with [orthoGuidelineStart]. Both are null when ortho-snap
+  /// is inactive.
+  final Point2D? orthoGuidelineEnd;
 }
 
 /// Highlight data for selected elements.

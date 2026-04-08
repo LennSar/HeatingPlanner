@@ -61,6 +61,34 @@ class WallDrawTool extends CanvasTool {
   /// Minimum wall length in mm (prevents zero-length walls).
   static const double _minLengthMm = 100.0;
 
+  /// Tolerance for coincident-wall detection (mm).
+  static const double _coincidentToleranceMm = 1.0;
+
+  /// Returns the first wall in [candidates] whose geometry is identical
+  /// (within [_coincidentToleranceMm]) to the segment [a]→[b] or [b]→[a],
+  /// provided that wall is already assigned to a room.
+  ///
+  /// Used by rect-mode to avoid adding a duplicate wall on top of a shared
+  /// edge that was already created when the adjacent room was drawn.
+  WallSegment? _findCoincidentAssignedWall(
+    Point2D a,
+    Point2D b,
+    List<WallSegment> candidates,
+  ) {
+    for (final w in candidates) {
+      if (w.roomId.isEmpty) continue;
+      const tol = _coincidentToleranceMm;
+      final fwdMatch =
+          GeometryEngine.distanceMm(w.startPoint, a) <= tol &&
+          GeometryEngine.distanceMm(w.endPoint, b) <= tol;
+      final revMatch =
+          GeometryEngine.distanceMm(w.startPoint, b) <= tol &&
+          GeometryEngine.distanceMm(w.endPoint, a) <= tol;
+      if (fwdMatch || revMatch) return w;
+    }
+    return null;
+  }
+
   @override
   String get name => 'Draw Wall';
 
@@ -162,10 +190,34 @@ class WallDrawTool extends CanvasTool {
       WallSegment(id: IdGenerator.newId(), roomId: '', startPoint: bl, endPoint: tl),
     ];
 
+    // Snapshot walls before any commits.  Used below to detect walls
+    // that are coincident with already-existing room-assigned walls so
+    // we can skip adding a duplicate and reuse the existing wall as the
+    // shared boundary instead (ADR-001 / ADR-003).
     final oldWalls = callbacks.currentWalls.toList();
+
+    // Commit each rect wall, skipping any that are geometrically
+    // identical to an existing room-assigned wall.  Track which
+    // WallSegment object will represent each edge for room detection.
+    WallSegment lastEffectiveWall = walls.last;
     for (final wall in walls) {
-      callbacks.commitWall(wall);
+      final coincident = _findCoincidentAssignedWall(
+        wall.startPoint,
+        wall.endPoint,
+        oldWalls,
+      );
+      if (coincident != null) {
+        // Reuse the existing wall — no duplicate is added.
+        lastEffectiveWall = coincident;
+      } else {
+        // Use commitWallWithSplit (not commitWall) so that rect corners
+        // which land on the interior of an existing assigned wall cause
+        // that host wall to be split (ADR-003).
+        callbacks.commitWallWithSplit(wall);
+        lastEffectiveWall = wall;
+      }
     }
+
     final newWalls = callbacks.currentWalls.toList();
 
     undoRedo.execute(_CreateWallCommand(
@@ -174,10 +226,11 @@ class WallDrawTool extends CanvasTool {
       newWalls: newWalls,
     ));
 
-    // Trigger room detection for the last wall.
-    final lastWall = walls.last;
+    // Trigger room detection using the last effective wall (which may be
+    // a pre-existing assigned wall when that edge is shared with a
+    // neighbouring room).
     final allWalls = callbacks.currentWalls;
-    final detected = RoomDetection.detectClosedRoom(allWalls, lastWall);
+    final detected = RoomDetection.detectClosedRoom(allWalls, lastEffectiveWall);
     if (detected != null) {
       callbacks.requestRoomDialog(detected.polygon, detected.wallIds);
     }
@@ -276,6 +329,29 @@ class WallDrawTool extends CanvasTool {
       return null;
     }
 
+    // Build ortho guideline when Shift is held.
+    // The guideline extends 20 000 mm (20 m) in each direction from the
+    // anchor along the constrained axis, ensuring it spans the visible canvas
+    // at any zoom level.
+    Point2D? orthoStart;
+    Point2D? orthoEnd;
+    if (_orthoSnap) {
+      const extent = 20000.0;
+      final anchor = _startPoint!;
+      final cur = _currentSnapped!;
+      final dx = (cur.x - anchor.x).abs();
+      final dy = (cur.y - anchor.y).abs();
+      if (dx >= dy) {
+        // Horizontal axis (Y locked to anchor.y).
+        orthoStart = Point2D(x: anchor.x - extent, y: anchor.y);
+        orthoEnd = Point2D(x: anchor.x + extent, y: anchor.y);
+      } else {
+        // Vertical axis (X locked to anchor.x).
+        orthoStart = Point2D(x: anchor.x, y: anchor.y - extent);
+        orthoEnd = Point2D(x: anchor.x, y: anchor.y + extent);
+      }
+    }
+
     return GhostLineData(
       startPoint: _startPoint!,
       currentPoint: _currentSnapped!,
@@ -285,6 +361,8 @@ class WallDrawTool extends CanvasTool {
               ? _currentSnapped
               : null,
       snapType: _currentSnapType?.name,
+      orthoGuidelineStart: orthoStart,
+      orthoGuidelineEnd: orthoEnd,
     );
   }
 }

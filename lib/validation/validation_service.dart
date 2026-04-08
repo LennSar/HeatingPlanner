@@ -34,6 +34,8 @@ import '../ui/providers/editor_state_provider.dart';
 /// - **VR-03** Heating circuit tube length exceeds hydraulic maximum.
 /// - **VR-04** Heating zone not connected to any circuit.
 /// - **VR-05** Circuit supply route not connected to the distributor.
+/// - **GE-01** Two room-assigned wall segments are geometrically coincident
+///   (overlapping walls).
 final validationResultsProvider =
     Provider.family<List<ValidationResult>, String>(
   (ref, projectId) {
@@ -44,6 +46,7 @@ final validationResultsProvider =
     results.addAll(_circuitLengthResults(ref));
     results.addAll(_unconnectedZoneResults(ref));
     results.addAll(_disconnectedCircuitResults(ref));
+    results.addAll(_overlappingWallResults(ref));
     // Sort: errors before warnings before info.
     results.sort(
       (a, b) => a.severity.index.compareTo(b.severity.index),
@@ -318,6 +321,68 @@ List<ValidationResult> _disconnectedCircuitResults(Ref ref) {
               'from the distributor.',
         ),
       );
+    }
+  }
+
+  return results;
+}
+
+// ── Rule GE-01: Overlapping (coincident) walls ────────────────────────────────
+
+/// Returns [ValidationResult]s for pairs of room-assigned [WallSegment]s that
+/// are geometrically coincident (same start/end points within 1 mm tolerance,
+/// in either direction).
+///
+/// Overlapping walls indicate a data-integrity problem — typically caused by
+/// drawing a rectangle on top of an existing room boundary — and prevent room
+/// detection and heat-demand calculations from working correctly.
+///
+/// Only room-assigned walls (`roomId` non-empty) are checked. Unassigned walls
+/// (not yet part of a room) are excluded because duplicate unassigned segments
+/// are transient and harmless during drawing.
+///
+/// Each coincident *pair* emits one [ValidationResult] on the wall with the
+/// lower-sorted ID so the same pair is never reported twice.
+List<ValidationResult> _overlappingWallResults(Ref ref) {
+  final state = ref.watch(editorStateProvider);
+  const tol = 1.0; // mm
+
+  // Only consider walls that belong to a room.
+  final assigned = state.walls.where((w) => w.roomId.isNotEmpty).toList();
+  final results = <ValidationResult>[];
+  final reported = <String>{};
+
+  for (var i = 0; i < assigned.length; i++) {
+    final a = assigned[i];
+    for (var j = i + 1; j < assigned.length; j++) {
+      final b = assigned[j];
+
+      final fwdMatch =
+          GeometryEngine.distanceMm(a.startPoint, b.startPoint) <= tol &&
+          GeometryEngine.distanceMm(a.endPoint, b.endPoint) <= tol;
+      final revMatch =
+          GeometryEngine.distanceMm(a.startPoint, b.endPoint) <= tol &&
+          GeometryEngine.distanceMm(a.endPoint, b.startPoint) <= tol;
+
+      if (!fwdMatch && !revMatch) continue;
+
+      // Report on the wall with the lexicographically smaller ID so each
+      // pair is emitted exactly once.
+      final reportId = a.id.compareTo(b.id) <= 0 ? a.id : b.id;
+      if (reported.add(reportId)) {
+        results.add(
+          ValidationResult(
+            severity: WarningSeverity.error,
+            elementId: reportId,
+            elementType: 'wall',
+            message: 'Two walls are stacked on top of each other at the '
+                'same position. This causes incorrect room detection and '
+                'heat-demand calculations.',
+            suggestedFix: 'Delete one of the overlapping walls. Use the '
+                'Select tool to click the wall and press Delete.',
+          ),
+        );
+      }
     }
   }
 

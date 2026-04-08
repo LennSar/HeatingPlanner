@@ -322,6 +322,44 @@ class EditorShortcuts extends ConsumerWidget {
         },
         child: Focus(
           autofocus: true,
+          onKeyEvent: (node, event) {
+            if (_isTextFieldFocused()) return KeyEventResult.ignored;
+            final isDown =
+                event is KeyDownEvent || event is KeyRepeatEvent;
+            final isUp = event is KeyUpEvent;
+            if (!isDown && !isUp) return KeyEventResult.ignored;
+
+            final key = event.logicalKey;
+            final isShift =
+                key == LogicalKeyboardKey.shiftLeft ||
+                key == LogicalKeyboardKey.shiftRight ||
+                key == LogicalKeyboardKey.shift;
+            final isCtrl =
+                key == LogicalKeyboardKey.controlLeft ||
+                key == LogicalKeyboardKey.controlRight ||
+                key == LogicalKeyboardKey.control;
+            final isAlt =
+                key == LogicalKeyboardKey.altLeft ||
+                key == LogicalKeyboardKey.altRight ||
+                key == LogicalKeyboardKey.alt;
+
+            if (isShift) {
+              ref
+                  .read(wallModifiersProvider.notifier)
+                  .update(orthoSnap: isDown);
+            } else if (isCtrl) {
+              ref
+                  .read(wallModifiersProvider.notifier)
+                  .update(rectMode: isDown);
+            } else if (isAlt) {
+              ref
+                  .read(wallModifiersProvider.notifier)
+                  .update(freePlacement: isDown);
+            }
+
+            // Never consume — let Shortcuts handle Ctrl+Z etc.
+            return KeyEventResult.ignored;
+          },
           child: child,
         ),
       ),

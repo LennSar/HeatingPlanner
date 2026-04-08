@@ -47,7 +47,8 @@ class InteractionPainter extends CustomPainter {
     if (interactionData != null) {
       switch (interactionData!) {
         case GhostLineData(:final startPoint, :final currentPoint,
-              :final snapIndicator, :final snapType):
+              :final snapIndicator, :final snapType,
+              :final orthoGuidelineStart, :final orthoGuidelineEnd):
           _drawGhostLine(
             canvas,
             Offset(startPoint.x, startPoint.y),
@@ -56,6 +57,12 @@ class InteractionPainter extends CustomPainter {
                 ? Offset(snapIndicator.x, snapIndicator.y)
                 : null,
             snapType,
+            orthoGuidelineStart != null
+                ? Offset(orthoGuidelineStart.x, orthoGuidelineStart.y)
+                : null,
+            orthoGuidelineEnd != null
+                ? Offset(orthoGuidelineEnd.x, orthoGuidelineEnd.y)
+                : null,
           );
         case SelectionHighlightData(:final selectedWalls,
               :final selectedRoom, :final handles,
@@ -444,10 +451,35 @@ class InteractionPainter extends CustomPainter {
       ..color = const Color(0xFF2563EB).withValues(alpha: 0.6)
       ..strokeWidth = 1.5
       ..style = PaintingStyle.stroke;
-    canvas.drawRect(
-      Rect.fromPoints(corner1, corner2),
-      paint,
+    final rect = Rect.fromPoints(corner1, corner2);
+    canvas.drawRect(rect, paint);
+
+    // Width annotation above the top edge.
+    final widthMm = rect.width.round();
+    final heightMm = rect.height.round();
+    _drawRectAnnotation(
+      canvas,
+      '$widthMm mm',
+      Offset(rect.center.dx, rect.top - 80),
     );
+    // Height annotation to the right of the right edge.
+    _drawRectAnnotation(
+      canvas,
+      '$heightMm mm',
+      Offset(rect.right + 30, rect.center.dy),
+    );
+  }
+
+  void _drawRectAnnotation(Canvas canvas, String text, Offset position) {
+    final color = selectionHighlightColor ?? Colors.blue;
+    final builder = ui.ParagraphBuilder(
+      ui.ParagraphStyle(textAlign: TextAlign.start, fontSize: 70),
+    )
+      ..pushStyle(ui.TextStyle(color: color, fontSize: 70))
+      ..addText(text);
+    final paragraph = builder.build()
+      ..layout(const ui.ParagraphConstraints(width: 500));
+    canvas.drawParagraph(paragraph, position);
   }
 
   void _drawCrosshair(Canvas canvas) {
@@ -477,8 +509,25 @@ class InteractionPainter extends CustomPainter {
     Offset start,
     Offset end,
     Offset? snapIndicator,
-    String? snapType,
-  ) {
+    String? snapType, [
+    Offset? orthoGuidelineStart,
+    Offset? orthoGuidelineEnd,
+  ]) {
+    // Dashed ortho-constraint guideline (§6.3 — drawn behind ghost line).
+    if (orthoGuidelineStart != null && orthoGuidelineEnd != null) {
+      _drawDashedLine(
+        canvas,
+        orthoGuidelineStart,
+        orthoGuidelineEnd,
+        Paint()
+          ..color = (selectionHighlightColor ?? Colors.blue)
+              .withValues(alpha: 0.35)
+          ..strokeWidth = 2.0
+          ..style = PaintingStyle.stroke,
+        20.0,
+      );
+    }
+
     // Dashed ghost line.
     final ghostPaint = Paint()
       ..color = selectionHighlightColor ?? Colors.blue

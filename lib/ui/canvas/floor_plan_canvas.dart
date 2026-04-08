@@ -84,6 +84,53 @@ final toolRotateDistributorProvider =
   ToolRotateDistributorNotifier.new,
 );
 
+// ----------------------------------------------------------
+// Wall modifier flags (Shift / Ctrl / Alt and tablet toggles)
+// ----------------------------------------------------------
+
+/// Current modifier state for [WallDrawTool].
+///
+/// Updated by keyboard events ([EditorShortcuts.onKeyEvent]) on desktop
+/// and by toggle buttons in the active-tool bar on tablet.
+class WallModifiers {
+  /// Creates [WallModifiers].
+  const WallModifiers({
+    this.orthoSnap = false,
+    this.rectMode = false,
+    this.freePlacement = false,
+  });
+
+  /// Shift held — constrain ghost line to 0° or 90°.
+  final bool orthoSnap;
+
+  /// Ctrl held — rectangle drag mode.
+  final bool rectMode;
+
+  /// Alt held — bypass grid snap.
+  final bool freePlacement;
+}
+
+/// Notifier for [wallModifiersProvider].
+class WallModifiersNotifier extends Notifier<WallModifiers> {
+  @override
+  WallModifiers build() => const WallModifiers();
+
+  /// Patch one or more modifier flags; leave others unchanged.
+  void update({bool? orthoSnap, bool? rectMode, bool? freePlacement}) {
+    state = WallModifiers(
+      orthoSnap: orthoSnap ?? state.orthoSnap,
+      rectMode: rectMode ?? state.rectMode,
+      freePlacement: freePlacement ?? state.freePlacement,
+    );
+  }
+}
+
+/// Provider that exposes the current wall-tool modifier flags.
+final wallModifiersProvider =
+    NotifierProvider<WallModifiersNotifier, WallModifiers>(
+  WallModifiersNotifier.new,
+);
+
 /// Notifier that increments a counter to trigger distributor rotation.
 class ToolRotateDistributorNotifier extends Notifier<int> {
   @override
@@ -682,6 +729,18 @@ class _FloorPlanCanvasState
     ref.listen<int>(toolRotateDistributorProvider, (_, __) {
       final t = _activeTool;
       if (t is SelectTool) t.onRotateDistributor();
+    });
+
+    // Forward wall modifier flags to the WallDrawTool.
+    ref.listen<WallModifiers>(wallModifiersProvider, (_, mods) {
+      final t = _tools[DrawingTool.drawWall];
+      if (t is WallDrawTool) {
+        t.updateModifiers(
+          shift: mods.orthoSnap,
+          ctrl: mods.rectMode,
+          alt: mods.freePlacement,
+        );
+      }
     });
 
     return LayoutBuilder(

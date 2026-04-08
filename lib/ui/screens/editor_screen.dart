@@ -154,8 +154,21 @@ class _EditorScreenState
                   dashboardVisible: _dashboardVisible,
                 ),
 
-                // Canvas fills remaining space
-                const Expanded(child: FloorPlanCanvas()),
+                // Canvas fills remaining space.
+                // On tablet, show the wall-tool options bar
+                // (ortho-snap + rectangle mode toggles) above
+                // the canvas when the wall tool is active.
+                Expanded(
+                  child: Column(
+                    children: [
+                      if (isTablet &&
+                          ref.watch(selectedToolProvider) ==
+                              DrawingTool.drawWall)
+                        const _WallTabletOptionsBar(),
+                      const Expanded(child: FloorPlanCanvas()),
+                    ],
+                  ),
+                ),
 
                 // Properties panel (desktop only)
                 if (!isTablet && _propertiesPanelVisible)
@@ -598,6 +611,158 @@ class _DragHandle extends StatelessWidget {
               .onSurfaceVariant,
           borderRadius: BorderRadius.circular(2),
         ),
+      ),
+    );
+  }
+}
+
+// ----------------------------------------------------------
+// Tablet wall-tool options bar (§5.1 tablet flow)
+// ----------------------------------------------------------
+
+/// Horizontal bar shown above the canvas on tablet when the wall
+/// tool is active. Provides toggle buttons for ortho-snap and
+/// rectangle mode, replacing the Shift/Ctrl modifier keys that
+/// are unavailable on touch screens.
+class _WallTabletOptionsBar extends ConsumerWidget {
+  const _WallTabletOptionsBar();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final mods = ref.watch(wallModifiersProvider);
+    final colors = Theme.of(context)
+        .extension<HeatingPlannerColors>()!;
+    final primary = Theme.of(context).colorScheme.primary;
+
+    return Container(
+      height: 44,
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        border: Border(
+          bottom: BorderSide(color: colors.gridLine),
+        ),
+      ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: Spacing.sm,
+      ),
+      child: Row(
+        children: [
+          Text(
+            'Wall:',
+            style: Theme.of(context).textTheme.labelMedium,
+          ),
+          const SizedBox(width: Spacing.sm),
+
+          // Ortho-snap toggle (mirrors Shift on desktop).
+          Tooltip(
+            message: 'Ortho snap — H/V only',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(6),
+              onTap: () => ref
+                  .read(wallModifiersProvider.notifier)
+                  .update(orthoSnap: !mods.orthoSnap),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: Spacing.sm,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: mods.orthoSnap
+                      ? primary.withValues(alpha: 0.15)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: mods.orthoSnap
+                        ? primary
+                        : colors.gridLine,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.straighten,
+                      size: 16,
+                      color: mods.orthoSnap
+                          ? primary
+                          : Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Ortho',
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelSmall
+                          ?.copyWith(
+                            color: mods.orthoSnap
+                                ? primary
+                                : null,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(width: Spacing.sm),
+
+          // Rectangle mode toggle (mirrors Ctrl on desktop).
+          Tooltip(
+            message: 'Rectangle mode',
+            child: InkWell(
+              borderRadius: BorderRadius.circular(6),
+              onTap: () => ref
+                  .read(wallModifiersProvider.notifier)
+                  .update(rectMode: !mods.rectMode),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: Spacing.sm,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: mods.rectMode
+                      ? primary.withValues(alpha: 0.15)
+                      : Colors.transparent,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(
+                    color: mods.rectMode
+                        ? primary
+                        : colors.gridLine,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.crop_square,
+                      size: 16,
+                      color: mods.rectMode
+                          ? primary
+                          : Theme.of(context)
+                              .colorScheme
+                              .onSurfaceVariant,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Rectangle',
+                      style: Theme.of(context)
+                          .textTheme
+                          .labelSmall
+                          ?.copyWith(
+                            color: mods.rectMode
+                                ? primary
+                                : null,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
