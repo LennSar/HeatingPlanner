@@ -8,6 +8,8 @@ const _kLastOpenedFloorId = 'lastOpenedFloorId';
 const _kCanvasZoom = 'canvasZoom';
 const _kCanvasPanX = 'canvasPanX';
 const _kCanvasPanY = 'canvasPanY';
+const _kGridSpacingMm = 'gridSpacingMm';
+const _kDefaultGridSpacingMm = 100;
 
 // ── AppPreferences ────────────────────────────────────────────────────────────
 
@@ -96,6 +98,16 @@ class AppPreferences {
       await _prefs.setDouble(_kCanvasPanY, y);
     }
   }
+
+  // ── gridSpacingMm ────────────────────────────────────────────────────────
+
+  /// Drawing grid spacing in mm. Defaults to 100 if not yet set.
+  Future<int> getGridSpacingMm() async =>
+      (await _prefs.getInt(_kGridSpacingMm)) ?? _kDefaultGridSpacingMm;
+
+  /// Persists the grid spacing in mm.
+  Future<void> setGridSpacingMm(int spacingMm) =>
+      _prefs.setInt(_kGridSpacingMm, spacingMm);
 }
 
 // ── Providers ─────────────────────────────────────────────────────────────────
@@ -135,4 +147,33 @@ class LastOpenedProjectIdNotifier extends AsyncNotifier<String?> {
 final lastOpenedProjectIdProvider =
     AsyncNotifierProvider<LastOpenedProjectIdNotifier, String?>(
   LastOpenedProjectIdNotifier.new,
+);
+
+// ── gridSpacingMmProvider ─────────────────────────────────────────────────────
+
+/// Notifier that persists the drawing grid spacing to [AppPreferences].
+///
+/// Defaults to 100 mm on first launch. Callers update it via
+/// [GridSpacingMmNotifier.set].
+class GridSpacingMmNotifier extends AsyncNotifier<int> {
+  @override
+  Future<int> build() {
+    return ref.read(appPreferencesProvider).getGridSpacingMm();
+  }
+
+  /// Updates the grid spacing and persists it immediately.
+  Future<void> set(int spacingMm) async {
+    await ref.read(appPreferencesProvider).setGridSpacingMm(spacingMm);
+    state = AsyncValue.data(spacingMm);
+  }
+}
+
+/// Persisted drawing grid spacing in mm.
+///
+/// Valid values are 5, 10, 25, 50, 100. Defaults to 100 on first launch.
+/// Changes take effect immediately on the canvas and are persisted across
+/// sessions.
+final gridSpacingMmProvider =
+    AsyncNotifierProvider<GridSpacingMmNotifier, int>(
+  GridSpacingMmNotifier.new,
 );

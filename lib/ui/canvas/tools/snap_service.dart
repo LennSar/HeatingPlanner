@@ -80,10 +80,14 @@ abstract final class SnapService {
 
   /// Snap [rawPoint] to the nearest endpoint, wall interior, or
   /// grid intersection, in that priority order.
+  ///
+  /// [spacingMm] overrides [gridSpacingMm] for the grid and wall-interior
+  /// snap steps.
   static SnapResult snap(
     Point2D rawPoint,
-    List<WallSegment> walls,
-  ) {
+    List<WallSegment> walls, [
+    double spacingMm = gridSpacingMm,
+  ]) {
     // 1. Endpoint snap (highest priority).
     final endpoints = <Point2D>[];
     for (final wall in walls) {
@@ -100,14 +104,14 @@ abstract final class SnapService {
     }
 
     // 2. Wall-interior snap.
-    final wallSnap = _snapToWallInterior(rawPoint, walls);
+    final wallSnap = _snapToWallInterior(rawPoint, walls, spacingMm);
     if (wallSnap != null) {
       return SnapResult(point: wallSnap, type: SnapType.wallPoint);
     }
 
     // 3. Grid snap (fallback).
     return SnapResult(
-      point: snapToGrid(rawPoint),
+      point: snapToGrid(rawPoint, spacingMm),
       type: SnapType.grid,
     );
   }
@@ -117,7 +121,7 @@ abstract final class SnapService {
   /// distance.
   ///
   /// Prefers a grid-aligned point on the wall so the split point
-  /// stays on the 100 mm grid. Falls back to the raw nearest point
+  /// stays on the active grid. Falls back to the raw nearest point
   /// on the wall when grid alignment moves the point off the wall
   /// (e.g. for diagonal walls).
   ///
@@ -125,6 +129,7 @@ abstract final class SnapService {
   static Point2D? _snapToWallInterior(
     Point2D rawPoint,
     List<WallSegment> walls,
+    double spacingMm,
   ) {
     Point2D? best;
     double bestDist = wallSnapThresholdMm;
@@ -145,7 +150,7 @@ abstract final class SnapService {
     if (best == null) return null;
 
     // Try grid-aligning the result and confirm it still lies on a wall.
-    final gridPt = snapToGrid(best);
+    final gridPt = snapToGrid(best, spacingMm);
     for (final wall in walls) {
       if (GeometryEngine.isPointOnSegment(
           gridPt, wall.startPoint, wall.endPoint)) {

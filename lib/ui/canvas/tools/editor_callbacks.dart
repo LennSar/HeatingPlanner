@@ -181,4 +181,7 @@ abstract class EditorCallbacks {
   /// The current canvas zoom level (for screen-space
   /// hit testing of handles).
   double get currentZoom;
+
+  /// The active drawing grid spacing in mm, read from [gridSpacingMmProvider].
+  double get currentGridSpacingMm;
 }

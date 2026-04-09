@@ -522,7 +522,7 @@ class InteractionPainter extends CustomPainter {
         Paint()
           ..color = (selectionHighlightColor ?? Colors.blue)
               .withValues(alpha: 0.35)
-          ..strokeWidth = 2.0
+          ..strokeWidth = 10.0
           ..style = PaintingStyle.stroke,
         20.0,
       );

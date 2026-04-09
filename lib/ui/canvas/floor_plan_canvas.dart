@@ -42,6 +42,7 @@ import 'tools/zone_draw_tool.dart';
 import '../../calculation/engines/geometry_engine.dart';
 import '../../calculation/providers/heat_demand_providers.dart';
 import '../../calculation/providers/heat_output_providers.dart';
+import '../../repositories/app_preferences.dart';
 
 /// Provider that signals tools to cancel (incremented on
 /// Escape). Tools check this to know when cancel is pressed.
@@ -164,8 +165,6 @@ class _FloorPlanCanvasState
   /// interaction painter and status bar.
   Offset? _hoverWorldPoint;
 
-  /// Default grid spacing (mm).
-  static const _gridSpacingMm = 100.0;
 
   double _initialZoom = 1.0;
 
@@ -629,6 +628,9 @@ class _FloorPlanCanvasState
     _ensureToolsInitialised();
     final canvasState = ref.watch(canvasControllerProvider);
     final editorState = ref.watch(editorStateProvider);
+    final gridSpacingMm = ref
+            .watch(gridSpacingMmProvider)
+            .when(data: (v) => v.toDouble(), loading: () => 100.0, error: (_, __) => 100.0);
     final hoveredElement = ref.watch(hoveredElementProvider);
     final colors = Theme.of(context)
         .extension<HeatingPlannerColors>()!;
@@ -961,7 +963,7 @@ class _FloorPlanCanvasState
                     size: viewSize,
                     painter: _CanvasCompositePainter(
                       transform: canvasState.transform,
-                      gridSpacingMm: _gridSpacingMm,
+                      gridSpacingMm: gridSpacingMm,
                       visibleRect: visibleRect,
                       colors: colors,
                       onSurface: onSurface,
