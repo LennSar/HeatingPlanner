@@ -411,6 +411,28 @@ When a wall segment is selected, three circular drag handles appear on the wall:
 - U-value and temperature profile update in real time on every change.
 - "Add Layer" inserts a new empty layer at the bottom (inside face). User can drag to reposition.
 
+**Inhomogeneous layer (stud/bridging element):**
+
+Each layer row has a **⊕** button at the right edge. Tapping ⊕ expands the row to reveal a stud sub-row directly below the main layer. Tapping ⊕ again (or ✕ on the sub-row) collapses and removes the stud definition.
+
+Expanded row wireframe:
+```
+  ⠿ [EPS insulation   ] [200 mm] [λ 0.035] [🗑] [⊕]
+    └─ Timber stud:  [60 mm] stud width  [300 mm] clear gap  [λ 0.13]  [✕]
+```
+
+Field labels and disambiguation:
+- The sub-row begins with the fixed label **"Timber stud:"** — no material picker.
+- First numeric field: **"stud width"** (label shown inline, mm unit).
+- Second numeric field: **"clear gap"** (label shown inline, mm unit).
+- Third field: **λ** — pre-filled with `0.13` (softwood default); user-overridable by tapping, same pattern as the main layer's λ override.
+- **Tooltip on "clear gap" field** (shown on hover/long-press): *"Clear distance between studs, edge to edge — not centre-to-centre. Centre-to-centre spacing = stud width + clear gap."*
+- Both width and clear gap are required. If either is empty or zero, the layer is treated as homogeneous and a warning indicator (⚠) appears next to the ⊕ button.
+
+Visual distinction: an inhomogeneous layer row has a subtle left border accent (`primaryLight` colour, 3px) to distinguish it from homogeneous rows at a glance.
+
+Stud material is always timber — no picker needed.
+
 **Preset buttons (second row in title area):**
 
 - **"⬆ Save as preset"** — always enabled. Tapping opens a small inline dialog:

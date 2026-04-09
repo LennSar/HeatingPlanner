@@ -104,6 +104,10 @@ const double rseInterior = 0.13; // interior partition surface
 /// Simplified approach — flag to user that ISO 13370 is more accurate
 const double groundCorrectionFactorDefault = 0.6;
 
+/// Default thermal conductivity for timber studs (softwood) W/(mK)
+/// Source: material library mat-013 (Softwood spruce/pine)
+const double lambdaTimberDefault = 0.13;
+
 /// Air change rate presets (1/h)
 const Map<String, double> airChangeRatePresets = {
   'Standard room': 0.5,
@@ -226,8 +230,74 @@ class ThermalEngine {
 }
 ```
 
+  /// U-value for a construction that may contain inhomogeneous layers.
+  ///
+  /// Uses the EN ISO 6946:2017 §6.9 **combined method**:
+  ///   R_T = (R'_T + R''_T) / 2
+  ///   U = 1 / R_T
+  ///
+  /// Each layer is described by a [LayerSpec] — either [HomogeneousLayerSpec]
+  /// or [InhomogeneousLayerSpec].  If all layers are homogeneous this method
+  /// is equivalent to [uValue].
+  ///
+  /// **Upper resistance limit R'_T** (parallel heat-flow paths through
+  /// the full assembly):
+  ///   For each fractional path p, compute R_T_p = R_si + Σ R_i(p) + R_se,
+  ///   where R_i(p) for an inhomogeneous layer is d/(λ_main) or d/(λ_stud)
+  ///   depending on path, and for homogeneous layers R_i(p) = d/λ.
+  ///   R'_T = 1 / Σ(f_p / R_T_p)
+  ///
+  /// **Lower resistance limit R''_T** (series of layers, each treated as
+  /// parallel conductances):
+  ///   For homogeneous layers: R_layer = d/λ
+  ///   For an inhomogeneous layer: R_layer = 1 / (f_stud/r_stud + f_main/r_main)
+  ///   R''_T = R_si + Σ R_layer + R_se
+  ///
+  /// **Area fractions** (from [InhomogeneousLayerSpec]):
+  ///   f_stud = studWidthMm / (studWidthMm + studClearGapMm)   // clear-gap definition
+  ///   f_main = 1 − f_stud
+  ///
+  /// Returns [double.nan] for invalid inputs (λ ≤ 0, thickness ≤ 0, f_stud ≥ 1).
+  static double uValueCombined({
+    required List<LayerSpec> layers,
+    required double rsi,
+    required double rse,
+  });
+}
+
+/// Describes a single layer in a [ThermalEngine.uValueCombined] call.
+sealed class LayerSpec {
+  const LayerSpec();
+}
+
+class HomogeneousLayerSpec extends LayerSpec {
+  const HomogeneousLayerSpec({
+    required this.thicknessMm,
+    required this.lambda,   // W/(mK)
+  });
+  final double thicknessMm;
+  final double lambda;
+}
+
+class InhomogeneousLayerSpec extends LayerSpec {
+  const InhomogeneousLayerSpec({
+    required this.thicknessMm,
+    required this.lambdaMain,        // W/(mK) — bulk fill material
+    required this.studWidthMm,       // mm — width of timber stud
+    required this.studClearGapMm,    // mm — clear gap (edge to edge) between studs
+    this.lambdaStud = 0.13,          // W/(mK) — timber stud; defaults to lambdaTimberDefault
+  });
+  final double thicknessMm;
+  final double lambdaMain;
+  final double studWidthMm;
+  final double studClearGapMm;
+  final double lambdaStud;
+}
+```
+
 **Implementation notes:**
 - `uValue`: Validate that all λ values are > 0, all thicknesses are > 0, and arrays are non-empty and equal-length. Return `double.nan` on violation.
+- `uValueCombined`: Validate same conditions for all layers; additionally validate f_stud ∈ (0, 1) exclusive for each inhomogeneous layer. Return `double.nan` on violation.
 - `transmissionLoss`: If `correctionF` is 0, return 0.0 (no loss between same-temp rooms).
 - `ventilationLoss`: The `/3600` converts from J/h to W (watts = J/s).
 

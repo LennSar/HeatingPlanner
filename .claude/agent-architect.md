@@ -431,6 +431,13 @@ current wall's construction — edits to one wall never mutate the saved preset.
 | thermalConductivity | double | 0.01-50.0 W/(mK) | from material |
 | density | double | 1-10000 kg/m³ | from material |
 | specificHeat | double | 100-5000 J/(kgK) | from material |
+| studWidthMm | double? | 1.0-1000.0; null = homogeneous layer | null |
+| studClearGapMm | double? | 1.0-10000.0 mm **clear gap** (edge to edge, not centre-to-centre); required when studWidthMm set | null |
+| studLambda | double? | 0.01-50.0 W/(mK); defaults to `lambdaTimberDefault` (0.13) when stud is added; user-overridable | null |
+
+A layer is **inhomogeneous** when `studWidthMm` is non-null. The stud is always timber; no material picker. The three stud fields are always set together (all non-null or all null).
+
+**DB migration note:** these three columns are new nullable columns on the `material_layers` table. Schema version must be incremented and a `stepByStep` migration must add all three columns with `DEFAULT NULL`.
 
 **MaterialEntry**
 | Field | Type | Constraint | Default |
