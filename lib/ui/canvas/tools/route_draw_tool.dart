@@ -60,7 +60,10 @@ class RouteDrawTool extends CanvasTool {
     Point2D worldPoint,
     PointerDeviceKind deviceKind,
   ) {
-    final snapped = SnapService.snapToGrid(worldPoint);
+    final snapped = SnapService.snapToGrid(
+      worldPoint,
+      callbacks.currentGridSpacingMm,
+    );
     switch (_phase) {
       case _Phase.idle:
         if (_isOnDistributor(worldPoint)) {

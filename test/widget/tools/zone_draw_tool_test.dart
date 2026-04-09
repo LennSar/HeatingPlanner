@@ -126,6 +126,8 @@ class _StubCallbacks implements EditorCallbacks {
   List<Door> get currentDoors => const [];
   @override
   double get currentZoom => 1.0;
+  @override
+  double get currentGridSpacingMm => 100.0;
 }
 
 // ── Test room ─────────────────────────────────────────────────────────────────

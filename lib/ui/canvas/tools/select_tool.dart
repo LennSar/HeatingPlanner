@@ -520,7 +520,11 @@ class SelectTool extends CanvasTool {
     final snapWalls = callbacks.currentWalls
         .where((w) => !excludedIds.contains(w.id))
         .toList();
-    final snap = SnapService.snap(worldPoint, snapWalls);
+    final snap = SnapService.snap(
+      worldPoint,
+      snapWalls,
+      callbacks.currentGridSpacingMm,
+    );
 
     switch (_dragHandle!) {
       case DragHandleType.mid:
@@ -884,7 +888,10 @@ class SelectTool extends CanvasTool {
     final zone = _zoneAtDragStart!;
     if (_zoneHandleDragIndex != null) {
       // Vertex drag: snap vertex to grid and move it.
-      final snapped = SnapService.snapToGrid(worldPoint);
+      final snapped = SnapService.snapToGrid(
+        worldPoint,
+        callbacks.currentGridSpacingMm,
+      );
       final newPolygon = List<Point2D>.from(zone.polygon);
       newPolygon[_zoneHandleDragIndex!] = snapped;
       final newZone = zone.copyWith(polygon: newPolygon);
@@ -1457,10 +1464,10 @@ class SelectTool extends CanvasTool {
     _dragStartDoor = null;
   }
 
-  /// Snap a distance along the wall axis to the 100 mm grid.
-  static double _snapAlongWall(double distanceMm) {
-    return (distanceMm / SnapService.gridSpacingMm).round() *
-        SnapService.gridSpacingMm;
+  /// Snap a distance along the wall axis to the active grid.
+  double _snapAlongWall(double distanceMm) {
+    final spacing = callbacks.currentGridSpacingMm;
+    return (distanceMm / spacing).round() * spacing;
   }
 
   // ================================================================
@@ -2173,8 +2180,8 @@ class SelectTool extends CanvasTool {
     final relY = worldPoint.y - orig.position.y;
     final projAlong = relX * cosA + relY * sinA;
     final snappedProj =
-        (projAlong / SnapService.gridSpacingMm).round() *
-            SnapService.gridSpacingMm;
+        (projAlong / callbacks.currentGridSpacingMm).round() *
+            callbacks.currentGridSpacingMm;
 
     switch (_distributorDragHandle) {
       case DragHandleType.start: // start/left handle — right edge fixed
@@ -2206,7 +2213,10 @@ class SelectTool extends CanvasTool {
           widthMm: newWidth,
         ));
       case DragHandleType.mid || null: // body / centre handle — move + wall snap
-        final snapped = SnapService.snapToGrid(worldPoint);
+        final snapped = SnapService.snapToGrid(
+          worldPoint,
+          callbacks.currentGridSpacingMm,
+        );
         final newRotation = _wallSnapRotationAt(
           snapped,
           orig.rotationDeg,

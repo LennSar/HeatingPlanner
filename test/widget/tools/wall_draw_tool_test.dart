@@ -136,6 +136,8 @@ class _StubCallbacks implements EditorCallbacks {
   List<HeatingZone> get currentZones => const [];
   @override
   double get currentZoom => 1.0;
+  @override
+  double get currentGridSpacingMm => 100.0;
 }
 
 // ── Factory ──────────────────────────────────────────────────────────────────

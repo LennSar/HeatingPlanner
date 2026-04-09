@@ -43,7 +43,10 @@ class DistributorPlaceTool extends CanvasTool {
 
   @override
   void onPointerMove(Point2D worldPoint) {
-    _ghostPosition = SnapService.snapToGrid(worldPoint);
+    _ghostPosition = SnapService.snapToGrid(
+      worldPoint,
+      callbacks.currentGridSpacingMm,
+    );
     _ghostRotationDeg = _wallSnapRotation(_ghostPosition!);
     onStateChanged();
   }
@@ -53,7 +56,10 @@ class DistributorPlaceTool extends CanvasTool {
     Point2D worldPoint,
     PointerDeviceKind deviceKind,
   ) {
-    final snapped = SnapService.snapToGrid(worldPoint);
+    final snapped = SnapService.snapToGrid(
+      worldPoint,
+      callbacks.currentGridSpacingMm,
+    );
     final existing = callbacks.currentDistributor;
 
     if (existing == null) {

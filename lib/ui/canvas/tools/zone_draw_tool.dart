@@ -72,7 +72,10 @@ class ZoneDrawTool extends CanvasTool {
     _hasValidationError = false;
 
     // Snap vertex to grid.
-    final snapped = SnapService.snapToGrid(worldPoint);
+    final snapped = SnapService.snapToGrid(
+      worldPoint,
+      callbacks.currentGridSpacingMm,
+    );
 
     // Double-tap closes when enough committed vertices exist.
     if (isDoubleTap && _vertices.length >= _minVertices) {

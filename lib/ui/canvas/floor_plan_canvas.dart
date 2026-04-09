@@ -621,6 +621,13 @@ class _FloorPlanCanvasState
   double get currentZoom =>
       ref.read(canvasControllerProvider).zoom;
 
+  @override
+  double get currentGridSpacingMm =>
+      ref.read(gridSpacingMmProvider).maybeWhen(
+        data: (v) => v.toDouble(),
+        orElse: () => 100.0,
+      );
+
   // ---- Build ----
 
   @override

@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/providers/project_settings_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../repositories/app_preferences.dart';
 import '../providers/editor_state_provider.dart';
 
 /// Opens the project settings dialog as a modal.
@@ -401,6 +402,26 @@ class _ProjectSettingsDialogState
                     ),
 
                     const SizedBox(height: Spacing.lg),
+                    const Divider(),
+                    const SizedBox(height: Spacing.md),
+
+                    // ── Drawing grid size ────────────────────
+                    Text(
+                      'Drawing Grid Size',
+                      style: textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: Spacing.xs),
+                    Text(
+                      'Snap interval for walls, zones, and'
+                      ' other elements on the canvas.',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: Spacing.sm),
+                    _GridSpacingRow(),
+
+                    const SizedBox(height: Spacing.lg),
 
                     // Close button
                     Align(
@@ -418,6 +439,32 @@ class _ProjectSettingsDialogState
           ],
         ),
       ),
+    );
+  }
+}
+
+/// Dropdown row for selecting the drawing grid spacing.
+class _GridSpacingRow extends ConsumerWidget {
+  static const _options = [5, 10, 25, 50, 100];
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final current = ref.watch(gridSpacingMmProvider).maybeWhen(
+          data: (v) => v,
+          orElse: () => 100,
+        );
+    final value = _options.contains(current) ? current : 100;
+
+    return DropdownButton<int>(
+      value: value,
+      items: _options
+          .map((v) => DropdownMenuItem(value: v, child: Text('$v mm')))
+          .toList(),
+      onChanged: (v) {
+        if (v != null) {
+          ref.read(gridSpacingMmProvider.notifier).set(v);
+        }
+      },
     );
   }
 }

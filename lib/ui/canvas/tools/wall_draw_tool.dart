@@ -116,7 +116,11 @@ class WallDrawTool extends CanvasTool {
   /// - Otherwise → normal [SnapService.snap].
   Point2D _snap(Point2D worldPoint) {
     if (_freePlacement) return worldPoint;
-    final result = SnapService.snap(worldPoint, callbacks.currentWalls);
+    final result = SnapService.snap(
+      worldPoint,
+      callbacks.currentWalls,
+      callbacks.currentGridSpacingMm,
+    );
     _currentSnapType = result.type;
     return result.point;
   }
@@ -302,7 +306,11 @@ class WallDrawTool extends CanvasTool {
         _currentSnapped = _ortho(_dragStart!, _snap(worldPoint));
       }
     } else {
-      final snap = SnapService.snap(worldPoint, callbacks.currentWalls);
+      final snap = SnapService.snap(
+        worldPoint,
+        callbacks.currentWalls,
+        callbacks.currentGridSpacingMm,
+      );
       _currentSnapped = _startPoint != null
           ? _ortho(_startPoint!, snap.point)
           : snap.point;
