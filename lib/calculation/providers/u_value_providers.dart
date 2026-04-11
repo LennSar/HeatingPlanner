@@ -9,13 +9,18 @@ import '../engines/thermal_engine.dart';
 
 /// U-value (W/(m²·K)) for a [WallConstruction] by [constructionId].
 ///
-/// EN ISO 6946: U = 1 / (R_si + Σ(d_i / λ_i) + R_se)
+/// Uses [ThermalEngine.uValueCombined] (EN ISO 6946:2017 §6.9) so that
+/// inhomogeneous layers with stud bridging are handled correctly.
+/// For fully homogeneous constructions the result is identical to the
+/// plain series formula.
 ///
-/// Layers are sorted by [MaterialLayer.sortOrder] (outside → inside)
-/// before being passed to [ThermalEngine.uValue].
+/// Layers are sorted by [MaterialLayer.sortOrder] (outside → inside) and
+/// mapped to [LayerSpec]: layers with non-null [MaterialLayer.studWidthMm],
+/// [MaterialLayer.studClearGapMm], and [MaterialLayer.studLambda] become
+/// [InhomogeneousLayerSpec]; all others become [HomogeneousLayerSpec].
 ///
 /// Returns [double.nan] if the construction or its layers are missing,
-/// still loading, or [ThermalEngine.uValue] rejects the inputs.
+/// still loading, or [ThermalEngine.uValueCombined] rejects the inputs.
 ///
 /// Depends on [constructionProvider] and [layersProvider].
 final uValueProvider =
@@ -36,13 +41,25 @@ final uValueProvider =
                       (a, b) =>
                           a.sortOrder.compareTo(b.sortOrder),
                     );
-                  return ThermalEngine.uValue(
-                    layerThicknessesMm: sorted
-                        .map((l) => l.thicknessMm)
-                        .toList(),
-                    layerLambdas: sorted
-                        .map((l) => l.thermalConductivity)
-                        .toList(),
+                  final specs = sorted.map((l) {
+                    if (l.studWidthMm != null &&
+                        l.studClearGapMm != null &&
+                        l.studLambda != null) {
+                      return InhomogeneousLayerSpec(
+                        thicknessMm: l.thicknessMm,
+                        lambdaMain: l.thermalConductivity,
+                        studWidthMm: l.studWidthMm!,
+                        studClearGapMm: l.studClearGapMm!,
+                        lambdaStud: l.studLambda!,
+                      );
+                    }
+                    return HomogeneousLayerSpec(
+                      thicknessMm: l.thicknessMm,
+                      lambda: l.thermalConductivity,
+                    );
+                  }).toList();
+                  return ThermalEngine.uValueCombined(
+                    layers: specs,
                     rsi: construction.rsi,
                     rse: construction.rse,
                   );

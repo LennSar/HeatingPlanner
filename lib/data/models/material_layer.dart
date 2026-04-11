@@ -34,6 +34,17 @@ abstract class MaterialLayer with _$MaterialLayer {
 
     /// Specific heat capacity in J/(kg·K). Range: 100–5000.
     required double specificHeat,
+
+    /// Stud width in mm. Non-null → inhomogeneous layer. Range: 1.0–1000.0.
+    /// Always set together with [studClearGapMm] and [studLambda].
+    double? studWidthMm,
+
+    /// Clear gap between studs in mm (edge-to-edge). Range: 1.0–10000.0.
+    double? studClearGapMm,
+
+    /// Thermal conductivity of the stud in W/(m·K). Range: 0.01–50.0.
+    /// Defaults to `lambdaTimberDefault` (0.13) when the stud is first added.
+    double? studLambda,
   }) = _MaterialLayer;
 
   factory MaterialLayer.fromJson(Map<String, dynamic> json) =>

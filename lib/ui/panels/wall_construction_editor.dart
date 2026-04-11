@@ -577,6 +577,7 @@ class _SlabConstructionDialogState
                         i,
                         layer.copyWith(thermalConductivity: v),
                       ),
+                      onStudChanged: (updated) => _updateLayer(i, updated),
                       onDelete: () => _removeLayer(i),
                     );
                   },
@@ -1116,6 +1117,7 @@ class _WallConstructionDialogState
                         i,
                         layer.copyWith(thermalConductivity: v),
                       ),
+                      onStudChanged: (updated) => _updateLayer(i, updated),
                       onDelete: () => _removeLayer(i),
                     );
                   },
@@ -1187,6 +1189,7 @@ class _LayerRow extends StatefulWidget {
     required this.onPickMaterial,
     required this.onThicknessChanged,
     required this.onLambdaChanged,
+    required this.onStudChanged,
     required this.onDelete,
   });
 
@@ -1196,6 +1199,10 @@ class _LayerRow extends StatefulWidget {
   final VoidCallback onPickMaterial;
   final ValueChanged<double> onThicknessChanged;
   final ValueChanged<double> onLambdaChanged;
+
+  /// Called whenever the stud sub-row changes. Receives the full updated
+  /// [MaterialLayer] with stud fields set (expand) or all null (collapse).
+  final ValueChanged<MaterialLayer> onStudChanged;
   final VoidCallback onDelete;
 
   @override
@@ -1203,8 +1210,28 @@ class _LayerRow extends StatefulWidget {
 }
 
 class _LayerRowState extends State<_LayerRow> {
+  // Main layer controllers.
   late TextEditingController _thicknessCtrl;
   late TextEditingController _lambdaCtrl;
+
+  // Stud sub-row controllers.
+  late TextEditingController _studWidthCtrl;
+  late TextEditingController _studGapCtrl;
+  late TextEditingController _studLambdaCtrl;
+
+  bool _studExpanded = false;
+
+  // 3px accent colour matching UI/UX §3.1 primaryLight.
+  static const _accentColor = Color(0xFF2E86C1);
+
+  static const _clearGapTooltip =
+      'Clear distance between studs, edge to edge — not centre-to-centre.'
+      ' Centre-to-centre spacing = stud width + clear gap.';
+
+  bool get _hasStud =>
+      widget.layer.studWidthMm != null &&
+      widget.layer.studClearGapMm != null &&
+      widget.layer.studLambda != null;
 
   @override
   void initState() {
@@ -1215,17 +1242,39 @@ class _LayerRowState extends State<_LayerRow> {
     _lambdaCtrl = TextEditingController(
       text: widget.layer.thermalConductivity.toString(),
     );
+    _studWidthCtrl = TextEditingController(
+      text: (widget.layer.studWidthMm ?? 60.0).round().toString(),
+    );
+    _studGapCtrl = TextEditingController(
+      text: (widget.layer.studClearGapMm ?? 300.0).round().toString(),
+    );
+    _studLambdaCtrl = TextEditingController(
+      text: (widget.layer.studLambda ?? 0.13).toString(),
+    );
+    _studExpanded = _hasStud;
   }
 
   @override
   void didUpdateWidget(_LayerRow old) {
     super.didUpdateWidget(old);
-    // Refresh controllers when material changes from outside.
     if (old.layer.materialId != widget.layer.materialId) {
-      _thicknessCtrl.text =
-          widget.layer.thicknessMm.round().toString();
-      _lambdaCtrl.text =
-          widget.layer.thermalConductivity.toString();
+      _thicknessCtrl.text = widget.layer.thicknessMm.round().toString();
+      _lambdaCtrl.text = widget.layer.thermalConductivity.toString();
+    }
+    // Sync stud controllers when stud fields change from outside.
+    if (old.layer.studWidthMm != widget.layer.studWidthMm ||
+        old.layer.studClearGapMm != widget.layer.studClearGapMm ||
+        old.layer.studLambda != widget.layer.studLambda) {
+      _studExpanded = _hasStud;
+      if (widget.layer.studWidthMm != null) {
+        _studWidthCtrl.text = widget.layer.studWidthMm!.round().toString();
+      }
+      if (widget.layer.studClearGapMm != null) {
+        _studGapCtrl.text = widget.layer.studClearGapMm!.round().toString();
+      }
+      if (widget.layer.studLambda != null) {
+        _studLambdaCtrl.text = widget.layer.studLambda.toString();
+      }
     }
   }
 
@@ -1233,106 +1282,297 @@ class _LayerRowState extends State<_LayerRow> {
   void dispose() {
     _thicknessCtrl.dispose();
     _lambdaCtrl.dispose();
+    _studWidthCtrl.dispose();
+    _studGapCtrl.dispose();
+    _studLambdaCtrl.dispose();
     super.dispose();
+  }
+
+  void _toggleStud() {
+    if (_studExpanded) {
+      // Collapse: remove stud definition.
+      setState(() => _studExpanded = false);
+      widget.onStudChanged(
+        widget.layer.copyWith(
+          studWidthMm: null,
+          studClearGapMm: null,
+          studLambda: null,
+        ),
+      );
+    } else {
+      // Expand: apply defaults.
+      setState(() => _studExpanded = true);
+      final width = double.tryParse(_studWidthCtrl.text) ?? 60.0;
+      final gap = double.tryParse(_studGapCtrl.text) ?? 300.0;
+      final lambda = double.tryParse(_studLambdaCtrl.text) ?? 0.13;
+      widget.onStudChanged(
+        widget.layer.copyWith(
+          studWidthMm: width,
+          studClearGapMm: gap,
+          studLambda: lambda,
+        ),
+      );
+    }
+  }
+
+  void _removeStud() {
+    setState(() => _studExpanded = false);
+    widget.onStudChanged(
+      widget.layer.copyWith(
+        studWidthMm: null,
+        studClearGapMm: null,
+        studLambda: null,
+      ),
+    );
+  }
+
+  void _notifyStudChange() {
+    final width = double.tryParse(_studWidthCtrl.text);
+    final gap = double.tryParse(_studGapCtrl.text);
+    final lambda = double.tryParse(_studLambdaCtrl.text);
+    if (width != null && width > 0 && gap != null && gap > 0 &&
+        lambda != null && lambda > 0) {
+      widget.onStudChanged(
+        widget.layer.copyWith(
+          studWidthMm: width,
+          studClearGapMm: gap,
+          studLambda: lambda,
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final showAccent = _studExpanded || _hasStud;
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: Spacing.xs),
-      child: Row(
-        children: [
-          // Drag handle.
-          MouseRegion(
-            cursor: SystemMouseCursors.resizeUpDown,
-            child: ReorderableDragStartListener(
-              index: widget.index,
-              child: const Icon(Icons.drag_handle, size: 20),
-            ),
-          ),
-          const SizedBox(width: Spacing.sm),
+      child: Container(
+        decoration: showAccent
+            ? const BoxDecoration(
+                border: Border(
+                  left: BorderSide(color: _accentColor, width: 3),
+                ),
+              )
+            : null,
+        padding: showAccent
+            ? const EdgeInsets.only(left: Spacing.xs)
+            : EdgeInsets.zero,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ── Main layer row ──
+            Row(
+              children: [
+                // Drag handle.
+                MouseRegion(
+                  cursor: SystemMouseCursors.resizeUpDown,
+                  child: ReorderableDragStartListener(
+                    index: widget.index,
+                    child: const Icon(Icons.drag_handle, size: 20),
+                  ),
+                ),
+                const SizedBox(width: Spacing.sm),
 
-          // Material picker button.
-          Expanded(
-            flex: 3,
-            child: OutlinedButton(
-              onPressed: widget.onPickMaterial,
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: Spacing.sm,
-                  vertical: Spacing.xs,
+                // Material picker button.
+                Expanded(
+                  flex: 3,
+                  child: OutlinedButton(
+                    onPressed: widget.onPickMaterial,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: Spacing.sm,
+                        vertical: Spacing.xs,
+                      ),
+                    ),
+                    child: Text(
+                      widget.materialName,
+                      style: textTheme.bodyMedium,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: Spacing.sm),
+
+                // Thickness field.
+                SizedBox(
+                  width: 60,
+                  child: TextField(
+                    controller: _thicknessCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      suffixText: 'mm',
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 8,
+                      ),
+                    ),
+                    style: textTheme.labelSmall,
+                    onChanged: (v) {
+                      final d = double.tryParse(v);
+                      if (d != null && d > 0) widget.onThicknessChanged(d);
+                    },
+                  ),
+                ),
+                const SizedBox(width: Spacing.sm),
+
+                // Lambda field (editable override).
+                SizedBox(
+                  width: 68,
+                  child: TextField(
+                    controller: _lambdaCtrl,
+                    keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: const InputDecoration(
+                      isDense: true,
+                      prefixText: '\u03BB ',
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 8,
+                      ),
+                    ),
+                    style: textTheme.labelSmall,
+                    onChanged: (v) {
+                      final d = double.tryParse(v);
+                      if (d != null && d > 0) widget.onLambdaChanged(d);
+                    },
+                  ),
+                ),
+                const SizedBox(width: Spacing.xs),
+
+                // Delete button.
+                IconButton(
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  onPressed: widget.onDelete,
+                  visualDensity: VisualDensity.compact,
+                  padding: EdgeInsets.zero,
+                ),
+
+                // ⊕ / toggle-stud button.
+                Tooltip(
+                  message: _studExpanded
+                      ? 'Remove stud definition'
+                      : 'Add timber stud (inhomogeneous layer)',
+                  child: IconButton(
+                    icon: Icon(
+                      _studExpanded ? Icons.remove_circle_outline : Icons.add_circle_outline,
+                      size: 18,
+                      color: _studExpanded ? _accentColor : null,
+                    ),
+                    onPressed: _toggleStud,
+                    visualDensity: VisualDensity.compact,
+                    padding: EdgeInsets.zero,
+                  ),
+                ),
+              ],
+            ),
+
+            // ── Stud sub-row ──
+            if (_studExpanded)
+              Padding(
+                padding: const EdgeInsets.only(
+                  left: 28,
+                  top: Spacing.xs,
+                  bottom: Spacing.xs,
+                ),
+                child: Row(
+                  children: [
+                    Text(
+                      'Timber stud:',
+                      style: textTheme.labelSmall?.copyWith(
+                        color: _accentColor,
+                      ),
+                    ),
+                    const SizedBox(width: Spacing.sm),
+
+                    // Stud width.
+                    SizedBox(
+                      width: 60,
+                      child: TextField(
+                        controller: _studWidthCtrl,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          suffixText: 'mm',
+                          hintText: 'width',
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 6,
+                          ),
+                        ),
+                        style: textTheme.labelSmall,
+                        onChanged: (_) => _notifyStudChange(),
+                      ),
+                    ),
+                    const SizedBox(width: Spacing.xs),
+                    Text('stud width', style: textTheme.labelSmall),
+                    const SizedBox(width: Spacing.sm),
+
+                    // Clear gap with tooltip.
+                    Tooltip(
+                      message: _clearGapTooltip,
+                      child: SizedBox(
+                        width: 60,
+                        child: TextField(
+                          controller: _studGapCtrl,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                            isDense: true,
+                            suffixText: 'mm',
+                            hintText: 'gap',
+                            contentPadding: EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 6,
+                            ),
+                          ),
+                          style: textTheme.labelSmall,
+                          onChanged: (_) => _notifyStudChange(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: Spacing.xs),
+                    Text('clear gap', style: textTheme.labelSmall),
+                    const SizedBox(width: Spacing.sm),
+
+                    // Stud lambda.
+                    SizedBox(
+                      width: 68,
+                      child: TextField(
+                        controller: _studLambdaCtrl,
+                        keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true,
+                        ),
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          prefixText: '\u03BB ',
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 6,
+                          ),
+                        ),
+                        style: textTheme.labelSmall,
+                        onChanged: (_) => _notifyStudChange(),
+                      ),
+                    ),
+                    const SizedBox(width: Spacing.xs),
+
+                    // ✕ remove stud.
+                    IconButton(
+                      icon: const Icon(Icons.close, size: 16),
+                      onPressed: _removeStud,
+                      visualDensity: VisualDensity.compact,
+                      padding: EdgeInsets.zero,
+                      tooltip: 'Remove stud definition',
+                    ),
+                  ],
                 ),
               ),
-              child: Text(
-                widget.materialName,
-                style: textTheme.bodyMedium,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ),
-          const SizedBox(width: Spacing.sm),
-
-          // Thickness field.
-          SizedBox(
-            width: 60,
-            child: TextField(
-              controller: _thicknessCtrl,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                isDense: true,
-                suffixText: 'mm',
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 8,
-                ),
-              ),
-              style: textTheme.labelSmall,
-              onChanged: (v) {
-                final d = double.tryParse(v);
-                if (d != null && d > 0) {
-                  widget.onThicknessChanged(d);
-                }
-              },
-            ),
-          ),
-          const SizedBox(width: Spacing.sm),
-
-          // Lambda field (editable override).
-          SizedBox(
-            width: 68,
-            child: TextField(
-              controller: _lambdaCtrl,
-              keyboardType: const TextInputType.numberWithOptions(
-                decimal: true,
-              ),
-              decoration: const InputDecoration(
-                isDense: true,
-                prefixText: '\u03BB ',
-                contentPadding: EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 8,
-                ),
-              ),
-              style: textTheme.labelSmall,
-              onChanged: (v) {
-                final d = double.tryParse(v);
-                if (d != null && d > 0) {
-                  widget.onLambdaChanged(d);
-                }
-              },
-            ),
-          ),
-          const SizedBox(width: Spacing.xs),
-
-          // Delete button.
-          IconButton(
-            icon: const Icon(Icons.delete_outline, size: 18),
-            onPressed: widget.onDelete,
-            visualDensity: VisualDensity.compact,
-            padding: EdgeInsets.zero,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -23,7 +23,12 @@ mixin _$MaterialLayer {
  double get thicknessMm;/// Thermal conductivity λ in W/(m·K). Range: 0.01–50.0.
  double get thermalConductivity;/// Bulk density in kg/m³. Range: 1–10 000.
  double get density;/// Specific heat capacity in J/(kg·K). Range: 100–5000.
- double get specificHeat;
+ double get specificHeat;/// Stud width in mm. Non-null → inhomogeneous layer. Range: 1.0–1000.0.
+/// Always set together with [studClearGapMm] and [studLambda].
+ double? get studWidthMm;/// Clear gap between studs in mm (edge-to-edge). Range: 1.0–10000.0.
+ double? get studClearGapMm;/// Thermal conductivity of the stud in W/(m·K). Range: 0.01–50.0.
+/// Defaults to `lambdaTimberDefault` (0.13) when the stud is first added.
+ double? get studLambda;
 /// Create a copy of MaterialLayer
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -36,16 +41,16 @@ $MaterialLayerCopyWith<MaterialLayer> get copyWith => _$MaterialLayerCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is MaterialLayer&&(identical(other.id, id) || other.id == id)&&(identical(other.constructionId, constructionId) || other.constructionId == constructionId)&&(identical(other.sortOrder, sortOrder) || other.sortOrder == sortOrder)&&(identical(other.materialId, materialId) || other.materialId == materialId)&&(identical(other.thicknessMm, thicknessMm) || other.thicknessMm == thicknessMm)&&(identical(other.thermalConductivity, thermalConductivity) || other.thermalConductivity == thermalConductivity)&&(identical(other.density, density) || other.density == density)&&(identical(other.specificHeat, specificHeat) || other.specificHeat == specificHeat));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is MaterialLayer&&(identical(other.id, id) || other.id == id)&&(identical(other.constructionId, constructionId) || other.constructionId == constructionId)&&(identical(other.sortOrder, sortOrder) || other.sortOrder == sortOrder)&&(identical(other.materialId, materialId) || other.materialId == materialId)&&(identical(other.thicknessMm, thicknessMm) || other.thicknessMm == thicknessMm)&&(identical(other.thermalConductivity, thermalConductivity) || other.thermalConductivity == thermalConductivity)&&(identical(other.density, density) || other.density == density)&&(identical(other.specificHeat, specificHeat) || other.specificHeat == specificHeat)&&(identical(other.studWidthMm, studWidthMm) || other.studWidthMm == studWidthMm)&&(identical(other.studClearGapMm, studClearGapMm) || other.studClearGapMm == studClearGapMm)&&(identical(other.studLambda, studLambda) || other.studLambda == studLambda));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,constructionId,sortOrder,materialId,thicknessMm,thermalConductivity,density,specificHeat);
+int get hashCode => Object.hash(runtimeType,id,constructionId,sortOrder,materialId,thicknessMm,thermalConductivity,density,specificHeat,studWidthMm,studClearGapMm,studLambda);
 
 @override
 String toString() {
-  return 'MaterialLayer(id: $id, constructionId: $constructionId, sortOrder: $sortOrder, materialId: $materialId, thicknessMm: $thicknessMm, thermalConductivity: $thermalConductivity, density: $density, specificHeat: $specificHeat)';
+  return 'MaterialLayer(id: $id, constructionId: $constructionId, sortOrder: $sortOrder, materialId: $materialId, thicknessMm: $thicknessMm, thermalConductivity: $thermalConductivity, density: $density, specificHeat: $specificHeat, studWidthMm: $studWidthMm, studClearGapMm: $studClearGapMm, studLambda: $studLambda)';
 }
 
 
@@ -56,7 +61,7 @@ abstract mixin class $MaterialLayerCopyWith<$Res>  {
   factory $MaterialLayerCopyWith(MaterialLayer value, $Res Function(MaterialLayer) _then) = _$MaterialLayerCopyWithImpl;
 @useResult
 $Res call({
- String id, String constructionId, int sortOrder, String materialId, double thicknessMm, double thermalConductivity, double density, double specificHeat
+ String id, String constructionId, int sortOrder, String materialId, double thicknessMm, double thermalConductivity, double density, double specificHeat, double? studWidthMm, double? studClearGapMm, double? studLambda
 });
 
 
@@ -73,7 +78,7 @@ class _$MaterialLayerCopyWithImpl<$Res>
 
 /// Create a copy of MaterialLayer
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? constructionId = null,Object? sortOrder = null,Object? materialId = null,Object? thicknessMm = null,Object? thermalConductivity = null,Object? density = null,Object? specificHeat = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? constructionId = null,Object? sortOrder = null,Object? materialId = null,Object? thicknessMm = null,Object? thermalConductivity = null,Object? density = null,Object? specificHeat = null,Object? studWidthMm = freezed,Object? studClearGapMm = freezed,Object? studLambda = freezed,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,constructionId: null == constructionId ? _self.constructionId : constructionId // ignore: cast_nullable_to_non_nullable
@@ -83,7 +88,10 @@ as String,thicknessMm: null == thicknessMm ? _self.thicknessMm : thicknessMm // 
 as double,thermalConductivity: null == thermalConductivity ? _self.thermalConductivity : thermalConductivity // ignore: cast_nullable_to_non_nullable
 as double,density: null == density ? _self.density : density // ignore: cast_nullable_to_non_nullable
 as double,specificHeat: null == specificHeat ? _self.specificHeat : specificHeat // ignore: cast_nullable_to_non_nullable
-as double,
+as double,studWidthMm: freezed == studWidthMm ? _self.studWidthMm : studWidthMm // ignore: cast_nullable_to_non_nullable
+as double?,studClearGapMm: freezed == studClearGapMm ? _self.studClearGapMm : studClearGapMm // ignore: cast_nullable_to_non_nullable
+as double?,studLambda: freezed == studLambda ? _self.studLambda : studLambda // ignore: cast_nullable_to_non_nullable
+as double?,
   ));
 }
 
@@ -168,10 +176,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String constructionId,  int sortOrder,  String materialId,  double thicknessMm,  double thermalConductivity,  double density,  double specificHeat)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String constructionId,  int sortOrder,  String materialId,  double thicknessMm,  double thermalConductivity,  double density,  double specificHeat,  double? studWidthMm,  double? studClearGapMm,  double? studLambda)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _MaterialLayer() when $default != null:
-return $default(_that.id,_that.constructionId,_that.sortOrder,_that.materialId,_that.thicknessMm,_that.thermalConductivity,_that.density,_that.specificHeat);case _:
+return $default(_that.id,_that.constructionId,_that.sortOrder,_that.materialId,_that.thicknessMm,_that.thermalConductivity,_that.density,_that.specificHeat,_that.studWidthMm,_that.studClearGapMm,_that.studLambda);case _:
   return orElse();
 
 }
@@ -189,10 +197,10 @@ return $default(_that.id,_that.constructionId,_that.sortOrder,_that.materialId,_
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String constructionId,  int sortOrder,  String materialId,  double thicknessMm,  double thermalConductivity,  double density,  double specificHeat)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String constructionId,  int sortOrder,  String materialId,  double thicknessMm,  double thermalConductivity,  double density,  double specificHeat,  double? studWidthMm,  double? studClearGapMm,  double? studLambda)  $default,) {final _that = this;
 switch (_that) {
 case _MaterialLayer():
-return $default(_that.id,_that.constructionId,_that.sortOrder,_that.materialId,_that.thicknessMm,_that.thermalConductivity,_that.density,_that.specificHeat);case _:
+return $default(_that.id,_that.constructionId,_that.sortOrder,_that.materialId,_that.thicknessMm,_that.thermalConductivity,_that.density,_that.specificHeat,_that.studWidthMm,_that.studClearGapMm,_that.studLambda);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -209,10 +217,10 @@ return $default(_that.id,_that.constructionId,_that.sortOrder,_that.materialId,_
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String constructionId,  int sortOrder,  String materialId,  double thicknessMm,  double thermalConductivity,  double density,  double specificHeat)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String constructionId,  int sortOrder,  String materialId,  double thicknessMm,  double thermalConductivity,  double density,  double specificHeat,  double? studWidthMm,  double? studClearGapMm,  double? studLambda)?  $default,) {final _that = this;
 switch (_that) {
 case _MaterialLayer() when $default != null:
-return $default(_that.id,_that.constructionId,_that.sortOrder,_that.materialId,_that.thicknessMm,_that.thermalConductivity,_that.density,_that.specificHeat);case _:
+return $default(_that.id,_that.constructionId,_that.sortOrder,_that.materialId,_that.thicknessMm,_that.thermalConductivity,_that.density,_that.specificHeat,_that.studWidthMm,_that.studClearGapMm,_that.studLambda);case _:
   return null;
 
 }
@@ -224,7 +232,7 @@ return $default(_that.id,_that.constructionId,_that.sortOrder,_that.materialId,_
 @JsonSerializable()
 
 class _MaterialLayer implements MaterialLayer {
-  const _MaterialLayer({required this.id, required this.constructionId, required this.sortOrder, required this.materialId, required this.thicknessMm, required this.thermalConductivity, required this.density, required this.specificHeat});
+  const _MaterialLayer({required this.id, required this.constructionId, required this.sortOrder, required this.materialId, required this.thicknessMm, required this.thermalConductivity, required this.density, required this.specificHeat, this.studWidthMm, this.studClearGapMm, this.studLambda});
   factory _MaterialLayer.fromJson(Map<String, dynamic> json) => _$MaterialLayerFromJson(json);
 
 /// UUID v4 primary key.
@@ -243,6 +251,14 @@ class _MaterialLayer implements MaterialLayer {
 @override final  double density;
 /// Specific heat capacity in J/(kg·K). Range: 100–5000.
 @override final  double specificHeat;
+/// Stud width in mm. Non-null → inhomogeneous layer. Range: 1.0–1000.0.
+/// Always set together with [studClearGapMm] and [studLambda].
+@override final  double? studWidthMm;
+/// Clear gap between studs in mm (edge-to-edge). Range: 1.0–10000.0.
+@override final  double? studClearGapMm;
+/// Thermal conductivity of the stud in W/(m·K). Range: 0.01–50.0.
+/// Defaults to `lambdaTimberDefault` (0.13) when the stud is first added.
+@override final  double? studLambda;
 
 /// Create a copy of MaterialLayer
 /// with the given fields replaced by the non-null parameter values.
@@ -257,16 +273,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _MaterialLayer&&(identical(other.id, id) || other.id == id)&&(identical(other.constructionId, constructionId) || other.constructionId == constructionId)&&(identical(other.sortOrder, sortOrder) || other.sortOrder == sortOrder)&&(identical(other.materialId, materialId) || other.materialId == materialId)&&(identical(other.thicknessMm, thicknessMm) || other.thicknessMm == thicknessMm)&&(identical(other.thermalConductivity, thermalConductivity) || other.thermalConductivity == thermalConductivity)&&(identical(other.density, density) || other.density == density)&&(identical(other.specificHeat, specificHeat) || other.specificHeat == specificHeat));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _MaterialLayer&&(identical(other.id, id) || other.id == id)&&(identical(other.constructionId, constructionId) || other.constructionId == constructionId)&&(identical(other.sortOrder, sortOrder) || other.sortOrder == sortOrder)&&(identical(other.materialId, materialId) || other.materialId == materialId)&&(identical(other.thicknessMm, thicknessMm) || other.thicknessMm == thicknessMm)&&(identical(other.thermalConductivity, thermalConductivity) || other.thermalConductivity == thermalConductivity)&&(identical(other.density, density) || other.density == density)&&(identical(other.specificHeat, specificHeat) || other.specificHeat == specificHeat)&&(identical(other.studWidthMm, studWidthMm) || other.studWidthMm == studWidthMm)&&(identical(other.studClearGapMm, studClearGapMm) || other.studClearGapMm == studClearGapMm)&&(identical(other.studLambda, studLambda) || other.studLambda == studLambda));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,constructionId,sortOrder,materialId,thicknessMm,thermalConductivity,density,specificHeat);
+int get hashCode => Object.hash(runtimeType,id,constructionId,sortOrder,materialId,thicknessMm,thermalConductivity,density,specificHeat,studWidthMm,studClearGapMm,studLambda);
 
 @override
 String toString() {
-  return 'MaterialLayer(id: $id, constructionId: $constructionId, sortOrder: $sortOrder, materialId: $materialId, thicknessMm: $thicknessMm, thermalConductivity: $thermalConductivity, density: $density, specificHeat: $specificHeat)';
+  return 'MaterialLayer(id: $id, constructionId: $constructionId, sortOrder: $sortOrder, materialId: $materialId, thicknessMm: $thicknessMm, thermalConductivity: $thermalConductivity, density: $density, specificHeat: $specificHeat, studWidthMm: $studWidthMm, studClearGapMm: $studClearGapMm, studLambda: $studLambda)';
 }
 
 
@@ -277,7 +293,7 @@ abstract mixin class _$MaterialLayerCopyWith<$Res> implements $MaterialLayerCopy
   factory _$MaterialLayerCopyWith(_MaterialLayer value, $Res Function(_MaterialLayer) _then) = __$MaterialLayerCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String constructionId, int sortOrder, String materialId, double thicknessMm, double thermalConductivity, double density, double specificHeat
+ String id, String constructionId, int sortOrder, String materialId, double thicknessMm, double thermalConductivity, double density, double specificHeat, double? studWidthMm, double? studClearGapMm, double? studLambda
 });
 
 
@@ -294,7 +310,7 @@ class __$MaterialLayerCopyWithImpl<$Res>
 
 /// Create a copy of MaterialLayer
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? constructionId = null,Object? sortOrder = null,Object? materialId = null,Object? thicknessMm = null,Object? thermalConductivity = null,Object? density = null,Object? specificHeat = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? constructionId = null,Object? sortOrder = null,Object? materialId = null,Object? thicknessMm = null,Object? thermalConductivity = null,Object? density = null,Object? specificHeat = null,Object? studWidthMm = freezed,Object? studClearGapMm = freezed,Object? studLambda = freezed,}) {
   return _then(_MaterialLayer(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,constructionId: null == constructionId ? _self.constructionId : constructionId // ignore: cast_nullable_to_non_nullable
@@ -304,7 +320,10 @@ as String,thicknessMm: null == thicknessMm ? _self.thicknessMm : thicknessMm // 
 as double,thermalConductivity: null == thermalConductivity ? _self.thermalConductivity : thermalConductivity // ignore: cast_nullable_to_non_nullable
 as double,density: null == density ? _self.density : density // ignore: cast_nullable_to_non_nullable
 as double,specificHeat: null == specificHeat ? _self.specificHeat : specificHeat // ignore: cast_nullable_to_non_nullable
-as double,
+as double,studWidthMm: freezed == studWidthMm ? _self.studWidthMm : studWidthMm // ignore: cast_nullable_to_non_nullable
+as double?,studClearGapMm: freezed == studClearGapMm ? _self.studClearGapMm : studClearGapMm // ignore: cast_nullable_to_non_nullable
+as double?,studLambda: freezed == studLambda ? _self.studLambda : studLambda // ignore: cast_nullable_to_non_nullable
+as double?,
   ));
 }
 

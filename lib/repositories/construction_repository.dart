@@ -90,6 +90,9 @@ MaterialLayer _layerFromRow($db.MaterialLayer row) {
     thermalConductivity: row.thermalConductivity,
     density: row.density,
     specificHeat: row.specificHeat,
+    studWidthMm: row.studWidthMm,
+    studClearGapMm: row.studClearGapMm,
+    studLambda: row.studLambda,
   );
 }
 
@@ -117,6 +120,9 @@ $db.MaterialLayersCompanion _layerToCompanion(MaterialLayer layer) {
     thermalConductivity: Value(layer.thermalConductivity),
     density: Value(layer.density),
     specificHeat: Value(layer.specificHeat),
+    studWidthMm: Value(layer.studWidthMm),
+    studClearGapMm: Value(layer.studClearGapMm),
+    studLambda: Value(layer.studLambda),
   );
 }
 

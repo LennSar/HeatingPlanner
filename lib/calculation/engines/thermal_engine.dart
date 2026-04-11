@@ -1,6 +1,64 @@
 import '../../core/constants/thermal_defaults.dart';
 import '../../data/models/enums.dart';
 
+// ── LayerSpec ─────────────────────────────────────────────────────────────────
+
+/// Describes a single layer in a [ThermalEngine.uValueCombined] call.
+///
+/// Use [HomogeneousLayerSpec] for uniform materials and
+/// [InhomogeneousLayerSpec] for bridged layers such as timber-stud walls.
+sealed class LayerSpec {
+  const LayerSpec();
+}
+
+/// A layer with a single, uniform thermal conductivity.
+class HomogeneousLayerSpec extends LayerSpec {
+  /// Creates a [HomogeneousLayerSpec].
+  const HomogeneousLayerSpec({
+    required this.thicknessMm,
+    required this.lambda,
+  });
+
+  /// Layer thickness in mm.
+  final double thicknessMm;
+
+  /// Thermal conductivity in W/(m·K).
+  final double lambda;
+}
+
+/// A layer that is bridged by repeating structural members (e.g. timber studs).
+///
+/// Uses the EN ISO 6946:2017 §6.9 combined method to account for the two
+/// parallel heat-flow paths through the main fill material and the stud.
+class InhomogeneousLayerSpec extends LayerSpec {
+  /// Creates an [InhomogeneousLayerSpec].
+  const InhomogeneousLayerSpec({
+    required this.thicknessMm,
+    required this.lambdaMain,
+    required this.studWidthMm,
+    required this.studClearGapMm,
+    this.lambdaStud = 0.13,
+  });
+
+  /// Layer thickness in mm.
+  final double thicknessMm;
+
+  /// Thermal conductivity of the bulk fill material in W/(m·K).
+  final double lambdaMain;
+
+  /// Width of the structural stud in mm.
+  final double studWidthMm;
+
+  /// Clear gap between studs (edge-to-edge) in mm.
+  final double studClearGapMm;
+
+  /// Thermal conductivity of the stud in W/(m·K).
+  /// Defaults to 0.13 (timber, per [lambdaTimberDefault]).
+  final double lambdaStud;
+}
+
+// ── ThermalEngine ─────────────────────────────────────────────────────────────
+
 /// Thermal calculation engine — EN ISO 6946 / EN 12831.
 ///
 /// All functions are pure static. Returns [double.nan] for invalid inputs;
@@ -29,6 +87,132 @@ class ThermalEngine {
     );
     if (r.isNaN || r <= 0) return double.nan;
     return 1.0 / r;
+  }
+
+  /// U-value for a construction that may contain inhomogeneous (bridged) layers.
+  ///
+  /// Uses the EN ISO 6946:2017 §6.9 **combined method**:
+  ///   R_T = (R'_T + R''_T) / 2
+  ///   U = 1 / R_T
+  ///
+  /// **Upper resistance limit R'_T** — parallel heat-flow paths through the
+  /// full assembly. For each path `p` (a combination of main-material or stud
+  /// choices at each inhomogeneous layer), the path resistance is:
+  ///   R_T_p = R_si + Σ R_i(p) + R_se
+  /// where R_i(p) = d / λ_chosen. The combined area fraction f_p is the
+  /// product of the individual per-layer fractions. Then:
+  ///   R'_T = 1 / Σ(f_p / R_T_p)
+  ///
+  /// **Lower resistance limit R''_T** — series of layers, each treated as
+  /// parallel conductances:
+  ///   homogeneous layer:   R_layer = d / λ
+  ///   inhomogeneous layer: R_layer = 1 / (f_stud / r_stud + f_main / r_main)
+  ///   R''_T = R_si + Σ R_layer + R_se
+  ///
+  /// **Area fractions:**
+  ///   f_stud = studWidthMm / (studWidthMm + studClearGapMm)
+  ///   f_main = 1 − f_stud
+  ///
+  /// Returns [double.nan] for invalid inputs (λ ≤ 0, thickness ≤ 0,
+  /// f_stud ≥ 1, empty layer list, or non-positive surface resistances).
+  /// If all layers are [HomogeneousLayerSpec] the result equals [uValue].
+  static double uValueCombined({
+    required List<LayerSpec> layers,
+    required double rsi,
+    required double rse,
+  }) {
+    if (layers.isEmpty) return double.nan;
+    if (rsi <= 0 || rse <= 0) return double.nan;
+
+    // Validate all layers and pre-compute fractions.
+    for (final layer in layers) {
+      switch (layer) {
+        case HomogeneousLayerSpec(:final thicknessMm, :final lambda):
+          if (thicknessMm <= 0 || lambda <= 0) return double.nan;
+        case InhomogeneousLayerSpec(
+            :final thicknessMm,
+            :final lambdaMain,
+            :final studWidthMm,
+            :final studClearGapMm,
+            :final lambdaStud,
+          ):
+          if (thicknessMm <= 0 || lambdaMain <= 0 || lambdaStud <= 0) {
+            return double.nan;
+          }
+          final fStud = studWidthMm / (studWidthMm + studClearGapMm);
+          if (fStud >= 1) return double.nan;
+      }
+    }
+
+    // ── Upper limit R'_T ────────────────────────────────────────────────────
+    //
+    // Build all parallel paths by expanding inhomogeneous layers into two
+    // branches. Each path carries a cumulative area fraction and a cumulative
+    // layer-resistance (surface resistances added at the end).
+    var paths = <(double fraction, double rLayers)>[(1.0, 0.0)];
+
+    for (final layer in layers) {
+      final next = <(double, double)>[];
+      switch (layer) {
+        case HomogeneousLayerSpec(:final thicknessMm, :final lambda):
+          final rLayer = thicknessMm / 1000.0 / lambda;
+          for (final (f, r) in paths) {
+            next.add((f, r + rLayer));
+          }
+        case InhomogeneousLayerSpec(
+            :final thicknessMm,
+            :final lambdaMain,
+            :final studWidthMm,
+            :final studClearGapMm,
+            :final lambdaStud,
+          ):
+          final fStud = studWidthMm / (studWidthMm + studClearGapMm);
+          final fMain = 1.0 - fStud;
+          final rMain = thicknessMm / 1000.0 / lambdaMain;
+          final rStud = thicknessMm / 1000.0 / lambdaStud;
+          for (final (f, r) in paths) {
+            next.add((f * fMain, r + rMain));
+            next.add((f * fStud, r + rStud));
+          }
+      }
+      paths = next;
+    }
+
+    var sumFracOverR = 0.0;
+    for (final (f, rLayers) in paths) {
+      final rTp = rsi + rLayers + rse;
+      if (rTp <= 0) return double.nan;
+      sumFracOverR += f / rTp;
+    }
+    if (sumFracOverR <= 0) return double.nan;
+    final rPrimeT = 1.0 / sumFracOverR;
+
+    // ── Lower limit R''_T ───────────────────────────────────────────────────
+    var rDoublePrimeT = rsi + rse;
+    for (final layer in layers) {
+      switch (layer) {
+        case HomogeneousLayerSpec(:final thicknessMm, :final lambda):
+          rDoublePrimeT += thicknessMm / 1000.0 / lambda;
+        case InhomogeneousLayerSpec(
+            :final thicknessMm,
+            :final lambdaMain,
+            :final studWidthMm,
+            :final studClearGapMm,
+            :final lambdaStud,
+          ):
+          final fStud = studWidthMm / (studWidthMm + studClearGapMm);
+          final fMain = 1.0 - fStud;
+          final rStud = thicknessMm / 1000.0 / lambdaStud;
+          final rMain = thicknessMm / 1000.0 / lambdaMain;
+          final conductance = fStud / rStud + fMain / rMain;
+          if (conductance <= 0) return double.nan;
+          rDoublePrimeT += 1.0 / conductance;
+      }
+    }
+
+    final rT = (rPrimeT + rDoublePrimeT) / 2.0;
+    if (rT <= 0) return double.nan;
+    return 1.0 / rT;
   }
 
   /// Total thermal resistance of the assembly R_total (m²·K/W).

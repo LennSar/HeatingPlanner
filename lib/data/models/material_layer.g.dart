@@ -16,6 +16,9 @@ _MaterialLayer _$MaterialLayerFromJson(Map<String, dynamic> json) =>
       thermalConductivity: (json['thermalConductivity'] as num).toDouble(),
       density: (json['density'] as num).toDouble(),
       specificHeat: (json['specificHeat'] as num).toDouble(),
+      studWidthMm: (json['studWidthMm'] as num?)?.toDouble(),
+      studClearGapMm: (json['studClearGapMm'] as num?)?.toDouble(),
+      studLambda: (json['studLambda'] as num?)?.toDouble(),
     );
 
 Map<String, dynamic> _$MaterialLayerToJson(_MaterialLayer instance) =>
@@ -28,4 +31,7 @@ Map<String, dynamic> _$MaterialLayerToJson(_MaterialLayer instance) =>
       'thermalConductivity': instance.thermalConductivity,
       'density': instance.density,
       'specificHeat': instance.specificHeat,
+      'studWidthMm': instance.studWidthMm,
+      'studClearGapMm': instance.studClearGapMm,
+      'studLambda': instance.studLambda,
     };

@@ -4169,6 +4169,39 @@ class $MaterialLayersTable extends MaterialLayers
     type: DriftSqlType.double,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _studWidthMmMeta = const VerificationMeta(
+    'studWidthMm',
+  );
+  @override
+  late final GeneratedColumn<double> studWidthMm = GeneratedColumn<double>(
+    'stud_width_mm',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _studClearGapMmMeta = const VerificationMeta(
+    'studClearGapMm',
+  );
+  @override
+  late final GeneratedColumn<double> studClearGapMm = GeneratedColumn<double>(
+    'stud_clear_gap_mm',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
+  static const VerificationMeta _studLambdaMeta = const VerificationMeta(
+    'studLambda',
+  );
+  @override
+  late final GeneratedColumn<double> studLambda = GeneratedColumn<double>(
+    'stud_lambda',
+    aliasedName,
+    true,
+    type: DriftSqlType.double,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -4179,6 +4212,9 @@ class $MaterialLayersTable extends MaterialLayers
     thermalConductivity,
     density,
     specificHeat,
+    studWidthMm,
+    studClearGapMm,
+    studLambda,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4265,6 +4301,30 @@ class $MaterialLayersTable extends MaterialLayers
     } else if (isInserting) {
       context.missing(_specificHeatMeta);
     }
+    if (data.containsKey('stud_width_mm')) {
+      context.handle(
+        _studWidthMmMeta,
+        studWidthMm.isAcceptableOrUnknown(
+          data['stud_width_mm']!,
+          _studWidthMmMeta,
+        ),
+      );
+    }
+    if (data.containsKey('stud_clear_gap_mm')) {
+      context.handle(
+        _studClearGapMmMeta,
+        studClearGapMm.isAcceptableOrUnknown(
+          data['stud_clear_gap_mm']!,
+          _studClearGapMmMeta,
+        ),
+      );
+    }
+    if (data.containsKey('stud_lambda')) {
+      context.handle(
+        _studLambdaMeta,
+        studLambda.isAcceptableOrUnknown(data['stud_lambda']!, _studLambdaMeta),
+      );
+    }
     return context;
   }
 
@@ -4306,6 +4366,18 @@ class $MaterialLayersTable extends MaterialLayers
         DriftSqlType.double,
         data['${effectivePrefix}specific_heat'],
       )!,
+      studWidthMm: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}stud_width_mm'],
+      ),
+      studClearGapMm: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}stud_clear_gap_mm'],
+      ),
+      studLambda: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}stud_lambda'],
+      ),
     );
   }
 
@@ -4324,6 +4396,16 @@ class MaterialLayer extends DataClass implements Insertable<MaterialLayer> {
   final double thermalConductivity;
   final double density;
   final double specificHeat;
+
+  /// Stud width in mm. Non-null → inhomogeneous layer. Always set together
+  /// with [studClearGapMm] and [studLambda].
+  final double? studWidthMm;
+
+  /// Clear gap between studs in mm (edge-to-edge, not centre-to-centre).
+  final double? studClearGapMm;
+
+  /// Thermal conductivity of the stud material in W/(m·K).
+  final double? studLambda;
   const MaterialLayer({
     required this.id,
     required this.constructionId,
@@ -4333,6 +4415,9 @@ class MaterialLayer extends DataClass implements Insertable<MaterialLayer> {
     required this.thermalConductivity,
     required this.density,
     required this.specificHeat,
+    this.studWidthMm,
+    this.studClearGapMm,
+    this.studLambda,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -4345,6 +4430,15 @@ class MaterialLayer extends DataClass implements Insertable<MaterialLayer> {
     map['thermal_conductivity'] = Variable<double>(thermalConductivity);
     map['density'] = Variable<double>(density);
     map['specific_heat'] = Variable<double>(specificHeat);
+    if (!nullToAbsent || studWidthMm != null) {
+      map['stud_width_mm'] = Variable<double>(studWidthMm);
+    }
+    if (!nullToAbsent || studClearGapMm != null) {
+      map['stud_clear_gap_mm'] = Variable<double>(studClearGapMm);
+    }
+    if (!nullToAbsent || studLambda != null) {
+      map['stud_lambda'] = Variable<double>(studLambda);
+    }
     return map;
   }
 
@@ -4358,6 +4452,15 @@ class MaterialLayer extends DataClass implements Insertable<MaterialLayer> {
       thermalConductivity: Value(thermalConductivity),
       density: Value(density),
       specificHeat: Value(specificHeat),
+      studWidthMm: studWidthMm == null && nullToAbsent
+          ? const Value.absent()
+          : Value(studWidthMm),
+      studClearGapMm: studClearGapMm == null && nullToAbsent
+          ? const Value.absent()
+          : Value(studClearGapMm),
+      studLambda: studLambda == null && nullToAbsent
+          ? const Value.absent()
+          : Value(studLambda),
     );
   }
 
@@ -4377,6 +4480,9 @@ class MaterialLayer extends DataClass implements Insertable<MaterialLayer> {
       ),
       density: serializer.fromJson<double>(json['density']),
       specificHeat: serializer.fromJson<double>(json['specificHeat']),
+      studWidthMm: serializer.fromJson<double?>(json['studWidthMm']),
+      studClearGapMm: serializer.fromJson<double?>(json['studClearGapMm']),
+      studLambda: serializer.fromJson<double?>(json['studLambda']),
     );
   }
   @override
@@ -4391,6 +4497,9 @@ class MaterialLayer extends DataClass implements Insertable<MaterialLayer> {
       'thermalConductivity': serializer.toJson<double>(thermalConductivity),
       'density': serializer.toJson<double>(density),
       'specificHeat': serializer.toJson<double>(specificHeat),
+      'studWidthMm': serializer.toJson<double?>(studWidthMm),
+      'studClearGapMm': serializer.toJson<double?>(studClearGapMm),
+      'studLambda': serializer.toJson<double?>(studLambda),
     };
   }
 
@@ -4403,6 +4512,9 @@ class MaterialLayer extends DataClass implements Insertable<MaterialLayer> {
     double? thermalConductivity,
     double? density,
     double? specificHeat,
+    Value<double?> studWidthMm = const Value.absent(),
+    Value<double?> studClearGapMm = const Value.absent(),
+    Value<double?> studLambda = const Value.absent(),
   }) => MaterialLayer(
     id: id ?? this.id,
     constructionId: constructionId ?? this.constructionId,
@@ -4412,6 +4524,11 @@ class MaterialLayer extends DataClass implements Insertable<MaterialLayer> {
     thermalConductivity: thermalConductivity ?? this.thermalConductivity,
     density: density ?? this.density,
     specificHeat: specificHeat ?? this.specificHeat,
+    studWidthMm: studWidthMm.present ? studWidthMm.value : this.studWidthMm,
+    studClearGapMm: studClearGapMm.present
+        ? studClearGapMm.value
+        : this.studClearGapMm,
+    studLambda: studLambda.present ? studLambda.value : this.studLambda,
   );
   MaterialLayer copyWithCompanion(MaterialLayersCompanion data) {
     return MaterialLayer(
@@ -4433,6 +4550,15 @@ class MaterialLayer extends DataClass implements Insertable<MaterialLayer> {
       specificHeat: data.specificHeat.present
           ? data.specificHeat.value
           : this.specificHeat,
+      studWidthMm: data.studWidthMm.present
+          ? data.studWidthMm.value
+          : this.studWidthMm,
+      studClearGapMm: data.studClearGapMm.present
+          ? data.studClearGapMm.value
+          : this.studClearGapMm,
+      studLambda: data.studLambda.present
+          ? data.studLambda.value
+          : this.studLambda,
     );
   }
 
@@ -4446,7 +4572,10 @@ class MaterialLayer extends DataClass implements Insertable<MaterialLayer> {
           ..write('thicknessMm: $thicknessMm, ')
           ..write('thermalConductivity: $thermalConductivity, ')
           ..write('density: $density, ')
-          ..write('specificHeat: $specificHeat')
+          ..write('specificHeat: $specificHeat, ')
+          ..write('studWidthMm: $studWidthMm, ')
+          ..write('studClearGapMm: $studClearGapMm, ')
+          ..write('studLambda: $studLambda')
           ..write(')'))
         .toString();
   }
@@ -4461,6 +4590,9 @@ class MaterialLayer extends DataClass implements Insertable<MaterialLayer> {
     thermalConductivity,
     density,
     specificHeat,
+    studWidthMm,
+    studClearGapMm,
+    studLambda,
   );
   @override
   bool operator ==(Object other) =>
@@ -4473,7 +4605,10 @@ class MaterialLayer extends DataClass implements Insertable<MaterialLayer> {
           other.thicknessMm == this.thicknessMm &&
           other.thermalConductivity == this.thermalConductivity &&
           other.density == this.density &&
-          other.specificHeat == this.specificHeat);
+          other.specificHeat == this.specificHeat &&
+          other.studWidthMm == this.studWidthMm &&
+          other.studClearGapMm == this.studClearGapMm &&
+          other.studLambda == this.studLambda);
 }
 
 class MaterialLayersCompanion extends UpdateCompanion<MaterialLayer> {
@@ -4485,6 +4620,9 @@ class MaterialLayersCompanion extends UpdateCompanion<MaterialLayer> {
   final Value<double> thermalConductivity;
   final Value<double> density;
   final Value<double> specificHeat;
+  final Value<double?> studWidthMm;
+  final Value<double?> studClearGapMm;
+  final Value<double?> studLambda;
   final Value<int> rowid;
   const MaterialLayersCompanion({
     this.id = const Value.absent(),
@@ -4495,6 +4633,9 @@ class MaterialLayersCompanion extends UpdateCompanion<MaterialLayer> {
     this.thermalConductivity = const Value.absent(),
     this.density = const Value.absent(),
     this.specificHeat = const Value.absent(),
+    this.studWidthMm = const Value.absent(),
+    this.studClearGapMm = const Value.absent(),
+    this.studLambda = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   MaterialLayersCompanion.insert({
@@ -4506,6 +4647,9 @@ class MaterialLayersCompanion extends UpdateCompanion<MaterialLayer> {
     required double thermalConductivity,
     required double density,
     required double specificHeat,
+    this.studWidthMm = const Value.absent(),
+    this.studClearGapMm = const Value.absent(),
+    this.studLambda = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        constructionId = Value(constructionId),
@@ -4524,6 +4668,9 @@ class MaterialLayersCompanion extends UpdateCompanion<MaterialLayer> {
     Expression<double>? thermalConductivity,
     Expression<double>? density,
     Expression<double>? specificHeat,
+    Expression<double>? studWidthMm,
+    Expression<double>? studClearGapMm,
+    Expression<double>? studLambda,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4536,6 +4683,9 @@ class MaterialLayersCompanion extends UpdateCompanion<MaterialLayer> {
         'thermal_conductivity': thermalConductivity,
       if (density != null) 'density': density,
       if (specificHeat != null) 'specific_heat': specificHeat,
+      if (studWidthMm != null) 'stud_width_mm': studWidthMm,
+      if (studClearGapMm != null) 'stud_clear_gap_mm': studClearGapMm,
+      if (studLambda != null) 'stud_lambda': studLambda,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4549,6 +4699,9 @@ class MaterialLayersCompanion extends UpdateCompanion<MaterialLayer> {
     Value<double>? thermalConductivity,
     Value<double>? density,
     Value<double>? specificHeat,
+    Value<double?>? studWidthMm,
+    Value<double?>? studClearGapMm,
+    Value<double?>? studLambda,
     Value<int>? rowid,
   }) {
     return MaterialLayersCompanion(
@@ -4560,6 +4713,9 @@ class MaterialLayersCompanion extends UpdateCompanion<MaterialLayer> {
       thermalConductivity: thermalConductivity ?? this.thermalConductivity,
       density: density ?? this.density,
       specificHeat: specificHeat ?? this.specificHeat,
+      studWidthMm: studWidthMm ?? this.studWidthMm,
+      studClearGapMm: studClearGapMm ?? this.studClearGapMm,
+      studLambda: studLambda ?? this.studLambda,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4591,6 +4747,15 @@ class MaterialLayersCompanion extends UpdateCompanion<MaterialLayer> {
     if (specificHeat.present) {
       map['specific_heat'] = Variable<double>(specificHeat.value);
     }
+    if (studWidthMm.present) {
+      map['stud_width_mm'] = Variable<double>(studWidthMm.value);
+    }
+    if (studClearGapMm.present) {
+      map['stud_clear_gap_mm'] = Variable<double>(studClearGapMm.value);
+    }
+    if (studLambda.present) {
+      map['stud_lambda'] = Variable<double>(studLambda.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4608,6 +4773,9 @@ class MaterialLayersCompanion extends UpdateCompanion<MaterialLayer> {
           ..write('thermalConductivity: $thermalConductivity, ')
           ..write('density: $density, ')
           ..write('specificHeat: $specificHeat, ')
+          ..write('studWidthMm: $studWidthMm, ')
+          ..write('studClearGapMm: $studClearGapMm, ')
+          ..write('studLambda: $studLambda, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -11822,6 +11990,9 @@ typedef $$MaterialLayersTableCreateCompanionBuilder =
       required double thermalConductivity,
       required double density,
       required double specificHeat,
+      Value<double?> studWidthMm,
+      Value<double?> studClearGapMm,
+      Value<double?> studLambda,
       Value<int> rowid,
     });
 typedef $$MaterialLayersTableUpdateCompanionBuilder =
@@ -11834,6 +12005,9 @@ typedef $$MaterialLayersTableUpdateCompanionBuilder =
       Value<double> thermalConductivity,
       Value<double> density,
       Value<double> specificHeat,
+      Value<double?> studWidthMm,
+      Value<double?> studClearGapMm,
+      Value<double?> studLambda,
       Value<int> rowid,
     });
 
@@ -11929,6 +12103,21 @@ class $$MaterialLayersTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<double> get studWidthMm => $composableBuilder(
+    column: $table.studWidthMm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get studClearGapMm => $composableBuilder(
+    column: $table.studClearGapMm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get studLambda => $composableBuilder(
+    column: $table.studLambda,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$WallConstructionsTableFilterComposer get constructionId {
     final $$WallConstructionsTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -12015,6 +12204,21 @@ class $$MaterialLayersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get studWidthMm => $composableBuilder(
+    column: $table.studWidthMm,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get studClearGapMm => $composableBuilder(
+    column: $table.studClearGapMm,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<double> get studLambda => $composableBuilder(
+    column: $table.studLambda,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$WallConstructionsTableOrderingComposer get constructionId {
     final $$WallConstructionsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -12092,6 +12296,21 @@ class $$MaterialLayersTableAnnotationComposer
 
   GeneratedColumn<double> get specificHeat => $composableBuilder(
     column: $table.specificHeat,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get studWidthMm => $composableBuilder(
+    column: $table.studWidthMm,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get studClearGapMm => $composableBuilder(
+    column: $table.studClearGapMm,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<double> get studLambda => $composableBuilder(
+    column: $table.studLambda,
     builder: (column) => column,
   );
 
@@ -12181,6 +12400,9 @@ class $$MaterialLayersTableTableManager
                 Value<double> thermalConductivity = const Value.absent(),
                 Value<double> density = const Value.absent(),
                 Value<double> specificHeat = const Value.absent(),
+                Value<double?> studWidthMm = const Value.absent(),
+                Value<double?> studClearGapMm = const Value.absent(),
+                Value<double?> studLambda = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MaterialLayersCompanion(
                 id: id,
@@ -12191,6 +12413,9 @@ class $$MaterialLayersTableTableManager
                 thermalConductivity: thermalConductivity,
                 density: density,
                 specificHeat: specificHeat,
+                studWidthMm: studWidthMm,
+                studClearGapMm: studClearGapMm,
+                studLambda: studLambda,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -12203,6 +12428,9 @@ class $$MaterialLayersTableTableManager
                 required double thermalConductivity,
                 required double density,
                 required double specificHeat,
+                Value<double?> studWidthMm = const Value.absent(),
+                Value<double?> studClearGapMm = const Value.absent(),
+                Value<double?> studLambda = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => MaterialLayersCompanion.insert(
                 id: id,
@@ -12213,6 +12441,9 @@ class $$MaterialLayersTableTableManager
                 thermalConductivity: thermalConductivity,
                 density: density,
                 specificHeat: specificHeat,
+                studWidthMm: studWidthMm,
+                studClearGapMm: studClearGapMm,
+                studLambda: studLambda,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

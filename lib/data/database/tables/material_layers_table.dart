@@ -16,6 +16,16 @@ class MaterialLayers extends Table {
   RealColumn get density => real()();
   RealColumn get specificHeat => real()();
 
+  /// Stud width in mm. Non-null → inhomogeneous layer. Always set together
+  /// with [studClearGapMm] and [studLambda].
+  RealColumn get studWidthMm => real().nullable()();
+
+  /// Clear gap between studs in mm (edge-to-edge, not centre-to-centre).
+  RealColumn get studClearGapMm => real().nullable()();
+
+  /// Thermal conductivity of the stud material in W/(m·K).
+  RealColumn get studLambda => real().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }
