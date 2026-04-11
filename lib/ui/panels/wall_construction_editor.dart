@@ -1262,18 +1262,29 @@ class _LayerRowState extends State<_LayerRow> {
       _lambdaCtrl.text = widget.layer.thermalConductivity.toString();
     }
     // Sync stud controllers when stud fields change from outside.
+    // Only overwrite the controller text when the *parsed* value in the
+    // controller differs from the new widget value.  This prevents cursor
+    // jumps while the user is actively typing (each valid keystroke triggers
+    // a persist → rebuild → didUpdateWidget round-trip, and unconditionally
+    // setting controller.text resets the cursor to the end of the field).
     if (old.layer.studWidthMm != widget.layer.studWidthMm ||
         old.layer.studClearGapMm != widget.layer.studClearGapMm ||
         old.layer.studLambda != widget.layer.studLambda) {
       _studExpanded = _hasStud;
-      if (widget.layer.studWidthMm != null) {
-        _studWidthCtrl.text = widget.layer.studWidthMm!.round().toString();
+      final newWidth = widget.layer.studWidthMm;
+      if (newWidth != null &&
+          double.tryParse(_studWidthCtrl.text)?.round() != newWidth.round()) {
+        _studWidthCtrl.text = newWidth.round().toString();
       }
-      if (widget.layer.studClearGapMm != null) {
-        _studGapCtrl.text = widget.layer.studClearGapMm!.round().toString();
+      final newGap = widget.layer.studClearGapMm;
+      if (newGap != null &&
+          double.tryParse(_studGapCtrl.text)?.round() != newGap.round()) {
+        _studGapCtrl.text = newGap.round().toString();
       }
-      if (widget.layer.studLambda != null) {
-        _studLambdaCtrl.text = widget.layer.studLambda.toString();
+      final newLambda = widget.layer.studLambda;
+      if (newLambda != null &&
+          double.tryParse(_studLambdaCtrl.text) != newLambda) {
+        _studLambdaCtrl.text = newLambda.toString();
       }
     }
   }
