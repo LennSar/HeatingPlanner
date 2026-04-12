@@ -190,9 +190,26 @@ class _SlabConstructionDialogState
   List<double> get _lambdas =>
       _layers.map((l) => l.thermalConductivity).toList();
 
-  double get _uVal => ThermalEngine.uValue(
-        layerThicknessesMm: _thicknesses,
-        layerLambdas: _lambdas,
+  List<LayerSpec> get _layerSpecs => _layers.map((l) {
+        if (l.studWidthMm != null &&
+            l.studClearGapMm != null &&
+            l.studLambda != null) {
+          return InhomogeneousLayerSpec(
+            thicknessMm: l.thicknessMm,
+            lambdaMain: l.thermalConductivity,
+            studWidthMm: l.studWidthMm!,
+            studClearGapMm: l.studClearGapMm!,
+            lambdaStud: l.studLambda!,
+          );
+        }
+        return HomogeneousLayerSpec(
+          thicknessMm: l.thicknessMm,
+          lambda: l.thermalConductivity,
+        );
+      }).toList();
+
+  double get _uVal => ThermalEngine.uValueCombined(
+        layers: _layerSpecs,
         rsi: _rsi,
         rse: _rse,
       );
@@ -354,13 +371,25 @@ class _SlabConstructionDialogState
               .materialLayers
               .where((l) => l.constructionId == p.id)
               .toList();
-          final thicknesses =
-              layers.map((l) => l.thicknessMm).toList();
-          final lambdas =
-              layers.map((l) => l.thermalConductivity).toList();
-          final u = ThermalEngine.uValue(
-            layerThicknessesMm: thicknesses,
-            layerLambdas: lambdas,
+          final specs = layers.map((l) {
+            if (l.studWidthMm != null &&
+                l.studClearGapMm != null &&
+                l.studLambda != null) {
+              return InhomogeneousLayerSpec(
+                thicknessMm: l.thicknessMm,
+                lambdaMain: l.thermalConductivity,
+                studWidthMm: l.studWidthMm!,
+                studClearGapMm: l.studClearGapMm!,
+                lambdaStud: l.studLambda!,
+              );
+            }
+            return HomogeneousLayerSpec(
+              thicknessMm: l.thicknessMm,
+              lambda: l.thermalConductivity,
+            );
+          }).toList();
+          final u = ThermalEngine.uValueCombined(
+            layers: specs,
             rsi: p.rsi,
             rse: p.rse,
           );
@@ -721,9 +750,26 @@ class _WallConstructionDialogState
   List<double> get _lambdas =>
       _layers.map((l) => l.thermalConductivity).toList();
 
-  double get _uVal => ThermalEngine.uValue(
-        layerThicknessesMm: _thicknesses,
-        layerLambdas: _lambdas,
+  List<LayerSpec> get _layerSpecs => _layers.map((l) {
+        if (l.studWidthMm != null &&
+            l.studClearGapMm != null &&
+            l.studLambda != null) {
+          return InhomogeneousLayerSpec(
+            thicknessMm: l.thicknessMm,
+            lambdaMain: l.thermalConductivity,
+            studWidthMm: l.studWidthMm!,
+            studClearGapMm: l.studClearGapMm!,
+            lambdaStud: l.studLambda!,
+          );
+        }
+        return HomogeneousLayerSpec(
+          thicknessMm: l.thicknessMm,
+          lambda: l.thermalConductivity,
+        );
+      }).toList();
+
+  double get _uVal => ThermalEngine.uValueCombined(
+        layers: _layerSpecs,
         rsi: _rsi,
         rse: _rse,
       );
@@ -889,13 +935,25 @@ class _WallConstructionDialogState
               .materialLayers
               .where((l) => l.constructionId == p.id)
               .toList();
-          final thicknesses =
-              layers.map((l) => l.thicknessMm).toList();
-          final lambdas =
-              layers.map((l) => l.thermalConductivity).toList();
-          final u = ThermalEngine.uValue(
-            layerThicknessesMm: thicknesses,
-            layerLambdas: lambdas,
+          final specs = layers.map((l) {
+            if (l.studWidthMm != null &&
+                l.studClearGapMm != null &&
+                l.studLambda != null) {
+              return InhomogeneousLayerSpec(
+                thicknessMm: l.thicknessMm,
+                lambdaMain: l.thermalConductivity,
+                studWidthMm: l.studWidthMm!,
+                studClearGapMm: l.studClearGapMm!,
+                lambdaStud: l.studLambda!,
+              );
+            }
+            return HomogeneousLayerSpec(
+              thicknessMm: l.thicknessMm,
+              lambda: l.thermalConductivity,
+            );
+          }).toList();
+          final u = ThermalEngine.uValueCombined(
+            layers: specs,
             rsi: p.rsi,
             rse: p.rse,
           );
