@@ -268,10 +268,13 @@ void main() {
       expect(a, closeTo(0.0, 0.1));
     });
 
-    test('north direction = 90 degrees', () {
+    // In screen coordinates y increases downward, so "north" (visually up)
+    // means end.y < start.y.  segmentAngleDegrees negates dy internally so
+    // that visually upward maps to +90° (north) and downward to -90° (south).
+    test('north direction = 90 degrees (screen up = y decreasing)', () {
       final a = GeometryEngine.segmentAngleDegrees(
-        const Point2D(x: 0, y: 0),
         const Point2D(x: 0, y: 1000),
+        const Point2D(x: 0, y: 0),
       );
       expect(a, closeTo(90.0, 0.1));
     });
@@ -284,18 +287,18 @@ void main() {
       expect(a.abs(), closeTo(180.0, 0.1));
     });
 
-    test('south direction = -90 degrees', () {
+    test('south direction = -90 degrees (screen down = y increasing)', () {
       final a = GeometryEngine.segmentAngleDegrees(
-        const Point2D(x: 0, y: 1000),
         const Point2D(x: 0, y: 0),
+        const Point2D(x: 0, y: 1000),
       );
       expect(a, closeTo(-90.0, 0.1));
     });
 
-    test('45 degree diagonal', () {
+    test('45 degree diagonal (right and up on screen)', () {
       final a = GeometryEngine.segmentAngleDegrees(
-        const Point2D(x: 0, y: 0),
-        const Point2D(x: 1000, y: 1000),
+        const Point2D(x: 0, y: 1000),
+        const Point2D(x: 1000, y: 0),
       );
       expect(a, closeTo(45.0, 0.1));
     });

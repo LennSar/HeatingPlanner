@@ -154,28 +154,40 @@ class EditorStateNotifier extends Notifier<EditorState>
 
   // ---- Walls ----
 
+  /// Returns [wall] with [WallSegment.orientation] recomputed from geometry.
+  WallSegment _withOrientation(WallSegment wall) => wall.copyWith(
+        orientation: CardinalDirection.fromAngleDegrees(
+          GeometryEngine.segmentAngleDegrees(
+            wall.startPoint,
+            wall.endPoint,
+          ),
+        ),
+      );
+
   /// Add a wall segment.
   void addWall(WallSegment wall) {
+    final w = _withOrientation(wall);
     state = state.copyWith(
-      walls: [...state.walls, wall],
+      walls: [...state.walls, w],
     );
-    if (wall.roomId.isNotEmpty) {
+    if (w.roomId.isNotEmpty) {
       final dao = ref.read(buildingDaoProvider);
-      unawaited(upsertWallSegment(dao, wall));
+      unawaited(upsertWallSegment(dao, w));
       markProjectDirty();
     }
   }
 
   /// Replace a wall with the same ID.
   void updateWall(WallSegment wall) {
+    final w = _withOrientation(wall);
     state = state.copyWith(
       walls: state.walls
-          .map((w) => w.id == wall.id ? wall : w)
+          .map((s) => s.id == w.id ? w : s)
           .toList(),
     );
-    if (wall.roomId.isNotEmpty) {
+    if (w.roomId.isNotEmpty) {
       final dao = ref.read(buildingDaoProvider);
-      unawaited(upsertWallSegment(dao, wall));
+      unawaited(upsertWallSegment(dao, w));
       markProjectDirty();
     }
   }
@@ -709,7 +721,7 @@ class EditorStateNotifier extends Notifier<EditorState>
         if (host.roomId.isEmpty) continue;
         if (!_isStrictlyInterior(pt, host)) continue;
 
-        final before = WallSegment(
+        final before = _withOrientation(WallSegment(
           id: IdGenerator.newId(),
           roomId: host.roomId,
           startPoint: host.startPoint,
@@ -717,9 +729,8 @@ class EditorStateNotifier extends Notifier<EditorState>
           wallType: host.wallType,
           constructionId: host.constructionId,
           adjacentRoomId: host.adjacentRoomId,
-          orientation: host.orientation,
-        );
-        final after = WallSegment(
+        ));
+        final after = _withOrientation(WallSegment(
           id: IdGenerator.newId(),
           roomId: host.roomId,
           startPoint: pt,
@@ -727,8 +738,7 @@ class EditorStateNotifier extends Notifier<EditorState>
           wallType: host.wallType,
           constructionId: host.constructionId,
           adjacentRoomId: host.adjacentRoomId,
-          orientation: host.orientation,
-        );
+        ));
 
         removed.add(host.id);
         addedPersisted.addAll([before, after]);
@@ -738,7 +748,7 @@ class EditorStateNotifier extends Notifier<EditorState>
       }
     }
 
-    walls.add(wall);
+    walls.add(_withOrientation(wall));
     state = state.copyWith(walls: walls);
 
     if (removed.isNotEmpty || addedPersisted.isNotEmpty) {

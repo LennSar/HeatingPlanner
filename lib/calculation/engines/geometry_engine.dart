@@ -140,11 +140,12 @@ class GeometryEngine {
   /// Angle of a wall segment in degrees.
   ///
   /// 0° = east, 90° = north — matches [CardinalDirection.fromAngleDegrees].
-  /// Uses mathematical y-up convention; negate dy for screen (y-down) coords.
+  /// Coordinates are expected in screen space (y increases downward);
+  /// dy is negated internally so that visually upward = positive = north.
   static double segmentAngleDegrees(Point2D start, Point2D end) {
     final dx = end.x - start.x;
     final dy = end.y - start.y;
-    return atan2(dy, dx) * 180.0 / pi;
+    return atan2(-dy, dx) * 180.0 / pi;
   }
 
   /// Polyline total length (mm).
