@@ -698,38 +698,58 @@ class EN1264Tables {
 
 **File:** `assets/materials.json`
 
-Provide this JSON array. The MaterialDao seeds the Drift database on first app launch if the `material_entries` table is empty.
+Provide this JSON array. The MaterialDao seeds the Drift database on first app launch if the `material_entries` table is empty. Each entry conforms to the `MaterialEntry` model (see architect agent Section 5.3). The `source` and `notes` fields in the JSON are metadata comments for documentation only — they are **not** stored in the Drift database and are ignored by `MaterialEntry.fromJson()`.
+
+The database contains **110 materials** across 15 categories, sourced from DIN 4108-4 design values, AMz-Bericht 8/2005 (historic masonry), and current manufacturer datasheets (STEICO, Kingspan, Rockwool, Knauf, Isover, Celotex, Wienerberger, Xella/Ytong). See the reference spreadsheet `materials_database.xlsx` for a human-readable version with full source attribution.
+
+### 7.1 Material Categories
+
+| Category | Count | λ range [W/(m·K)] | Sources |
+|----------|-------|-------------------|---------|
+| Masonry - Historic | 15 | 0.30 – 1.20 | DIN 4108:1952/1960/1969/1981, AMz-Bericht 8/2005 |
+| Masonry - Modern | 6 | 0.066 – 0.09 | Wienerberger, Leipfinger-Bader/Unipor |
+| Masonry - Calcium Silicate | 5 | 0.56 – 1.10 | DIN 4108-4 |
+| Masonry - AAC | 6 | 0.07 – 0.19 | Xella/Ytong, DIN 4108-4 |
+| Concrete | 11 | 0.33 – 2.50 | DIN 4108-4 |
+| Insulation - Synthetic | 8 | 0.007 – 0.035 | DIN 4108-4, Celotex, Kingspan, Knauf |
+| Insulation - Mineral | 14 | 0.030 – 0.070 | DIN 4108-4, Rockwool, Knauf, Isover, Xella/Multipor |
+| Insulation - Natural | 14 | 0.036 – 0.052 | STEICO, DIN 4108-4 |
+| Wood | 8 | 0.12 – 0.20 | DIN 4108-4 |
+| Plaster | 8 | 0.070 – 1.00 | DIN 4108-4 |
+| Floor Covering | 10 | 0.05 – 3.50 | DIN 4108-4 |
+| Membrane | 3 | 0.17 – 0.50 | DIN 4108-4 |
+| Metal | 3 | 50.0 – 380.0 | DIN 4108-4 |
+| Glass | 2 | 0.040 – 1.00 | DIN 4108-4 |
+
+### 7.2 JSON Data
+
+The full JSON is in `assets/materials.json` (separate file, not inlined here due to size). A representative excerpt showing the schema per entry:
 
 ```json
 [
-  {"id":"mat-001","name":"Solid brick","category":"Masonry","lambdaDefault":0.77,"densityDefault":1800,"specificHeatDefault":900},
-  {"id":"mat-002","name":"Hollow brick","category":"Masonry","lambdaDefault":0.44,"densityDefault":1200,"specificHeatDefault":900},
-  {"id":"mat-003","name":"Concrete block","category":"Masonry","lambdaDefault":1.05,"densityDefault":2000,"specificHeatDefault":900},
-  {"id":"mat-004","name":"AAC block","category":"Masonry","lambdaDefault":0.12,"densityDefault":500,"specificHeatDefault":1000},
-  {"id":"mat-005","name":"Normal concrete","category":"Concrete","lambdaDefault":1.65,"densityDefault":2300,"specificHeatDefault":1000},
-  {"id":"mat-006","name":"Lightweight concrete","category":"Concrete","lambdaDefault":0.33,"densityDefault":800,"specificHeatDefault":1000},
-  {"id":"mat-007","name":"Reinforced concrete","category":"Concrete","lambdaDefault":2.10,"densityDefault":2400,"specificHeatDefault":1000},
-  {"id":"mat-008","name":"EPS","category":"Insulation","lambdaDefault":0.035,"densityDefault":20,"specificHeatDefault":1450},
-  {"id":"mat-009","name":"XPS","category":"Insulation","lambdaDefault":0.034,"densityDefault":35,"specificHeatDefault":1450},
-  {"id":"mat-010","name":"Mineral wool","category":"Insulation","lambdaDefault":0.038,"densityDefault":30,"specificHeatDefault":1030},
-  {"id":"mat-011","name":"PUR/PIR rigid board","category":"Insulation","lambdaDefault":0.023,"densityDefault":32,"specificHeatDefault":1400},
-  {"id":"mat-012","name":"Phenolic foam","category":"Insulation","lambdaDefault":0.020,"densityDefault":35,"specificHeatDefault":1400},
-  {"id":"mat-013","name":"Softwood (spruce/pine)","category":"Wood","lambdaDefault":0.13,"densityDefault":450,"specificHeatDefault":1600},
-  {"id":"mat-014","name":"Hardwood (oak)","category":"Wood","lambdaDefault":0.18,"densityDefault":700,"specificHeatDefault":1600},
-  {"id":"mat-015","name":"Plywood","category":"Wood","lambdaDefault":0.14,"densityDefault":550,"specificHeatDefault":1600},
-  {"id":"mat-016","name":"OSB","category":"Wood","lambdaDefault":0.13,"densityDefault":600,"specificHeatDefault":1700},
-  {"id":"mat-017","name":"Cement render","category":"Plaster","lambdaDefault":1.00,"densityDefault":1800,"specificHeatDefault":1000},
-  {"id":"mat-018","name":"Lime plaster","category":"Plaster","lambdaDefault":0.70,"densityDefault":1600,"specificHeatDefault":1000},
-  {"id":"mat-019","name":"Gypsum plaster","category":"Plaster","lambdaDefault":0.40,"densityDefault":1200,"specificHeatDefault":1000},
-  {"id":"mat-020","name":"Ceramic tile","category":"Floor Covering","lambdaDefault":1.30,"densityDefault":2300,"specificHeatDefault":840},
-  {"id":"mat-021","name":"Parquet (oak)","category":"Floor Covering","lambdaDefault":0.18,"densityDefault":700,"specificHeatDefault":1600},
-  {"id":"mat-022","name":"Laminate","category":"Floor Covering","lambdaDefault":0.13,"densityDefault":900,"specificHeatDefault":1400},
-  {"id":"mat-023","name":"Carpet","category":"Floor Covering","lambdaDefault":0.05,"densityDefault":200,"specificHeatDefault":1300},
-  {"id":"mat-024","name":"Vinyl","category":"Floor Covering","lambdaDefault":0.17,"densityDefault":1400,"specificHeatDefault":900},
-  {"id":"mat-025","name":"Vapour barrier (PE)","category":"Membrane","lambdaDefault":0.50,"densityDefault":980,"specificHeatDefault":1800},
-  {"id":"mat-026","name":"Breather membrane","category":"Membrane","lambdaDefault":0.17,"densityDefault":500,"specificHeatDefault":1000}
+  {"id":"mat-001","name":"Solid brick (Vollziegel, pre-1952)","category":"Masonry - Historic","lambdaDefault":1.05,"densityDefault":1900,"specificHeatDefault":900,"source":"DIN 4108:1952, AMz-Bericht 8/2005","notes":"KMz/KK, density >=1900 kg/m³"},
+  {"id":"mat-002","name":"Solid brick (Vollziegel, 1952–1968)","category":"Masonry - Historic","lambdaDefault":0.79,"densityDefault":1800,"specificHeatDefault":900,"source":"DIN 4108:1960-5","notes":"KHLz/KHK"},
+  {"id":"mat-020","name":"Poroton T9 (unfilled, ρ≈650)","category":"Masonry - Modern","lambdaDefault":0.09,"densityDefault":650,"specificHeatDefault":900,"source":"Wienerberger","notes":"Unfilled perforated clay block"},
+  {"id":"mat-074","name":"PIR insulation (Celotex GA4000 / Kingspan Therma)","category":"Insulation - Synthetic","lambdaDefault":0.022,"densityDefault":32,"specificHeatDefault":1400,"source":"Celotex / Kingspan","notes":"BBA certified, foil-faced PIR board"},
+  {"id":"mat-075","name":"Phenolic foam (Kingspan Kooltherm)","category":"Insulation - Synthetic","lambdaDefault":0.019,"densityDefault":35,"specificHeatDefault":1400,"source":"Kingspan","notes":"Kooltherm K-range"},
+  {"id":"mat-077","name":"Vacuum insulation panel (Kingspan OPTIM-R)","category":"Insulation - Synthetic","lambdaDefault":0.007,"densityDefault":200,"specificHeatDefault":800,"source":"Kingspan","notes":"VIP, extremely thin, fragile, expensive"},
+  {"id":"mat-089","name":"Stone wool (Rockwool NyRock, λ=0.032)","category":"Insulation - Mineral","lambdaDefault":0.032,"densityDefault":70,"specificHeatDefault":1030,"source":"Rockwool","notes":"NyRock technology"},
+  {"id":"mat-090","name":"Wood fibre (STEICO flex 036)","category":"Insulation - Natural","lambdaDefault":0.036,"densityDefault":50,"specificHeatDefault":2100,"source":"STEICO","notes":"Flexible batt, best natural λ"}
 ]
 ```
+
+### 7.3 Historic Masonry Notes
+
+For renovation projects, correct material selection is critical. The historic brick entries (mat-001 through mat-015) are based on the AMz-Bericht 8/2005 "Wärmeleitfähigkeit von Ziegelmauerwerk im historischen Wandaufbau" which tabulates design λ values from successive DIN 4108 editions. Key considerations:
+
+- **Pre-1952 bricks** (ρ ≥ 1900): λ = 1.05 W/(m·K) — very poor insulation
+- **1952–1968 era**: λ values range 0.46–0.79 depending on brick type and density
+- **Post-1981 DIN 4108-4**: finer density differentiation with λ from 0.30 (HLz W, ρ=700, LM) to 1.20 (clinker, ρ=2200)
+- Historical bricks show wide variance (λ = 0.6–1.1 for 1920s bricks per AMz), so the UI should allow user override of the default λ value per layer
+
+### 7.4 Material Picker Grouping
+
+The material picker dialog should group entries by the `category` field. Subcategories (e.g. "Masonry - Historic", "Masonry - Modern") should be grouped under a collapsible "Masonry" parent header. The UI agent handles this presentation logic.
 
 ---
 
@@ -757,7 +777,7 @@ const int maxOpeningHeightMm = 3000;
 const int maxSillHeightMm = 2500;
 
 // Materials
-const double minLambda = 0.01;
+const double minLambda = 0.005;
 const double maxLambda = 50.0;
 const double minThicknessMm = 1.0;
 const double maxThicknessMm = 1000.0;
@@ -809,20 +829,20 @@ You must produce reference test cases for every engine function. These are the a
 ### 9.1 U-Value Test Cases
 
 **Case UV-1: Simple single-layer wall**
-- Layers: 200mm solid brick (λ = 0.77)
+- Layers: 200mm solid brick 1952–1968 era (mat-002, λ = 0.79)
 - Rsi = 0.13, Rse = 0.04
-- R_total = 0.13 + (0.200 / 0.77) + 0.04 = 0.13 + 0.2597 + 0.04 = 0.4297
-- **Expected U = 2.327 W/(m²K)** (to 3 decimal places)
+- R_total = 0.13 + (0.200 / 0.79) + 0.04 = 0.13 + 0.2532 + 0.04 = 0.4232
+- **Expected U = 2.363 W/(m²K)** (to 3 decimal places)
 
 **Case UV-2: Multi-layer insulated wall**
-- Layer 1 (outside): 15mm cement render (λ = 1.00)
-- Layer 2: 100mm EPS insulation (λ = 0.035)
-- Layer 3: 200mm hollow brick (λ = 0.44)
-- Layer 4 (inside): 15mm gypsum plaster (λ = 0.40)
+- Layer 1 (outside): 15mm cement render (mat-120, λ = 1.00)
+- Layer 2: 100mm EPS insulation (mat-070, λ = 0.035)
+- Layer 3: 200mm hollow brick 1969 ρ=1000 (mat-003, λ = 0.46)
+- Layer 4 (inside): 15mm gypsum plaster (mat-123, λ = 0.40)
 - Rsi = 0.13, Rse = 0.04
-- R_total = 0.13 + (0.015/1.00) + (0.100/0.035) + (0.200/0.44) + (0.015/0.40) + 0.04
-- R_total = 0.13 + 0.015 + 2.857 + 0.4545 + 0.0375 + 0.04 = 3.534
-- **Expected U = 0.283 W/(m²K)**
+- R_total = 0.13 + (0.015/1.00) + (0.100/0.035) + (0.200/0.46) + (0.015/0.40) + 0.04
+- R_total = 0.13 + 0.015 + 2.857 + 0.4348 + 0.0375 + 0.04 = 3.514
+- **Expected U = 0.285 W/(m²K)**
 
 **Case UV-3: Edge case — zero thickness layer**
 - Any layer with thickness = 0 mm
@@ -836,17 +856,17 @@ You must produce reference test cases for every engine function. These are the a
 
 **Case HD-1: Simple rectangular room**
 - Room: 5m × 4m, height 2.6m, target 20°C
-- One exterior wall: 5m long, U = 0.283 W/(m²K) (from UV-2)
+- One exterior wall: 5m long, U = 0.285 W/(m²K) (from UV-2)
 - One window on that wall: 1.5m × 1.4m, U = 1.3 W/(m²K)
 - Outdoor temp: -12°C
 - Air change rate: 0.5/h
 - Net wall area: (5.0 × 2.6) - (1.5 × 1.4) = 13.0 - 2.1 = 10.9 m²
-- Q_T_wall = 0.283 × 10.9 × 1.0 × (20 - (-12)) = 0.283 × 10.9 × 32 = 98.71 W
+- Q_T_wall = 0.285 × 10.9 × 1.0 × (20 - (-12)) = 0.285 × 10.9 × 32 = 99.41 W
 - Q_T_window = 1.3 × 2.1 × 1.0 × 32 = 87.36 W
-- Q_T = 98.71 + 87.36 = 186.07 W
+- Q_T = 99.41 + 87.36 = 186.77 W
 - V_room = 5.0 × 4.0 × 2.6 = 52.0 m³
 - Q_V = 52.0 × 0.5 × 1.2 × 1005 × 32 / 3600 = 277.87 W
-- **Expected Q_total = 463.94 W** (within ±2%)
+- **Expected Q_total = 464.64 W** (within ±2%)
 
 ### 9.3 Hydraulic Test Cases
 
