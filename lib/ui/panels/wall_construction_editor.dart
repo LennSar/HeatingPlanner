@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/engines/thermal_engine.dart';
+import '../../calculation/providers/project_settings_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/id_generator.dart';
 import '../../data/models/material_layer.dart';
@@ -221,13 +222,14 @@ class _SlabConstructionDialogState
         rse: _rse,
       );
 
-  List<double> get _tempProfile => ThermalEngine.temperatureProfile(
+  List<double> _tempProfile(double tIndoorC, double tOutdoorC) =>
+      ThermalEngine.temperatureProfile(
         layerThicknessesMm: _thicknesses,
         layerLambdas: _lambdas,
         rsi: _rsi,
         rse: _rse,
-        tIndoorC: 20.0,
-        tOutdoorC: -12.0,
+        tIndoorC: tIndoorC,
+        tOutdoorC: tOutdoorC,
       );
 
   void _addLayer() {
@@ -467,9 +469,12 @@ class _SlabConstructionDialogState
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
+    final settings = ref.watch(projectSettingsProvider);
+    final tOutdoorC = settings.designOutdoorTempC;
+    final tIndoorC = settings.defaultIndoorTempC;
     final uVal = _uVal;
     final rTotal = _rTotal;
-    final profile = _tempProfile;
+    final profile = _tempProfile(tIndoorC, tOutdoorC);
 
     return Dialog(
       shape: RoundedRectangleBorder(
@@ -619,7 +624,8 @@ class _SlabConstructionDialogState
               if (profile.length >= 2) ...[
                 Text(
                   'Temperature Profile  '
-                  '(20\u00B0C \u2192 \u221212\u00B0C)',
+                  '(${tIndoorC.toStringAsFixed(1)}\u00B0C'
+                  ' \u2192 ${tOutdoorC.toStringAsFixed(1)}\u00B0C)',
                   style: textTheme.bodySmall,
                 ),
                 const SizedBox(height: Spacing.xs),
@@ -781,13 +787,14 @@ class _WallConstructionDialogState
         rse: _rse,
       );
 
-  List<double> get _tempProfile => ThermalEngine.temperatureProfile(
+  List<double> _tempProfile(double tIndoorC, double tOutdoorC) =>
+      ThermalEngine.temperatureProfile(
         layerThicknessesMm: _thicknesses,
         layerLambdas: _lambdas,
         rsi: _rsi,
         rse: _rse,
-        tIndoorC: 20.0,
-        tOutdoorC: -12.0,
+        tIndoorC: tIndoorC,
+        tOutdoorC: tOutdoorC,
       );
 
   // ---- Mutations ----
@@ -1042,9 +1049,16 @@ class _WallConstructionDialogState
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
+    final settings = ref.watch(projectSettingsProvider);
+    final tOutdoorC = settings.designOutdoorTempC;
+    final editorState = ref.watch(editorStateProvider);
+    final room = editorState.rooms
+        .where((r) => r.id == widget.wall.roomId)
+        .firstOrNull;
+    final tIndoorC = room?.targetTempC ?? settings.defaultIndoorTempC;
     final uVal = _uVal;
     final rTotal = _rTotal;
-    final profile = _tempProfile;
+    final profile = _tempProfile(tIndoorC, tOutdoorC);
 
     return Dialog(
       shape: RoundedRectangleBorder(
@@ -1188,7 +1202,8 @@ class _WallConstructionDialogState
               if (profile.length >= 2) ...[
                 Text(
                   'Temperature Profile  '
-                  '(20\u00B0C \u2192 \u221212\u00B0C)',
+                  '(${tIndoorC.toStringAsFixed(1)}\u00B0C'
+                  ' \u2192 ${tOutdoorC.toStringAsFixed(1)}\u00B0C)',
                   style: textTheme.bodySmall,
                 ),
                 const SizedBox(height: Spacing.xs),

@@ -409,6 +409,9 @@ When a wall segment is selected, three circular drag handles appear on the wall:
 - 🗑 = delete layer button.
 - Bar width is proportional to layer thickness, providing intuitive visual feedback.
 - U-value and temperature profile update in real time on every change.
+- Temperature profile boundary values are **never hardcoded**. The editor receives the indoor and outdoor temperatures as parameters:
+  - **Outdoor:** always `designOutdoorTempC` from project settings.
+  - **Indoor:** the owning room's `targetTempC` when opened from a wall; `defaultIndoorTempC` from project settings when opened from a floor/ceiling context (no specific room).
 - "Add Layer" inserts a new empty layer at the bottom (inside face). User can drag to reposition.
 
 **Inhomogeneous layer (stud/bridging element):**
