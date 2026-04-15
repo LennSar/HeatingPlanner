@@ -37,7 +37,6 @@ dependencies:
   archive: ^3.6.0
   collection: ^1.18.0
   logging: ^1.2.0
-  shared_preferences: ^2.3.0
 
 dev_dependencies:
   flutter_test:
@@ -164,9 +163,7 @@ lib/
 │   ├── building_repository.dart
 │   ├── construction_repository.dart
 │   ├── material_repository.dart
-│   ├── heating_repository.dart
-│   ├── save_state_notifier.dart    # SaveState model + StateNotifier + debounced .hsp export
-│   └── app_preferences.dart        # lastOpenedProjectId, canvasZoom/pan, AppPreferences DAO
+│   └── heating_repository.dart
 │
 ├── calculation/
 │   ├── engines/                           # Pure static functions — no state, no I/O
@@ -299,15 +296,6 @@ enum DrawingTool {
   select, drawWall, placeWindow, placeDoor,
   drawZone, placeDistributor, routePipe, measure
 }
-
-/// Describes what is on the other side of a room's floor or ceiling slab.
-/// Determines the correction factor applied to U × A × ΔT transmission loss.
-enum BoundaryCondition {
-  exterior,      // Direct outdoor air contact (e.g. flat roof, exposed soffit)
-  ground,        // In contact with ground — uses simplified 0.6 factor (ISO 13370)
-  unheatedSpace, // Adjacent unheated space (attic, garage, crawlspace, cellar)
-  interior,      // Adjacent heated room at the same target temperature — no loss
-}
 ```
 
 ### 5.2 Point2D
@@ -357,19 +345,6 @@ Each model below is defined in its own file under `lib/data/models/`. I am listi
 | targetTempC | double | 15.0-30.0 | 20.0 |
 | airChangeRate | double | 0.1-5.0 (1/h) | 0.5 |
 | polygon | List\<Point2D\> | ≥ 3 vertices, closed | required |
-| floorConstructionId | String? | FK → WallConstruction (reused) | null |
-| ceilingConstructionId | String? | FK → WallConstruction (reused) | null |
-| floorBoundary | BoundaryCondition | enum | `ground` |
-| ceilingBoundary | BoundaryCondition | enum | `exterior` |
-| floorUnheatedCorrectionFactor | double? | 0.0–1.0, only when floorBoundary = unheatedSpace | null (defaults to 0.6 in engine) |
-| ceilingUnheatedCorrectionFactor | double? | 0.0–1.0, only when ceilingBoundary = unheatedSpace | null (defaults to 0.8 in engine) |
-
-**Floor/ceiling construction note:** `floorConstructionId` and
-`ceilingConstructionId` reference the existing `WallConstruction` table.
-No new model is needed — constructions are layer assemblies regardless of
-whether they represent a wall, floor slab, or roof build-up.
-The DB schema change is a migration adding 6 new nullable columns to `rooms`
-(schema version 7).
 
 **WallSegment**
 | Field | Type | Constraint | Default |
@@ -412,13 +387,6 @@ The DB schema change is a migration adding 6 new nullable columns to `rooms`
 | name | String | 1-200 chars | required |
 | rsi | double | m²K/W | 0.13 |
 | rse | double | m²K/W | 0.04 |
-| isPreset | bool | — | false |
-
-`isPreset = true` marks the construction as a saved user preset visible in the
-"Load preset" picker inside the construction editor. Presets are stored in the
-same `wall_constructions` table. When the user loads a preset, a **deep copy**
-(new UUID for the construction + new UUIDs for all layers) is made into the
-current wall's construction — edits to one wall never mutate the saved preset.
 
 **MaterialLayer**
 | Field | Type | Constraint | Default |
@@ -431,24 +399,24 @@ current wall's construction — edits to one wall never mutate the saved preset.
 | thermalConductivity | double | 0.01-50.0 W/(mK) | from material |
 | density | double | 1-10000 kg/m³ | from material |
 | specificHeat | double | 100-5000 J/(kgK) | from material |
-| studWidthMm | double? | 1.0-1000.0; null = homogeneous layer | null |
-| studClearGapMm | double? | 1.0-10000.0 mm **clear gap** (edge to edge, not centre-to-centre); required when studWidthMm set | null |
-| studLambda | double? | 0.01-50.0 W/(mK); defaults to `lambdaTimberDefault` (0.13) when stud is added; user-overridable | null |
-
-A layer is **inhomogeneous** when `studWidthMm` is non-null. The stud is always timber; no material picker. The three stud fields are always set together (all non-null or all null).
-
-**DB migration note:** these three columns are new nullable columns on the `material_layers` table. Schema version must be incremented and a `stepByStep` migration must add all three columns with `DEFAULT NULL`.
 
 **MaterialEntry**
 | Field | Type | Constraint | Default |
 |-------|------|-----------|---------|
 | id | String | UUID v4 | auto |
 | name | String | 1-200 chars | required |
-| category | String | e.g. "Masonry" | required |
+| category | String | e.g. "Masonry", "Insulation boards" | required |
+| subcategory | String | e.g. "Historic brick", "Stone wool board" | required |
+| manufacturer | String | Company name or standard ref (e.g. "Rockwool", "DIN 4108-4") | required |
 | lambdaDefault | double | W/(mK) | required |
 | densityDefault | double | kg/m³ | required |
 | specificHeatDefault | double | J/(kgK) | required |
+| source | String | URL to datasheet/catalog PDF, empty if none | "" |
 | isBuiltIn | bool | true for seed data | true |
+
+**DB migration note:** `subcategory`, `manufacturer`, and `source` are new non-nullable TEXT columns on the `material_entries` table. Schema version must be incremented. Migration adds columns with `DEFAULT ''` for existing rows. After migration, re-seed built-in materials from `assets/materials.json` to populate correct values.
+
+**Material picker hierarchy:** The material picker dialog groups entries in a 3-level tree: `category` → `subcategory` → individual entries. Subcategories like "Historic brick" and "Modern thermal brick" are grouped under the "Masonry" parent. The UI agent handles this presentation logic.
 
 **HeatingZone**
 | Field | Type | Constraint | Default |
@@ -564,18 +532,14 @@ Use `@riverpod` annotation with code generation. Every provider is defined in th
 | `selectedToolProvider` | StateProvider | — | DrawingTool | editor_screen.dart |
 | `canvasTransformProvider` | StateNotifierProvider | — | Matrix4 | canvas_controller.dart |
 | `selectedElementProvider` | StateProvider | — | (String type, String id)? | editor_screen.dart |
-| `hoveredElementProvider` | NotifierProvider | — | SelectedElement? | selection_provider.dart |
 | `validationResultsProvider` | Provider.family | projectId | List\<ValidationResult\> | validation_service.dart |
-| `saveStateProvider` | StateNotifierProvider | — | SaveState | save_state_notifier.dart |
-| `lastOpenedProjectIdProvider` | StateProvider | — | String? | app_preferences.dart |
-| `gridSpacingMmProvider` | NotifierProvider | — | int | app_preferences.dart |
 
 ### 6.3 Invalidation Cascade
 
 When data changes, providers automatically re-evaluate because they depend on upstream streams. However, ensure:
 
 - `uValueProvider(constructionId)` depends on `layersProvider(constructionId)`.
-- `roomHeatDemandProvider(roomId)` depends on: `roomProvider(roomId)`, `wallSegmentsProvider(roomId)`, every `uValueProvider` for each wall's construction, `windowsProvider` / `doorsProvider`, project's `designOutdoorTempC`, `uValueProvider(room.floorConstructionId)` (when set), `uValueProvider(room.ceilingConstructionId)` (when set). Floor and ceiling losses use `ThermalEngine.boundaryCorrectionFactor()` with the room's `floorBoundary` / `ceilingBoundary` fields.
+- `roomHeatDemandProvider(roomId)` depends on: `roomProvider(roomId)`, `wallSegmentsProvider(roomId)`, every `uValueProvider` for each wall's construction, `windowsProvider` / `doorsProvider`, project's `designOutdoorTempC`.
 - `zoneHeatOutputProvider(zoneId)` depends on: zone params, `TubeType`, `FlooringMaterial`, distributor supply/return temps.
 - `pressureLossProvider(circuitId)` depends on: `tubeLengthProvider(circuitId)`, `flowRateProvider(circuitId)`, tube inner diameter, roughness.
 - `hydraulicBalanceProvider(distributorId)` depends on: every `pressureLossProvider` for each circuit of that distributor.
@@ -610,87 +574,11 @@ Each DAO exposes:
 - `Future<void> update(T entity)`
 - `Future<void> delete(String id)`
 
-### 7.3 Two-Tier Persistence Model
+### 7.3 Auto-Save
 
-HeatingPlanner uses two distinct persistence layers. Understanding both is critical for any implementation involving data mutation.
+Debounce: 60 seconds after last change. Implemented as a global listener on the ProviderContainer that tracks write operations. Fires `projectRepository.save()`.
 
-**Tier 1 — Drift/SQLite (always-on, immediate)**
-
-Every call to a DAO `insert`, `update`, or `delete` method commits to the local SQLite database synchronously within the Drift transaction. There is no write buffer, no deferred flush, and no separate "save" step for Drift writes. This means:
-
-- Drawing a wall, placing a window, adjusting tube spacing, editing a layer thickness — all persist to SQLite the moment the repository call returns.
-- If the app crashes or is force-quit, **zero project data is lost**. The SQLite file always reflects the most recent committed state.
-- When the app relaunches, it reopens the same SQLite database and all entities are immediately available through the reactive stream providers.
-
-**All repository methods must write immediately** — no batching, buffering, or "commit on save" patterns in the repository layer. Each mutation is an independent Drift transaction.
-
-**Tier 2 — `.hsp` Portable File (manual + debounced export)**
-
-The `.hsp` file is a gzip-compressed JSON snapshot of the entire project (format in §7.4). It exists for:
-- Portability: copy a project between devices or share with a colleague.
-- Backup: an independent copy outside the app's SQLite file.
-- The "Save" and "Save As" menu actions both write this file.
-
-The `.hsp` file is **not** the source of truth during editing — the SQLite database is. The `.hsp` is a point-in-time export.
-
-### 7.4 Dirty State and Auto-Export
-
-**Dirty state** tracks whether the in-database project state has diverged from the last `.hsp` export (or has never been exported). This is distinct from "unsaved data" — all data is always saved in SQLite.
-
-#### `SaveStateNotifier`
-
-Define a `SaveStateNotifier` in `lib/repositories/save_state_notifier.dart`:
-
-```dart
-@freezed
-class SaveState with _$SaveState {
-  const factory SaveState({
-    required bool isDirty,           // true = in-DB changes not yet in .hsp
-    required DateTime? lastExportedAt, // null = never exported to .hsp
-    required String? lastExportPath,   // null = never exported or path unknown
-    required bool isAutoExporting,   // true during background .hsp write
-  }) = _SaveState;
-}
-```
-
-The notifier **sets `isDirty = true`** on every successful repository write operation (any insert/update/delete). It **clears `isDirty = false`** when an `.hsp` export completes successfully.
-
-Provider registration in §6.2: `saveStateProvider → StateNotifierProvider<SaveStateNotifier, SaveState>`.
-
-#### Auto-Export Debounce
-
-When the project has been previously exported to an `.hsp` file (i.e., `lastExportPath != null`), the `SaveStateNotifier` schedules a debounced auto-export:
-
-- Debounce window: **3 seconds** after the last mutation.
-- On fire: write the current SQLite project state to the same `.hsp` path.
-- While writing: set `isAutoExporting = true`.
-- On success: clear `isDirty`, update `lastExportedAt`.
-- On failure (disk full, permission error): log the error, keep `isDirty = true`, show a persistent status bar warning.
-
-**If the project has never been exported** (new project or opened from SQLite without a file path): the debounced auto-export does NOT fire. The user must trigger "Save As" manually to establish a file path. After that, auto-export activates.
-
-#### Session Continuity (no `.hsp` required)
-
-The app does not require the user to ever export to `.hsp` in order to preserve their work. On every launch, the app queries `AppDatabase` for the most recently modified project and re-opens it directly from SQLite. The user's session is restored without any file interaction.
-
-**`AppPreferences`** — a simple key-value store (using `shared_preferences` or a single-row Drift table `app_preferences`) tracks:
-
-| Key | Value | Purpose |
-|-----|-------|---------|
-| `lastOpenedProjectId` | String (UUID) or null | Which project to reopen on next launch |
-| `lastOpenedFloorId` | String (UUID) or null | Which floor was active |
-| `canvasZoom` | double | Last zoom level per project |
-| `canvasPanX`, `canvasPanY` | double | Last pan offset per project |
-| `gridSpacingMm` | int (default: 100) | Drawing grid spacing in mm — one of: 5, 10, 25, 50, 100 |
-
-On app startup:
-1. Read `lastOpenedProjectId`.
-2. If a valid project exists in SQLite with that ID → open it directly, skip the project list.
-3. If not found (deleted, first launch) → show Project List Screen.
-
-Provider: `lastOpenedProjectIdProvider → StateProvider<String?>` persisted to `AppPreferences`.
-
-### 7.5 Project File Format (.hsp)
+### 7.4 Project File Format (.hsp)
 
 Gzip-compressed JSON. Structure:
 
@@ -778,6 +666,3 @@ Before any PR is merged, the architect verifies:
 - [ ] Zero lint warnings
 - [ ] Doc comments on all public APIs
 - [ ] No direct repository imports from UI layer
-- [ ] Every repository write calls `ref.read(saveStateProvider.notifier).markDirty()` — or the notifier is wired to intercept via a repository mixin
-- [ ] No repository method buffers writes — every DAO call is an immediate Drift transaction
-- [ ] `lastOpenedProjectId` updated whenever a project is opened or created

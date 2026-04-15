@@ -403,7 +403,7 @@ When a wall segment is selected, three circular drag handles appear on the wall:
 
 **Interaction:**
 - ⠿ = drag handle for reordering layers.
-- Material name is a dropdown/searchable picker (tap to open material picker dialog).
+- Material name is a searchable dropdown (see §5.7.1).
 - Thickness is a numeric input with mm unit label.
 - λ is read-only (from material database) but can be overridden by tapping it.
 - 🗑 = delete layer button.
@@ -435,6 +435,18 @@ Field labels and disambiguation:
 Visual distinction: an inhomogeneous layer row has a subtle left border accent (`primaryLight` colour, 3px) to distinguish it from homogeneous rows at a glance.
 
 Stud material is always timber — no picker needed.
+
+#### §5.7.1 Material Dropdown
+
+The material field on each layer row is a **searchable dropdown** — tapping it opens an inline dropdown menu anchored below the field. The dropdown contains:
+
+1. **Search field** pinned at the top of the open dropdown — filters the list in real time (case-insensitive substring match on material name). Does not close the dropdown.
+
+2. **Grouped entries** below the search field. Materials are grouped by top-level category, derived by stripping the sub-category suffix (e.g. "Masonry - Historic" and "Masonry - Modern" both fold under a **"Masonry"** header). Group headers are non-selectable divider rows styled in `onSurfaceSecondary`. Order of groups matches `agent-hvac.md` §7.1 category order. When the search field is non-empty, group headers are hidden and a flat filtered list is shown.
+
+3. Each material entry shows the material name and λ value in secondary text (e.g. "λ 0.035 W/(m·K)").
+
+4. Selecting an entry closes the dropdown and updates the layer row with the material name and its default λ.
 
 **Preset buttons (second row in title area):**
 

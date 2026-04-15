@@ -104,10 +104,6 @@ const double rseInterior = 0.13; // interior partition surface
 /// Simplified approach — flag to user that ISO 13370 is more accurate
 const double groundCorrectionFactorDefault = 0.6;
 
-/// Default thermal conductivity for timber studs (softwood) W/(mK)
-/// Source: material library mat-013 (Softwood spruce/pine)
-const double lambdaTimberDefault = 0.13;
-
 /// Air change rate presets (1/h)
 const Map<String, double> airChangeRatePresets = {
   'Standard room': 0.5,
@@ -195,22 +191,6 @@ class ThermalEngine {
     required double tOutdoorC,
   });
 
-  /// Temperature correction factor for floor or ceiling boundary conditions.
-  ///
-  /// | BoundaryCondition | Formula / Value |
-  /// |-------------------|----------------|
-  /// | exterior          | 1.0 (direct outdoor contact) |
-  /// | ground            | [groundCorrectionFactorDefault] = 0.6 (simplified ISO 13370) |
-  /// | unheatedSpace     | user-supplied [unheatedCorrectionFactor] ∈ [0.0, 1.0] |
-  /// | interior          | 0.0 (same temperature on both sides — no loss) |
-  ///
-  /// Returns [double.nan] if [condition] is unheatedSpace and
-  /// [unheatedCorrectionFactor] is null.
-  static double boundaryCorrectionFactor({
-    required BoundaryCondition condition,
-    double? unheatedCorrectionFactor,
-  });
-
   /// Ventilation heat loss (W)
   /// Q_V = V × n × ρ_air × c_air × (T_i - T_e) / 3600
   static double ventilationLoss({
@@ -230,121 +210,10 @@ class ThermalEngine {
 }
 ```
 
-  /// U-value for a construction that may contain inhomogeneous layers.
-  ///
-  /// Uses the EN ISO 6946:2017 §6.9 **combined method**:
-  ///   R_T = (R'_T + R''_T) / 2
-  ///   U = 1 / R_T
-  ///
-  /// Each layer is described by a [LayerSpec] — either [HomogeneousLayerSpec]
-  /// or [InhomogeneousLayerSpec].  If all layers are homogeneous this method
-  /// is equivalent to [uValue].
-  ///
-  /// **Upper resistance limit R'_T** (parallel heat-flow paths through
-  /// the full assembly):
-  ///   For each fractional path p, compute R_T_p = R_si + Σ R_i(p) + R_se,
-  ///   where R_i(p) for an inhomogeneous layer is d/(λ_main) or d/(λ_stud)
-  ///   depending on path, and for homogeneous layers R_i(p) = d/λ.
-  ///   R'_T = 1 / Σ(f_p / R_T_p)
-  ///
-  /// **Lower resistance limit R''_T** (series of layers, each treated as
-  /// parallel conductances):
-  ///   For homogeneous layers: R_layer = d/λ
-  ///   For an inhomogeneous layer: R_layer = 1 / (f_stud/r_stud + f_main/r_main)
-  ///   R''_T = R_si + Σ R_layer + R_se
-  ///
-  /// **Area fractions** (from [InhomogeneousLayerSpec]):
-  ///   f_stud = studWidthMm / (studWidthMm + studClearGapMm)   // clear-gap definition
-  ///   f_main = 1 − f_stud
-  ///
-  /// Returns [double.nan] for invalid inputs (λ ≤ 0, thickness ≤ 0, f_stud ≥ 1).
-  static double uValueCombined({
-    required List<LayerSpec> layers,
-    required double rsi,
-    required double rse,
-  });
-}
-
-/// Describes a single layer in a [ThermalEngine.uValueCombined] call.
-sealed class LayerSpec {
-  const LayerSpec();
-}
-
-class HomogeneousLayerSpec extends LayerSpec {
-  const HomogeneousLayerSpec({
-    required this.thicknessMm,
-    required this.lambda,   // W/(mK)
-  });
-  final double thicknessMm;
-  final double lambda;
-}
-
-class InhomogeneousLayerSpec extends LayerSpec {
-  const InhomogeneousLayerSpec({
-    required this.thicknessMm,
-    required this.lambdaMain,        // W/(mK) — bulk fill material
-    required this.studWidthMm,       // mm — width of timber stud
-    required this.studClearGapMm,    // mm — clear gap (edge to edge) between studs
-    this.lambdaStud = 0.13,          // W/(mK) — timber stud; defaults to lambdaTimberDefault
-  });
-  final double thicknessMm;
-  final double lambdaMain;
-  final double studWidthMm;
-  final double studClearGapMm;
-  final double lambdaStud;
-}
-```
-
 **Implementation notes:**
 - `uValue`: Validate that all λ values are > 0, all thicknesses are > 0, and arrays are non-empty and equal-length. Return `double.nan` on violation.
-- `uValueCombined`: Validate same conditions for all layers; additionally validate f_stud ∈ (0, 1) exclusive for each inhomogeneous layer. Return `double.nan` on violation.
 - `transmissionLoss`: If `correctionF` is 0, return 0.0 (no loss between same-temp rooms).
 - `ventilationLoss`: The `/3600` converts from J/h to W (watts = J/s).
-
-### 5.1a Floor and Ceiling Heat Loss
-
-Floor and ceiling heat loss uses the same `transmissionLoss()` formula as walls.
-The U-value is calculated with `uValue()` using the construction's material layers.
-The key differences are the surface resistances and correction factors.
-
-**Surface resistances (EN ISO 6946 Table 1) — heat flow direction:**
-
-| Element | Heat flow direction | R_si (m²K/W) | R_se (m²K/W) |
-|---------|--------------------|--------------|----|
-| Floor (loss downward into ground/space below) | Downward | 0.17 | 0.04 |
-| Ceiling / roof (loss upward into space above) | Upward | 0.10 | 0.04 |
-
-For ground contact (`BoundaryCondition.ground`), R_se is still 0.04 but the
-correction factor (0.6) absorbs the simplified ISO 13370 ground correction.
-Flag to the user that ISO 13370 gives a more accurate ground U-value for slabs
-on grade, especially for large floor areas.
-
-**Boundary correction factors:**
-
-| BoundaryCondition | Correction factor f | Notes |
-|-------------------|---------------------|-------|
-| `exterior` | 1.0 | Roof directly exposed to outdoor air |
-| `ground` | `groundCorrectionFactorDefault` = 0.6 | Simplified EN 12831 / ISO 13370 approach |
-| `unheatedSpace` | user-adjustable 0.0–1.0 | Preset defaults: attic 0.8, garage/basement 0.6, crawlspace 0.5 |
-| `interior` | 0.0 | Adjacent room at same temperature — no heat loss |
-
-**Heat loss formula** (identical to wall transmission loss):
-```
-Q_floor   = U_floor   × A_room × f_floor   × (T_indoor − T_outdoor)
-Q_ceiling = U_ceiling × A_room × f_ceiling × (T_indoor − T_outdoor)
-```
-where A_room is the polygon area of the room (m²). Floors and ceilings have no
-openings to subtract.
-
-**Unheated space correction factor presets** (add to `thermal_defaults.dart`):
-```dart
-const double unheatedAtticCorrectionFactor     = 0.8; // well-ventilated loft
-const double unheatedBasementCorrectionFactor  = 0.6; // semi-conditioned cellar
-const double unheatedGarageCorrectionFactor    = 0.6; // attached unheated garage
-const double unheatedCrawlspaceCorrectionFactor = 0.5; // vented crawlspace
-```
-These are EN 12831-1 Annex B temperature-ratio (b_u) approximations. The user
-may override with a custom value.
 
 ### 5.2 Heating Output Engine
 
@@ -565,16 +434,6 @@ class HydraulicEngine {
 - Outer diameter ≤ 14 mm → max 90 m
 - Outer diameter > 14 mm → max 120 m
 
-**Hydraulic imbalance warning (rule HB-01):**
-- Threshold constant: `maxCircuitLengthImbalanceRatio = 1.3` (in `validation_limits.dart`)
-- Trigger: longest circuit total tube length / shortest circuit total tube length > 1.3 within the same distributor
-- Severity: `WarningSeverity.warning`
-- One distributor-level warning (overview) + one per-circuit warning for each circuit whose required valve Δp ≥ `significantValveSettingPa` (2000 Pa)
-- Suggested fix text must include **both** remediation options:
-  1. Install a balancing valve at the computed Δp (kPa) on the short circuit
-  2. Lengthen the circuit to approximately match the longest circuit
-- Rationale: in a parallel manifold, hydraulic resistance is roughly proportional to circuit length for equal-diameter tubes. A 1.5× length ratio produces a significant flow imbalance without passive correction.
-
 ### 5.4 Geometry Engine
 
 **File:** `lib/calculation/engines/geometry_engine.dart`
@@ -698,58 +557,70 @@ class EN1264Tables {
 
 **File:** `assets/materials.json`
 
-Provide this JSON array. The MaterialDao seeds the Drift database on first app launch if the `material_entries` table is empty. Each entry conforms to the `MaterialEntry` model (see architect agent Section 5.3). The `source` and `notes` fields in the JSON are metadata comments for documentation only — they are **not** stored in the Drift database and are ignored by `MaterialEntry.fromJson()`.
+Provide this JSON array. The MaterialDao seeds the Drift database on first app launch if the `material_entries` table is empty. Each entry conforms to the `MaterialEntry` model (see architect agent Section 5.3). The `notes` field in the JSON is a documentation comment only — it is **not** stored in the Drift database and is ignored by `MaterialEntry.fromJson()`.
 
-The database contains **110 materials** across 15 categories, sourced from DIN 4108-4 design values, AMz-Bericht 8/2005 (historic masonry), and current manufacturer datasheets (STEICO, Kingspan, Rockwool, Knauf, Isover, Celotex, Wienerberger, Xella/Ytong). See the reference spreadsheet `materials_database.xlsx` for a human-readable version with full source attribution.
+The database contains **136 materials** across 10 categories and 33 subcategories, sourced from DIN 4108-4 design values, AMz-Bericht 8/2005 (historic masonry), and current manufacturer datasheets (STEICO, Kingspan, Rockwool, Knauf, Isover, Celotex, Wienerberger, Xella/Ytong, isofloc, Homatherm, Climacell). See the reference spreadsheet `materials_database.xlsx` for a human-readable version with full source attribution.
 
-### 7.1 Material Categories
+### 7.1 Category / Subcategory Hierarchy
 
-| Category | Count | λ range [W/(m·K)] | Sources |
-|----------|-------|-------------------|---------|
-| Masonry - Historic | 15 | 0.30 – 1.20 | DIN 4108:1952/1960/1969/1981, AMz-Bericht 8/2005 |
-| Masonry - Modern | 6 | 0.066 – 0.09 | Wienerberger, Leipfinger-Bader/Unipor |
-| Masonry - Calcium Silicate | 5 | 0.56 – 1.10 | DIN 4108-4 |
-| Masonry - AAC | 6 | 0.07 – 0.19 | Xella/Ytong, DIN 4108-4 |
-| Concrete | 11 | 0.33 – 2.50 | DIN 4108-4 |
-| Insulation - Synthetic | 8 | 0.007 – 0.035 | DIN 4108-4, Celotex, Kingspan, Knauf |
-| Insulation - Mineral | 14 | 0.030 – 0.070 | DIN 4108-4, Rockwool, Knauf, Isover, Xella/Multipor |
-| Insulation - Natural | 14 | 0.036 – 0.052 | STEICO, DIN 4108-4 |
-| Wood | 8 | 0.12 – 0.20 | DIN 4108-4 |
-| Plaster | 8 | 0.070 – 1.00 | DIN 4108-4 |
-| Floor Covering | 10 | 0.05 – 3.50 | DIN 4108-4 |
-| Membrane | 3 | 0.17 – 0.50 | DIN 4108-4 |
-| Metal | 3 | 50.0 – 380.0 | DIN 4108-4 |
-| Glass | 2 | 0.040 – 1.00 | DIN 4108-4 |
+The material picker uses a 3-level tree: **Category → Subcategory → Material**
 
-### 7.2 JSON Data
+| Category | Subcategories | Count | λ range [W/(m·K)] |
+|----------|---------------|-------|-------------------|
+| Masonry | Historic brick, Modern thermal brick, Calcium silicate, AAC / Aerated concrete | 32 | 0.07 – 1.20 |
+| Concrete & Screed | Normal concrete, Lightweight concrete, Screed | 11 | 0.33 – 2.50 |
+| Insulation boards | Rigid foam (EPS/XPS/PUR-PIR/phenolic), Stone wool board, Glass wool board/roll, Wood fibre, Calcium silicate board, Cellular glass, Cork, Vacuum insulation | 54 | 0.007 – 0.048 |
+| Loose fill / Blow-in | Cellulose, Mineral wool blow-in, Perlite, Vermiculite, Natural fibre | 12 | 0.035 – 0.070 |
+| Wood | Structural timber, Engineered wood | 8 | 0.12 – 0.20 |
+| Plaster & Mortar | Cement/Lime, Gypsum, Clay, Insulation plaster | 7 | 0.070 – 1.00 |
+| Board materials | Gypsum board | 1 | 0.25 |
+| Floor covering | Tile / Natural stone, Wood / Laminate / Vinyl | 10 | 0.05 – 3.50 |
+| Glass | Window glass | 1 | 1.00 |
 
-The full JSON is in `assets/materials.json` (separate file, not inlined here due to size). A representative excerpt showing the schema per entry:
+### 7.2 JSON Schema
+
+Each entry follows this schema (full data is in `assets/materials.json`, not inlined here due to size):
 
 ```json
-[
-  {"id":"mat-001","name":"Solid brick (Vollziegel, pre-1952)","category":"Masonry - Historic","lambdaDefault":1.05,"densityDefault":1900,"specificHeatDefault":900,"source":"DIN 4108:1952, AMz-Bericht 8/2005","notes":"KMz/KK, density >=1900 kg/m³"},
-  {"id":"mat-002","name":"Solid brick (Vollziegel, 1952–1968)","category":"Masonry - Historic","lambdaDefault":0.79,"densityDefault":1800,"specificHeatDefault":900,"source":"DIN 4108:1960-5","notes":"KHLz/KHK"},
-  {"id":"mat-020","name":"Poroton T9 (unfilled, ρ≈650)","category":"Masonry - Modern","lambdaDefault":0.09,"densityDefault":650,"specificHeatDefault":900,"source":"Wienerberger","notes":"Unfilled perforated clay block"},
-  {"id":"mat-074","name":"PIR insulation (Celotex GA4000 / Kingspan Therma)","category":"Insulation - Synthetic","lambdaDefault":0.022,"densityDefault":32,"specificHeatDefault":1400,"source":"Celotex / Kingspan","notes":"BBA certified, foil-faced PIR board"},
-  {"id":"mat-075","name":"Phenolic foam (Kingspan Kooltherm)","category":"Insulation - Synthetic","lambdaDefault":0.019,"densityDefault":35,"specificHeatDefault":1400,"source":"Kingspan","notes":"Kooltherm K-range"},
-  {"id":"mat-077","name":"Vacuum insulation panel (Kingspan OPTIM-R)","category":"Insulation - Synthetic","lambdaDefault":0.007,"densityDefault":200,"specificHeatDefault":800,"source":"Kingspan","notes":"VIP, extremely thin, fragile, expensive"},
-  {"id":"mat-089","name":"Stone wool (Rockwool NyRock, λ=0.032)","category":"Insulation - Mineral","lambdaDefault":0.032,"densityDefault":70,"specificHeatDefault":1030,"source":"Rockwool","notes":"NyRock technology"},
-  {"id":"mat-090","name":"Wood fibre (STEICO flex 036)","category":"Insulation - Natural","lambdaDefault":0.036,"densityDefault":50,"specificHeatDefault":2100,"source":"STEICO","notes":"Flexible batt, best natural λ"}
-]
+{
+  "id": "mat-090",
+  "name": "Rockwool Sonorock 035",
+  "category": "Insulation boards",
+  "subcategory": "Stone wool board",
+  "manufacturer": "Rockwool",
+  "lambdaDefault": 0.035,
+  "densityDefault": 50,
+  "specificHeatDefault": 1030,
+  "source": "https://www.rockwool.com/siteassets/rw-d/datenblatter/leichte-trennwand/db-sonorock-035-rockwool.pdf",
+  "notes": "Partition wall slab"
+}
 ```
 
-### 7.3 Historic Masonry Notes
+### 7.3 Key Manufacturers
 
-For renovation projects, correct material selection is critical. The historic brick entries (mat-001 through mat-015) are based on the AMz-Bericht 8/2005 "Wärmeleitfähigkeit von Ziegelmauerwerk im historischen Wandaufbau" which tabulates design λ values from successive DIN 4108 editions. Key considerations:
+| Manufacturer | Products in DB | Category |
+|---|---|---|
+| Rockwool | Sonorock, Coverrock, Frontrock, Fixrock, Masterrock, Varirock, Floorrock, Fillrock, NyRock | Stone wool boards, Blow-in |
+| STEICO | flex 036/038, therm, special, universal, protect M/H, base, floor | Wood fibre |
+| Kingspan | Therma PIR, Kooltherm K103/K106/K107/K108/K5, OPTIM-R VIP | PUR/PIR, Phenolic, Vacuum |
+| Celotex (Saint-Gobain) | GA4000, XR4000 | PUR/PIR |
+| Knauf Insulation | FrameTherm 32, DriTherm 32, Loft Roll 44 | Glass wool |
+| Isover (Saint-Gobain) | Spacesaver Plus, Super Profi, Multimax 030, CWS 34 | Glass wool |
+| Wienerberger | Poroton T7-P, T8-MW, T9, Porotherm WDF | Modern thermal brick |
+| Xella / Ytong | Therm Standard, PP2, PP1.6 | AAC |
+| Leipfinger-Bader | Unipor W07 Coriso, WS08 Coriso | Modern thermal brick |
+| isofloc | LM cellulose | Cellulose blow-in |
+| DIN 4108-4 | Generic values for all standard material types | All categories |
+| DIN 4108:1952–1981 | Historic brick values by era and density | Historic brick |
+
+### 7.4 Historic Masonry Notes
+
+For renovation projects, correct material selection is critical. The historic brick entries (mat-001 through mat-015) are based on the AMz-Bericht 8/2005 which tabulates design λ values from successive DIN 4108 editions:
 
 - **Pre-1952 bricks** (ρ ≥ 1900): λ = 1.05 W/(m·K) — very poor insulation
-- **1952–1968 era**: λ values range 0.46–0.79 depending on brick type and density
-- **Post-1981 DIN 4108-4**: finer density differentiation with λ from 0.30 (HLz W, ρ=700, LM) to 1.20 (clinker, ρ=2200)
+- **1952–1968 era**: λ = 0.46–0.79 depending on brick type and density
+- **Post-1981 DIN 4108-4**: λ from 0.30 (HLz W, ρ=700, lightweight mortar) to 1.20 (clinker, ρ=2200)
 - Historical bricks show wide variance (λ = 0.6–1.1 for 1920s bricks per AMz), so the UI should allow user override of the default λ value per layer
-
-### 7.4 Material Picker Grouping
-
-The material picker dialog should group entries by the `category` field. Subcategories (e.g. "Masonry - Historic", "Masonry - Modern") should be grouped under a collapsible "Masonry" parent header. The UI agent handles this presentation logic.
 
 ---
 
@@ -829,20 +700,20 @@ You must produce reference test cases for every engine function. These are the a
 ### 9.1 U-Value Test Cases
 
 **Case UV-1: Simple single-layer wall**
-- Layers: 200mm solid brick 1952–1968 era (mat-002, λ = 0.79)
+- Layers: 200mm solid brick (λ = 0.77)
 - Rsi = 0.13, Rse = 0.04
-- R_total = 0.13 + (0.200 / 0.79) + 0.04 = 0.13 + 0.2532 + 0.04 = 0.4232
-- **Expected U = 2.363 W/(m²K)** (to 3 decimal places)
+- R_total = 0.13 + (0.200 / 0.77) + 0.04 = 0.13 + 0.2597 + 0.04 = 0.4297
+- **Expected U = 2.327 W/(m²K)** (to 3 decimal places)
 
 **Case UV-2: Multi-layer insulated wall**
-- Layer 1 (outside): 15mm cement render (mat-120, λ = 1.00)
-- Layer 2: 100mm EPS insulation (mat-070, λ = 0.035)
-- Layer 3: 200mm hollow brick 1969 ρ=1000 (mat-003, λ = 0.46)
-- Layer 4 (inside): 15mm gypsum plaster (mat-123, λ = 0.40)
+- Layer 1 (outside): 15mm cement render (λ = 1.00)
+- Layer 2: 100mm EPS insulation (λ = 0.035)
+- Layer 3: 200mm hollow brick (λ = 0.44)
+- Layer 4 (inside): 15mm gypsum plaster (λ = 0.40)
 - Rsi = 0.13, Rse = 0.04
-- R_total = 0.13 + (0.015/1.00) + (0.100/0.035) + (0.200/0.46) + (0.015/0.40) + 0.04
-- R_total = 0.13 + 0.015 + 2.857 + 0.4348 + 0.0375 + 0.04 = 3.514
-- **Expected U = 0.285 W/(m²K)**
+- R_total = 0.13 + (0.015/1.00) + (0.100/0.035) + (0.200/0.44) + (0.015/0.40) + 0.04
+- R_total = 0.13 + 0.015 + 2.857 + 0.4545 + 0.0375 + 0.04 = 3.534
+- **Expected U = 0.283 W/(m²K)**
 
 **Case UV-3: Edge case — zero thickness layer**
 - Any layer with thickness = 0 mm
@@ -856,17 +727,17 @@ You must produce reference test cases for every engine function. These are the a
 
 **Case HD-1: Simple rectangular room**
 - Room: 5m × 4m, height 2.6m, target 20°C
-- One exterior wall: 5m long, U = 0.285 W/(m²K) (from UV-2)
+- One exterior wall: 5m long, U = 0.283 W/(m²K) (from UV-2)
 - One window on that wall: 1.5m × 1.4m, U = 1.3 W/(m²K)
 - Outdoor temp: -12°C
 - Air change rate: 0.5/h
 - Net wall area: (5.0 × 2.6) - (1.5 × 1.4) = 13.0 - 2.1 = 10.9 m²
-- Q_T_wall = 0.285 × 10.9 × 1.0 × (20 - (-12)) = 0.285 × 10.9 × 32 = 99.41 W
+- Q_T_wall = 0.283 × 10.9 × 1.0 × (20 - (-12)) = 0.283 × 10.9 × 32 = 98.71 W
 - Q_T_window = 1.3 × 2.1 × 1.0 × 32 = 87.36 W
-- Q_T = 99.41 + 87.36 = 186.77 W
+- Q_T = 98.71 + 87.36 = 186.07 W
 - V_room = 5.0 × 4.0 × 2.6 = 52.0 m³
 - Q_V = 52.0 × 0.5 × 1.2 × 1005 × 32 / 3600 = 277.87 W
-- **Expected Q_total = 464.64 W** (within ±2%)
+- **Expected Q_total = 463.94 W** (within ±2%)
 
 ### 9.3 Hydraulic Test Cases
 
