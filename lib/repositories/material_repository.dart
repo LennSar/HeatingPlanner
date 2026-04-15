@@ -1,10 +1,20 @@
+import 'dart:convert';
+import 'package:flutter/services.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/database/app_database.dart' as $db;
 import '../data/database/daos/material_dao.dart';
 import '../data/models/material_entry.dart';
+import 'app_preferences.dart';
 import 'save_state_notifier.dart';
+
+/// Version of the built-in material catalogue shipped with this build.
+///
+/// Increment this whenever [assets/materials.json] is updated. On next
+/// launch [MaterialRepository.ensureMaterialsSeeded] will detect the
+/// mismatch and re-upsert all entries.
+const materialDbVersion = 2;
 
 // ── DAO provider ──────────────────────────────────────────────────────────────
 
@@ -63,6 +73,40 @@ class MaterialRepository with SaveStateMixin {
   Future<void> deleteCustomMaterial(String id) async {
     await _dao.deleteById(id);
     markProjectDirty();
+  }
+
+  /// Ensures the built-in material catalogue is up-to-date.
+  ///
+  /// Compares [materialDbVersion] with the value stored in [AppPreferences].
+  /// When they differ (first install or catalogue update) the full
+  /// `assets/materials.json` is loaded and every entry is upserted into the
+  /// `material_entries` table. The preference is then updated so subsequent
+  /// launches are a no-op.
+  Future<void> ensureMaterialsSeeded() async {
+    final prefs = ref.read(appPreferencesProvider);
+    final stored = await prefs.getMaterialDbVersion();
+    if (stored == materialDbVersion) return;
+
+    final jsonString =
+        await rootBundle.loadString('assets/materials.json');
+    final jsonList = json.decode(jsonString) as List<dynamic>;
+
+    for (final raw in jsonList) {
+      final map = raw as Map<String, dynamic>;
+      await upsertBuiltInMaterial(
+        MaterialEntry(
+          id: map['id'] as String,
+          name: map['name'] as String,
+          category: map['category'] as String,
+          lambdaDefault: (map['lambdaDefault'] as num).toDouble(),
+          densityDefault: (map['densityDefault'] as num).toDouble(),
+          specificHeatDefault:
+              (map['specificHeatDefault'] as num).toDouble(),
+        ),
+      );
+    }
+
+    await prefs.setMaterialDbVersion(materialDbVersion);
   }
 }
 

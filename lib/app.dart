@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
 import 'repositories/app_preferences.dart';
+import 'repositories/material_repository.dart';
 import 'repositories/project_repository.dart';
 import 'repositories/save_state_notifier.dart';
 import 'ui/providers/editor_state_provider.dart';
@@ -22,6 +23,9 @@ import 'ui/screens/project_list_screen.dart';
 /// exists in SQLite before returning it.
 final _startupProjectIdProvider =
     FutureProvider.autoDispose<String?>((ref) async {
+  // Ensure the built-in material catalogue is seeded / up-to-date.
+  // Idempotent: skips immediately when the stored version matches.
+  await ref.read(materialRepositoryProvider).ensureMaterialsSeeded();
   final id = await ref.read(lastOpenedProjectIdProvider.future);
   if (id == null) return null;
   final project = await ref.read(projectRepositoryProvider).findById(id);

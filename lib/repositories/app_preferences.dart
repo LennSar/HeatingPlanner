@@ -9,6 +9,7 @@ const _kCanvasZoom = 'canvasZoom';
 const _kCanvasPanX = 'canvasPanX';
 const _kCanvasPanY = 'canvasPanY';
 const _kGridSpacingMm = 'gridSpacingMm';
+const _kMaterialDbVersion = 'materialDbVersion';
 const _kDefaultGridSpacingMm = 100;
 
 // ── AppPreferences ────────────────────────────────────────────────────────────
@@ -108,6 +109,19 @@ class AppPreferences {
   /// Persists the grid spacing in mm.
   Future<void> setGridSpacingMm(int spacingMm) =>
       _prefs.setInt(_kGridSpacingMm, spacingMm);
+
+  // ── materialDbVersion ─────────────────────────────────────────────────────
+
+  /// Version of the built-in material database that has been seeded.
+  ///
+  /// `null` means no seeding has been recorded yet (fresh install or
+  /// pre-versioning schema).
+  Future<int?> getMaterialDbVersion() =>
+      _prefs.getInt(_kMaterialDbVersion);
+
+  /// Stores [version] after a successful material re-seed.
+  Future<void> setMaterialDbVersion(int version) =>
+      _prefs.setInt(_kMaterialDbVersion, version);
 }
 
 // ── Providers ─────────────────────────────────────────────────────────────────

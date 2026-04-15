@@ -9,58 +9,8 @@ import '../../data/models/material_layer.dart';
 import '../../data/models/wall_construction.dart';
 import '../../data/models/wall_segment.dart';
 import '../providers/editor_state_provider.dart';
-
-// ---------------------------------------------------------------
-// Built-in material catalogue (mirrors assets/materials.json)
-// ---------------------------------------------------------------
-
-@immutable
-class _Mat {
-  const _Mat(
-    this.id,
-    this.name,
-    this.category,
-    this.lambda,
-    this.density,
-    this.specificHeat,
-  );
-
-  final String id;
-  final String name;
-  final String category;
-  final double lambda; // W/(m·K)
-  final double density; // kg/m³
-  final double specificHeat; // J/(kg·K)
-}
-
-const _kMats = <_Mat>[
-  _Mat('mat-001', 'Solid brick', 'Masonry', 0.77, 1800, 900),
-  _Mat('mat-002', 'Hollow brick', 'Masonry', 0.44, 1200, 900),
-  _Mat('mat-003', 'Concrete block', 'Masonry', 1.05, 2000, 900),
-  _Mat('mat-004', 'AAC block', 'Masonry', 0.12, 500, 1000),
-  _Mat('mat-005', 'Normal concrete', 'Concrete', 1.65, 2300, 1000),
-  _Mat('mat-006', 'Lightweight concrete', 'Concrete', 0.33, 800, 1000),
-  _Mat('mat-007', 'Reinforced concrete', 'Concrete', 2.10, 2400, 1000),
-  _Mat('mat-008', 'EPS', 'Insulation', 0.035, 20, 1450),
-  _Mat('mat-009', 'XPS', 'Insulation', 0.034, 35, 1450),
-  _Mat('mat-010', 'Mineral wool', 'Insulation', 0.038, 30, 1030),
-  _Mat('mat-011', 'PUR/PIR rigid board', 'Insulation', 0.023, 32, 1400),
-  _Mat('mat-012', 'Phenolic foam', 'Insulation', 0.020, 35, 1400),
-  _Mat('mat-013', 'Softwood', 'Wood', 0.13, 450, 1600),
-  _Mat('mat-014', 'Hardwood (oak)', 'Wood', 0.18, 700, 1600),
-  _Mat('mat-015', 'Plywood', 'Wood', 0.14, 550, 1600),
-  _Mat('mat-016', 'OSB', 'Wood', 0.13, 600, 1700),
-  _Mat('mat-017', 'Cement render', 'Plaster', 1.00, 1800, 1000),
-  _Mat('mat-018', 'Lime plaster', 'Plaster', 0.70, 1600, 1000),
-  _Mat('mat-019', 'Gypsum plaster', 'Plaster', 0.40, 1200, 1000),
-  _Mat('mat-020', 'Ceramic tile', 'Floor Covering', 1.30, 2300, 840),
-  _Mat('mat-021', 'Parquet (oak)', 'Floor Covering', 0.18, 700, 1600),
-  _Mat('mat-022', 'Laminate', 'Floor Covering', 0.13, 900, 1400),
-  _Mat('mat-023', 'Carpet', 'Floor Covering', 0.05, 200, 1300),
-  _Mat('mat-024', 'Vinyl', 'Floor Covering', 0.17, 1400, 900),
-  _Mat('mat-025', 'Vapour barrier (PE)', 'Membrane', 0.50, 980, 1800),
-  _Mat('mat-026', 'Breather membrane', 'Membrane', 0.17, 500, 1000),
-];
+import '../../data/models/material_entry.dart';
+import '../../repositories/material_repository.dart';
 
 // ---------------------------------------------------------------
 // Public entry point
@@ -233,7 +183,10 @@ class _SlabConstructionDialogState
       );
 
   void _addLayer() {
-    final mat = _kMats.first;
+    final entries =
+        ref.read(materialEntriesProvider).asData?.value ?? [];
+    final mat = entries.firstOrNull;
+    if (mat == null) return;
     setState(() {
       _layers = [
         ..._layers,
@@ -243,9 +196,9 @@ class _SlabConstructionDialogState
           sortOrder: _layers.length,
           materialId: mat.id,
           thicknessMm: 100.0,
-          thermalConductivity: mat.lambda,
-          density: mat.density,
-          specificHeat: mat.specificHeat,
+          thermalConductivity: mat.lambdaDefault,
+          density: mat.densityDefault,
+          specificHeat: mat.specificHeatDefault,
         ),
       ];
     });
@@ -285,15 +238,17 @@ class _SlabConstructionDialogState
   }
 
   Future<void> _pickMaterial(int index) async {
-    final mat = await _showMaterialPicker(context);
+    final entries =
+        ref.read(materialEntriesProvider).asData?.value ?? [];
+    final mat = await _showGroupedMaterialPicker(context, entries);
     if (mat == null || !mounted) return;
     _updateLayer(
       index,
       _layers[index].copyWith(
         materialId: mat.id,
-        thermalConductivity: mat.lambda,
-        density: mat.density,
-        specificHeat: mat.specificHeat,
+        thermalConductivity: mat.lambdaDefault,
+        density: mat.densityDefault,
+        specificHeat: mat.specificHeatDefault,
       ),
     );
   }
@@ -470,6 +425,8 @@ class _SlabConstructionDialogState
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     final settings = ref.watch(projectSettingsProvider);
+    final materials =
+        ref.watch(materialEntriesProvider).asData?.value ?? [];
     final tOutdoorC = settings.designOutdoorTempC;
     final tIndoorC = settings.defaultIndoorTempC;
     final uVal = _uVal;
@@ -594,14 +551,14 @@ class _SlabConstructionDialogState
                   ),
                   itemBuilder: (context, i) {
                     final layer = _layers[i];
-                    final mat = _kMats
+                    final mat = materials
                         .where((m) => m.id == layer.materialId)
                         .firstOrNull;
                     return _LayerRow(
                       key: ValueKey(layer.id),
                       index: i,
                       layer: layer,
-                      materialName: mat?.name ?? 'Unknown',
+                      materialName: mat?.name ?? layer.materialId,
                       onPickMaterial: () => _pickMaterial(i),
                       onThicknessChanged: (v) => _updateLayer(
                         i,
@@ -800,7 +757,10 @@ class _WallConstructionDialogState
   // ---- Mutations ----
 
   void _addLayer() {
-    final mat = _kMats.first;
+    final entries =
+        ref.read(materialEntriesProvider).asData?.value ?? [];
+    final mat = entries.firstOrNull;
+    if (mat == null) return;
     setState(() {
       _layers = [
         ..._layers,
@@ -810,9 +770,9 @@ class _WallConstructionDialogState
           sortOrder: _layers.length,
           materialId: mat.id,
           thicknessMm: 100.0,
-          thermalConductivity: mat.lambda,
-          density: mat.density,
-          specificHeat: mat.specificHeat,
+          thermalConductivity: mat.lambdaDefault,
+          density: mat.densityDefault,
+          specificHeat: mat.specificHeatDefault,
         ),
       ];
     });
@@ -851,15 +811,17 @@ class _WallConstructionDialogState
   }
 
   Future<void> _pickMaterialForLayer(int index) async {
-    final mat = await _showMaterialPicker(context);
+    final entries =
+        ref.read(materialEntriesProvider).asData?.value ?? [];
+    final mat = await _showGroupedMaterialPicker(context, entries);
     if (mat == null || !mounted) return;
     _updateLayer(
       index,
       _layers[index].copyWith(
         materialId: mat.id,
-        thermalConductivity: mat.lambda,
-        density: mat.density,
-        specificHeat: mat.specificHeat,
+        thermalConductivity: mat.lambdaDefault,
+        density: mat.densityDefault,
+        specificHeat: mat.specificHeatDefault,
       ),
     );
   }
@@ -1050,6 +1012,8 @@ class _WallConstructionDialogState
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     final settings = ref.watch(projectSettingsProvider);
+    final materials =
+        ref.watch(materialEntriesProvider).asData?.value ?? [];
     final tOutdoorC = settings.designOutdoorTempC;
     final editorState = ref.watch(editorStateProvider);
     final room = editorState.rooms
@@ -1174,14 +1138,14 @@ class _WallConstructionDialogState
                   ),
                   itemBuilder: (context, i) {
                     final layer = _layers[i];
-                    final mat = _kMats
+                    final mat = materials
                         .where((m) => m.id == layer.materialId)
                         .firstOrNull;
                     return _LayerRow(
                       key: ValueKey(layer.id),
                       index: i,
                       layer: layer,
-                      materialName: mat?.name ?? 'Unknown',
+                      materialName: mat?.name ?? layer.materialId,
                       onPickMaterial: () => _pickMaterialForLayer(i),
                       onThicknessChanged: (v) =>
                           _updateLayer(i, layer.copyWith(thicknessMm: v)),
@@ -1853,67 +1817,157 @@ class _PresetRow extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------
-// Material picker dialog
+// Grouped searchable material picker
 // ---------------------------------------------------------------
 
-/// Shows a searchable list of built-in materials and returns
-/// the selected [_Mat], or null if cancelled.
-Future<_Mat?> _showMaterialPicker(BuildContext context) {
-  return showDialog<_Mat>(
+/// Canonical display order for top-level material groups.
+///
+/// Derived from agent-hvac.md §7.1.
+const _kGroupOrder = [
+  'Masonry',
+  'Concrete',
+  'Insulation',
+  'Wood',
+  'Plaster',
+  'Floor Covering',
+  'Membrane',
+  'Metal',
+  'Glass',
+];
+
+/// Returns the top-level category by stripping the sub-category suffix.
+///
+/// e.g. "Masonry - Historic" → "Masonry", "Insulation - Synthetic" → "Insulation".
+String _topCategory(String category) {
+  final i = category.indexOf(' - ');
+  return i >= 0 ? category.substring(0, i) : category;
+}
+
+/// Shows a searchable, accordion-grouped material picker dialog and returns
+/// the selected [MaterialEntry], or null if cancelled.
+///
+/// When no search text is entered the materials are shown as collapsible
+/// [ExpansionTile] groups (one per top-level category). Tapping a category
+/// header expands it inline to reveal the entries underneath. When a search
+/// string is typed the accordion collapses and a flat filtered list is shown
+/// instead (group headers hidden per §5.7.1). λ is shown as secondary text
+/// on every entry.
+Future<MaterialEntry?> _showGroupedMaterialPicker(
+  BuildContext context,
+  List<MaterialEntry> materials,
+) {
+  return showDialog<MaterialEntry>(
     context: context,
     builder: (ctx) {
       var filter = '';
       return StatefulBuilder(
         builder: (ctx, setInner) {
-          final filtered = filter.isEmpty
-              ? _kMats
-              : _kMats
-                  .where(
-                    (m) =>
-                        m.name
-                            .toLowerCase()
-                            .contains(filter.toLowerCase()) ||
-                        m.category
-                            .toLowerCase()
-                            .contains(filter.toLowerCase()),
-                  )
-                  .toList();
+          // ── Build grouped structure ───────────────────────────────────
+          final byGroup = <String, List<MaterialEntry>>{};
+          for (final m in materials) {
+            byGroup.putIfAbsent(_topCategory(m.category), () => []).add(m);
+          }
+          final orderedGroups = [
+            for (final g in _kGroupOrder)
+              if (byGroup.containsKey(g)) g,
+            // Any group not in the canonical order appended at the end.
+            for (final g in byGroup.keys)
+              if (!_kGroupOrder.contains(g)) g,
+          ];
+
+          // ── Flat filtered list (search active) ────────────────────────
+          Widget buildFilteredList() {
+            final q = filter.toLowerCase();
+            final flat = materials
+                .where(
+                  (m) =>
+                      m.name.toLowerCase().contains(q) ||
+                      m.category.toLowerCase().contains(q),
+                )
+                .toList();
+            if (flat.isEmpty) {
+              return const Center(child: Text('No materials found.'));
+            }
+            return ListView.builder(
+              itemCount: flat.length,
+              itemBuilder: (_, i) {
+                final m = flat[i];
+                return ListTile(
+                  title: Text(m.name),
+                  subtitle: Text(
+                    '\u03BB\u202F${m.lambdaDefault}\u00A0W/(m\u00B7K)',
+                  ),
+                  dense: true,
+                  onTap: () => Navigator.of(ctx).pop(m),
+                );
+              },
+            );
+          }
+
+          // ── Accordion list (no search) ────────────────────────────────
+          Widget buildAccordion() {
+            return ListView.builder(
+              itemCount: orderedGroups.length,
+              itemBuilder: (_, gi) {
+                final group = orderedGroups[gi];
+                final members = byGroup[group]!;
+                return ExpansionTile(
+                  title: Text(
+                    group,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  childrenPadding: EdgeInsets.zero,
+                  tilePadding: const EdgeInsets.symmetric(
+                    horizontal: Spacing.md,
+                  ),
+                  children: [
+                    for (final m in members)
+                      ListTile(
+                        contentPadding: const EdgeInsets.only(
+                          left: Spacing.lg,
+                          right: Spacing.md,
+                        ),
+                        title: Text(m.name),
+                        subtitle: Text(
+                          '\u03BB\u202F${m.lambdaDefault}\u00A0W/(m\u00B7K)',
+                        ),
+                        dense: true,
+                        onTap: () => Navigator.of(ctx).pop(m),
+                      ),
+                  ],
+                );
+              },
+            );
+          }
 
           return AlertDialog(
             title: const Text('Select Material'),
+            contentPadding:
+                const EdgeInsets.fromLTRB(0, Spacing.md, 0, 0),
             content: SizedBox(
-              width: 320,
-              height: 420,
+              width: 360,
+              height: 520,
               child: Column(
                 children: [
-                  TextField(
-                    autofocus: true,
-                    decoration: const InputDecoration(
-                      hintText: 'Search\u2026',
-                      prefixIcon: Icon(Icons.search),
-                      isDense: true,
+                  Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: Spacing.md,
                     ),
-                    onChanged: (v) =>
-                        setInner(() => filter = v),
+                    child: TextField(
+                      autofocus: true,
+                      decoration: const InputDecoration(
+                        hintText: 'Search\u2026',
+                        prefixIcon: Icon(Icons.search),
+                        isDense: true,
+                      ),
+                      onChanged: (v) => setInner(() => filter = v),
+                    ),
                   ),
                   const SizedBox(height: Spacing.sm),
                   Expanded(
-                    child: ListView.builder(
-                      itemCount: filtered.length,
-                      itemBuilder: (_, i) {
-                        final m = filtered[i];
-                        return ListTile(
-                          title: Text(m.name),
-                          subtitle: Text(
-                            '${m.category}  '
-                            '\u03BB\u202F${m.lambda}\u00A0W/(m\u00B7K)',
-                          ),
-                          dense: true,
-                          onTap: () =>
-                              Navigator.of(ctx).pop(m),
-                        );
-                      },
-                    ),
+                    child: filter.isNotEmpty
+                        ? buildFilteredList()
+                        : buildAccordion(),
                   ),
                 ],
               ),
@@ -1930,3 +1984,4 @@ Future<_Mat?> _showMaterialPicker(BuildContext context) {
     },
   );
 }
+
