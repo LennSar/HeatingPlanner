@@ -22,10 +22,12 @@ import 'material_entry_tile.dart';
 /// scroll correctly.
 ///
 /// ## Paths
-/// - **Search inactive** (implemented): grouped three-level tree via
-///   [_GroupedList] backed by [groupedMaterialsProvider].
-/// - **Search active** (TODO): flat case-insensitive filtered list with
-///   group headers hidden — see inline TODO in [_MaterialPickerState.build].
+/// - **Search inactive**: grouped three-level tree via [_GroupedList] backed
+///   by [groupedMaterialsProvider].
+/// - **Search active**: flat [_FlatFilteredList] — case-insensitive substring
+///   match on [MaterialEntry.name] and [MaterialEntry.subcategory]; group
+///   headers are hidden. Matches on `manufacturer` will be added once that
+///   field is available in [MaterialEntry].
 class MaterialPicker extends ConsumerStatefulWidget {
   /// Creates a [MaterialPicker].
   const MaterialPicker({super.key, required this.onSelected});
@@ -40,11 +42,24 @@ class MaterialPicker extends ConsumerStatefulWidget {
 class _MaterialPickerState extends ConsumerState<MaterialPicker> {
   final _searchController = TextEditingController();
 
+  /// Raw query text; drives search-active / search-inactive path switch.
+  String _query = '';
+
   @override
   void dispose() {
     _searchController.dispose();
     super.dispose();
   }
+
+  /// Returns true when [m] matches [lowerQuery] on any searchable field.
+  ///
+  /// [lowerQuery] must already be lower-cased by the caller (done once per
+  /// build, not per item). Matches on [MaterialEntry.name] and
+  /// [MaterialEntry.subcategory]. Extend to `m.manufacturer` once that field
+  /// is added to [MaterialEntry] and the database schema.
+  static bool _matches(MaterialEntry m, String lowerQuery) =>
+      m.name.toLowerCase().contains(lowerQuery) ||
+      m.subcategory.toLowerCase().contains(lowerQuery);
 
   @override
   Widget build(BuildContext context) {
@@ -84,11 +99,7 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
                 horizontal: Spacing.sm,
               ),
             ),
-            // TODO(frontend §5.7.1 — search-active path): add onChanged that
-            // calls setState to track query text. When text is non-empty,
-            // replace _GroupedList below with a _FlatFilteredList that performs
-            // case-insensitive substring matching on MaterialEntry.name and
-            // shows only MaterialEntryTile rows (no CollapsibleGroupTile headers).
+            onChanged: (value) => setState(() => _query = value),
           ),
         ),
 
@@ -108,23 +119,80 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
                 ),
               ),
             ),
-            data: (_) => grouped.isEmpty
-                ? Padding(
-                    padding: const EdgeInsets.all(Spacing.md),
-                    child: Text(
-                      'No materials available.',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
+            data: (materials) {
+              // ── Search-active path ──────────────────────────────────────
+              final q = _query.trim().toLowerCase();
+              if (q.isNotEmpty) {
+                final filtered =
+                    materials.where((m) => _matches(m, q)).toList();
+                return _FlatFilteredList(
+                  materials: filtered,
+                  onSelected: widget.onSelected,
+                );
+              }
+              // ── Search-inactive path ────────────────────────────────────
+              if (grouped.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.all(Spacing.md),
+                  child: Text(
+                    'No materials available.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                     ),
-                  )
-                : _GroupedList(
-                    grouped: grouped,
-                    onSelected: widget.onSelected,
                   ),
+                );
+              }
+              return _GroupedList(
+                grouped: grouped,
+                onSelected: widget.onSelected,
+              );
+            },
           ),
         ),
       ],
+    );
+  }
+}
+
+// ── Private: flat filtered list (search-active path) ──────────────────────
+
+/// Flat [ListView] of [MaterialEntryTile] rows with no group headers.
+///
+/// Shown when the search field is non-empty. [materials] is already filtered
+/// by [_MaterialPickerState._matches]; this widget only renders them.
+class _FlatFilteredList extends StatelessWidget {
+  const _FlatFilteredList({
+    required this.materials,
+    required this.onSelected,
+  });
+
+  final List<MaterialEntry> materials;
+  final void Function(MaterialEntry) onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    if (materials.isEmpty) {
+      return Padding(
+        padding: const EdgeInsets.all(Spacing.md),
+        child: Text(
+          'No matching materials.',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+        ),
+      );
+    }
+    return ListView.builder(
+      shrinkWrap: true,
+      padding: EdgeInsets.zero,
+      itemCount: materials.length,
+      // indentLevel 0: no group headers to nest under, so tiles sit flush
+      // at the base indent (Spacing.sm = 8 px left padding).
+      itemBuilder: (_, i) => MaterialEntryTile(
+        entry: materials[i],
+        indentLevel: 0,
+        onTap: () => onSelected(materials[i]),
+      ),
     );
   }
 }
