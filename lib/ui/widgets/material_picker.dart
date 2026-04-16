@@ -228,19 +228,29 @@ class _GroupedList extends StatelessWidget {
             indentLevel: 0,
             children: [
               for (final subcatEntry in catEntry.value.entries)
-                // Level 1 — subcategory header.
-                CollapsibleGroupTile(
-                  title: subcatEntry.key,
-                  indentLevel: 1,
-                  children: [
-                    for (final material in subcatEntry.value)
-                      // Level 2 — leaf material row.
-                      MaterialEntryTile(
-                        entry: material,
-                        onTap: () => onSelected(material),
-                      ),
-                  ],
-                ),
+                if (subcatEntry.key.isEmpty)
+                  // No subcategory — render materials directly at level 1
+                  // to avoid an empty-titled subcategory header.
+                  for (final material in subcatEntry.value)
+                    MaterialEntryTile(
+                      entry: material,
+                      indentLevel: 1,
+                      onTap: () => onSelected(material),
+                    )
+                else
+                  // Level 1 — subcategory header.
+                  CollapsibleGroupTile(
+                    title: subcatEntry.key,
+                    indentLevel: 1,
+                    children: [
+                      for (final material in subcatEntry.value)
+                        // Level 2 — leaf material row.
+                        MaterialEntryTile(
+                          entry: material,
+                          onTap: () => onSelected(material),
+                        ),
+                    ],
+                  ),
             ],
           ),
       ],

@@ -11,6 +11,7 @@ import '../../data/models/wall_segment.dart';
 import '../providers/editor_state_provider.dart';
 import '../../data/models/material_entry.dart';
 import '../../repositories/material_repository.dart';
+import '../widgets/material_picker.dart';
 
 // ---------------------------------------------------------------
 // Public entry point
@@ -238,9 +239,7 @@ class _SlabConstructionDialogState
   }
 
   Future<void> _pickMaterial(int index) async {
-    final entries =
-        ref.read(materialEntriesProvider).asData?.value ?? [];
-    final mat = await _showGroupedMaterialPicker(context, entries);
+    final mat = await _showMaterialPickerDialog(context);
     if (mat == null || !mounted) return;
     _updateLayer(
       index,
@@ -811,9 +810,7 @@ class _WallConstructionDialogState
   }
 
   Future<void> _pickMaterialForLayer(int index) async {
-    final entries =
-        ref.read(materialEntriesProvider).asData?.value ?? [];
-    final mat = await _showGroupedMaterialPicker(context, entries);
+    final mat = await _showMaterialPickerDialog(context);
     if (mat == null || !mounted) return;
     _updateLayer(
       index,
@@ -1817,171 +1814,29 @@ class _PresetRow extends StatelessWidget {
 }
 
 // ---------------------------------------------------------------
-// Grouped searchable material picker
+// Material picker dialog
 // ---------------------------------------------------------------
 
-/// Canonical display order for top-level material groups.
-///
-/// Derived from agent-hvac.md §7.1.
-const _kGroupOrder = [
-  'Masonry',
-  'Concrete',
-  'Insulation',
-  'Wood',
-  'Plaster',
-  'Floor Covering',
-  'Membrane',
-  'Metal',
-  'Glass',
-];
-
-/// Returns the top-level category by stripping the sub-category suffix.
-///
-/// e.g. "Masonry - Historic" → "Masonry", "Insulation - Synthetic" → "Insulation".
-String _topCategory(String category) {
-  final i = category.indexOf(' - ');
-  return i >= 0 ? category.substring(0, i) : category;
-}
-
-/// Shows a searchable, accordion-grouped material picker dialog and returns
-/// the selected [MaterialEntry], or null if cancelled.
-///
-/// When no search text is entered the materials are shown as collapsible
-/// [ExpansionTile] groups (one per top-level category). Tapping a category
-/// header expands it inline to reveal the entries underneath. When a search
-/// string is typed the accordion collapses and a flat filtered list is shown
-/// instead (group headers hidden per §5.7.1). λ is shown as secondary text
-/// on every entry.
-Future<MaterialEntry?> _showGroupedMaterialPicker(
-  BuildContext context,
-  List<MaterialEntry> materials,
-) {
+/// Shows a [MaterialPicker] inside a dialog and returns the chosen
+/// [MaterialEntry], or null if the user dismisses without selecting.
+Future<MaterialEntry?> _showMaterialPickerDialog(BuildContext context) {
   return showDialog<MaterialEntry>(
     context: context,
-    builder: (ctx) {
-      var filter = '';
-      return StatefulBuilder(
-        builder: (ctx, setInner) {
-          // ── Build grouped structure ───────────────────────────────────
-          final byGroup = <String, List<MaterialEntry>>{};
-          for (final m in materials) {
-            byGroup.putIfAbsent(_topCategory(m.category), () => []).add(m);
-          }
-          final orderedGroups = [
-            for (final g in _kGroupOrder)
-              if (byGroup.containsKey(g)) g,
-            // Any group not in the canonical order appended at the end.
-            for (final g in byGroup.keys)
-              if (!_kGroupOrder.contains(g)) g,
-          ];
-
-          // ── Flat filtered list (search active) ────────────────────────
-          Widget buildFilteredList() {
-            final q = filter.toLowerCase();
-            final flat = materials
-                .where(
-                  (m) =>
-                      m.name.toLowerCase().contains(q) ||
-                      m.category.toLowerCase().contains(q),
-                )
-                .toList();
-            if (flat.isEmpty) {
-              return const Center(child: Text('No materials found.'));
-            }
-            return ListView.builder(
-              itemCount: flat.length,
-              itemBuilder: (_, i) {
-                final m = flat[i];
-                return ListTile(
-                  title: Text(m.name),
-                  subtitle: Text(
-                    '\u03BB\u202F${m.lambdaDefault}\u00A0W/(m\u00B7K)',
-                  ),
-                  dense: true,
-                  onTap: () => Navigator.of(ctx).pop(m),
-                );
-              },
-            );
-          }
-
-          // ── Accordion list (no search) ────────────────────────────────
-          Widget buildAccordion() {
-            return ListView.builder(
-              itemCount: orderedGroups.length,
-              itemBuilder: (_, gi) {
-                final group = orderedGroups[gi];
-                final members = byGroup[group]!;
-                return ExpansionTile(
-                  title: Text(
-                    group,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  childrenPadding: EdgeInsets.zero,
-                  tilePadding: const EdgeInsets.symmetric(
-                    horizontal: Spacing.md,
-                  ),
-                  children: [
-                    for (final m in members)
-                      ListTile(
-                        contentPadding: const EdgeInsets.only(
-                          left: Spacing.lg,
-                          right: Spacing.md,
-                        ),
-                        title: Text(m.name),
-                        subtitle: Text(
-                          '\u03BB\u202F${m.lambdaDefault}\u00A0W/(m\u00B7K)',
-                        ),
-                        dense: true,
-                        onTap: () => Navigator.of(ctx).pop(m),
-                      ),
-                  ],
-                );
-              },
-            );
-          }
-
-          return AlertDialog(
-            title: const Text('Select Material'),
-            contentPadding:
-                const EdgeInsets.fromLTRB(0, Spacing.md, 0, 0),
-            content: SizedBox(
-              width: 360,
-              height: 520,
-              child: Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: Spacing.md,
-                    ),
-                    child: TextField(
-                      autofocus: true,
-                      decoration: const InputDecoration(
-                        hintText: 'Search\u2026',
-                        prefixIcon: Icon(Icons.search),
-                        isDense: true,
-                      ),
-                      onChanged: (v) => setInner(() => filter = v),
-                    ),
-                  ),
-                  const SizedBox(height: Spacing.sm),
-                  Expanded(
-                    child: filter.isNotEmpty
-                        ? buildFilteredList()
-                        : buildAccordion(),
-                  ),
-                ],
-              ),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(ctx).pop(),
-                child: const Text('Cancel'),
-              ),
-            ],
-          );
-        },
-      );
-    },
+    builder: (ctx) => Dialog(
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: SizedBox(
+        width: 400,
+        height: 560,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: MaterialPicker(
+            onSelected: (m) => Navigator.of(ctx).pop(m),
+          ),
+        ),
+      ),
+    ),
   );
 }
 
