@@ -3623,6 +3623,18 @@ class $MaterialEntriesTable extends MaterialEntries
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _subcategoryMeta = const VerificationMeta(
+    'subcategory',
+  );
+  @override
+  late final GeneratedColumn<String> subcategory = GeneratedColumn<String>(
+    'subcategory',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(''),
+  );
   static const VerificationMeta _lambdaDefaultMeta = const VerificationMeta(
     'lambdaDefault',
   );
@@ -3676,6 +3688,7 @@ class $MaterialEntriesTable extends MaterialEntries
     id,
     name,
     category,
+    subcategory,
     lambdaDefault,
     densityDefault,
     specificHeatDefault,
@@ -3713,6 +3726,15 @@ class $MaterialEntriesTable extends MaterialEntries
       );
     } else if (isInserting) {
       context.missing(_categoryMeta);
+    }
+    if (data.containsKey('subcategory')) {
+      context.handle(
+        _subcategoryMeta,
+        subcategory.isAcceptableOrUnknown(
+          data['subcategory']!,
+          _subcategoryMeta,
+        ),
+      );
     }
     if (data.containsKey('lambda_default')) {
       context.handle(
@@ -3774,6 +3796,10 @@ class $MaterialEntriesTable extends MaterialEntries
         DriftSqlType.string,
         data['${effectivePrefix}category'],
       )!,
+      subcategory: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}subcategory'],
+      )!,
       lambdaDefault: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}lambda_default'],
@@ -3803,6 +3829,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
   final String id;
   final String name;
   final String category;
+  final String subcategory;
   final double lambdaDefault;
   final double densityDefault;
   final double specificHeatDefault;
@@ -3811,6 +3838,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
     required this.id,
     required this.name,
     required this.category,
+    required this.subcategory,
     required this.lambdaDefault,
     required this.densityDefault,
     required this.specificHeatDefault,
@@ -3822,6 +3850,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
     map['category'] = Variable<String>(category);
+    map['subcategory'] = Variable<String>(subcategory);
     map['lambda_default'] = Variable<double>(lambdaDefault);
     map['density_default'] = Variable<double>(densityDefault);
     map['specific_heat_default'] = Variable<double>(specificHeatDefault);
@@ -3834,6 +3863,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
       id: Value(id),
       name: Value(name),
       category: Value(category),
+      subcategory: Value(subcategory),
       lambdaDefault: Value(lambdaDefault),
       densityDefault: Value(densityDefault),
       specificHeatDefault: Value(specificHeatDefault),
@@ -3850,6 +3880,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       category: serializer.fromJson<String>(json['category']),
+      subcategory: serializer.fromJson<String>(json['subcategory']),
       lambdaDefault: serializer.fromJson<double>(json['lambdaDefault']),
       densityDefault: serializer.fromJson<double>(json['densityDefault']),
       specificHeatDefault: serializer.fromJson<double>(
@@ -3865,6 +3896,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'category': serializer.toJson<String>(category),
+      'subcategory': serializer.toJson<String>(subcategory),
       'lambdaDefault': serializer.toJson<double>(lambdaDefault),
       'densityDefault': serializer.toJson<double>(densityDefault),
       'specificHeatDefault': serializer.toJson<double>(specificHeatDefault),
@@ -3876,6 +3908,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
     String? id,
     String? name,
     String? category,
+    String? subcategory,
     double? lambdaDefault,
     double? densityDefault,
     double? specificHeatDefault,
@@ -3884,6 +3917,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
     id: id ?? this.id,
     name: name ?? this.name,
     category: category ?? this.category,
+    subcategory: subcategory ?? this.subcategory,
     lambdaDefault: lambdaDefault ?? this.lambdaDefault,
     densityDefault: densityDefault ?? this.densityDefault,
     specificHeatDefault: specificHeatDefault ?? this.specificHeatDefault,
@@ -3894,6 +3928,9 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
       category: data.category.present ? data.category.value : this.category,
+      subcategory: data.subcategory.present
+          ? data.subcategory.value
+          : this.subcategory,
       lambdaDefault: data.lambdaDefault.present
           ? data.lambdaDefault.value
           : this.lambdaDefault,
@@ -3913,6 +3950,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('category: $category, ')
+          ..write('subcategory: $subcategory, ')
           ..write('lambdaDefault: $lambdaDefault, ')
           ..write('densityDefault: $densityDefault, ')
           ..write('specificHeatDefault: $specificHeatDefault, ')
@@ -3926,6 +3964,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
     id,
     name,
     category,
+    subcategory,
     lambdaDefault,
     densityDefault,
     specificHeatDefault,
@@ -3938,6 +3977,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
           other.id == this.id &&
           other.name == this.name &&
           other.category == this.category &&
+          other.subcategory == this.subcategory &&
           other.lambdaDefault == this.lambdaDefault &&
           other.densityDefault == this.densityDefault &&
           other.specificHeatDefault == this.specificHeatDefault &&
@@ -3948,6 +3988,7 @@ class MaterialEntriesCompanion extends UpdateCompanion<MaterialEntry> {
   final Value<String> id;
   final Value<String> name;
   final Value<String> category;
+  final Value<String> subcategory;
   final Value<double> lambdaDefault;
   final Value<double> densityDefault;
   final Value<double> specificHeatDefault;
@@ -3957,6 +3998,7 @@ class MaterialEntriesCompanion extends UpdateCompanion<MaterialEntry> {
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.category = const Value.absent(),
+    this.subcategory = const Value.absent(),
     this.lambdaDefault = const Value.absent(),
     this.densityDefault = const Value.absent(),
     this.specificHeatDefault = const Value.absent(),
@@ -3967,6 +4009,7 @@ class MaterialEntriesCompanion extends UpdateCompanion<MaterialEntry> {
     required String id,
     required String name,
     required String category,
+    this.subcategory = const Value.absent(),
     required double lambdaDefault,
     required double densityDefault,
     required double specificHeatDefault,
@@ -3982,6 +4025,7 @@ class MaterialEntriesCompanion extends UpdateCompanion<MaterialEntry> {
     Expression<String>? id,
     Expression<String>? name,
     Expression<String>? category,
+    Expression<String>? subcategory,
     Expression<double>? lambdaDefault,
     Expression<double>? densityDefault,
     Expression<double>? specificHeatDefault,
@@ -3992,6 +4036,7 @@ class MaterialEntriesCompanion extends UpdateCompanion<MaterialEntry> {
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (category != null) 'category': category,
+      if (subcategory != null) 'subcategory': subcategory,
       if (lambdaDefault != null) 'lambda_default': lambdaDefault,
       if (densityDefault != null) 'density_default': densityDefault,
       if (specificHeatDefault != null)
@@ -4005,6 +4050,7 @@ class MaterialEntriesCompanion extends UpdateCompanion<MaterialEntry> {
     Value<String>? id,
     Value<String>? name,
     Value<String>? category,
+    Value<String>? subcategory,
     Value<double>? lambdaDefault,
     Value<double>? densityDefault,
     Value<double>? specificHeatDefault,
@@ -4015,6 +4061,7 @@ class MaterialEntriesCompanion extends UpdateCompanion<MaterialEntry> {
       id: id ?? this.id,
       name: name ?? this.name,
       category: category ?? this.category,
+      subcategory: subcategory ?? this.subcategory,
       lambdaDefault: lambdaDefault ?? this.lambdaDefault,
       densityDefault: densityDefault ?? this.densityDefault,
       specificHeatDefault: specificHeatDefault ?? this.specificHeatDefault,
@@ -4034,6 +4081,9 @@ class MaterialEntriesCompanion extends UpdateCompanion<MaterialEntry> {
     }
     if (category.present) {
       map['category'] = Variable<String>(category.value);
+    }
+    if (subcategory.present) {
+      map['subcategory'] = Variable<String>(subcategory.value);
     }
     if (lambdaDefault.present) {
       map['lambda_default'] = Variable<double>(lambdaDefault.value);
@@ -4061,6 +4111,7 @@ class MaterialEntriesCompanion extends UpdateCompanion<MaterialEntry> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('category: $category, ')
+          ..write('subcategory: $subcategory, ')
           ..write('lambdaDefault: $lambdaDefault, ')
           ..write('densityDefault: $densityDefault, ')
           ..write('specificHeatDefault: $specificHeatDefault, ')
@@ -11628,6 +11679,7 @@ typedef $$MaterialEntriesTableCreateCompanionBuilder =
       required String id,
       required String name,
       required String category,
+      Value<String> subcategory,
       required double lambdaDefault,
       required double densityDefault,
       required double specificHeatDefault,
@@ -11639,6 +11691,7 @@ typedef $$MaterialEntriesTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> name,
       Value<String> category,
+      Value<String> subcategory,
       Value<double> lambdaDefault,
       Value<double> densityDefault,
       Value<double> specificHeatDefault,
@@ -11698,6 +11751,11 @@ class $$MaterialEntriesTableFilterComposer
 
   ColumnFilters<String> get category => $composableBuilder(
     column: $table.category,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get subcategory => $composableBuilder(
+    column: $table.subcategory,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -11771,6 +11829,11 @@ class $$MaterialEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get subcategory => $composableBuilder(
+    column: $table.subcategory,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get lambdaDefault => $composableBuilder(
     column: $table.lambdaDefault,
     builder: (column) => ColumnOrderings(column),
@@ -11809,6 +11872,11 @@ class $$MaterialEntriesTableAnnotationComposer
 
   GeneratedColumn<String> get category =>
       $composableBuilder(column: $table.category, builder: (column) => column);
+
+  GeneratedColumn<String> get subcategory => $composableBuilder(
+    column: $table.subcategory,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<double> get lambdaDefault => $composableBuilder(
     column: $table.lambdaDefault,
@@ -11887,6 +11955,7 @@ class $$MaterialEntriesTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String> category = const Value.absent(),
+                Value<String> subcategory = const Value.absent(),
                 Value<double> lambdaDefault = const Value.absent(),
                 Value<double> densityDefault = const Value.absent(),
                 Value<double> specificHeatDefault = const Value.absent(),
@@ -11896,6 +11965,7 @@ class $$MaterialEntriesTableTableManager
                 id: id,
                 name: name,
                 category: category,
+                subcategory: subcategory,
                 lambdaDefault: lambdaDefault,
                 densityDefault: densityDefault,
                 specificHeatDefault: specificHeatDefault,
@@ -11907,6 +11977,7 @@ class $$MaterialEntriesTableTableManager
                 required String id,
                 required String name,
                 required String category,
+                Value<String> subcategory = const Value.absent(),
                 required double lambdaDefault,
                 required double densityDefault,
                 required double specificHeatDefault,
@@ -11916,6 +11987,7 @@ class $$MaterialEntriesTableTableManager
                 id: id,
                 name: name,
                 category: category,
+                subcategory: subcategory,
                 lambdaDefault: lambdaDefault,
                 densityDefault: densityDefault,
                 specificHeatDefault: specificHeatDefault,

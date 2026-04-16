@@ -98,6 +98,7 @@ class MaterialRepository with SaveStateMixin {
           id: map['id'] as String,
           name: map['name'] as String,
           category: map['category'] as String,
+          subcategory: (map['subcategory'] as String?) ?? '',
           lambdaDefault: (map['lambdaDefault'] as num).toDouble(),
           densityDefault: (map['densityDefault'] as num).toDouble(),
           specificHeatDefault:
@@ -122,6 +123,7 @@ MaterialEntry _entryFromRow($db.MaterialEntry row) {
     id: row.id,
     name: row.name,
     category: row.category,
+    subcategory: row.subcategory,
     lambdaDefault: row.lambdaDefault,
     densityDefault: row.densityDefault,
     specificHeatDefault: row.specificHeatDefault,
@@ -136,6 +138,7 @@ $db.MaterialEntriesCompanion _entryToCompanion(MaterialEntry entry) {
     id: Value(entry.id),
     name: Value(entry.name),
     category: Value(entry.category),
+    subcategory: Value(entry.subcategory),
     lambdaDefault: Value(entry.lambdaDefault),
     densityDefault: Value(entry.densityDefault),
     specificHeatDefault: Value(entry.specificHeatDefault),

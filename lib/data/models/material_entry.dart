@@ -16,8 +16,11 @@ abstract class MaterialEntry with _$MaterialEntry {
     /// Display name (1–200 chars).
     required String name,
 
-    /// Material category string (e.g. "Masonry", "Insulation").
+    /// Material category string (e.g. "Masonry", "Insulation boards").
     required String category,
+
+    /// Material subcategory string (e.g. "Historic brick", "Stone wool board").
+    @Default('') String subcategory,
 
     /// Default thermal conductivity λ in W/(m·K).
     required double lambdaDefault,

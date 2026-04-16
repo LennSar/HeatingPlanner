@@ -65,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 12;
+  int get schemaVersion => 13;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -166,6 +166,12 @@ class AppDatabase extends _$AppDatabase {
             await m.database.customStatement(
               'ALTER TABLE material_layers ADD COLUMN '
               'stud_lambda REAL',
+            );
+          }
+          if (from < 13) {
+            await m.database.customStatement(
+              "ALTER TABLE material_entries ADD COLUMN "
+              "subcategory TEXT NOT NULL DEFAULT ''",
             );
           }
         },
