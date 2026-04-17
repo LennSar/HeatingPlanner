@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../data/models/enums.dart';
+import '../../platform/desktop_menu.dart';
 import '../../platform/keyboard_shortcuts.dart';
 import '../../repositories/app_preferences.dart';
 import '../../repositories/building_repository.dart';
@@ -127,7 +128,8 @@ class _EditorScreenState
     final isTablet = width < 600;
 
     return EditorShortcuts(
-      child: Scaffold(
+      child: DesktopMenuBar(
+        child: Scaffold(
         body: Column(
         children: [
           // Main content area: toolbar + canvas + panel
@@ -248,6 +250,7 @@ class _EditorScreenState
               },
             )
           : null,
+        ),
       ),
     );
   }
@@ -390,6 +393,38 @@ class _Toolbar extends StatelessWidget {
             child: Divider(color: colors.gridLine),
           ),
 
+          // ── File action buttons (Open / Save / Save As) ──────────
+          _ToolbarFileButton(
+            icon: Icons.folder_open,
+            tooltip: 'Open (Ctrl+O)',
+            width: toolbarWidth,
+            iconSize: isCompact ? 20.0 : 22.0,
+            onTap: () => Actions.invoke(
+              context,
+              const OpenIntent(),
+            ),
+          ),
+          _ToolbarFileButton(
+            icon: Icons.save,
+            tooltip: 'Save (Ctrl+S)',
+            width: toolbarWidth,
+            iconSize: isCompact ? 20.0 : 22.0,
+            onTap: () => Actions.invoke(
+              context,
+              const SaveIntent(),
+            ),
+          ),
+          _ToolbarFileButton(
+            icon: Icons.save_as,
+            tooltip: 'Save As (Ctrl+Shift+S)',
+            width: toolbarWidth,
+            iconSize: isCompact ? 20.0 : 22.0,
+            onTap: () => Actions.invoke(
+              context,
+              const SaveAsIntent(),
+            ),
+          ),
+
           // Dashboard toggle
           Tooltip(
             message: 'Dashboard',
@@ -453,6 +488,55 @@ class _ToolEntry {
   final DrawingTool tool;
   final IconData icon;
   final String label;
+}
+
+// ----------------------------------------------------------
+// Toolbar file-action button
+// ----------------------------------------------------------
+
+/// A single icon button used in the toolbar for Open / Save / Save As.
+///
+/// Uses [HeatingPlannerColors] tokens; no hard-coded colours.
+class _ToolbarFileButton extends StatelessWidget {
+  const _ToolbarFileButton({
+    required this.icon,
+    required this.tooltip,
+    required this.width,
+    required this.iconSize,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final double width;
+  final double iconSize;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      preferBelow: false,
+      waitDuration: const Duration(milliseconds: 500),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox(
+            width: width,
+            height: width,
+            child: Icon(
+              icon,
+              size: iconSize,
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurfaceVariant,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 // ----------------------------------------------------------

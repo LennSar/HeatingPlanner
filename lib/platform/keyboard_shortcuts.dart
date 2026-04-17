@@ -1,18 +1,27 @@
 import 'dart:async';
+import 'dart:convert';
+import 'dart:io';
 
+import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../data/database/app_database.dart' as $db;
 import '../data/models/enums.dart';
+import '../repositories/app_preferences.dart';
+import '../repositories/hsp_importer.dart';
 import '../repositories/save_state_notifier.dart';
 import '../ui/canvas/canvas_controller.dart';
 import '../ui/canvas/floor_plan_canvas.dart';
 import '../ui/canvas/tools/undo_redo_service.dart';
 import '../ui/panels/properties_panel.dart'
     show selectedElementProvider;
+import '../ui/providers/editor_state_provider.dart'
+    show currentProjectNameProvider;
 import '../ui/screens/editor_screen.dart';
+import '../ui/widgets/save_flash_notifier.dart';
 
 // ----------------------------------------------------------
 // Intent definitions (UI/UX Section 8)
@@ -90,6 +99,16 @@ class SaveAsIntent extends Intent {
   const SaveAsIntent();
 }
 
+/// Open an `.hsp` project file (Ctrl/Cmd+O).
+///
+/// Opens a file picker, imports the selected project (with new UUIDs per
+/// §7.4 of agent-architect.md), writes `lastOpenedProjectId`, and navigates
+/// to the editor for the newly imported project.
+class OpenIntent extends Intent {
+  /// Creates an [OpenIntent].
+  const OpenIntent();
+}
+
 // ----------------------------------------------------------
 // Shortcut map
 // ----------------------------------------------------------
@@ -155,6 +174,10 @@ final Map<ShortcutActivator, Intent> editorShortcuts = {
   ): const ZoomToFitIntent(),
 
   // File
+  const SingleActivator(
+    LogicalKeyboardKey.keyO,
+    control: true,
+  ): const OpenIntent(),
   const SingleActivator(
     LogicalKeyboardKey.keyS,
     control: true,
@@ -296,26 +319,21 @@ class EditorShortcuts extends ConsumerWidget {
               return null;
             },
           ),
+          OpenIntent: CallbackAction<OpenIntent>(
+            onInvoke: (_) {
+              unawaited(_performOpen(context, ref));
+              return null;
+            },
+          ),
           SaveIntent: CallbackAction<SaveIntent>(
             onInvoke: (_) {
-              final notifier =
-                  ref.read(saveStateProvider.notifier);
-              if (ref.read(saveStateProvider).lastExportPath !=
-                  null) {
-                unawaited(notifier.exportNow());
-              } else {
-                unawaited(_pickAndSaveAs(notifier));
-              }
+              unawaited(_performSave(ref));
               return null;
             },
           ),
           SaveAsIntent: CallbackAction<SaveAsIntent>(
             onInvoke: (_) {
-              unawaited(
-                _pickAndSaveAs(
-                  ref.read(saveStateProvider.notifier),
-                ),
-              );
+              unawaited(_performSaveAs(ref));
               return null;
             },
           ),
@@ -367,17 +385,75 @@ class EditorShortcuts extends ConsumerWidget {
   }
 }
 
-// ── Save helpers ───────────────────────────────────────────────────────────────
+// ── File action helpers ────────────────────────────────────────────────────────
 
-/// Opens a save-file dialog and delegates to [SaveStateNotifier.saveAs].
+/// Saves to the existing `.hsp` path, or opens a Save As picker if
+/// no path is established yet.
 ///
-/// Does nothing if the user dismisses the dialog.
-Future<void> _pickAndSaveAs(SaveStateNotifier notifier) async {
+/// Triggers [saveFlashProvider] on success for the 2-second status-bar
+/// confirmation (agent-ui-ux.md §12.7).
+Future<void> _performSave(WidgetRef ref) async {
+  final state = ref.read(saveStateProvider);
+  if (state.lastExportPath != null) {
+    await ref.read(saveStateProvider.notifier).exportNow();
+    ref.read(saveFlashProvider.notifier).trigger();
+  } else {
+    await _performSaveAs(ref);
+  }
+}
+
+/// Opens a save-file dialog and exports to the selected path.
+///
+/// Default filename is `{ProjectName}.hsp`. Updates [SaveState.lastExportPath]
+/// and clears `isDirty`. Triggers [saveFlashProvider] on success.
+Future<void> _performSaveAs(WidgetRef ref) async {
+  final projectName = ref.read(currentProjectNameProvider);
   final path = await FilePicker.platform.saveFile(
     dialogTitle: 'Save Project As',
-    fileName: 'project.hsp',
+    fileName: '$projectName.hsp',
     allowedExtensions: ['hsp'],
     type: FileType.custom,
   );
-  if (path != null) await notifier.saveAs(path);
+  if (path == null) return;
+  await ref.read(saveStateProvider.notifier).saveAs(path);
+  ref.read(saveFlashProvider.notifier).trigger();
+}
+
+/// Opens a file picker, imports the chosen `.hsp` file with fresh UUIDs,
+/// persists `lastOpenedProjectId`, and navigates to the new project.
+///
+/// On cancel (null path) does nothing.
+Future<void> _performOpen(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  final result = await FilePicker.platform.pickFiles(
+    type: FileType.custom,
+    allowedExtensions: ['hsp'],
+    allowMultiple: false,
+  );
+  if (result == null || result.files.isEmpty) return;
+  final path = result.files.first.path;
+  if (path == null) return;
+
+  final bytes = await File(path).readAsBytes();
+  final jsonStr =
+      utf8.decode(const GZipDecoder().decodeBytes(bytes));
+  final snapshot =
+      jsonDecode(jsonStr) as Map<String, dynamic>;
+
+  final newId = await HspImporter(
+    ref.read($db.appDatabaseProvider),
+  ).importSnapshot(snapshot);
+
+  await ref
+      .read(lastOpenedProjectIdProvider.notifier)
+      .set(newId);
+
+  if (!context.mounted) return;
+  await Navigator.of(context).pushReplacement(
+    MaterialPageRoute<void>(
+      builder: (_) => EditorScreen(projectId: newId),
+    ),
+  );
 }
