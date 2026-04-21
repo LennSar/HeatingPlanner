@@ -356,7 +356,12 @@ Each model below is defined in its own file under `lib/data/models/`. I am listi
 | wallType | WallType | enum | exterior |
 | constructionId | String? | FK → WallConstruction | null |
 | adjacentRoomId | String? | FK → Room | null |
+| mirrorId | String? | FK → WallSegment (ON DELETE SET NULL) | null |
 | orientation | CardinalDirection | auto-calculated | auto |
+
+> **ADR-011:** `EditorStateNotifier.updateWall` auto-synchronizes the partner
+> wall when `mirrorId` is non-null. See `DECISIONS.md ADR-011` for the full
+> sync contract (which fields sync, which do not, and cascade-delete behaviour).
 
 **WindowElement**
 | Field | Type | Constraint | Default |

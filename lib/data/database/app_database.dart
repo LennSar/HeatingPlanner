@@ -65,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 13;
+  int get schemaVersion => 14;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -172,6 +172,12 @@ class AppDatabase extends _$AppDatabase {
             await m.database.customStatement(
               "ALTER TABLE material_entries ADD COLUMN "
               "subcategory TEXT NOT NULL DEFAULT ''",
+            );
+          }
+          if (from < 14) {
+            await m.database.customStatement(
+              'ALTER TABLE wall_segments ADD COLUMN '
+              'mirror_id TEXT REFERENCES wall_segments(id) ON DELETE SET NULL',
             );
           }
         },

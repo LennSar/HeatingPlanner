@@ -24,6 +24,15 @@ class WallSegments extends Table {
   TextColumn get orientation =>
       text().withDefault(const Constant('north'))();
 
+  /// UUID of the mirror wall in an ADR-001 pair.
+  ///
+  /// Nullable self-referencing FK. Set to NULL via `ON DELETE SET NULL`
+  /// when the partner wall is deleted (ADR-011 Rule 5).
+  @ReferenceName('mirrorWallSegments')
+  TextColumn get mirrorId => text()
+      .nullable()
+      .references(WallSegments, #id, onDelete: KeyAction.setNull)();
+
   @override
   Set<Column> get primaryKey => {id};
 }

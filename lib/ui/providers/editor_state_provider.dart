@@ -178,8 +178,48 @@ class EditorStateNotifier extends Notifier<EditorState>
   }
 
   /// Replace a wall with the same ID.
+  ///
+  /// When [wall] has a non-null [WallSegment.mirrorId], the partner wall is
+  /// located by ID and updated atomically in the same [state.copyWith] call,
+  /// syncing [constructionId], [startPoint]/[endPoint] (reversed), and
+  /// [wallType] (ADR-011 Rule 4). Both walls are persisted to the DAO.
   void updateWall(WallSegment wall) {
     final w = _withOrientation(wall);
+    final partnerId = w.mirrorId;
+
+    if (partnerId != null) {
+      final partnerIdx =
+          state.walls.indexWhere((s) => s.id == partnerId);
+      if (partnerIdx != -1) {
+        final partner = state.walls[partnerIdx];
+        final updatedPartner = _withOrientation(
+          partner.copyWith(
+            constructionId: w.constructionId,
+            startPoint: w.endPoint,
+            endPoint: w.startPoint,
+            wallType: w.wallType,
+          ),
+        );
+        state = state.copyWith(
+          walls: [
+            for (final s in state.walls)
+              if (s.id == w.id)
+                w
+              else if (s.id == partnerId)
+                updatedPartner
+              else
+                s,
+          ],
+        );
+        final dao = ref.read(buildingDaoProvider);
+        unawaited(upsertWallSegment(dao, w));
+        unawaited(upsertWallSegment(dao, updatedPartner));
+        markProjectDirty();
+        return;
+      }
+    }
+
+    // No mirror or partner not found: update single wall.
     state = state.copyWith(
       walls: state.walls
           .map((s) => s.id == w.id ? w : s)
@@ -788,15 +828,19 @@ class EditorStateNotifier extends Notifier<EditorState>
         toPersist.add(assigned);
       } else {
         final neighbourRoomId = wall.roomId;
+        // Generate the mirror's ID upfront so both walls can
+        // cross-reference each other (ADR-011 Rule 3).
+        final newMirrorId = IdGenerator.newId();
         final updated = wall.copyWith(
           wallType: WallType.interior,
           adjacentRoomId: room.id,
+          mirrorId: newMirrorId,
         );
         updatedWalls[idx] = updated;
         toPersist.add(updated);
 
         final mirror = WallSegment(
-          id: IdGenerator.newId(),
+          id: newMirrorId,
           roomId: room.id,
           startPoint: wall.endPoint,
           endPoint: wall.startPoint,
@@ -804,6 +848,7 @@ class EditorStateNotifier extends Notifier<EditorState>
           constructionId: wall.constructionId,
           adjacentRoomId: neighbourRoomId,
           orientation: wall.orientation,
+          mirrorId: updated.id,
         );
         updatedWalls.add(mirror);
         toPersist.add(mirror);

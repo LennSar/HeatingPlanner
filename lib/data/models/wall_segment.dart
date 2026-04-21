@@ -36,6 +36,12 @@ abstract class WallSegment with _$WallSegment {
 
     /// Compass orientation derived from segment angle.
     @Default(CardinalDirection.north) CardinalDirection orientation,
+
+    /// UUID of the mirror wall in an ADR-001 shared-wall pair.
+    ///
+    /// Set by [addRoomFromDetection] when the interior copy is created.
+    /// Null for exterior and unassigned walls.
+    String? mirrorId,
   }) = _WallSegment;
 
   factory WallSegment.fromJson(Map<String, dynamic> json) =>

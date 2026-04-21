@@ -2193,6 +2193,20 @@ class $WallSegmentsTable extends WallSegments
     requiredDuringInsert: false,
     defaultValue: const Constant('north'),
   );
+  static const VerificationMeta _mirrorIdMeta = const VerificationMeta(
+    'mirrorId',
+  );
+  @override
+  late final GeneratedColumn<String> mirrorId = GeneratedColumn<String>(
+    'mirror_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES wall_segments (id) ON DELETE SET NULL',
+    ),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -2203,6 +2217,7 @@ class $WallSegmentsTable extends WallSegments
     constructionId,
     adjacentRoomId,
     orientation,
+    mirrorId,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -2284,6 +2299,12 @@ class $WallSegmentsTable extends WallSegments
         ),
       );
     }
+    if (data.containsKey('mirror_id')) {
+      context.handle(
+        _mirrorIdMeta,
+        mirrorId.isAcceptableOrUnknown(data['mirror_id']!, _mirrorIdMeta),
+      );
+    }
     return context;
   }
 
@@ -2325,6 +2346,10 @@ class $WallSegmentsTable extends WallSegments
         DriftSqlType.string,
         data['${effectivePrefix}orientation'],
       )!,
+      mirrorId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}mirror_id'],
+      ),
     );
   }
 
@@ -2347,6 +2372,12 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
   final String? constructionId;
   final String? adjacentRoomId;
   final String orientation;
+
+  /// UUID of the mirror wall in an ADR-001 pair.
+  ///
+  /// Nullable self-referencing FK. Set to NULL via `ON DELETE SET NULL`
+  /// when the partner wall is deleted (ADR-011 Rule 5).
+  final String? mirrorId;
   const WallSegment({
     required this.id,
     required this.roomId,
@@ -2356,6 +2387,7 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
     this.constructionId,
     this.adjacentRoomId,
     required this.orientation,
+    this.mirrorId,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2372,6 +2404,9 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
       map['adjacent_room_id'] = Variable<String>(adjacentRoomId);
     }
     map['orientation'] = Variable<String>(orientation);
+    if (!nullToAbsent || mirrorId != null) {
+      map['mirror_id'] = Variable<String>(mirrorId);
+    }
     return map;
   }
 
@@ -2389,6 +2424,9 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
           ? const Value.absent()
           : Value(adjacentRoomId),
       orientation: Value(orientation),
+      mirrorId: mirrorId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(mirrorId),
     );
   }
 
@@ -2406,6 +2444,7 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
       constructionId: serializer.fromJson<String?>(json['constructionId']),
       adjacentRoomId: serializer.fromJson<String?>(json['adjacentRoomId']),
       orientation: serializer.fromJson<String>(json['orientation']),
+      mirrorId: serializer.fromJson<String?>(json['mirrorId']),
     );
   }
   @override
@@ -2420,6 +2459,7 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
       'constructionId': serializer.toJson<String?>(constructionId),
       'adjacentRoomId': serializer.toJson<String?>(adjacentRoomId),
       'orientation': serializer.toJson<String>(orientation),
+      'mirrorId': serializer.toJson<String?>(mirrorId),
     };
   }
 
@@ -2432,6 +2472,7 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
     Value<String?> constructionId = const Value.absent(),
     Value<String?> adjacentRoomId = const Value.absent(),
     String? orientation,
+    Value<String?> mirrorId = const Value.absent(),
   }) => WallSegment(
     id: id ?? this.id,
     roomId: roomId ?? this.roomId,
@@ -2445,6 +2486,7 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
         ? adjacentRoomId.value
         : this.adjacentRoomId,
     orientation: orientation ?? this.orientation,
+    mirrorId: mirrorId.present ? mirrorId.value : this.mirrorId,
   );
   WallSegment copyWithCompanion(WallSegmentsCompanion data) {
     return WallSegment(
@@ -2466,6 +2508,7 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
       orientation: data.orientation.present
           ? data.orientation.value
           : this.orientation,
+      mirrorId: data.mirrorId.present ? data.mirrorId.value : this.mirrorId,
     );
   }
 
@@ -2479,7 +2522,8 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
           ..write('wallType: $wallType, ')
           ..write('constructionId: $constructionId, ')
           ..write('adjacentRoomId: $adjacentRoomId, ')
-          ..write('orientation: $orientation')
+          ..write('orientation: $orientation, ')
+          ..write('mirrorId: $mirrorId')
           ..write(')'))
         .toString();
   }
@@ -2494,6 +2538,7 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
     constructionId,
     adjacentRoomId,
     orientation,
+    mirrorId,
   );
   @override
   bool operator ==(Object other) =>
@@ -2506,7 +2551,8 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
           other.wallType == this.wallType &&
           other.constructionId == this.constructionId &&
           other.adjacentRoomId == this.adjacentRoomId &&
-          other.orientation == this.orientation);
+          other.orientation == this.orientation &&
+          other.mirrorId == this.mirrorId);
 }
 
 class WallSegmentsCompanion extends UpdateCompanion<WallSegment> {
@@ -2518,6 +2564,7 @@ class WallSegmentsCompanion extends UpdateCompanion<WallSegment> {
   final Value<String?> constructionId;
   final Value<String?> adjacentRoomId;
   final Value<String> orientation;
+  final Value<String?> mirrorId;
   final Value<int> rowid;
   const WallSegmentsCompanion({
     this.id = const Value.absent(),
@@ -2528,6 +2575,7 @@ class WallSegmentsCompanion extends UpdateCompanion<WallSegment> {
     this.constructionId = const Value.absent(),
     this.adjacentRoomId = const Value.absent(),
     this.orientation = const Value.absent(),
+    this.mirrorId = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   WallSegmentsCompanion.insert({
@@ -2539,6 +2587,7 @@ class WallSegmentsCompanion extends UpdateCompanion<WallSegment> {
     this.constructionId = const Value.absent(),
     this.adjacentRoomId = const Value.absent(),
     this.orientation = const Value.absent(),
+    this.mirrorId = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        roomId = Value(roomId),
@@ -2553,6 +2602,7 @@ class WallSegmentsCompanion extends UpdateCompanion<WallSegment> {
     Expression<String>? constructionId,
     Expression<String>? adjacentRoomId,
     Expression<String>? orientation,
+    Expression<String>? mirrorId,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2564,6 +2614,7 @@ class WallSegmentsCompanion extends UpdateCompanion<WallSegment> {
       if (constructionId != null) 'construction_id': constructionId,
       if (adjacentRoomId != null) 'adjacent_room_id': adjacentRoomId,
       if (orientation != null) 'orientation': orientation,
+      if (mirrorId != null) 'mirror_id': mirrorId,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2577,6 +2628,7 @@ class WallSegmentsCompanion extends UpdateCompanion<WallSegment> {
     Value<String?>? constructionId,
     Value<String?>? adjacentRoomId,
     Value<String>? orientation,
+    Value<String?>? mirrorId,
     Value<int>? rowid,
   }) {
     return WallSegmentsCompanion(
@@ -2588,6 +2640,7 @@ class WallSegmentsCompanion extends UpdateCompanion<WallSegment> {
       constructionId: constructionId ?? this.constructionId,
       adjacentRoomId: adjacentRoomId ?? this.adjacentRoomId,
       orientation: orientation ?? this.orientation,
+      mirrorId: mirrorId ?? this.mirrorId,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2619,6 +2672,9 @@ class WallSegmentsCompanion extends UpdateCompanion<WallSegment> {
     if (orientation.present) {
       map['orientation'] = Variable<String>(orientation.value);
     }
+    if (mirrorId.present) {
+      map['mirror_id'] = Variable<String>(mirrorId.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2636,6 +2692,7 @@ class WallSegmentsCompanion extends UpdateCompanion<WallSegment> {
           ..write('constructionId: $constructionId, ')
           ..write('adjacentRoomId: $adjacentRoomId, ')
           ..write('orientation: $orientation, ')
+          ..write('mirrorId: $mirrorId, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -7969,6 +8026,13 @@ abstract class _$AppDatabase extends GeneratedDatabase {
         'wall_segments',
         limitUpdateKind: UpdateKind.delete,
       ),
+      result: [TableUpdate('wall_segments', kind: UpdateKind.update)],
+    ),
+    WritePropagation(
+      on: TableUpdateQuery.onTableName(
+        'wall_segments',
+        limitUpdateKind: UpdateKind.delete,
+      ),
       result: [TableUpdate('windows', kind: UpdateKind.delete)],
     ),
     WritePropagation(
@@ -10096,6 +10160,7 @@ typedef $$WallSegmentsTableCreateCompanionBuilder =
       Value<String?> constructionId,
       Value<String?> adjacentRoomId,
       Value<String> orientation,
+      Value<String?> mirrorId,
       Value<int> rowid,
     });
 typedef $$WallSegmentsTableUpdateCompanionBuilder =
@@ -10108,6 +10173,7 @@ typedef $$WallSegmentsTableUpdateCompanionBuilder =
       Value<String?> constructionId,
       Value<String?> adjacentRoomId,
       Value<String> orientation,
+      Value<String?> mirrorId,
       Value<int> rowid,
     });
 
@@ -10168,6 +10234,25 @@ final class $$WallSegmentsTableReferences
       $_db.rooms,
     ).filter((f) => f.id.sqlEquals($_column));
     final item = $_typedResult.readTableOrNull(_adjacentRoomIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
+
+  static $WallSegmentsTable _mirrorIdTable(_$AppDatabase db) =>
+      db.wallSegments.createAlias(
+        $_aliasNameGenerator(db.wallSegments.mirrorId, db.wallSegments.id),
+      );
+
+  $$WallSegmentsTableProcessedTableManager? get mirrorId {
+    final $_column = $_itemColumn<String>('mirror_id');
+    if ($_column == null) return null;
+    final manager = $$WallSegmentsTableTableManager(
+      $_db,
+      $_db.wallSegments,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_mirrorIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
@@ -10331,6 +10416,29 @@ class $$WallSegmentsTableFilterComposer
           }) => $$RoomsTableFilterComposer(
             $db: $db,
             $table: $db.rooms,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
+  $$WallSegmentsTableFilterComposer get mirrorId {
+    final $$WallSegmentsTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.mirrorId,
+      referencedTable: $db.wallSegments,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WallSegmentsTableFilterComposer(
+            $db: $db,
+            $table: $db.wallSegments,
             $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
             joinBuilder: joinBuilder,
             $removeJoinBuilderFromRootComposer:
@@ -10518,6 +10626,29 @@ class $$WallSegmentsTableOrderingComposer
     );
     return composer;
   }
+
+  $$WallSegmentsTableOrderingComposer get mirrorId {
+    final $$WallSegmentsTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.mirrorId,
+      referencedTable: $db.wallSegments,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WallSegmentsTableOrderingComposer(
+            $db: $db,
+            $table: $db.wallSegments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$WallSegmentsTableAnnotationComposer
@@ -10620,6 +10751,29 @@ class $$WallSegmentsTableAnnotationComposer
     return composer;
   }
 
+  $$WallSegmentsTableAnnotationComposer get mirrorId {
+    final $$WallSegmentsTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.mirrorId,
+      referencedTable: $db.wallSegments,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$WallSegmentsTableAnnotationComposer(
+            $db: $db,
+            $table: $db.wallSegments,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
+
   Expression<T> windowsRefs<T extends Object>(
     Expression<T> Function($$WindowsTableAnnotationComposer a) f,
   ) {
@@ -10713,6 +10867,7 @@ class $$WallSegmentsTableTableManager
             bool roomId,
             bool constructionId,
             bool adjacentRoomId,
+            bool mirrorId,
             bool windowsRefs,
             bool doorsRefs,
             bool heatingZonesRefs,
@@ -10739,6 +10894,7 @@ class $$WallSegmentsTableTableManager
                 Value<String?> constructionId = const Value.absent(),
                 Value<String?> adjacentRoomId = const Value.absent(),
                 Value<String> orientation = const Value.absent(),
+                Value<String?> mirrorId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => WallSegmentsCompanion(
                 id: id,
@@ -10749,6 +10905,7 @@ class $$WallSegmentsTableTableManager
                 constructionId: constructionId,
                 adjacentRoomId: adjacentRoomId,
                 orientation: orientation,
+                mirrorId: mirrorId,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -10761,6 +10918,7 @@ class $$WallSegmentsTableTableManager
                 Value<String?> constructionId = const Value.absent(),
                 Value<String?> adjacentRoomId = const Value.absent(),
                 Value<String> orientation = const Value.absent(),
+                Value<String?> mirrorId = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => WallSegmentsCompanion.insert(
                 id: id,
@@ -10771,6 +10929,7 @@ class $$WallSegmentsTableTableManager
                 constructionId: constructionId,
                 adjacentRoomId: adjacentRoomId,
                 orientation: orientation,
+                mirrorId: mirrorId,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -10786,6 +10945,7 @@ class $$WallSegmentsTableTableManager
                 roomId = false,
                 constructionId = false,
                 adjacentRoomId = false,
+                mirrorId = false,
                 windowsRefs = false,
                 doorsRefs = false,
                 heatingZonesRefs = false,
@@ -10854,6 +11014,21 @@ class $$WallSegmentsTableTableManager
                                     referencedColumn:
                                         $$WallSegmentsTableReferences
                                             ._adjacentRoomIdTable(db)
+                                            .id,
+                                  )
+                                  as T;
+                        }
+                        if (mirrorId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.mirrorId,
+                                    referencedTable:
+                                        $$WallSegmentsTableReferences
+                                            ._mirrorIdTable(db),
+                                    referencedColumn:
+                                        $$WallSegmentsTableReferences
+                                            ._mirrorIdTable(db)
                                             .id,
                                   )
                                   as T;
@@ -10950,6 +11125,7 @@ typedef $$WallSegmentsTableProcessedTableManager =
         bool roomId,
         bool constructionId,
         bool adjacentRoomId,
+        bool mirrorId,
         bool windowsRefs,
         bool doorsRefs,
         bool heatingZonesRefs,

@@ -372,3 +372,59 @@ preview uses raw cursor for performance). Single-wall draw mode is unaffected.
 
 **Verification.**
 WDT-12 in `test/widget/tools/wall_draw_tool_test.dart`.
+
+---
+
+## ADR-011 — Shared-wall mirror synchronization via `mirrorId`
+
+**What.**
+`WallSegment` gains a nullable `String? mirrorId` that points to the other wall
+in an ADR-001 mirror pair. `addRoomFromDetection` sets `mirrorId` on both walls
+when it creates the pair. `EditorStateNotifier.updateWall` detects a non-null
+`mirrorId`, finds the partner wall by ID, and writes both walls in a single
+`state.copyWith` call.
+
+**Why.**
+Without explicit linkage the user must edit both halves of a shared wall
+independently — changing construction material or moving a vertex requires two
+identical operations. A coordinate-heuristic search (find wall with reversed
+endpoints) would work for current data but is fragile under float drift and
+non-self-documenting. An explicit FK is O(1), survives any geometry
+manipulation, and makes the pairing visible in the data model and Drift schema.
+
+**Rules.**
+
+1. `mirrorId` is `String?`, default `null`. Exterior and unassigned walls carry
+   `null`. Only walls created by `addRoomFromDetection` carry a non-null value.
+
+2. Drift `wall_segments` table: add nullable TEXT column `mirror_id` with
+   `REFERENCES wall_segments(id) ON DELETE SET NULL`. Increment schema version;
+   migration adds the column with `DEFAULT NULL`.
+
+3. `addRoomFromDetection` sets `mirrorId` cross-referencing both walls after
+   creating the mirror copy: `original.mirrorId = mirror.id` and
+   `mirror.mirrorId = original.id`. No other call-site sets `mirrorId`.
+
+4. `EditorStateNotifier.updateWall` — when `wall.mirrorId` is non-null, find
+   the partner by ID and write a single atomic `state.copyWith`. Fields that
+   sync:
+   - `constructionId` — same physical material on both sides (covers both
+     re-assignment of a different construction ID and creation of a new
+     `WallConstruction` record by the editor; edits to the layers of an already-
+     shared construction propagate automatically via the shared FK without
+     needing `updateWall`)
+   - `startPoint` / `endPoint` — reversed for the mirror (same geometry,
+     opposite direction)
+   - `wallType` — always both interior
+
+   Fields that do **not** sync: `id`, `roomId`, `adjacentRoomId`, `mirrorId`,
+   `orientation` (auto-recalculated from new geometry by `_withOrientation`).
+   Both walls are persisted to the DAO in the same call.
+
+5. `destroyRoom` cascade on `roomId` deletes the room's walls; the remaining
+   partner's `mirrorId` becomes `null` via `ON DELETE SET NULL` — no
+   application code needed.
+
+6. `.hsp` format: `mirrorId` is included automatically once `build_runner`
+   regenerates `WallSegment.toJson`/`fromJson`. No manual exporter change
+   required.

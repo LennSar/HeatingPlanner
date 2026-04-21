@@ -100,6 +100,8 @@ class SelectTool extends CanvasTool {
   WallSegment? _dragStartWall;
   List<WallSegment> _dragStartConnected = const [];
   Room? _dragStartRoom;
+  // ADR-011: snapshot of the mirror wall's room at drag start.
+  Room? _dragStartMirrorRoom;
 
   // -- Opening selection state --
 
@@ -445,6 +447,24 @@ class SelectTool extends CanvasTool {
     } else {
       _dragStartRoom = null;
     }
+    // ADR-011: snapshot the mirror wall's room so we can keep it in sync.
+    final mirrorWallId = _selectedWall!.mirrorId;
+    if (mirrorWallId != null) {
+      final mirrorWall = callbacks.currentWalls
+          .where((w) => w.id == mirrorWallId)
+          .firstOrNull;
+      final mirrorRoomId =
+          (mirrorWall != null && mirrorWall.roomId.isNotEmpty)
+              ? mirrorWall.roomId
+              : null;
+      _dragStartMirrorRoom = mirrorRoomId != null
+          ? callbacks.currentRooms
+                .where((r) => r.id == mirrorRoomId)
+                .firstOrNull
+          : null;
+    } else {
+      _dragStartMirrorRoom = null;
+    }
     onStateChanged();
   }
 
@@ -627,6 +647,7 @@ class SelectTool extends CanvasTool {
     final oldWall = _dragStartWall!;
     final oldConnected = List<WallSegment>.from(_dragStartConnected);
     final oldRoom = _dragStartRoom;
+    final oldMirrorRoom = _dragStartMirrorRoom;
     final newWall = currentWall;
     final newConnected = <WallSegment>[];
     for (final oc in oldConnected) {
@@ -640,6 +661,12 @@ class SelectTool extends CanvasTool {
               .where((r) => r.id == oldRoom.id)
               .firstOrNull
         : null;
+    // ADR-011: capture the mirror room's post-drag state for undo/redo.
+    final newMirrorRoom = oldMirrorRoom != null
+        ? callbacks.currentRooms
+              .where((r) => r.id == oldMirrorRoom.id)
+              .firstOrNull
+        : null;
 
     if (oldWall.startPoint != newWall.startPoint ||
         oldWall.endPoint != newWall.endPoint) {
@@ -651,6 +678,8 @@ class SelectTool extends CanvasTool {
         newConnected: newConnected,
         oldRoom: oldRoom,
         newRoom: newRoom,
+        oldMirrorRoom: oldMirrorRoom,
+        newMirrorRoom: newMirrorRoom,
       ));
     }
 
@@ -1733,6 +1762,10 @@ class SelectTool extends CanvasTool {
     required Point2D newEnd,
   }) {
     for (final conn in _dragStartConnected) {
+      // ADR-011: the mirror wall's geometry is already fully and correctly
+      // synced by updateWall's mirror path.  A second partial update here
+      // would trigger ADR-011 again and corrupt the original wall.
+      if (conn.mirrorId == origWall.id) continue;
       WallSegment? updated;
       if (_pointsEqual(conn.startPoint, origWall.startPoint)) {
         updated = conn.copyWith(startPoint: newStart);
@@ -1756,6 +1789,8 @@ class SelectTool extends CanvasTool {
     required Point2D newPosition,
   }) {
     for (final conn in _dragStartConnected) {
+      // ADR-011: skip the mirror wall — already synced by updateWall.
+      if (conn.mirrorId == origWall.id) continue;
       WallSegment? updated;
       if (_pointsEqual(conn.startPoint, movedEndpoint)) {
         updated = conn.copyWith(startPoint: newPosition);
@@ -1771,17 +1806,35 @@ class SelectTool extends CanvasTool {
   // ================================================================
 
   void _updateRoomPolygon() {
-    if (_dragStartRoom == null) return;
-    final roomId = _dragStartRoom!.id;
-    final roomWalls = callbacks.currentWalls
-        .where((w) => w.roomId == roomId)
-        .toList();
-    if (roomWalls.length < 3) return;
-    final polygon = _buildPolygonFromWalls(roomWalls);
-    if (polygon.isNotEmpty) {
-      callbacks.updateRoom(
-        _dragStartRoom!.copyWith(polygon: polygon),
-      );
+    // Room on the dragged wall's side.
+    if (_dragStartRoom != null) {
+      final roomId = _dragStartRoom!.id;
+      final roomWalls = callbacks.currentWalls
+          .where((w) => w.roomId == roomId)
+          .toList();
+      if (roomWalls.length >= 3) {
+        final polygon = _buildPolygonFromWalls(roomWalls);
+        if (polygon.isNotEmpty) {
+          callbacks.updateRoom(
+            _dragStartRoom!.copyWith(polygon: polygon),
+          );
+        }
+      }
+    }
+    // ADR-011: also rebuild the mirror wall's room polygon.
+    if (_dragStartMirrorRoom != null) {
+      final mirrorRoomId = _dragStartMirrorRoom!.id;
+      final mirrorRoomWalls = callbacks.currentWalls
+          .where((w) => w.roomId == mirrorRoomId)
+          .toList();
+      if (mirrorRoomWalls.length >= 3) {
+        final polygon = _buildPolygonFromWalls(mirrorRoomWalls);
+        if (polygon.isNotEmpty) {
+          callbacks.updateRoom(
+            _dragStartMirrorRoom!.copyWith(polygon: polygon),
+          );
+        }
+      }
     }
   }
 
@@ -1933,6 +1986,10 @@ class SelectTool extends CanvasTool {
     if (_dragStartRoom != null) {
       callbacks.updateRoom(_dragStartRoom!);
     }
+    // ADR-011: also restore the mirror room polygon.
+    if (_dragStartMirrorRoom != null) {
+      callbacks.updateRoom(_dragStartMirrorRoom!);
+    }
   }
 
   void _clearDragState() {
@@ -1940,6 +1997,7 @@ class SelectTool extends CanvasTool {
     _dragStartWall = null;
     _dragStartConnected = const [];
     _dragStartRoom = null;
+    _dragStartMirrorRoom = null;
   }
 
   // ================================================================
@@ -2320,6 +2378,8 @@ class _MoveWallCommand extends Command {
     required this.newConnected,
     this.oldRoom,
     this.newRoom,
+    this.oldMirrorRoom,
+    this.newMirrorRoom,
   });
 
   final EditorCallbacks callbacks;
@@ -2329,6 +2389,9 @@ class _MoveWallCommand extends Command {
   final List<WallSegment> newConnected;
   final Room? oldRoom;
   final Room? newRoom;
+  // ADR-011: mirror room snapshots for undo/redo.
+  final Room? oldMirrorRoom;
+  final Room? newMirrorRoom;
 
   @override
   String get label => 'Move wall';
@@ -2340,6 +2403,7 @@ class _MoveWallCommand extends Command {
       callbacks.updateWall(w);
     }
     if (newRoom != null) callbacks.updateRoom(newRoom!);
+    if (newMirrorRoom != null) callbacks.updateRoom(newMirrorRoom!);
   }
 
   @override
@@ -2349,6 +2413,7 @@ class _MoveWallCommand extends Command {
       callbacks.updateWall(w);
     }
     if (oldRoom != null) callbacks.updateRoom(oldRoom!);
+    if (oldMirrorRoom != null) callbacks.updateRoom(oldMirrorRoom!);
   }
 }
 

@@ -19,6 +19,7 @@ _WallSegment _$WallSegmentFromJson(Map<String, dynamic> json) => _WallSegment(
   orientation:
       $enumDecodeNullable(_$CardinalDirectionEnumMap, json['orientation']) ??
       CardinalDirection.north,
+  mirrorId: json['mirrorId'] as String?,
 );
 
 Map<String, dynamic> _$WallSegmentToJson(_WallSegment instance) =>
@@ -31,6 +32,7 @@ Map<String, dynamic> _$WallSegmentToJson(_WallSegment instance) =>
       'constructionId': instance.constructionId,
       'adjacentRoomId': instance.adjacentRoomId,
       'orientation': _$CardinalDirectionEnumMap[instance.orientation]!,
+      'mirrorId': instance.mirrorId,
     };
 
 const _$WallTypeEnumMap = {

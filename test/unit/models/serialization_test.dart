@@ -108,7 +108,8 @@ void main() {
   // ── WallSegment ───────────────────────────────────────────────────────────
 
   group('WallSegment serialization', () {
-    test('round-trip: fully populated (optionals set)', () {
+    test('round-trip: fully populated (all optionals set, mirrorId non-null)',
+        () {
       const original = WallSegment(
         id: 'wall-1',
         roomId: 'room-1',
@@ -118,6 +119,7 @@ void main() {
         constructionId: 'constr-1',
         adjacentRoomId: 'room-2',
         orientation: CardinalDirection.south,
+        mirrorId: 'wall-mirror-1',
       );
 
       final restored = WallSegment.fromJson(_fullRoundTrip(original.toJson()));
@@ -126,9 +128,12 @@ void main() {
       expect(restored.wallType, WallType.interior);
       expect(restored.constructionId, 'constr-1');
       expect(restored.adjacentRoomId, 'room-2');
+      // ADR-011: mirrorId must survive the JSON round-trip.
+      expect(restored.mirrorId, 'wall-mirror-1');
     });
 
-    test('round-trip: minimal (no construction, no adjacent room)', () {
+    test('round-trip: minimal (no construction, no adjacent room, mirrorId null)',
+        () {
       const original = WallSegment(
         id: 'wall-min',
         roomId: 'room-1',
@@ -141,6 +146,8 @@ void main() {
       expect(restored, equals(original));
       expect(restored.constructionId, isNull);
       expect(restored.adjacentRoomId, isNull);
+      // ADR-011: mirrorId must deserialize to null when absent.
+      expect(restored.mirrorId, isNull);
     });
   });
 

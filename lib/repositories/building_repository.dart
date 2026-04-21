@@ -195,6 +195,7 @@ WallSegment _wallSegmentFromRow($db.WallSegment row) {
     constructionId: row.constructionId,
     adjacentRoomId: row.adjacentRoomId,
     orientation: CardinalDirection.values.byName(row.orientation),
+    mirrorId: row.mirrorId,
   );
 }
 
@@ -261,6 +262,7 @@ $db.WallSegmentsCompanion _wallSegmentToCompanion(WallSegment wall) {
     constructionId: Value(wall.constructionId),
     adjacentRoomId: Value(wall.adjacentRoomId),
     orientation: Value(wall.orientation.name),
+    mirrorId: Value(wall.mirrorId),
   );
 }
 
