@@ -153,10 +153,17 @@ abstract class EditorCallbacks {
   void selectElement(String? type, String? id);
 
   /// Request a room-name dialog after auto-detection.
+  ///
+  /// When [onCreated] is provided (rect-mode batch, ADR-009 §Rule 5),
+  /// the caller handles undo registration and [onCreated] is invoked
+  /// with the post-room walls and rooms lists instead of pushing a
+  /// separate undo command. When [onCreated] is null (single-wall
+  /// mode), the implementation registers its own undo command.
   void requestRoomDialog(
     List<Point2D> polygon,
-    List<String> wallIds,
-  );
+    List<String> wallIds, {
+    void Function(List<WallSegment> walls, List<Room> rooms)? onCreated,
+  });
 
   /// Show a transient toast message.
   void showToast(String message);

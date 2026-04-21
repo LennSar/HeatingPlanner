@@ -422,8 +422,9 @@ class _FloorPlanCanvasState
   @override
   void requestRoomDialog(
     List<Point2D> polygon,
-    List<String> wallIds,
-  ) {
+    List<String> wallIds, {
+    void Function(List<WallSegment> walls, List<Room> rooms)? onCreated,
+  }) {
     final roomNumber =
         ref.read(editorStateProvider.notifier).nextRoomNumber;
 
@@ -481,17 +482,24 @@ class _FloorPlanCanvasState
       // Snapshot state after mutation for redo.
       final newState = ref.read(editorStateProvider);
 
-      // Register as undoable command. execute() is a no-op
-      // on first call (state is already newState).
-      ref.read(undoRedoProvider).execute(
-        _CreateRoomCommand(
-          callbacks: this,
-          oldWalls: oldState.walls,
-          oldRooms: oldState.rooms,
-          newWalls: newState.walls,
-          newRooms: newState.rooms,
-        ),
-      );
+      if (onCreated != null) {
+        // Rect-mode batch (ADR-009 §Rule 5): the caller registered a
+        // combined undo command covering walls + room; notify it so it
+        // can update its newWalls/newRooms snapshots.
+        onCreated(newState.walls, newState.rooms);
+      } else {
+        // Single-wall mode: register a dedicated room undo command.
+        // execute() is a no-op on first call (state is already newState).
+        ref.read(undoRedoProvider).execute(
+          _CreateRoomCommand(
+            callbacks: this,
+            oldWalls: oldState.walls,
+            oldRooms: oldState.rooms,
+            newWalls: newState.walls,
+            newRooms: newState.rooms,
+          ),
+        );
+      }
 
       // Auto-select the new room.
       selectElement('room', roomId);

@@ -3,6 +3,7 @@ import 'package:flutter/gestures.dart';
 import '../../../calculation/engines/geometry_engine.dart';
 import '../../../core/utils/id_generator.dart';
 import '../../../data/models/point2d.dart';
+import '../../../data/models/room.dart';
 import '../../../data/models/wall_segment.dart';
 import '../painters/interaction_data.dart';
 import 'editor_callbacks.dart';
@@ -61,23 +62,28 @@ class WallDrawTool extends CanvasTool {
   /// Minimum wall length in mm (prevents zero-length walls).
   static const double _minLengthMm = 100.0;
 
-  /// Tolerance for coincident-wall detection (mm).
-  static const double _coincidentToleranceMm = 1.0;
-
-  /// Returns the first wall in [candidates] whose geometry is identical
-  /// (within [_coincidentToleranceMm]) to the segment [a]→[b] or [b]→[a],
-  /// provided that wall is already assigned to a room.
+  /// Endpoint-match tolerance for rect-mode shared-wall detection (mm).
   ///
-  /// Used by rect-mode to avoid adding a duplicate wall on top of a shared
-  /// edge that was already created when the adjacent room was drawn.
-  WallSegment? _findCoincidentAssignedWall(
+  /// Both endpoints of a candidate edge must be within this distance of
+  /// the corresponding endpoints of an existing room wall (either
+  /// forward or reversed) for the edge to be considered a match
+  /// (ADR-009 §Rule 2).
+  static const double _edgeMatchToleranceMm = 50.0;
+
+  /// Returns the first existing room-assigned wall whose geometry
+  /// matches the edge [a]→[b] within [_edgeMatchToleranceMm] on
+  /// **both** endpoints (direction-agnostic).
+  ///
+  /// Used by rect-mode to reuse an existing shared-boundary wall
+  /// instead of inserting a duplicate segment (ADR-009 §Rules 2–3).
+  WallSegment? _findMatchingWall(
     Point2D a,
     Point2D b,
     List<WallSegment> candidates,
   ) {
     for (final w in candidates) {
       if (w.roomId.isEmpty) continue;
-      const tol = _coincidentToleranceMm;
+      const tol = _edgeMatchToleranceMm;
       final fwdMatch =
           GeometryEngine.distanceMm(w.startPoint, a) <= tol &&
           GeometryEngine.distanceMm(w.endPoint, b) <= tol;
@@ -147,7 +153,12 @@ class WallDrawTool extends CanvasTool {
   @override
   void onPointerDown(Point2D worldPoint, int buttons) {
     if (!_rectMode) return;
-    _dragStart = _snap(worldPoint);
+    // Grid snap then corner snap (ADR-009 §Rule 1).
+    _dragStart = SnapService.snapRectCorner(
+      _snap(worldPoint),
+      callbacks.currentWalls,
+      callbacks.currentGridSpacingMm,
+    );
     _currentSnapped = _dragStart;
     onStateChanged();
   }
@@ -155,7 +166,13 @@ class WallDrawTool extends CanvasTool {
   @override
   void onDragUpdate(Point2D worldPoint) {
     if (!_rectMode || _dragStart == null) return;
-    _currentSnapped = _ortho(_dragStart!, _snap(worldPoint));
+    // Grid snap → ortho → corner snap.
+    final orthoSnapped = _ortho(_dragStart!, _snap(worldPoint));
+    _currentSnapped = SnapService.snapRectCorner(
+      orthoSnapped,
+      callbacks.currentWalls,
+      callbacks.currentGridSpacingMm,
+    );
     onStateChanged();
   }
 
@@ -166,7 +183,17 @@ class WallDrawTool extends CanvasTool {
     _dragStart = null;
     if (start == null) return;
 
-    final end = _ortho(start, _snap(worldPoint));
+    // Grid snap (a) → ortho (b) → corner snap (c) → dimension snap (d).
+    // Order matches ADR-010 §Rule 3.
+    final end = SnapService.snapRectDimension(
+      start,
+      SnapService.snapRectCorner(
+        _ortho(start, _snap(worldPoint)),
+        callbacks.currentWalls,
+        callbacks.currentGridSpacingMm,
+      ),
+      callbacks.currentWalls,
+    );
 
     final w = (end.x - start.x).abs();
     final h = (end.y - start.y).abs();
@@ -187,56 +214,83 @@ class WallDrawTool extends CanvasTool {
     final br = Point2D(x: tl.x + w, y: tl.y + h);
     final bl = Point2D(x: tl.x, y: tl.y + h);
 
-    final walls = [
-      WallSegment(id: IdGenerator.newId(), roomId: '', startPoint: tl, endPoint: tr),
-      WallSegment(id: IdGenerator.newId(), roomId: '', startPoint: tr, endPoint: br),
-      WallSegment(id: IdGenerator.newId(), roomId: '', startPoint: br, endPoint: bl),
-      WallSegment(id: IdGenerator.newId(), roomId: '', startPoint: bl, endPoint: tl),
-    ];
-
-    // Snapshot walls before any commits.  Used below to detect walls
-    // that are coincident with already-existing room-assigned walls so
-    // we can skip adding a duplicate and reuse the existing wall as the
-    // shared boundary instead (ADR-001 / ADR-003).
+    // Snapshot walls and rooms before any mutations (for undo).
     final oldWalls = callbacks.currentWalls.toList();
+    final oldRooms = callbacks.currentRooms.toList();
 
-    // Commit each rect wall, skipping any that are geometrically
-    // identical to an existing room-assigned wall.  Track which
-    // WallSegment object will represent each edge for room detection.
-    WallSegment lastEffectiveWall = walls.last;
-    for (final wall in walls) {
-      final coincident = _findCoincidentAssignedWall(
-        wall.startPoint,
-        wall.endPoint,
-        oldWalls,
-      );
-      if (coincident != null) {
-        // Reuse the existing wall — no duplicate is added.
-        lastEffectiveWall = coincident;
+    // Commit each edge, reusing any room-assigned wall that already
+    // matches the edge within 50 mm (ADR-009 §Rules 2–3). Unmatched
+    // edges go through commitWallWithSplit so ADR-003 corner-split
+    // logic applies at intersections.
+    //
+    // firstNewWall tracks the first wall that was actually committed
+    // this drag. It is used (instead of lastEffectiveWall) as the
+    // anchor for room detection so that BFS starts on a freshly-added
+    // wall. When the last processed edge happens to be a matched
+    // existing wall (e.g. edge 4 = the shared edge), BFS from that
+    // wall's endpoint traverses the matched room's own existing cycle
+    // (same hop-count as Room 2's path) and returns the wrong wallIds.
+    // Starting BFS from a new wall avoids this ambiguity entirely.
+    WallSegment? firstNewWall;
+    WallSegment? lastEffectiveWall;
+    for (final (a, b) in [(tl, tr), (tr, br), (br, bl), (bl, tl)]) {
+      final match = _findMatchingWall(a, b, oldWalls);
+      if (match != null) {
+        // Reuse the existing wall; addRoomFromDetection will promote it
+        // to WallType.interior and insert the ADR-001 mirror copy.
+        lastEffectiveWall = match;
       } else {
-        // Use commitWallWithSplit (not commitWall) so that rect corners
-        // which land on the interior of an existing assigned wall cause
-        // that host wall to be split (ADR-003).
+        final wall = WallSegment(
+          id: IdGenerator.newId(),
+          roomId: '',
+          startPoint: a,
+          endPoint: b,
+        );
         callbacks.commitWallWithSplit(wall);
         lastEffectiveWall = wall;
+        firstNewWall ??= wall;
       }
+    }
+
+    if (lastEffectiveWall == null) {
+      // All four edges matched — degenerate rect on top of existing room.
+      _currentSnapped = null;
+      onStateChanged();
+      return;
     }
 
     final newWalls = callbacks.currentWalls.toList();
 
-    undoRedo.execute(_CreateWallCommand(
+    // Register one undo command covering walls + room (ADR-009 §Rule 5).
+    // newRooms starts as oldRooms (safe default when dialog is cancelled).
+    // The onCreated callback updates it when the room is confirmed.
+    final cmd = _RectDrawCommand(
       callbacks: callbacks,
       oldWalls: oldWalls,
+      oldRooms: oldRooms,
       newWalls: newWalls,
-    ));
+      newRooms: oldRooms,
+    );
+    undoRedo.execute(cmd);
 
-    // Trigger room detection using the last effective wall (which may be
-    // a pre-existing assigned wall when that edge is shared with a
-    // neighbouring room).
+    // Use a newly committed wall as the BFS anchor for room detection.
+    // Falling back to lastEffectiveWall (an existing matched wall) can
+    // cause BFS to return the neighbouring room's own cycle when both
+    // paths have the same hop-count (see comment above).
+    final detectionWall = firstNewWall ?? lastEffectiveWall;
     final allWalls = callbacks.currentWalls;
-    final detected = RoomDetection.detectClosedRoom(allWalls, lastEffectiveWall);
+    final detected = RoomDetection.detectClosedRoom(allWalls, detectionWall);
     if (detected != null) {
-      callbacks.requestRoomDialog(detected.polygon, detected.wallIds);
+      callbacks.requestRoomDialog(
+        detected.polygon,
+        detected.wallIds,
+        onCreated: (walls, rooms) {
+          // Update the undo command so a single Ctrl+Z reverts both
+          // the rect walls and the newly created room.
+          cmd.newWalls = walls;
+          cmd.newRooms = rooms;
+        },
+      );
     }
 
     _currentSnapped = null;
@@ -303,7 +357,14 @@ class WallDrawTool extends CanvasTool {
   void onPointerMove(Point2D worldPoint) {
     if (_rectMode) {
       if (_dragStart != null) {
-        _currentSnapped = _ortho(_dragStart!, _snap(worldPoint));
+        // Mirror onDragUpdate: grid snap → ortho → corner snap so the
+        // ghost rectangle preview matches what will be committed.
+        final orthoSnapped = _ortho(_dragStart!, _snap(worldPoint));
+        _currentSnapped = SnapService.snapRectCorner(
+          orthoSnapped,
+          callbacks.currentWalls,
+          callbacks.currentGridSpacingMm,
+        );
       }
     } else {
       final snap = SnapService.snap(
@@ -403,4 +464,45 @@ class _CreateWallCommand extends Command {
 
   @override
   void undo() => callbacks.replaceAllWalls(oldWalls);
+}
+
+/// Command: draw a rectangle (four walls + optional room detection).
+///
+/// Created in [WallDrawTool.onDragEnd] when rect mode is active.
+/// [newWalls] and [newRooms] are initialised to the post-wall-commit
+/// state (before the room dialog). If the dialog is confirmed, the
+/// [onCreated] callback updates them to the full post-room state so
+/// that a single Ctrl+Z reverts both the rect walls and the room
+/// entity (ADR-009 §Rule 5). If the dialog is cancelled, undo still
+/// correctly reverts only the walls.
+class _RectDrawCommand extends Command {
+  _RectDrawCommand({
+    required this.callbacks,
+    required this.oldWalls,
+    required this.oldRooms,
+    required List<WallSegment> newWalls,
+    required List<Room> newRooms,
+  })  : newWalls = List.of(newWalls),
+        newRooms = List.of(newRooms);
+
+  final EditorCallbacks callbacks;
+  final List<WallSegment> oldWalls;
+  final List<Room> oldRooms;
+
+  /// Mutable: updated by the room-dialog [onCreated] callback.
+  List<WallSegment> newWalls;
+
+  /// Mutable: updated by the room-dialog [onCreated] callback.
+  List<Room> newRooms;
+
+  @override
+  String get label => 'Draw rectangle';
+
+  @override
+  void execute() =>
+      callbacks.replaceAllWallsAndRooms(newWalls, newRooms);
+
+  @override
+  void undo() =>
+      callbacks.replaceAllWallsAndRooms(oldWalls, oldRooms);
 }

@@ -265,3 +265,110 @@ before circuits exist inverts this dependency and produces meaningless values.
 3. The distributor properties panel shows `pumpHeadPa` as a read-only computed
    field (displayed after circuits are connected) and `pumpCapacityPa` as an
    optional input field.
+
+---
+
+## ADR-009 — Rect-mode corner snap and shared-wall deduplication
+
+**What.**
+When the user draws a second room in rectangle mode (Ctrl+drag) near an existing
+room corner, the drag start and/or end point snaps to that corner. When the
+resulting rectangle shares a full edge with an existing wall, a single shared wall
+is created (ADR-001 pattern) instead of two overlapping wall segments.
+
+**Why.**
+Without snapping, the user must land the cursor pixel-perfectly on an existing
+corner to avoid a small gap or overlap between rooms. Without deduplication, Ctrl+drag
+next to an existing room produces two coincident wall segments (one per room),
+breaking heat-loss calculations and rendering artefacts.
+
+**Rules.**
+
+1. **Corner snap in rect mode** — When `WallDrawTool._rectMode` is active, both the
+   drag-start point (from `onDragStart`) and the drag-end point (from `onDragUpdate`
+   / `onDragEnd`) are passed through `SnapService.snapRectCorner` *after* normal
+   grid snap. The snap radius is `2 × gridSpacingMm`.
+
+   ```
+   SnapService.snapRectCorner(Point2D point, List<WallSegment> walls, double gridSpacingMm)
+     → Point2D
+   ```
+
+   The method iterates all existing wall segment endpoints; if any endpoint lies
+   within the snap radius, it returns that endpoint instead of `point`. If multiple
+   endpoints qualify, the nearest one wins. If none qualifies, returns `point`
+   unchanged.
+
+2. **Edge-match detection** — After the four rect edges are finalised (at
+   `onDragEnd`), before committing any wall segment, check each of the four edges
+   against all existing `WallSegment` records. An edge *matches* an existing wall
+   when **both** of the following hold:
+   - The edge's start and end points are each within **50 mm** of the existing
+     wall's start/end or end/start (direction-agnostic).
+   - The existing wall belongs to a different room than the one being created.
+
+3. **Commit behaviour for matched edges** — For each matched edge:
+   - Do **not** insert a new `WallSegment` for the new room's side.
+   - Promote the existing `WallSegment` to `wallType = WallType.interior`
+     (if not already interior).
+   - Set `adjacentRoomId` on the existing segment to the new room's ID.
+   - Insert the ADR-001 mirror copy: a second `WallSegment` with swapped
+     `startPoint`/`endPoint`, `roomId = newRoom`, `adjacentRoomId = existingRoom`,
+     and `wallType = WallType.interior`.
+
+4. **Non-adjacent behaviour** — When no edge matches, the four wall segments are
+   committed exactly as before (grid-snapped corners, ADR-003 split logic applies
+   at intersections). No change to the existing rect-mode commit flow.
+
+5. **Undo** — All insertions and updates for a single rect-mode drag are grouped
+   into one `UndoRedoService` batch so that a single Ctrl+Z reverts the entire
+   room creation (shared walls, mirror copies, and room entity).
+
+**Scope.**
+Applies only to `WallDrawTool` in rect mode. Single-wall draw mode is unaffected.
+
+---
+
+## ADR-010 — Rect-mode dimension-matching snap
+
+**What.**
+When the user Ctrl+drags a second room and the grid-snapped drag-end's y (or x)
+coordinate is within **100 mm** of a wall endpoint that shares the x (or y)
+coordinate of the snapped drag-start, that axis is overridden to match — ensuring
+the new room has the same height (or width) as the adjacent room's shared wall.
+
+**Why.**
+After the drag-start snaps to an existing corner (ADR-009 Rule 1), the drag-end
+has no wall endpoint nearby, so `snapRectCorner` cannot help. Grid snap may land
+on the wrong line: e.g., y = 2050 grid-snaps to 2100 with a 100 mm grid, making
+the new room 100 mm taller than the adjacent one. A dimension-matching snap infers
+the intended size from the wall already anchored at the drag-start corner.
+
+**Rules.**
+
+1. **Axis candidates** — From the snapped drag-start `S`, collect all wall
+   endpoints `E` where:
+   - `|E.x − S.x| ≤ 1 mm` (same x-column) → `E.y` is a y-snap candidate
+   - `|E.y − S.y| ≤ 1 mm` (same y-row)    → `E.x` is an x-snap candidate
+
+2. **Snap condition** — For each y-snap candidate `cy`: if
+   `|dragEnd.y − cy| ≤ 100 mm`, set `dragEnd.y = cy` (prefer nearest). Apply
+   the same logic to x-snap candidates independently.
+
+3. **Order of operations** in `WallDrawTool.onDragEnd`:
+   a. `SnapService.snap` (grid + endpoint snap)
+   b. `_ortho` constraint
+   c. `SnapService.snapRectCorner` (ADR-009 Rule 1)
+   d. `SnapService.snapRectDimension` ← new — applied last
+
+4. **New method** — `SnapService.snapRectDimension(Point2D dragStart, Point2D dragEnd, List<WallSegment> walls) → Point2D`. Pure static function; no state, no I/O.
+
+5. **Threshold** — 100 mm. Intentionally narrower than the ADR-009 corner-snap
+   radius (200 mm) to avoid snapping when rooms are intentionally different sizes.
+
+**Scope.**
+`WallDrawTool` rect mode, `onDragEnd` only. Not applied to `onDragUpdate` (ghost
+preview uses raw cursor for performance). Single-wall draw mode is unaffected.
+
+**Verification.**
+WDT-12 in `test/widget/tools/wall_draw_tool_test.dart`.

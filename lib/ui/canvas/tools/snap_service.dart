@@ -163,6 +163,92 @@ abstract final class SnapService {
   }
 
 
+  /// Snap [point] to the nearest existing wall endpoint within
+  /// `2 × gridSpacingMm`. Returns the nearest endpoint when one
+  /// qualifies, otherwise returns [point] unchanged.
+  ///
+  /// Used by [WallDrawTool] in rect mode (ADR-009 §Rule 1) so that
+  /// the drag-start and drag-end corners snap to existing room
+  /// corners automatically. The snap radius is intentionally wider
+  /// than [endpointThresholdMm] to compensate for the coarser
+  /// cursor control inherent in a click-drag gesture.
+  static Point2D snapRectCorner(
+    Point2D point,
+    List<WallSegment> walls,
+    double gridSpacingMm,
+  ) {
+    final radius = 2.0 * gridSpacingMm;
+    Point2D? nearest;
+    var minDist = double.infinity;
+
+    for (final wall in walls) {
+      for (final ep in [wall.startPoint, wall.endPoint]) {
+        final d = GeometryEngine.distanceMm(point, ep);
+        if (d < minDist) {
+          minDist = d;
+          nearest = ep;
+        }
+      }
+    }
+
+    if (nearest != null && minDist <= radius) return nearest;
+    return point;
+  }
+
+  /// Snap [dragEnd] so that the new room's height and/or width matches that
+  /// of an adjacent room whose shared wall is anchored at [dragStart]
+  /// (ADR-010).
+  ///
+  /// **Algorithm (two independent axes):**
+  ///
+  /// 1. Collect *axis candidates* from [dragStart] `S`:
+  ///    - Any wall endpoint `E` with `|E.x − S.x| ≤ 1 mm` contributes
+  ///      `E.y` as a y-snap candidate (same x-column).
+  ///    - Any endpoint `E` with `|E.y − S.y| ≤ 1 mm` contributes `E.x`
+  ///      as an x-snap candidate (same y-row).
+  ///
+  /// 2. For each y-candidate `cy`: if `|dragEnd.y − cy| ≤ 100 mm`, the
+  ///    nearest candidate overrides `dragEnd.y`. Same logic for x.
+  ///
+  /// Returns [dragEnd] unchanged when no candidate is within the threshold.
+  static Point2D snapRectDimension(
+    Point2D dragStart,
+    Point2D dragEnd,
+    List<WallSegment> walls,
+  ) {
+    const axisTolMm = 1.0;   // same-column / same-row tolerance (mm)
+    const snapTolMm = 100.0; // ADR-010 snap threshold (mm)
+
+    double newX = dragEnd.x;
+    double newY = dragEnd.y;
+    double bestYDist = double.infinity;
+    double bestXDist = double.infinity;
+
+    for (final wall in walls) {
+      for (final ep in [wall.startPoint, wall.endPoint]) {
+        // y-snap: endpoint is in the same x-column as dragStart.
+        if ((ep.x - dragStart.x).abs() <= axisTolMm) {
+          final dist = (dragEnd.y - ep.y).abs();
+          if (dist <= snapTolMm && dist < bestYDist) {
+            bestYDist = dist;
+            newY = ep.y;
+          }
+        }
+        // x-snap: endpoint is in the same y-row as dragStart.
+        if ((ep.y - dragStart.y).abs() <= axisTolMm) {
+          final dist = (dragEnd.x - ep.x).abs();
+          if (dist <= snapTolMm && dist < bestXDist) {
+            bestXDist = dist;
+            newX = ep.x;
+          }
+        }
+      }
+    }
+
+    if (newX == dragEnd.x && newY == dragEnd.y) return dragEnd;
+    return Point2D(x: newX, y: newY);
+  }
+
   /// Default wall-hover threshold for opening placement (mm).
   ///
   /// Wider than [wallSnapThresholdMm] so the user can hover

@@ -119,7 +119,7 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   void selectElement(String? type, String? id) {}
   @override
-  void requestRoomDialog(List<Point2D> polygon, List<String> wallIds) {}
+  void requestRoomDialog(List<Point2D> polygon, List<String> wallIds, {void Function(List<WallSegment>, List<Room>)? onCreated}) {}
   @override
   List<WindowElement> get currentWindows => const [];
   @override

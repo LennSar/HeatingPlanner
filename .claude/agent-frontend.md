@@ -304,6 +304,10 @@ Modifier flags are independent — `_orthoSnap` and `_freePlacement` may both be
 
 `getInteractionData` must return the ghost rectangle preview (4 line segments) when `_rectMode` is active and a drag is in progress. Width and height annotations must update each frame. When `_orthoSnap` is active, include the dashed axis guideline in the returned data.
 
+**Rect-mode corner snap and shared-wall deduplication (ADR-009):** When `_rectMode` is active, both the drag-start and drag-end points must be passed through `SnapService.snapRectCorner` (snap radius = `2 × gridSpacingMm`) *after* normal grid snap. At `onDragEnd`, before committing wall segments, check each of the four edges for an exact-edge match against existing walls (tolerance: **50 mm** on both endpoints). For matched edges, skip the new segment, promote the existing wall to `WallType.interior` with `adjacentRoomId`, and insert the ADR-001 mirror copy. All insertions for one rect drag are grouped as a single undo batch. See `DECISIONS.md ADR-009` for the full specification.
+
+**Rect-mode dimension-matching snap (ADR-010):** After `snapRectCorner`, apply `SnapService.snapRectDimension(dragStart, dragEnd, walls)` to the drag-end at `onDragEnd`. This overrides individual axes when the grid-snapped drag-end coordinate is within **100 mm** of a wall endpoint that shares the corresponding axis coordinate with the snapped drag-start (same x-column → candidate y-snap; same y-row → candidate x-snap). Ensures the new room matches the height or width of the adjacent room's shared wall even when grid snap would land on the wrong line. See `DECISIONS.md ADR-010` for full rules and threshold rationale.
+
 ### 4.5 Snapping Implementation
 
 Implement snapping in a `SnapService` utility class consumed by all tools.
