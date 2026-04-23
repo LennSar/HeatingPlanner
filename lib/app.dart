@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
+import 'l10n/app_localizations.dart';
 import 'repositories/app_preferences.dart';
 import 'repositories/material_repository.dart';
 import 'repositories/project_repository.dart';
@@ -116,9 +117,18 @@ class _HeatingPlannerAppState
 
   @override
   Widget build(BuildContext context) {
+    final langCode = ref.watch(languageCodeProvider).maybeWhen(
+          data: (v) => v,
+          orElse: () => 'en',
+        );
+
     return MaterialApp(
       title: 'HeatingPlanner',
       theme: AppTheme.light(),
+      locale: Locale(langCode),
+      localizationsDelegates:
+          AppLocalizations.localizationsDelegates,
+      supportedLocales: const [Locale('en'), Locale('de')],
       navigatorKey: _navigatorKey,
       home: const _StartupRouter(),
       debugShowCheckedModeBanner: false,

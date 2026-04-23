@@ -4,4 +4,6 @@
 
 3. drop down for loading constructions and materials
 
-4. fix orientation of walls
+5. make language adjustable
+
+6. fix drawing to adjacent rooms next to each other by holding ctrl. makes the shared wall between them do funky stuff

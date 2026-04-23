@@ -9,6 +9,7 @@ const _kCanvasZoom = 'canvasZoom';
 const _kCanvasPanX = 'canvasPanX';
 const _kCanvasPanY = 'canvasPanY';
 const _kGridSpacingMm = 'gridSpacingMm';
+const _kLanguageCode = 'languageCode';
 const _kMaterialDbVersion = 'materialDbVersion';
 const _kDefaultGridSpacingMm = 100;
 
@@ -110,6 +111,23 @@ class AppPreferences {
   Future<void> setGridSpacingMm(int spacingMm) =>
       _prefs.setInt(_kGridSpacingMm, spacingMm);
 
+  // ── languageCode ──────────────────────────────────────────────────────────
+
+  /// Two-letter language code (`en`, `de`), or `null` to follow the
+  /// system locale.
+  Future<String?> getLanguageCode() =>
+      _prefs.getString(_kLanguageCode);
+
+  /// Persists [code] as the user-chosen language. Pass `null` to
+  /// revert to the system default.
+  Future<void> setLanguageCode(String? code) async {
+    if (code == null) {
+      await _prefs.remove(_kLanguageCode);
+    } else {
+      await _prefs.setString(_kLanguageCode, code);
+    }
+  }
+
   // ── materialDbVersion ─────────────────────────────────────────────────────
 
   /// Version of the built-in material database that has been seeded.
@@ -190,4 +208,37 @@ class GridSpacingMmNotifier extends AsyncNotifier<int> {
 final gridSpacingMmProvider =
     AsyncNotifierProvider<GridSpacingMmNotifier, int>(
   GridSpacingMmNotifier.new,
+);
+
+// ── languageCodeProvider ─────────────────────────────────────────────────────
+
+/// Notifier that persists the user-chosen language code to
+/// [AppPreferences].
+///
+/// Defaults to `'en'` when no preference has been stored.
+class LanguageCodeNotifier extends AsyncNotifier<String> {
+  @override
+  Future<String> build() async {
+    return await ref
+            .read(appPreferencesProvider)
+            .getLanguageCode() ??
+        'en';
+  }
+
+  /// Updates the language code and persists it immediately.
+  Future<void> set(String code) async {
+    await ref
+        .read(appPreferencesProvider)
+        .setLanguageCode(code);
+    state = AsyncValue.data(code);
+  }
+}
+
+/// Persisted two-letter language code (`en` or `de`).
+///
+/// Defaults to `'en'` on first launch. The root [MaterialApp]
+/// watches this provider to set the active [Locale].
+final languageCodeProvider =
+    AsyncNotifierProvider<LanguageCodeNotifier, String>(
+  LanguageCodeNotifier.new,
 );
