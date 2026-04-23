@@ -10,4 +10,13 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get appTitle => 'HeatingPlanner';
+
+  @override
+  String get settingsLanguageLabel => 'Sprache';
+
+  @override
+  String get languageEnglish => 'Englisch';
+
+  @override
+  String get languageGerman => 'Deutsch';
 }

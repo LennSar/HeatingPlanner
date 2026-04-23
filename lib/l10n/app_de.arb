@@ -1,4 +1,7 @@
 {
   "@@locale": "de",
-  "appTitle": "HeatingPlanner"
+  "appTitle": "HeatingPlanner",
+  "settingsLanguageLabel": "Sprache",
+  "languageEnglish": "Englisch",
+  "languageGerman": "Deutsch"
 }
