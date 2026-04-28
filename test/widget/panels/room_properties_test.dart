@@ -16,6 +16,7 @@ import 'package:heating_planner/core/theme/app_theme.dart';
 import 'package:heating_planner/data/models/heating_zone.dart';
 import 'package:heating_planner/data/models/point2d.dart';
 import 'package:heating_planner/data/models/room.dart';
+import 'package:heating_planner/l10n/app_localizations.dart';
 import 'package:heating_planner/ui/canvas/tools/undo_redo_service.dart';
 import 'package:heating_planner/ui/panels/room_properties.dart';
 import 'package:heating_planner/ui/providers/editor_state_provider.dart';
@@ -90,6 +91,8 @@ Widget _buildWidget({Room room = _testRoom}) {
     ],
     child: MaterialApp(
       theme: AppTheme.light(),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: const [Locale('en')],
       home: const Scaffold(
         body: RoomProperties(roomId: _roomId),
       ),

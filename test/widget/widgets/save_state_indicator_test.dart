@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/core/theme/app_theme.dart';
+import 'package:heating_planner/l10n/app_localizations.dart';
 import 'package:heating_planner/repositories/save_state_notifier.dart';
 import 'package:heating_planner/ui/widgets/save_state_indicator.dart';
 
@@ -31,6 +32,8 @@ Widget _buildApp(SaveState state, {ThemeData? theme}) {
     ],
     child: MaterialApp(
       theme: theme ?? AppTheme.light(),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: const [Locale('en')],
       home: const Scaffold(
         body: Center(child: SaveStateIndicator()),
       ),

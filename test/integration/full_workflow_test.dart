@@ -34,6 +34,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/core/theme/app_theme.dart';
 import 'package:heating_planner/data/database/app_database.dart' as $db;
+import 'package:heating_planner/l10n/app_localizations.dart';
 import 'package:heating_planner/ui/canvas/canvas_controller.dart';
 import 'package:heating_planner/ui/canvas/floor_plan_canvas.dart';
 import 'package:heating_planner/ui/providers/editor_state_provider.dart';
@@ -145,6 +146,9 @@ void main() {
             container: container,
             child: MaterialApp(
               theme: AppTheme.light(),
+              localizationsDelegates:
+                  AppLocalizations.localizationsDelegates,
+              supportedLocales: const [Locale('en')],
               home: const EditorScreen(projectId: projectId),
             ),
           ),

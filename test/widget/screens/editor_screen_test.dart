@@ -5,6 +5,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:heating_planner/core/theme/app_theme.dart';
 import 'package:heating_planner/data/models/point2d.dart';
+import 'package:heating_planner/l10n/app_localizations.dart';
 import 'package:heating_planner/data/models/wall_segment.dart';
 import 'package:heating_planner/ui/providers/editor_state_provider.dart';
 import 'package:heating_planner/ui/screens/editor_screen.dart';
@@ -17,6 +18,8 @@ void main() {
       container: container,
       child: MaterialApp(
         theme: AppTheme.light(),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: const [Locale('en')],
         home: const EditorScreen(projectId: 'test-project'),
       ),
     );

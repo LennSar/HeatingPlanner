@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/core/theme/app_theme.dart';
 import 'package:heating_planner/data/models/enums.dart';
+import 'package:heating_planner/l10n/app_localizations.dart';
 import 'package:heating_planner/data/models/material_layer.dart';
 import 'package:heating_planner/data/models/point2d.dart';
 import 'package:heating_planner/data/models/wall_construction.dart';
@@ -99,6 +100,8 @@ Widget _buildTrigger({
     ],
     child: MaterialApp(
       theme: AppTheme.light(),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: const [Locale('en')],
       home: Scaffold(
         body: Builder(
           builder: (ctx) => ElevatedButton(

@@ -19,6 +19,7 @@ import 'package:heating_planner/calculation/providers/heat_demand_providers.dart
 import 'package:heating_planner/calculation/providers/heat_output_providers.dart';
 import 'package:heating_planner/calculation/providers/pressure_loss_providers.dart';
 import 'package:heating_planner/core/theme/app_theme.dart';
+import 'package:heating_planner/l10n/app_localizations.dart';
 import 'package:heating_planner/data/models/distributor.dart';
 import 'package:heating_planner/data/models/enums.dart';
 import 'package:heating_planner/data/models/heating_circuit.dart';
@@ -140,6 +141,8 @@ Widget _buildPanel({
     ],
     child: MaterialApp(
       theme: AppTheme.light(),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: const [Locale('en')],
       home: const Scaffold(
         body: PropertiesPanel(),
       ),
