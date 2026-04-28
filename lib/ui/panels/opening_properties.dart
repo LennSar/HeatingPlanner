@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/id_generator.dart';
+import '../../l10n/app_localizations.dart';
 import '../../data/models/door.dart';
 import '../../data/models/window_element.dart';
 import '../canvas/tools/undo_redo_service.dart';
@@ -93,6 +94,7 @@ class _WindowPropertiesState
   @override
   Widget build(BuildContext context, ) {
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context)!;
     final editorState = ref.watch(editorStateProvider);
     final window = editorState.windows
         .where((w) => w.id == widget.windowId)
@@ -101,7 +103,7 @@ class _WindowPropertiesState
     if (window == null) {
       return Padding(
         padding: const EdgeInsets.all(Spacing.md),
-        child: Text('Window not found', style: textTheme.bodyMedium),
+        child: Text(l10n.windowNotFound, style: textTheme.bodyMedium),
       );
     }
 
@@ -112,31 +114,31 @@ class _WindowPropertiesState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Properties', style: textTheme.headlineMedium),
+          Text(l10n.properties, style: textTheme.headlineMedium),
           const SizedBox(height: Spacing.lg),
 
           // Type toggle
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Type', style: textTheme.bodyMedium),
+              Text(l10n.typeLabel, style: textTheme.bodyMedium),
               const SizedBox(height: Spacing.xs),
               SizedBox(
                 width: double.infinity,
                 child: SegmentedButton<bool>(
-                  segments: const [
+                  segments: [
                     ButtonSegment<bool>(
                       value: true,
                       label: FittedBox(
                         fit: BoxFit.scaleDown,
-                        child: Text('Window'),
+                        child: Text(l10n.toolWindow),
                       ),
                     ),
                     ButtonSegment<bool>(
                       value: false,
                       label: FittedBox(
                         fit: BoxFit.scaleDown,
-                        child: Text('Door'),
+                        child: Text(l10n.toolDoor),
                       ),
                     ),
                   ],
@@ -154,11 +156,11 @@ class _WindowPropertiesState
           const Divider(),
           const SizedBox(height: Spacing.sm),
 
-          Text('Window', style: textTheme.headlineSmall),
+          Text(l10n.toolWindow, style: textTheme.headlineSmall),
           const SizedBox(height: Spacing.md),
 
           _NumericField(
-            label: 'Width',
+            label: l10n.widthLabel,
             unit: 'mm',
             controller: _widthCtrl,
             focusNode: _widthFocus,
@@ -176,7 +178,7 @@ class _WindowPropertiesState
             },
           ),
           _NumericField(
-            label: 'Height',
+            label: l10n.heightLabel,
             unit: 'mm',
             controller: _heightCtrl,
             focusNode: _heightFocus,
@@ -194,7 +196,7 @@ class _WindowPropertiesState
             },
           ),
           _NumericField(
-            label: 'Sill Height',
+            label: l10n.sillHeight,
             unit: 'mm',
             controller: _sillCtrl,
             focusNode: _sillFocus,
@@ -213,7 +215,7 @@ class _WindowPropertiesState
             },
           ),
           _NumericField(
-            label: 'U-Value',
+            label: l10n.uValueLabel,
             unit: 'W/(m²K)',
             controller: _uValueCtrl,
             focusNode: _uValueFocus,
@@ -360,6 +362,7 @@ class _DoorPropertiesState
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context)!;
     final editorState = ref.watch(editorStateProvider);
     final door = editorState.doors
         .where((d) => d.id == widget.doorId)
@@ -368,7 +371,7 @@ class _DoorPropertiesState
     if (door == null) {
       return Padding(
         padding: const EdgeInsets.all(Spacing.md),
-        child: Text('Door not found', style: textTheme.bodyMedium),
+        child: Text(l10n.doorNotFound, style: textTheme.bodyMedium),
       );
     }
 
@@ -379,31 +382,31 @@ class _DoorPropertiesState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Properties', style: textTheme.headlineMedium),
+          Text(l10n.properties, style: textTheme.headlineMedium),
           const SizedBox(height: Spacing.lg),
 
           // Type toggle
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Type', style: textTheme.bodyMedium),
+              Text(l10n.typeLabel, style: textTheme.bodyMedium),
               const SizedBox(height: Spacing.xs),
               SizedBox(
                 width: double.infinity,
                 child: SegmentedButton<bool>(
-                  segments: const [
+                  segments: [
                     ButtonSegment<bool>(
                       value: true,
                       label: FittedBox(
                         fit: BoxFit.scaleDown,
-                        child: Text('Window'),
+                        child: Text(l10n.toolWindow),
                       ),
                     ),
                     ButtonSegment<bool>(
                       value: false,
                       label: FittedBox(
                         fit: BoxFit.scaleDown,
-                        child: Text('Door'),
+                        child: Text(l10n.toolDoor),
                       ),
                     ),
                   ],
@@ -421,11 +424,11 @@ class _DoorPropertiesState
           const Divider(),
           const SizedBox(height: Spacing.sm),
 
-          Text('Door', style: textTheme.headlineSmall),
+          Text(l10n.toolDoor, style: textTheme.headlineSmall),
           const SizedBox(height: Spacing.md),
 
           _NumericField(
-            label: 'Width',
+            label: l10n.widthLabel,
             unit: 'mm',
             controller: _widthCtrl,
             focusNode: _widthFocus,
@@ -442,7 +445,7 @@ class _DoorPropertiesState
             },
           ),
           _NumericField(
-            label: 'Height',
+            label: l10n.heightLabel,
             unit: 'mm',
             controller: _heightCtrl,
             focusNode: _heightFocus,
@@ -460,7 +463,7 @@ class _DoorPropertiesState
             },
           ),
           _NumericField(
-            label: 'Sill Height',
+            label: l10n.sillHeight,
             unit: 'mm',
             controller: _sillCtrl,
             focusNode: _sillFocus,
@@ -479,7 +482,7 @@ class _DoorPropertiesState
             },
           ),
           _NumericField(
-            label: 'U-Value',
+            label: l10n.uValueLabel,
             unit: 'W/(m²K)',
             controller: _uValueCtrl,
             focusNode: _uValueFocus,

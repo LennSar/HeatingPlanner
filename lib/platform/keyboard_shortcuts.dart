@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/database/app_database.dart' as $db;
 import '../data/models/enums.dart';
+import '../l10n/app_localizations.dart';
 import '../repositories/app_preferences.dart';
 import '../repositories/hsp_importer.dart';
 import '../repositories/save_state_notifier.dart';
@@ -327,13 +328,13 @@ class EditorShortcuts extends ConsumerWidget {
           ),
           SaveIntent: CallbackAction<SaveIntent>(
             onInvoke: (_) {
-              unawaited(_performSave(ref));
+              unawaited(_performSave(context, ref));
               return null;
             },
           ),
           SaveAsIntent: CallbackAction<SaveAsIntent>(
             onInvoke: (_) {
-              unawaited(_performSaveAs(ref));
+              unawaited(_performSaveAs(context, ref));
               return null;
             },
           ),
@@ -392,13 +393,16 @@ class EditorShortcuts extends ConsumerWidget {
 ///
 /// Triggers [saveFlashProvider] on success for the 2-second status-bar
 /// confirmation (agent-ui-ux.md §12.7).
-Future<void> _performSave(WidgetRef ref) async {
+Future<void> _performSave(
+  BuildContext context,
+  WidgetRef ref,
+) async {
   final state = ref.read(saveStateProvider);
   if (state.lastExportPath != null) {
     await ref.read(saveStateProvider.notifier).exportNow();
     ref.read(saveFlashProvider.notifier).trigger();
   } else {
-    await _performSaveAs(ref);
+    await _performSaveAs(context, ref);
   }
 }
 
@@ -406,10 +410,14 @@ Future<void> _performSave(WidgetRef ref) async {
 ///
 /// Default filename is `{ProjectName}.hsp`. Updates [SaveState.lastExportPath]
 /// and clears `isDirty`. Triggers [saveFlashProvider] on success.
-Future<void> _performSaveAs(WidgetRef ref) async {
+Future<void> _performSaveAs(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  final l10n = AppLocalizations.of(context)!;
   final projectName = ref.read(currentProjectNameProvider);
   final path = await FilePicker.platform.saveFile(
-    dialogTitle: 'Save Project As',
+    dialogTitle: l10n.dialogSaveProjectAs,
     fileName: '$projectName.hsp',
     allowedExtensions: ['hsp'],
     type: FileType.custom,

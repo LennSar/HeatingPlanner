@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../data/models/enums.dart';
+import '../../l10n/app_localizations.dart';
 import '../../platform/desktop_menu.dart';
 import '../../platform/keyboard_shortcuts.dart';
 import '../../repositories/app_preferences.dart';
@@ -13,6 +14,7 @@ import '../../repositories/save_state_notifier.dart';
 import '../canvas/canvas_controller.dart';
 import '../canvas/floor_plan_canvas.dart';
 import '../dialogs/project_settings_dialog.dart';
+import 'settings_screen.dart';
 import '../panels/performance_dashboard.dart';
 import '../panels/properties_panel.dart';
 import '../providers/editor_state_provider.dart';
@@ -101,24 +103,38 @@ class _EditorScreenState
   /// - Clean / no path: `{name} — HeatingPlanner`
   /// - Dirty:           `{name} ● — HeatingPlanner`
   /// - Saving:          `{name} — HeatingPlanner (Saving…)`
-  static String _windowTitle(String projectName, SaveState s) {
-    if (s.isAutoExporting) return '$projectName — HeatingPlanner (Saving…)';
-    if (s.isDirty && s.lastExportPath != null) {
-      return '$projectName ● — HeatingPlanner';
+  static String _windowTitle(
+    String projectName,
+    SaveState s,
+    AppLocalizations l10n,
+  ) {
+    final app = l10n.appTitle;
+    if (s.isAutoExporting) {
+      return '$projectName — $app (${l10n.saving})';
     }
-    return '$projectName — HeatingPlanner';
+    if (s.isDirty && s.lastExportPath != null) {
+      return '$projectName ● — $app';
+    }
+    return '$projectName — $app';
   }
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+
     // Keep the desktop window title in sync with save state.
     final saveState = ref.watch(saveStateProvider);
-    final projectName = ref.watch(currentProjectNameProvider);
+    final projectName =
+        ref.watch(currentProjectNameProvider);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       SystemChrome.setApplicationSwitcherDescription(
         ApplicationSwitcherDescription(
-          label: _windowTitle(projectName, saveState),
+          label: _windowTitle(
+            projectName,
+            saveState,
+            l10n,
+          ),
           primaryColor: 0,
         ),
       );
@@ -275,52 +291,60 @@ class _Toolbar extends StatelessWidget {
   final VoidCallback onToggleDashboard;
   final bool dashboardVisible;
 
-  static const _toolEntries = [
-    _ToolEntry(DrawingTool.select, Icons.near_me, 'Select'),
-    _ToolEntry(
-      DrawingTool.drawWall,
-      Icons.border_style,
-      'Wall',
-    ),
-    _ToolEntry(
-      DrawingTool.placeWindow,
-      Icons.window,
-      'Window',
-    ),
-    _ToolEntry(
-      DrawingTool.placeDoor,
-      Icons.door_front_door_outlined,
-      'Door',
-    ),
-    _ToolEntry(
-      DrawingTool.drawZone,
-      Icons.grid_on,
-      'Floor Zone',
-    ),
-    _ToolEntry(
-      DrawingTool.drawWallZone,
-      Icons.view_column_outlined,
-      'Wall Zone',
-    ),
-    _ToolEntry(
-      DrawingTool.placeDistributor,
-      Icons.hub_outlined,
-      'Distributor',
-    ),
-    _ToolEntry(
-      DrawingTool.routePipe,
-      Icons.route,
-      'Pipe',
-    ),
-    _ToolEntry(
-      DrawingTool.measure,
-      Icons.straighten,
-      'Measure',
-    ),
-  ];
+  static List<_ToolEntry> _toolEntries(
+    AppLocalizations l10n,
+  ) =>
+      [
+        _ToolEntry(
+          DrawingTool.select,
+          Icons.near_me,
+          l10n.toolSelect,
+        ),
+        _ToolEntry(
+          DrawingTool.drawWall,
+          Icons.border_style,
+          l10n.toolWall,
+        ),
+        _ToolEntry(
+          DrawingTool.placeWindow,
+          Icons.window,
+          l10n.toolWindow,
+        ),
+        _ToolEntry(
+          DrawingTool.placeDoor,
+          Icons.door_front_door_outlined,
+          l10n.toolDoor,
+        ),
+        _ToolEntry(
+          DrawingTool.drawZone,
+          Icons.grid_on,
+          l10n.toolFloorZone,
+        ),
+        _ToolEntry(
+          DrawingTool.drawWallZone,
+          Icons.view_column_outlined,
+          l10n.toolWallZone,
+        ),
+        _ToolEntry(
+          DrawingTool.placeDistributor,
+          Icons.hub_outlined,
+          l10n.toolDistributor,
+        ),
+        _ToolEntry(
+          DrawingTool.routePipe,
+          Icons.route,
+          l10n.toolPipe,
+        ),
+        _ToolEntry(
+          DrawingTool.measure,
+          Icons.straighten,
+          l10n.toolMeasure,
+        ),
+      ];
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final colors = Theme.of(context)
         .extension<HeatingPlannerColors>()!;
     final primary = Theme.of(context).colorScheme.primary;
@@ -350,7 +374,7 @@ class _Toolbar extends StatelessWidget {
               child: Column(
                 children: [
                   const SizedBox(height: Spacing.sm),
-                  for (final entry in _toolEntries)
+                  for (final entry in _toolEntries(l10n))
                     Tooltip(
                       message: entry.label,
                       preferBelow: false,
@@ -396,7 +420,7 @@ class _Toolbar extends StatelessWidget {
           // ── File action buttons (Open / Save / Save As) ──────────
           _ToolbarFileButton(
             icon: Icons.folder_open,
-            tooltip: 'Open (Ctrl+O)',
+            tooltip: l10n.tooltipOpen,
             width: toolbarWidth,
             iconSize: isCompact ? 20.0 : 22.0,
             onTap: () => Actions.invoke(
@@ -406,7 +430,7 @@ class _Toolbar extends StatelessWidget {
           ),
           _ToolbarFileButton(
             icon: Icons.save,
-            tooltip: 'Save (Ctrl+S)',
+            tooltip: l10n.tooltipSave,
             width: toolbarWidth,
             iconSize: isCompact ? 20.0 : 22.0,
             onTap: () => Actions.invoke(
@@ -416,7 +440,7 @@ class _Toolbar extends StatelessWidget {
           ),
           _ToolbarFileButton(
             icon: Icons.save_as,
-            tooltip: 'Save As (Ctrl+Shift+S)',
+            tooltip: l10n.tooltipSaveAs,
             width: toolbarWidth,
             iconSize: isCompact ? 20.0 : 22.0,
             onTap: () => Actions.invoke(
@@ -427,7 +451,7 @@ class _Toolbar extends StatelessWidget {
 
           // Dashboard toggle
           Tooltip(
-            message: 'Dashboard',
+            message: l10n.tooltipDashboard,
             child: Material(
               color: dashboardVisible
                   ? primary.withValues(alpha: 0.15)
@@ -453,7 +477,7 @@ class _Toolbar extends StatelessWidget {
 
           // Project settings
           Tooltip(
-            message: 'Project Settings',
+            message: l10n.tooltipProjectSettings,
             child: Material(
               color: Colors.transparent,
               child: InkWell(
@@ -471,6 +495,19 @@ class _Toolbar extends StatelessWidget {
                         .onSurfaceVariant,
                   ),
                 ),
+              ),
+            ),
+          ),
+
+          // App settings
+          _ToolbarFileButton(
+            icon: Icons.settings,
+            tooltip: l10n.menuSettings,
+            width: toolbarWidth,
+            iconSize: isCompact ? 20.0 : 22.0,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const SettingsScreen(),
               ),
             ),
           ),
@@ -554,6 +591,7 @@ class _StatusBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     final canvasState = ref.watch(canvasControllerProvider);
     final zoomPercent =
         (canvasState.zoom * 100).round();
@@ -589,7 +627,7 @@ class _StatusBar extends ConsumerWidget {
           children: [
             // Zoom percentage
             Text(
-              'Zoom: $zoomPercent%',
+              l10n.statusBarZoom(zoomPercent),
               style: textTheme.bodySmall,
             ),
             const SizedBox(width: Spacing.lg),
@@ -638,8 +676,7 @@ class _StatusBar extends ConsumerWidget {
                   ),
                   const SizedBox(width: Spacing.xs),
                   Text(
-                    '$warningCount warning'
-                    '${warningCount == 1 ? '' : 's'}',
+                    l10n.statusBarWarnings(warningCount),
                     style: textTheme.bodySmall,
                   ),
                 ],
@@ -652,8 +689,10 @@ class _StatusBar extends ConsumerWidget {
             const SizedBox(width: Spacing.md),
 
             // Room count
-            Text('$roomCount rooms',
-                style: textTheme.bodySmall),
+            Text(
+              l10n.statusBarRooms(roomCount),
+              style: textTheme.bodySmall,
+            ),
             const SizedBox(width: Spacing.sm),
 
             // Panel toggle
@@ -714,6 +753,7 @@ class _WallTabletOptionsBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     final mods = ref.watch(wallModifiersProvider);
     final colors = Theme.of(context)
         .extension<HeatingPlannerColors>()!;
@@ -733,14 +773,14 @@ class _WallTabletOptionsBar extends ConsumerWidget {
       child: Row(
         children: [
           Text(
-            'Wall:',
+            l10n.wallToolLabel,
             style: Theme.of(context).textTheme.labelMedium,
           ),
           const SizedBox(width: Spacing.sm),
 
           // Ortho-snap toggle (mirrors Shift on desktop).
           Tooltip(
-            message: 'Ortho snap — H/V only',
+            message: l10n.tooltipOrthoSnap,
             child: InkWell(
               borderRadius: BorderRadius.circular(6),
               onTap: () => ref
@@ -776,7 +816,7 @@ class _WallTabletOptionsBar extends ConsumerWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      'Ortho',
+                      l10n.orthoLabel,
                       style: Theme.of(context)
                           .textTheme
                           .labelSmall
@@ -796,7 +836,7 @@ class _WallTabletOptionsBar extends ConsumerWidget {
 
           // Rectangle mode toggle (mirrors Ctrl on desktop).
           Tooltip(
-            message: 'Rectangle mode',
+            message: l10n.tooltipRectangleMode,
             child: InkWell(
               borderRadius: BorderRadius.circular(6),
               onTap: () => ref
@@ -832,7 +872,7 @@ class _WallTabletOptionsBar extends ConsumerWidget {
                     ),
                     const SizedBox(width: 4),
                     Text(
-                      'Rectangle',
+                      l10n.rectangleLabel,
                       style: Theme.of(context)
                           .textTheme
                           .labelSmall

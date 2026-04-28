@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../l10n/app_localizations.dart';
 import '../../repositories/save_state_notifier.dart';
 import 'save_flash_notifier.dart';
 
@@ -56,8 +57,9 @@ class _Saving extends StatelessWidget {
         .bodySmall
         ?.copyWith(color: onSurface);
 
+    final l10n = AppLocalizations.of(context)!;
     return Tooltip(
-      message: 'Saving to file…',
+      message: l10n.savingToFile,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -70,7 +72,7 @@ class _Saving extends StatelessWidget {
             ),
           ),
           const SizedBox(width: Spacing.xs),
-          Text('Saving…', style: textStyle),
+          Text(l10n.saving, style: textStyle),
         ],
       ),
     );
@@ -85,9 +87,9 @@ class _UnsavedDot extends StatelessWidget {
     final colors =
         Theme.of(context).extension<HeatingPlannerColors>()!;
 
+    final l10n = AppLocalizations.of(context)!;
     return Tooltip(
-      message:
-          'File export out of date — press Ctrl+S to update',
+      message: l10n.exportOutOfDate,
       child: Container(
         width: 6,
         height: 6,
@@ -118,14 +120,15 @@ class _Saved extends StatelessWidget {
         .bodySmall
         ?.copyWith(color: color);
 
+    final l10n = AppLocalizations.of(context)!;
     return Tooltip(
-      message: 'All changes saved to file',
+      message: l10n.allChangesSaved,
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.check, size: 12, color: color),
           const SizedBox(width: Spacing.xs),
-          Text('Saved', style: textStyle),
+          Text(l10n.saved, style: textStyle),
         ],
       ),
     );

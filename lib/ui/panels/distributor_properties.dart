@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/validation_limits.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/distributor.dart';
+import '../../l10n/app_localizations.dart';
 import '../providers/editor_state_provider.dart';
 
 /// Properties panel content for a selected [Distributor].
@@ -109,12 +110,14 @@ class _DistributorPropertiesState
     final editorState = ref.watch(editorStateProvider);
     final distributor = editorState.distributor;
 
+    final l10n = AppLocalizations.of(context)!;
+
     if (distributor == null ||
         distributor.id != widget.distributorId) {
       return Padding(
         padding: const EdgeInsets.all(Spacing.md),
         child: Text(
-          'Distributor not found.',
+          l10n.distributor,
           style: textTheme.bodyMedium,
         ),
       );
@@ -127,23 +130,25 @@ class _DistributorPropertiesState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Properties', style: textTheme.headlineMedium),
+          Text(l10n.properties, style: textTheme.headlineMedium),
           const SizedBox(height: Spacing.lg),
           Text(
-            'Distributor',
+            l10n.distributor,
             style: textTheme.headlineSmall,
           ),
           const SizedBox(height: Spacing.sm),
           Text(
-            'Position: (${distributor.position.x.round()} mm, '
-            '${distributor.position.y.round()} mm)',
+            l10n.positionLabel(
+              distributor.position.x.round(),
+              distributor.position.y.round(),
+            ),
             style: textTheme.bodySmall,
           ),
           const SizedBox(height: Spacing.lg),
 
           // ── Supply temperature ─────────────────────────────
           _SectionLabel(
-            label: 'Supply Temperature',
+            label: l10n.supplyTemperature,
             unit: '°C',
             textTheme: textTheme,
           ),
@@ -192,7 +197,7 @@ class _DistributorPropertiesState
 
           // ── Return temperature ─────────────────────────────
           _SectionLabel(
-            label: 'Return Temperature',
+            label: l10n.returnTemperature,
             unit: '°C',
             textTheme: textTheme,
           ),
@@ -234,7 +239,7 @@ class _DistributorPropertiesState
 
           // ── Read-only info ─────────────────────────────────
           _infoRow(
-            'Width',
+            l10n.widthLabel,
             '${distributor.widthMm} mm',
             textTheme,
           ),
@@ -250,14 +255,14 @@ class _DistributorPropertiesState
 
           // ── Pump section ───────────────────────────────────
           Text(
-            'Pump',
+            l10n.pump,
             style: textTheme.headlineSmall,
           ),
           const SizedBox(height: Spacing.sm),
 
           // Min. required pump pressure — read-only, computed
           _infoRow(
-            'Min. required pump pressure',
+            l10n.minPumpPressure,
             '— Pa',
             textTheme,
           ),
@@ -265,7 +270,7 @@ class _DistributorPropertiesState
 
           // Pump capacity — optional user input
           _SectionLabel(
-            label: 'Pump Capacity (optional)',
+            label: l10n.pumpCapacityOptional,
             unit: 'Pa',
             textTheme: textTheme,
           ),

@@ -1,7 +1,760 @@
 {
   "@@locale": "en",
+
   "appTitle": "HeatingPlanner",
+  "@appTitle": {
+    "description": "Application name shown in title bar and project list"
+  },
+
   "settingsLanguageLabel": "Language",
+  "@settingsLanguageLabel": {
+    "description": "Label for the language selector in settings"
+  },
   "languageEnglish": "English",
-  "languageGerman": "Deutsch"
+  "@languageEnglish": {
+    "description": "Display name for the English language option"
+  },
+  "languageGerman": "Deutsch",
+  "@languageGerman": {
+    "description": "Display name for the German language option"
+  },
+  "settingsDrawingGridSize": "Drawing Grid Size",
+  "@settingsDrawingGridSize": {
+    "description": "Label for the grid spacing selector in settings"
+  },
+
+  "newProject": "New Project",
+  "@newProject": {
+    "description": "Button and dialog title for creating a new project"
+  },
+  "errorLoadingProjects": "Error loading projects: {error}",
+  "@errorLoadingProjects": {
+    "description": "Error message when the project list fails to load",
+    "placeholders": {
+      "error": { "type": "String" }
+    }
+  },
+  "noProjectsYet": "No projects yet",
+  "@noProjectsYet": {
+    "description": "Heading shown when the project list is empty"
+  },
+  "createFirstProject": "Create your first heating plan to get started.",
+  "@createFirstProject": {
+    "description": "Subtitle shown below the empty-state heading"
+  },
+  "projectNameLabel": "Project name *",
+  "@projectNameLabel": {
+    "description": "Label for the project name text field"
+  },
+  "projectNameHint": "e.g. Villa Schmidt",
+  "@projectNameHint": {
+    "description": "Hint text inside the project name field"
+  },
+  "nameIsRequired": "Name is required",
+  "@nameIsRequired": {
+    "description": "Validation error when the name field is empty"
+  },
+  "designOutdoorTemperature": "Design outdoor temperature",
+  "@designOutdoorTemperature": {
+    "description": "Label for the outdoor design temperature slider"
+  },
+  "defaultIndoorTemperature": "Default indoor temperature",
+  "@defaultIndoorTemperature": {
+    "description": "Label for the default indoor temperature slider"
+  },
+  "cancel": "Cancel",
+  "@cancel": {
+    "description": "Generic cancel button label"
+  },
+  "create": "Create",
+  "@create": {
+    "description": "Button label for creating a new project"
+  },
+  "duplicateAction": "Duplicate",
+  "@duplicateAction": {
+    "description": "Context menu action to duplicate a project"
+  },
+  "delete": "Delete",
+  "@delete": {
+    "description": "Generic delete button or menu item label"
+  },
+  "deleteProjectTitle": "Delete project?",
+  "@deleteProjectTitle": {
+    "description": "Title of the project deletion confirmation dialog"
+  },
+  "deleteProjectContent": "Delete \"{name}\"? This cannot be undone.",
+  "@deleteProjectContent": {
+    "description": "Body text of the project deletion confirmation dialog",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "defaultFloorName": "Ground Floor",
+  "@defaultFloorName": {
+    "description": "Default name assigned to the first floor of a new project"
+  },
+  "projectCopyName": "{name} (copy)",
+  "@projectCopyName": {
+    "description": "Name pattern for duplicated projects",
+    "placeholders": {
+      "name": { "type": "String" }
+    }
+  },
+  "relativeJustNow": "Just now",
+  "@relativeJustNow": {
+    "description": "Relative timestamp for less than one minute ago"
+  },
+  "relativeMinutesAgo": "{count}m ago",
+  "@relativeMinutesAgo": {
+    "description": "Relative timestamp in minutes",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "relativeHoursAgo": "{count}h ago",
+  "@relativeHoursAgo": {
+    "description": "Relative timestamp in hours",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "relativeDaysAgo": "{count}d ago",
+  "@relativeDaysAgo": {
+    "description": "Relative timestamp in days",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "relativeWeeksAgo": "{count, plural, =1{1 week ago} other{{count} weeks ago}}",
+  "@relativeWeeksAgo": {
+    "description": "Relative timestamp in weeks",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "relativeMonthsAgo": "{count, plural, =1{1 month ago} other{{count} months ago}}",
+  "@relativeMonthsAgo": {
+    "description": "Relative timestamp in months",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "relativeYearsAgo": "{count, plural, =1{1 year ago} other{{count} years ago}}",
+  "@relativeYearsAgo": {
+    "description": "Relative timestamp in years",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+
+  "toolSelect": "Select",
+  "@toolSelect": {
+    "description": "Toolbar tooltip for the selection tool"
+  },
+  "toolWall": "Wall",
+  "@toolWall": {
+    "description": "Toolbar tooltip for the wall drawing tool"
+  },
+  "toolWindow": "Window",
+  "@toolWindow": {
+    "description": "Toolbar tooltip for the window placement tool"
+  },
+  "toolDoor": "Door",
+  "@toolDoor": {
+    "description": "Toolbar tooltip for the door placement tool"
+  },
+  "toolFloorZone": "Floor Zone",
+  "@toolFloorZone": {
+    "description": "Toolbar tooltip for the floor heating zone tool"
+  },
+  "toolWallZone": "Wall Zone",
+  "@toolWallZone": {
+    "description": "Toolbar tooltip for the wall heating zone tool"
+  },
+  "toolDistributor": "Distributor",
+  "@toolDistributor": {
+    "description": "Toolbar tooltip for the distributor placement tool"
+  },
+  "toolPipe": "Pipe",
+  "@toolPipe": {
+    "description": "Toolbar tooltip for the pipe routing tool"
+  },
+  "toolMeasure": "Measure",
+  "@toolMeasure": {
+    "description": "Toolbar tooltip for the measurement tool"
+  },
+  "tooltipOpen": "Open (Ctrl+O)",
+  "@tooltipOpen": {
+    "description": "Tooltip for the Open file toolbar button"
+  },
+  "tooltipSave": "Save (Ctrl+S)",
+  "@tooltipSave": {
+    "description": "Tooltip for the Save toolbar button"
+  },
+  "tooltipSaveAs": "Save As (Ctrl+Shift+S)",
+  "@tooltipSaveAs": {
+    "description": "Tooltip for the Save As toolbar button"
+  },
+  "tooltipDashboard": "Dashboard",
+  "@tooltipDashboard": {
+    "description": "Tooltip for the dashboard toggle button"
+  },
+  "tooltipProjectSettings": "Project Settings",
+  "@tooltipProjectSettings": {
+    "description": "Tooltip for the project settings button"
+  },
+  "statusBarZoom": "Zoom: {percent}%",
+  "@statusBarZoom": {
+    "description": "Zoom level display in the editor status bar",
+    "placeholders": {
+      "percent": { "type": "int" }
+    }
+  },
+  "statusBarWarnings": "{count, plural, =1{1 warning} other{{count} warnings}}",
+  "@statusBarWarnings": {
+    "description": "Warning count in the editor status bar",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "statusBarRooms": "{count, plural, =1{1 room} other{{count} rooms}}",
+  "@statusBarRooms": {
+    "description": "Room count in the editor status bar",
+    "placeholders": {
+      "count": { "type": "int" }
+    }
+  },
+  "wallToolLabel": "Wall:",
+  "@wallToolLabel": {
+    "description": "Label shown in the tablet wall-tool options bar"
+  },
+  "tooltipOrthoSnap": "Ortho snap — H/V only",
+  "@tooltipOrthoSnap": {
+    "description": "Tooltip for the ortho-snap toggle"
+  },
+  "orthoLabel": "Ortho",
+  "@orthoLabel": {
+    "description": "Short label on the ortho-snap toggle button"
+  },
+  "tooltipRectangleMode": "Rectangle mode",
+  "@tooltipRectangleMode": {
+    "description": "Tooltip for the rectangle mode toggle"
+  },
+  "rectangleLabel": "Rectangle",
+  "@rectangleLabel": {
+    "description": "Short label on the rectangle mode toggle button"
+  },
+  "saving": "Saving…",
+  "@saving": {
+    "description": "Status text shown in window title during auto-export"
+  },
+
+  "menuFile": "File",
+  "@menuFile": {
+    "description": "Top-level File menu label"
+  },
+  "menuNew": "New",
+  "@menuNew": {
+    "description": "File > New menu item"
+  },
+  "menuOpen": "Open…",
+  "@menuOpen": {
+    "description": "File > Open menu item"
+  },
+  "menuSave": "Save",
+  "@menuSave": {
+    "description": "File > Save menu item"
+  },
+  "menuSaveAs": "Save As…",
+  "@menuSaveAs": {
+    "description": "File > Save As menu item"
+  },
+  "menuExportPdf": "Export PDF…",
+  "@menuExportPdf": {
+    "description": "File > Export PDF menu item"
+  },
+  "menuExportCsv": "Export CSV…",
+  "@menuExportCsv": {
+    "description": "File > Export CSV menu item"
+  },
+  "menuEdit": "Edit",
+  "@menuEdit": {
+    "description": "Top-level Edit menu label"
+  },
+  "menuUndo": "Undo",
+  "@menuUndo": {
+    "description": "Edit > Undo menu item"
+  },
+  "menuRedo": "Redo",
+  "@menuRedo": {
+    "description": "Edit > Redo menu item"
+  },
+  "menuDelete": "Delete",
+  "@menuDelete": {
+    "description": "Edit > Delete menu item"
+  },
+  "menuSelectAll": "Select All",
+  "@menuSelectAll": {
+    "description": "Edit > Select All menu item"
+  },
+  "menuView": "View",
+  "@menuView": {
+    "description": "Top-level View menu label"
+  },
+  "menuZoomIn": "Zoom In",
+  "@menuZoomIn": {
+    "description": "View > Zoom In menu item"
+  },
+  "menuZoomOut": "Zoom Out",
+  "@menuZoomOut": {
+    "description": "View > Zoom Out menu item"
+  },
+  "menuZoomToFit": "Zoom to Fit",
+  "@menuZoomToFit": {
+    "description": "View > Zoom to Fit menu item"
+  },
+  "menuTogglePropertiesPanel": "Toggle Properties Panel",
+  "@menuTogglePropertiesPanel": {
+    "description": "View > Toggle Properties Panel menu item"
+  },
+  "menuToggleDashboard": "Toggle Dashboard",
+  "@menuToggleDashboard": {
+    "description": "View > Toggle Dashboard menu item"
+  },
+  "menuTools": "Tools",
+  "@menuTools": {
+    "description": "Top-level Tools menu label"
+  },
+  "menuDrawWall": "Draw Wall",
+  "@menuDrawWall": {
+    "description": "Tools > Draw Wall menu item"
+  },
+  "menuPlaceWindow": "Place Window",
+  "@menuPlaceWindow": {
+    "description": "Tools > Place Window menu item"
+  },
+  "menuPlaceDoor": "Place Door",
+  "@menuPlaceDoor": {
+    "description": "Tools > Place Door menu item"
+  },
+  "menuDrawFloorZone": "Draw Floor Zone",
+  "@menuDrawFloorZone": {
+    "description": "Tools > Draw Floor Zone menu item"
+  },
+  "menuPlaceDistributor": "Place Distributor",
+  "@menuPlaceDistributor": {
+    "description": "Tools > Place Distributor menu item"
+  },
+  "menuRoutePipe": "Route Pipe",
+  "@menuRoutePipe": {
+    "description": "Tools > Route Pipe menu item"
+  },
+  "menuHelp": "Help",
+  "@menuHelp": {
+    "description": "Top-level Help menu label"
+  },
+  "menuAbout": "About HeatingPlanner",
+  "@menuAbout": {
+    "description": "Help > About menu item"
+  },
+  "menuDocumentation": "Documentation",
+  "@menuDocumentation": {
+    "description": "Help > Documentation menu item"
+  },
+
+  "menuSettings": "Settings",
+  "@menuSettings": {
+    "description": "Menu item and screen title for application settings"
+  },
+
+  "dialogSaveProjectAs": "Save Project As",
+  "@dialogSaveProjectAs": {
+    "description": "Title of the system save-file dialog"
+  },
+
+  "properties": "Properties",
+  "@properties": { "description": "Panel heading for properties inspector" },
+  "close": "Close",
+  "@close": { "description": "Generic close button label" },
+  "save": "Save",
+  "@save": { "description": "Generic save button label" },
+  "saved": "Saved",
+  "@saved": { "description": "Save state indicator label" },
+  "savingToFile": "Saving to file…",
+  "@savingToFile": { "description": "Tooltip during auto-export save" },
+  "exportOutOfDate": "File export out of date — press Ctrl+S to update",
+  "@exportOutOfDate": { "description": "Tooltip when file export needs updating" },
+  "allChangesSaved": "All changes saved to file",
+  "@allChangesSaved": { "description": "Tooltip when file export is current" },
+
+  "newRoomDetected": "New Room Detected",
+  "@newRoomDetected": { "description": "Dialog title when walls form a closed room" },
+  "roomNameLabel": "Room name",
+  "@roomNameLabel": { "description": "Label for room name field in new room dialog" },
+  "distributorAlreadyPlaced": "Distributor already placed",
+  "@distributorAlreadyPlaced": { "description": "Dialog title for duplicate distributor" },
+  "distributorAlreadyPlacedContent": "A distributor already exists on this floor.\nMove it to the new position, or replace it with a fresh one?",
+  "@distributorAlreadyPlacedContent": { "description": "Dialog body for duplicate distributor" },
+  "move": "Move",
+  "@move": { "description": "Button to move element to new position" },
+  "replace": "Replace",
+  "@replace": { "description": "Button to replace element" },
+  "deleteDistributorTitle": "Delete distributor?",
+  "@deleteDistributorTitle": { "description": "Confirmation dialog title for distributor deletion" },
+  "deleteDistributorContent": "This will remove the distributor from the floor plan.",
+  "@deleteDistributorContent": { "description": "Confirmation dialog body for distributor deletion" },
+
+  "room": "Room",
+  "@room": { "description": "Section heading in room properties" },
+  "nameLabel": "Name",
+  "@nameLabel": { "description": "Label for name text field" },
+  "targetTemperatureValue": "Target Temperature: {temp} °C",
+  "@targetTemperatureValue": {
+    "description": "Room target temperature with value",
+    "placeholders": { "temp": { "type": "String" } }
+  },
+  "airChangeRate": "Air Change Rate",
+  "@airChangeRate": { "description": "Label for air change rate dropdown" },
+  "custom": "Custom",
+  "@custom": { "description": "Option label for custom input" },
+  "rateLabel": "Rate",
+  "@rateLabel": { "description": "Label for custom air change rate field" },
+
+  "windowNotFound": "Window not found",
+  "@windowNotFound": { "description": "Error when selected window no longer exists" },
+  "doorNotFound": "Door not found",
+  "@doorNotFound": { "description": "Error when selected door no longer exists" },
+  "typeLabel": "Type",
+  "@typeLabel": { "description": "Label for element type selector" },
+  "widthLabel": "Width",
+  "@widthLabel": { "description": "Label for width dimension field" },
+  "heightLabel": "Height",
+  "@heightLabel": { "description": "Label for height dimension field" },
+  "sillHeight": "Sill Height",
+  "@sillHeight": { "description": "Label for sill height field" },
+  "uValueLabel": "U-Value",
+  "@uValueLabel": { "description": "Label for thermal transmittance field" },
+
+  "circuitZoneRoom": "Zone / Room",
+  "@circuitZoneRoom": { "description": "Column header in circuit overview" },
+  "circuitLengthM": "Length (m)",
+  "@circuitLengthM": { "description": "Column header for pipe length" },
+  "circuitFlowKgH": "Flow (kg/h)",
+  "@circuitFlowKgH": { "description": "Column header for flow rate" },
+  "circuitValveKpa": "Valve (kPa)",
+  "@circuitValveKpa": { "description": "Column header for valve pressure" },
+  "circuitStatus": "Status",
+  "@circuitStatus": { "description": "Column header for circuit status" },
+  "circuitNotFound": "Circuit not found",
+  "@circuitNotFound": { "description": "Error when selected circuit no longer exists" },
+  "heatingCircuit": "Heating Circuit",
+  "@heatingCircuit": { "description": "Section heading in circuit properties" },
+  "supplyPipeInsulation": "Supply pipe insulation",
+  "@supplyPipeInsulation": { "description": "Section label for insulation selection" },
+  "insulationNone": "None (in screed)",
+  "@insulationNone": { "description": "Radio option for no insulation" },
+  "insulationConduit": "Corrugated conduit",
+  "@insulationConduit": { "description": "Radio option for conduit insulation" },
+  "insulationLayer": "Insulation layer",
+  "@insulationLayer": { "description": "Radio option for insulation layer" },
+  "pipeLengths": "Pipe lengths",
+  "@pipeLengths": { "description": "Section label for pipe length info" },
+  "supplyRoute": "Supply route",
+  "@supplyRoute": { "description": "Label for supply pipe length" },
+  "returnRoute": "Return route",
+  "@returnRoute": { "description": "Label for return pipe length" },
+  "zoneTube": "Zone tube",
+  "@zoneTube": { "description": "Label for zone tube length" },
+  "totalTube": "Total tube",
+  "@totalTube": { "description": "Label for total tube length" },
+  "hydraulics": "Hydraulics",
+  "@hydraulics": { "description": "Section label for hydraulic results" },
+  "flowRate": "Flow rate",
+  "@flowRate": { "description": "Label for flow rate value" },
+  "flowVelocity": "Flow velocity",
+  "@flowVelocity": { "description": "Label for flow velocity value" },
+  "pressureLossLabel": "Pressure loss",
+  "@pressureLossLabel": { "description": "Label for pressure loss value" },
+  "heatOutput": "Heat output",
+  "@heatOutput": { "description": "Label for heat output value" },
+  "deleteCircuit": "Delete circuit",
+  "@deleteCircuit": { "description": "Button to delete a heating circuit" },
+
+  "distributor": "Distributor",
+  "@distributor": { "description": "Section heading in distributor properties" },
+  "positionLabel": "Position: ({x} mm, {y} mm)",
+  "@positionLabel": {
+    "description": "Distributor position coordinates",
+    "placeholders": { "x": { "type": "int" }, "y": { "type": "int" } }
+  },
+  "supplyTemperature": "Supply Temperature",
+  "@supplyTemperature": { "description": "Label for supply temperature slider" },
+  "returnTemperature": "Return Temperature",
+  "@returnTemperature": { "description": "Label for return temperature slider" },
+  "pump": "Pump",
+  "@pump": { "description": "Section heading for pump properties" },
+  "minPumpPressure": "Min. required pump pressure",
+  "@minPumpPressure": { "description": "Label for minimum pump pressure" },
+  "pumpCapacityOptional": "Pump Capacity (optional)",
+  "@pumpCapacityOptional": { "description": "Label for optional pump capacity" },
+
+  "saveAsPreset": "Save as preset",
+  "@saveAsPreset": { "description": "Dialog title / button for saving construction preset" },
+  "presetName": "Preset name",
+  "@presetName": { "description": "Label for preset name field" },
+  "savedAsPreset": "Saved as preset",
+  "@savedAsPreset": { "description": "Snackbar confirmation for preset save" },
+  "loadPreset": "Load preset",
+  "@loadPreset": { "description": "Dialog title for loading construction preset" },
+  "load": "Load",
+  "@load": { "description": "Generic load button label" },
+  "constructionName": "Construction name",
+  "@constructionName": { "description": "Label for wall construction name field" },
+  "addLayer": "Add Layer",
+  "@addLayer": { "description": "Button to add a material layer" },
+  "layerStack": "Layer Stack  (outside → inside)",
+  "@layerStack": { "description": "Section heading for material layer list" },
+  "surfaceResistances": "Surface resistances (m²K/W):",
+  "@surfaceResistances": { "description": "Label for surface resistance inputs" },
+
+  "heatingZone": "Heating Zone",
+  "@heatingZone": { "description": "Section heading in zone properties" },
+  "tubeSpacingValue": "Tube Spacing: {value} mm",
+  "@tubeSpacingValue": {
+    "description": "Zone tube spacing with value",
+    "placeholders": { "value": { "type": "int" } }
+  },
+  "heightValue": "Height: {value} mm",
+  "@heightValue": {
+    "description": "Wall zone height with value",
+    "placeholders": { "value": { "type": "int" } }
+  },
+  "borderDistanceValue": "Border Distance: {value} mm",
+  "@borderDistanceValue": {
+    "description": "Floor zone border distance with value",
+    "placeholders": { "value": { "type": "int" } }
+  },
+  "layoutPattern": "Layout Pattern",
+  "@layoutPattern": { "description": "Section label for tube layout pattern" },
+  "tubeType": "Tube Type",
+  "@tubeType": { "description": "Section label for tube type selection" },
+  "zoneOutput": "Zone Output",
+  "@zoneOutput": { "description": "Section heading for zone heat output" },
+  "rValueLabel": "R value",
+  "@rValueLabel": { "description": "Label for custom floor covering R-value" },
+
+  "searchMaterials": "Search materials…",
+  "@searchMaterials": { "description": "Hint text in material search field" },
+  "rotateDistributor": "Rotate distributor",
+  "@rotateDistributor": { "description": "Undo label for distributor rotation" },
+
+  "projectSettings": "Project Settings",
+  "@projectSettings": { "description": "Title of project settings dialog" },
+  "designOutdoorTempDesc": "Used in all heat-demand calculations (EN 12831).",
+  "@designOutdoorTempDesc": { "description": "Description for outdoor temperature setting" },
+  "defaultIndoorTempDesc": "Applied to new rooms when they are created.",
+  "@defaultIndoorTempDesc": { "description": "Description for indoor temperature setting" },
+  "defaultRoomHeight": "Default Room Height",
+  "@defaultRoomHeight": { "description": "Label for default room height setting" },
+  "defaultRoomHeightDesc": "Used as the default height for wall heating zones.",
+  "@defaultRoomHeightDesc": { "description": "Description for room height setting" },
+  "unheatedSpaceTemp": "Unheated Space Temperature",
+  "@unheatedSpaceTemp": { "description": "Label for unheated space temperature" },
+  "unheatedSpaceTempDesc": "Default temperature used for unheated basements, attics, and adjacent unheated spaces.",
+  "@unheatedSpaceTempDesc": { "description": "Description for unheated space temperature" },
+  "drawingGridSizeDesc": "Snap interval for walls, zones, and other elements on the canvas.",
+  "@drawingGridSizeDesc": { "description": "Description for drawing grid size setting" },
+
+  "tabHeatBalance": "Heat Balance",
+  "@tabHeatBalance": { "description": "Dashboard tab for heat balance" },
+  "tabHydraulic": "Hydraulic",
+  "@tabHydraulic": { "description": "Dashboard tab for hydraulic view" },
+  "tabWarnings": "Warnings",
+  "@tabWarnings": { "description": "Dashboard tab for warnings" },
+  "warningsWithCount": "Warnings ({count})",
+  "@warningsWithCount": {
+    "description": "Warning tab label with count",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "filterAll": "All",
+  "@filterAll": { "description": "Filter option to show all items" },
+  "filterErrorsOnly": "Errors only",
+  "@filterErrorsOnly": { "description": "Filter for errors only" },
+  "filterWarningsOnly": "Warnings only",
+  "@filterWarningsOnly": { "description": "Filter for warnings only" },
+  "filterInfoOnly": "Info only",
+  "@filterInfoOnly": { "description": "Filter for info only" },
+  "filterLabel": "Filter",
+  "@filterLabel": { "description": "Generic filter label" },
+  "noIssuesFound": "No issues found",
+  "@noIssuesFound": { "description": "Empty state for warnings tab" },
+  "emptyHeatBalance": "Draw rooms to see the heat balance.",
+  "@emptyHeatBalance": { "description": "Empty state for heat balance tab" },
+  "demand": "Demand",
+  "@demand": { "description": "Label for heat demand in summary" },
+  "output": "Output",
+  "@output": { "description": "Label for heat output in summary" },
+  "balance": "Balance",
+  "@balance": { "description": "Label for heat balance in summary" },
+  "emptyHydraulic": "Add a distributor and connect heating zones to see hydraulic data.",
+  "@emptyHydraulic": { "description": "Empty state for hydraulic tab" },
+  "pressureLossByCircuit": "Pressure Loss by Circuit (kPa)",
+  "@pressureLossByCircuit": { "description": "Chart title for pressure loss" },
+  "pipeLoss": "Pipe loss",
+  "@pipeLoss": { "description": "Legend label for pipe loss" },
+  "valveThrottling": "Valve throttling",
+  "@valveThrottling": { "description": "Legend label for valve throttling" },
+  "flowRateDistribution": "Flow Rate Distribution",
+  "@flowRateDistribution": { "description": "Chart title for flow distribution" },
+
+  "unsavedExportFile": "Unsaved export file",
+  "@unsavedExportFile": { "description": "Title of unsaved changes dialog" },
+  "unsavedExportContent": "\"{name}\" has changes that have not been saved to the .hsp file.\n\nYour project data is safely stored in the app — only the portable export file is out of date.",
+  "@unsavedExportContent": {
+    "description": "Body of unsaved changes dialog",
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "quitAnyway": "Quit Anyway",
+  "@quitAnyway": { "description": "Button to close without saving" },
+  "saveFileAndQuit": "Save File and Quit",
+  "@saveFileAndQuit": { "description": "Button to save and close" },
+
+  "roomNotFound": "Room not found",
+  "@roomNotFound": { "description": "Error when selected room no longer exists" },
+  "floorArea": "Floor Area",
+  "@floorArea": { "description": "Read-only row label for room floor area" },
+  "roomVolume": "Room Volume",
+  "@roomVolume": { "description": "Read-only row label for room volume" },
+  "wallsCount": "Walls",
+  "@wallsCount": { "description": "Read-only row label for wall count" },
+  "heatDemand": "Heat Demand",
+  "@heatDemand": { "description": "Section heading for heat demand" },
+  "transmissionQt": "Transmission Q\u1D40",
+  "@transmissionQt": { "description": "Label for transmission heat loss" },
+  "assignConstructionsHint": "Assign constructions to walls for transmission loss.",
+  "@assignConstructionsHint": { "description": "Hint when no constructions are assigned" },
+  "transmissionFloor": "Transmission \u2014 floor",
+  "@transmissionFloor": { "description": "Label for floor transmission loss" },
+  "transmissionCeiling": "Transmission \u2014 ceiling",
+  "@transmissionCeiling": { "description": "Label for ceiling transmission loss" },
+  "ventilationQv": "Ventilation Q\u1D20",
+  "@ventilationQv": { "description": "Label for ventilation heat loss" },
+  "totalHeatDemand": "Total Heat Demand",
+  "@totalHeatDemand": { "description": "Label for total heat demand" },
+  "specificHeatDemand": "Specific Heat Demand",
+  "@specificHeatDemand": { "description": "Label for specific heat demand per m²" },
+  "envelopeFloorCeiling": "Envelope \u2014 Floor & Ceiling",
+  "@envelopeFloorCeiling": { "description": "Expansion tile heading for envelope section" },
+  "floorLabel": "Floor",
+  "@floorLabel": { "description": "Subsection heading for floor boundary" },
+  "ceilingLabel": "Ceiling",
+  "@ceilingLabel": { "description": "Subsection heading for ceiling boundary" },
+  "whatsBelow": "What's below?",
+  "@whatsBelow": { "description": "Label for floor boundary dropdown" },
+  "whatsAbove": "What's above?",
+  "@whatsAbove": { "description": "Label for ceiling boundary dropdown" },
+  "floorConstruction": "Floor construction",
+  "@floorConstruction": { "description": "Dialog title for floor construction editor" },
+  "roofCeilingConstruction": "Roof / ceiling construction",
+  "@roofCeilingConstruction": { "description": "Dialog title for ceiling construction editor" },
+  "notAssigned": "Not assigned",
+  "@notAssigned": { "description": "Label when no construction is assigned" },
+  "assignAction": "+ Assign",
+  "@assignAction": { "description": "Button label to assign a construction" },
+  "editAction": "Edit",
+  "@editAction": { "description": "Generic edit button label" },
+  "adjacentRoomTemp": "Adjacent room temp.",
+  "@adjacentRoomTemp": { "description": "Label for adjacent room temperature field" },
+  "unheatedSpaceTempShort": "Unheated space temp.",
+  "@unheatedSpaceTempShort": { "description": "Short label for unheated space temp field" },
+  "defaultHint": "{value} (default)",
+  "@defaultHint": {
+    "description": "Hint text showing default value",
+    "placeholders": { "value": { "type": "String" } }
+  },
+  "resetToProjectDefault": "Reset to project default",
+  "@resetToProjectDefault": { "description": "Tooltip for reset-to-default button" },
+  "boundaryGround": "Ground (slab on grade)",
+  "@boundaryGround": { "description": "Floor boundary option: ground" },
+  "boundaryUnheatedBelow": "Unheated space (basement / garage / crawlspace)",
+  "@boundaryUnheatedBelow": { "description": "Floor boundary option: unheated space below" },
+  "boundaryAdjacentBelow": "Adjacent heated room (floor above another room)",
+  "@boundaryAdjacentBelow": { "description": "Floor boundary option: heated room below" },
+  "boundaryExteriorRoof": "Exterior / Roof",
+  "@boundaryExteriorRoof": { "description": "Ceiling boundary option: exterior" },
+  "boundaryUnheatedAbove": "Unheated space (attic / garage / crawlspace)",
+  "@boundaryUnheatedAbove": { "description": "Ceiling boundary option: unheated space above" },
+  "boundaryAdjacentAbove": "Adjacent heated room (ceiling below another room)",
+  "@boundaryAdjacentAbove": { "description": "Ceiling boundary option: heated room above" },
+  "acrStandardRoom": "Standard room",
+  "@acrStandardRoom": { "description": "Air change rate preset label" },
+  "acrKitchen": "Kitchen",
+  "@acrKitchen": { "description": "Air change rate preset label" },
+  "acrBathroom": "Bathroom",
+  "@acrBathroom": { "description": "Air change rate preset label" },
+  "acrUtilityRoom": "Utility room",
+  "@acrUtilityRoom": { "description": "Air change rate preset label" },
+  "acrServerRoom": "Server room",
+  "@acrServerRoom": { "description": "Air change rate preset label" },
+
+  "circuitsWithCount": "Circuits ({count})",
+  "@circuitsWithCount": {
+    "description": "Header for circuit overview panel",
+    "placeholders": { "count": { "type": "int" } }
+  },
+  "circuitDeltaPKpa": "\u0394p (kPa)",
+  "@circuitDeltaPKpa": { "description": "Column header for pressure difference" },
+  "noCircuits": "No circuits",
+  "@noCircuits": { "description": "Empty state heading for circuit panel" },
+  "noCircuitsHint": "Add a distributor and draw heating zones to see circuit data here.",
+  "@noCircuitsHint": { "description": "Empty state description for circuit panel" },
+
+  "wallSegment": "Wall Segment",
+  "@wallSegment": { "description": "Section heading in wall properties" },
+  "lengthLabel": "Length",
+  "@lengthLabel": { "description": "Label for length dimension" },
+  "orientationLabel": "Orientation",
+  "@orientationLabel": { "description": "Label for wall orientation" },
+  "constructionLabel": "Construction",
+  "@constructionLabel": { "description": "Label for wall construction" },
+  "addConstruction": "Add Construction",
+  "@addConstruction": { "description": "Button to add wall construction" },
+  "editConstruction": "Edit Construction",
+  "@editConstruction": { "description": "Button to edit wall construction" },
+
+  "surfaceMaterial": "Surface Material",
+  "@surfaceMaterial": { "description": "Label for wall zone surface material" },
+  "flooringMaterial": "Flooring Material",
+  "@flooringMaterial": { "description": "Label for floor zone material" },
+  "customEllipsis": "Custom\u2026",
+  "@customEllipsis": { "description": "Dropdown option for custom value" },
+  "zoneArea": "Zone Area",
+  "@zoneArea": { "description": "Read-only label for zone area" },
+  "tubeLengthLabel": "Tube Length",
+  "@tubeLengthLabel": { "description": "Read-only label for tube length" },
+  "specificOutput": "Specific Output",
+  "@specificOutput": { "description": "Read-only label for specific heat output" },
+  "totalOutput": "Total Output",
+  "@totalOutput": { "description": "Read-only label for total heat output" },
+  "errorLoadingTubeTypes": "Error loading tube types",
+  "@errorLoadingTubeTypes": { "description": "Error when tube types fail to load" },
+  "errorLoadingFlooringMaterials": "Error loading flooring materials",
+  "@errorLoadingFlooringMaterials": { "description": "Error when flooring materials fail to load" },
+
+  "projectSummary": "Project Summary",
+  "@projectSummary": { "description": "Heading in properties panel when nothing is selected" },
+  "rooms": "Rooms",
+  "@rooms": { "description": "Label for room count" },
+  "walls": "Walls",
+  "@walls": { "description": "Label for wall count" },
+  "totalArea": "Total Area",
+  "@totalArea": { "description": "Label for total floor area" },
+  "selectElementHint": "Select an element on the canvas to see its properties.",
+  "@selectElementHint": { "description": "Hint text when no element is selected" },
+  "wallNotFound": "Wall not found",
+  "@wallNotFound": { "description": "Error when selected wall no longer exists" },
+  "typeWallLabel": "Type",
+  "@typeWallLabel": { "description": "Label for wall type" },
+  "surfaceTemperature": "Surface Temperature",
+  "@surfaceTemperature": { "description": "Read-only label for zone surface temperature" }
 }

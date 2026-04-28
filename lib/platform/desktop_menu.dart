@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/enums.dart';
+import '../l10n/app_localizations.dart';
+import '../ui/screens/settings_screen.dart';
 import 'keyboard_shortcuts.dart';
 
 /// Wraps [child] with a native desktop menu bar on macOS, Windows,
@@ -25,28 +27,32 @@ class DesktopMenuBar extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     return PlatformMenuBar(
       menus: [
-        _fileMenu(context),
-        _editMenu(context),
-        _viewMenu(context),
-        _toolsMenu(context),
-        _helpMenu(),
+        _fileMenu(context, l10n),
+        _editMenu(context, l10n),
+        _viewMenu(context, l10n),
+        _toolsMenu(context, l10n),
+        _helpMenu(l10n),
       ],
       child: child,
     );
   }
 
-  // ── File ──────────────────────────────────────────────────────────────────
+  // ── File ────────────────────────────────────────────────────
 
-  PlatformMenu _fileMenu(BuildContext context) {
+  PlatformMenu _fileMenu(
+    BuildContext context,
+    AppLocalizations l10n,
+  ) {
     return PlatformMenu(
-      label: 'File',
+      label: l10n.menuFile,
       menus: [
         // New — not yet implemented; greyed out.
-        const PlatformMenuItem(
-          label: 'New',
-          shortcut: SingleActivator(
+        PlatformMenuItem(
+          label: l10n.menuNew,
+          shortcut: const SingleActivator(
             LogicalKeyboardKey.keyN,
             control: true,
           ),
@@ -56,7 +62,7 @@ class DesktopMenuBar extends ConsumerWidget {
           members: [
             // Open (Ctrl/Cmd+O)
             PlatformMenuItem(
-              label: 'Open…',
+              label: l10n.menuOpen,
               shortcut: const SingleActivator(
                 LogicalKeyboardKey.keyO,
                 control: true,
@@ -72,7 +78,7 @@ class DesktopMenuBar extends ConsumerWidget {
           members: [
             // Save (Ctrl/Cmd+S)
             PlatformMenuItem(
-              label: 'Save',
+              label: l10n.menuSave,
               shortcut: const SingleActivator(
                 LogicalKeyboardKey.keyS,
                 control: true,
@@ -84,7 +90,7 @@ class DesktopMenuBar extends ConsumerWidget {
             ),
             // Save As (Ctrl/Cmd+Shift+S)
             PlatformMenuItem(
-              label: 'Save As…',
+              label: l10n.menuSaveAs,
               shortcut: const SingleActivator(
                 LogicalKeyboardKey.keyS,
                 control: true,
@@ -97,16 +103,16 @@ class DesktopMenuBar extends ConsumerWidget {
             ),
           ],
         ),
-        const PlatformMenuItemGroup(
+        PlatformMenuItemGroup(
           members: [
             // Export PDF — not yet implemented.
             PlatformMenuItem(
-              label: 'Export PDF…',
+              label: l10n.menuExportPdf,
               onSelected: null,
             ),
             // Export CSV — not yet implemented.
             PlatformMenuItem(
-              label: 'Export CSV…',
+              label: l10n.menuExportCsv,
               onSelected: null,
             ),
           ],
@@ -115,14 +121,17 @@ class DesktopMenuBar extends ConsumerWidget {
     );
   }
 
-  // ── Edit ──────────────────────────────────────────────────────────────────
+  // ── Edit ────────────────────────────────────────────────────
 
-  PlatformMenu _editMenu(BuildContext context) {
+  PlatformMenu _editMenu(
+    BuildContext context,
+    AppLocalizations l10n,
+  ) {
     return PlatformMenu(
-      label: 'Edit',
+      label: l10n.menuEdit,
       menus: [
         PlatformMenuItem(
-          label: 'Undo',
+          label: l10n.menuUndo,
           shortcut: const SingleActivator(
             LogicalKeyboardKey.keyZ,
             control: true,
@@ -133,7 +142,7 @@ class DesktopMenuBar extends ConsumerWidget {
           ),
         ),
         PlatformMenuItem(
-          label: 'Redo',
+          label: l10n.menuRedo,
           shortcut: const SingleActivator(
             LogicalKeyboardKey.keyZ,
             control: true,
@@ -147,7 +156,7 @@ class DesktopMenuBar extends ConsumerWidget {
         PlatformMenuItemGroup(
           members: [
             PlatformMenuItem(
-              label: 'Delete',
+              label: l10n.menuDelete,
               shortcut: const SingleActivator(
                 LogicalKeyboardKey.delete,
               ),
@@ -157,9 +166,9 @@ class DesktopMenuBar extends ConsumerWidget {
               ),
             ),
             // Select All — not yet implemented.
-            const PlatformMenuItem(
-              label: 'Select All',
-              shortcut: SingleActivator(
+            PlatformMenuItem(
+              label: l10n.menuSelectAll,
+              shortcut: const SingleActivator(
                 LogicalKeyboardKey.keyA,
                 control: true,
               ),
@@ -167,18 +176,37 @@ class DesktopMenuBar extends ConsumerWidget {
             ),
           ],
         ),
+        PlatformMenuItemGroup(
+          members: [
+            PlatformMenuItem(
+              label: l10n.menuSettings,
+              shortcut: const SingleActivator(
+                LogicalKeyboardKey.comma,
+                control: true,
+              ),
+              onSelected: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) => const SettingsScreen(),
+                ),
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
 
-  // ── View ──────────────────────────────────────────────────────────────────
+  // ── View ────────────────────────────────────────────────────
 
-  PlatformMenu _viewMenu(BuildContext context) {
+  PlatformMenu _viewMenu(
+    BuildContext context,
+    AppLocalizations l10n,
+  ) {
     return PlatformMenu(
-      label: 'View',
+      label: l10n.menuView,
       menus: [
         PlatformMenuItem(
-          label: 'Zoom In',
+          label: l10n.menuZoomIn,
           shortcut: const SingleActivator(
             LogicalKeyboardKey.equal,
             control: true,
@@ -189,7 +217,7 @@ class DesktopMenuBar extends ConsumerWidget {
           ),
         ),
         PlatformMenuItem(
-          label: 'Zoom Out',
+          label: l10n.menuZoomOut,
           shortcut: const SingleActivator(
             LogicalKeyboardKey.minus,
             control: true,
@@ -200,7 +228,7 @@ class DesktopMenuBar extends ConsumerWidget {
           ),
         ),
         PlatformMenuItem(
-          label: 'Zoom to Fit',
+          label: l10n.menuZoomToFit,
           shortcut: const SingleActivator(
             LogicalKeyboardKey.digit0,
             control: true,
@@ -210,15 +238,16 @@ class DesktopMenuBar extends ConsumerWidget {
             const ZoomToFitIntent(),
           ),
         ),
-        const PlatformMenuItemGroup(
+        PlatformMenuItemGroup(
           members: [
-            // Grid submenu and panel toggles — not yet implemented.
+            // Grid submenu and panel toggles — not yet
+            // implemented.
             PlatformMenuItem(
-              label: 'Toggle Properties Panel',
+              label: l10n.menuTogglePropertiesPanel,
               onSelected: null,
             ),
             PlatformMenuItem(
-              label: 'Toggle Dashboard',
+              label: l10n.menuToggleDashboard,
               onSelected: null,
             ),
           ],
@@ -227,79 +256,96 @@ class DesktopMenuBar extends ConsumerWidget {
     );
   }
 
-  // ── Tools ─────────────────────────────────────────────────────────────────
+  // ── Tools ───────────────────────────────────────────────────
 
-  PlatformMenu _toolsMenu(BuildContext context) {
+  PlatformMenu _toolsMenu(
+    BuildContext context,
+    AppLocalizations l10n,
+  ) {
     return PlatformMenu(
-      label: 'Tools',
+      label: l10n.menuTools,
       menus: [
         PlatformMenuItem(
-          label: 'Select',
-          shortcut:
-              const SingleActivator(LogicalKeyboardKey.keyV),
+          label: l10n.toolSelect,
+          shortcut: const SingleActivator(
+            LogicalKeyboardKey.keyV,
+          ),
           onSelected: () => Actions.invoke(
             context,
             const SwitchToolIntent(DrawingTool.select),
           ),
         ),
         PlatformMenuItem(
-          label: 'Draw Wall',
-          shortcut:
-              const SingleActivator(LogicalKeyboardKey.keyW),
+          label: l10n.menuDrawWall,
+          shortcut: const SingleActivator(
+            LogicalKeyboardKey.keyW,
+          ),
           onSelected: () => Actions.invoke(
             context,
             const SwitchToolIntent(DrawingTool.drawWall),
           ),
         ),
         PlatformMenuItem(
-          label: 'Place Window',
-          shortcut:
-              const SingleActivator(LogicalKeyboardKey.keyN),
+          label: l10n.menuPlaceWindow,
+          shortcut: const SingleActivator(
+            LogicalKeyboardKey.keyN,
+          ),
           onSelected: () => Actions.invoke(
             context,
-            const SwitchToolIntent(DrawingTool.placeWindow),
+            const SwitchToolIntent(
+              DrawingTool.placeWindow,
+            ),
           ),
         ),
         PlatformMenuItem(
-          label: 'Place Door',
-          shortcut:
-              const SingleActivator(LogicalKeyboardKey.keyD),
+          label: l10n.menuPlaceDoor,
+          shortcut: const SingleActivator(
+            LogicalKeyboardKey.keyD,
+          ),
           onSelected: () => Actions.invoke(
             context,
-            const SwitchToolIntent(DrawingTool.placeDoor),
+            const SwitchToolIntent(
+              DrawingTool.placeDoor,
+            ),
           ),
         ),
         PlatformMenuItem(
-          label: 'Draw Floor Zone',
-          shortcut:
-              const SingleActivator(LogicalKeyboardKey.keyH),
+          label: l10n.menuDrawFloorZone,
+          shortcut: const SingleActivator(
+            LogicalKeyboardKey.keyH,
+          ),
           onSelected: () => Actions.invoke(
             context,
             const SwitchToolIntent(DrawingTool.drawZone),
           ),
         ),
         PlatformMenuItem(
-          label: 'Place Distributor',
-          shortcut:
-              const SingleActivator(LogicalKeyboardKey.keyG),
+          label: l10n.menuPlaceDistributor,
+          shortcut: const SingleActivator(
+            LogicalKeyboardKey.keyG,
+          ),
           onSelected: () => Actions.invoke(
             context,
-            const SwitchToolIntent(DrawingTool.placeDistributor),
+            const SwitchToolIntent(
+              DrawingTool.placeDistributor,
+            ),
           ),
         ),
         PlatformMenuItem(
-          label: 'Route Pipe',
-          shortcut:
-              const SingleActivator(LogicalKeyboardKey.keyR),
+          label: l10n.menuRoutePipe,
+          shortcut: const SingleActivator(
+            LogicalKeyboardKey.keyR,
+          ),
           onSelected: () => Actions.invoke(
             context,
             const RotateOrRoutePipeIntent(),
           ),
         ),
         PlatformMenuItem(
-          label: 'Measure',
-          shortcut:
-              const SingleActivator(LogicalKeyboardKey.keyM),
+          label: l10n.toolMeasure,
+          shortcut: const SingleActivator(
+            LogicalKeyboardKey.keyM,
+          ),
           onSelected: () => Actions.invoke(
             context,
             const SwitchToolIntent(DrawingTool.measure),
@@ -309,18 +355,18 @@ class DesktopMenuBar extends ConsumerWidget {
     );
   }
 
-  // ── Help ──────────────────────────────────────────────────────────────────
+  // ── Help ────────────────────────────────────────────────────
 
-  PlatformMenu _helpMenu() {
-    return const PlatformMenu(
-      label: 'Help',
+  PlatformMenu _helpMenu(AppLocalizations l10n) {
+    return PlatformMenu(
+      label: l10n.menuHelp,
       menus: [
         PlatformMenuItem(
-          label: 'About HeatingPlanner',
+          label: l10n.menuAbout,
           onSelected: null,
         ),
         PlatformMenuItem(
-          label: 'Documentation',
+          label: l10n.menuDocumentation,
           onSelected: null,
         ),
       ],

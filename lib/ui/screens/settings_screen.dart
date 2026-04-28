@@ -18,7 +18,7 @@ class SettingsScreen extends ConsumerWidget {
     final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
-      appBar: AppBar(title: Text(l10n.settingsLanguageLabel)),
+      appBar: AppBar(title: Text(l10n.menuSettings)),
       body: ListView(
         padding: const EdgeInsets.all(Spacing.lg),
         children: [
@@ -97,10 +97,11 @@ class _GridSpacingRow extends ConsumerWidget {
     final value =
         _options.contains(current) ? current : 100;
 
+    final l10n = AppLocalizations.of(context)!;
     return Row(
       children: [
         Text(
-          'Drawing Grid Size',
+          l10n.settingsDrawingGridSize,
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(width: Spacing.md),

@@ -8,6 +8,7 @@ import '../../calculation/providers/tube_length_providers.dart';
 import '../../core/constants/validation_limits.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/enums.dart';
+import '../../l10n/app_localizations.dart';
 import '../../data/models/flooring_material.dart';
 import '../../data/models/heating_zone.dart';
 import '../../data/models/tube_type.dart';
@@ -114,6 +115,7 @@ class _HeatingZonePropertiesState
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
 
     final editorState = ref.watch(editorStateProvider);
     final floorHeightMm = ref.watch(floorHeightMmProvider);
@@ -226,14 +228,14 @@ class _HeatingZonePropertiesState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Properties', style: textTheme.headlineMedium),
+          Text(l10n.properties, style: textTheme.headlineMedium),
           const SizedBox(height: Spacing.lg),
-          Text('Heating Zone', style: textTheme.headlineSmall),
+          Text(l10n.heatingZone, style: textTheme.headlineSmall),
           const SizedBox(height: Spacing.md),
 
           // ── Tube spacing ─────────────────────────────────────────
           Text(
-            'Tube Spacing: ${zone.tubeSpacingMm}\u202Fmm',
+            l10n.tubeSpacingValue(zone.tubeSpacingMm),
             style: textTheme.bodyMedium,
           ),
           Slider(
@@ -278,8 +280,7 @@ class _HeatingZonePropertiesState
           // Shown only for wall heating zones.
           if (isWallZone) ...[
             Text(
-              'Height: '
-              '${zone.heightMm ?? floorHeightMm}\u202Fmm',
+              l10n.heightValue(zone.heightMm ?? floorHeightMm),
               style: textTheme.bodyMedium,
             ),
             Slider(
@@ -344,7 +345,7 @@ class _HeatingZonePropertiesState
           // ── Border distance (floor zones only) ───────────────────
           if (!isWallZone) ...[
             Text(
-              'Border Distance: ${zone.borderDistanceMm}\u202Fmm',
+              l10n.borderDistanceValue(zone.borderDistanceMm),
               style: textTheme.bodyMedium,
             ),
             Slider(
@@ -399,7 +400,7 @@ class _HeatingZonePropertiesState
           const Divider(height: Spacing.lg),
 
           // ── Layout pattern ───────────────────────────────────────
-          Text('Layout Pattern', style: textTheme.bodyMedium),
+          Text(l10n.layoutPattern, style: textTheme.bodyMedium),
           const SizedBox(height: Spacing.xs),
           RadioGroup<LayoutPattern>(
             groupValue: zone.layoutPattern,
@@ -430,7 +431,7 @@ class _HeatingZonePropertiesState
           const Divider(height: Spacing.lg),
 
           // ── Tube type dropdown ───────────────────────────────────
-          Text('Tube Type', style: textTheme.bodyMedium),
+          Text(l10n.tubeType, style: textTheme.bodyMedium),
           const SizedBox(height: Spacing.xs),
           tubeTypesAsync.when(
             data: (tubes) => _TubeTypeDropdown(
@@ -443,7 +444,7 @@ class _HeatingZonePropertiesState
             ),
             loading: () => const LinearProgressIndicator(),
             error: (e, _) => Text(
-              'Error loading tube types',
+              l10n.errorLoadingTubeTypes,
               style: textTheme.bodySmall?.copyWith(
                 color: colorScheme.error,
               ),
@@ -454,7 +455,7 @@ class _HeatingZonePropertiesState
 
           // ── Surface material dropdown ────────────────────────────
           Text(
-            isWallZone ? 'Surface Material' : 'Flooring Material',
+            isWallZone ? l10n.surfaceMaterial : l10n.flooringMaterial,
             style: textTheme.bodyMedium,
           ),
           const SizedBox(height: Spacing.xs),
@@ -514,7 +515,7 @@ class _HeatingZonePropertiesState
                         DropdownMenuItem(
                           value: kCustomFlooringMaterialId,
                           child: Text(
-                            'Custom\u2026',
+                            l10n.customEllipsis,
                             style: textTheme.bodyMedium,
                           ),
                         ),
@@ -554,7 +555,7 @@ class _HeatingZonePropertiesState
             },
             loading: () => const LinearProgressIndicator(),
             error: (e, _) => Text(
-              'Error loading flooring materials',
+              l10n.errorLoadingFlooringMaterials,
               style: textTheme.bodySmall?.copyWith(
                 color: colorScheme.error,
               ),
@@ -564,24 +565,24 @@ class _HeatingZonePropertiesState
           const Divider(height: Spacing.lg),
 
           // ── Computed read-only fields ────────────────────────────
-          Text('Zone Output', style: textTheme.headlineSmall),
+          Text(l10n.zoneOutput, style: textTheme.headlineSmall),
           const SizedBox(height: Spacing.xs),
           _readOnlyRow(
-            'Zone Area',
+            l10n.zoneArea,
             areaM2.isNaN
                 ? '\u2014'
                 : '${areaM2.toStringAsFixed(2)}\u202Fm\u00B2',
             textTheme,
           ),
           _readOnlyRow(
-            'Tube Length',
+            l10n.tubeLengthLabel,
             _tubeLengthText(
               ref.watch(zoneTubeLengthProvider(widget.zoneId)),
             ),
             textTheme,
           ),
           _readOnlyRow(
-            'Specific Output',
+            l10n.specificOutput,
             specificOutputWPerM2.isNaN
                 ? '\u2014'
                 : '${specificOutputWPerM2.toStringAsFixed(1)}\u202FW/m\u00B2',
@@ -590,7 +591,7 @@ class _HeatingZonePropertiesState
             tooltipMessage: outputTooltip,
           ),
           _readOnlyRow(
-            'Total Output',
+            l10n.totalOutput,
             totalOutputW.isNaN
                 ? '\u2014'
                 : '${totalOutputW.round()}\u202FW',
@@ -599,7 +600,7 @@ class _HeatingZonePropertiesState
             tooltipMessage: outputTooltip,
           ),
           _readOnlyRow(
-            'Surface Temperature',
+            l10n.surfaceTemperature,
             surfaceTempC.isNaN
                 ? '\u2014'
                 : '${surfaceTempC.toStringAsFixed(1)}\u202F\u00B0C',
@@ -830,7 +831,7 @@ class _CustomRValueField extends StatelessWidget {
         decimal: true,
       ),
       decoration: InputDecoration(
-        labelText: 'R value',
+        labelText: AppLocalizations.of(context)!.rValueLabel,
         suffixText: 'm\u00B2K/W',
         helperText:
             '${minCustomFlooringResistance.toStringAsFixed(3)}'

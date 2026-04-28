@@ -7,10 +7,12 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/id_generator.dart';
 import '../../data/models/floor.dart';
 import '../../data/models/project.dart';
+import '../../l10n/app_localizations.dart';
 import '../../repositories/app_preferences.dart';
 import '../../repositories/building_repository.dart';
 import '../../repositories/project_repository.dart';
 import 'editor_screen.dart';
+import 'settings_screen.dart';
 
 /// Entry screen showing all saved projects as a card grid.
 ///
@@ -23,17 +25,29 @@ class ProjectListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final projectsAsync = ref.watch(projectsProvider);
+    final l10n = AppLocalizations.of(context)!;
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('HeatingPlanner'),
+        title: Text(l10n.appTitle),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            tooltip: l10n.menuSettings,
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const SettingsScreen(),
+              ),
+            ),
+          ),
           Padding(
-            padding: const EdgeInsets.only(right: Spacing.md),
+            padding:
+                const EdgeInsets.only(right: Spacing.md),
             child: FilledButton.icon(
               icon: const Icon(Icons.add),
-              label: const Text('New Project'),
-              onPressed: () => _showNewProjectDialog(context, ref),
+              label: Text(l10n.newProject),
+              onPressed: () =>
+                  _showNewProjectDialog(context, ref),
             ),
           ),
         ],
@@ -41,8 +55,11 @@ class ProjectListScreen extends ConsumerWidget {
       body: projectsAsync.when(
         loading: () =>
             const Center(child: CircularProgressIndicator()),
-        error: (e, _) =>
-            Center(child: Text('Error loading projects: $e')),
+        error: (e, _) => Center(
+          child: Text(
+            l10n.errorLoadingProjects(e.toString()),
+          ),
+        ),
         data: (projects) => projects.isEmpty
             ? _EmptyState(
                 onNewProject: () =>
@@ -57,6 +74,7 @@ class ProjectListScreen extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
   ) async {
+    final l10n = AppLocalizations.of(context)!;
     final result = await showDialog<Project>(
       context: context,
       builder: (ctx) => const _NewProjectDialog(),
@@ -67,16 +85,19 @@ class ProjectListScreen extends ConsumerWidget {
     final buildingDao = ref.read(buildingDaoProvider);
     final floor = Floor(
       id: IdGenerator.newId(),
-      name: 'Ground Floor',
+      name: l10n.defaultFloorName,
     );
     await upsertFloor(buildingDao, floor, result.id);
     unawaited(
-      ref.read(lastOpenedProjectIdProvider.notifier).set(result.id),
+      ref
+          .read(lastOpenedProjectIdProvider.notifier)
+          .set(result.id),
     );
     if (!context.mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => EditorScreen(projectId: result.id),
+        builder: (_) =>
+            EditorScreen(projectId: result.id),
       ),
     );
   }
@@ -102,7 +123,8 @@ class _ProjectGrid extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(Spacing.lg),
       child: GridView.builder(
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        gridDelegate:
+            SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: crossAxisCount,
           mainAxisSpacing: Spacing.md,
           crossAxisSpacing: Spacing.md,
@@ -128,6 +150,7 @@ class _ProjectCard extends ConsumerWidget {
     final colors = Theme.of(context)
         .extension<HeatingPlannerColors>()!;
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
 
     return GestureDetector(
       onTap: () => _openProject(context, ref),
@@ -136,7 +159,8 @@ class _ProjectCard extends ConsumerWidget {
         child: InkWell(
           onTap: () => _openProject(context, ref),
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+            crossAxisAlignment:
+                CrossAxisAlignment.stretch,
             children: [
               // Thumbnail placeholder
               Expanded(
@@ -164,16 +188,22 @@ class _ProjectCard extends ConsumerWidget {
                         children: [
                           Text(
                             project.name,
-                            style: theme.textTheme.titleSmall,
-                            overflow: TextOverflow.ellipsis,
+                            style:
+                                theme.textTheme.titleSmall,
+                            overflow:
+                                TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            _relativeDate(project.modifiedAt),
-                            style:
-                                theme.textTheme.bodySmall?.copyWith(
-                              color: theme
-                                  .colorScheme.onSurfaceVariant,
+                            _relativeDate(
+                              project.modifiedAt,
+                              l10n,
+                            ),
+                            style: theme
+                                .textTheme.bodySmall
+                                ?.copyWith(
+                              color: theme.colorScheme
+                                  .onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -192,29 +222,47 @@ class _ProjectCard extends ConsumerWidget {
 
   void _openProject(BuildContext context, WidgetRef ref) {
     unawaited(
-      ref.read(lastOpenedProjectIdProvider.notifier).set(project.id),
+      ref
+          .read(lastOpenedProjectIdProvider.notifier)
+          .set(project.id),
     );
     Navigator.of(context).push(
       MaterialPageRoute<void>(
-        builder: (_) => EditorScreen(projectId: project.id),
+        builder: (_) =>
+            EditorScreen(projectId: project.id),
       ),
     );
   }
 
-  String _relativeDate(DateTime dt) {
+  static String _relativeDate(
+    DateTime dt,
+    AppLocalizations l10n,
+  ) {
     final now = DateTime.now();
     final diff = now.difference(dt);
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inHours < 1) return '${diff.inMinutes}m ago';
-    if (diff.inDays < 1) return '${diff.inHours}h ago';
-    if (diff.inDays < 7) return '${diff.inDays}d ago';
+    if (diff.inMinutes < 1) return l10n.relativeJustNow;
+    if (diff.inHours < 1) {
+      return l10n.relativeMinutesAgo(diff.inMinutes);
+    }
+    if (diff.inDays < 1) {
+      return l10n.relativeHoursAgo(diff.inHours);
+    }
+    if (diff.inDays < 7) {
+      return l10n.relativeDaysAgo(diff.inDays);
+    }
     if (diff.inDays < 30) {
-      return '${(diff.inDays / 7).round()} weeks ago';
+      return l10n.relativeWeeksAgo(
+        (diff.inDays / 7).round(),
+      );
     }
     if (diff.inDays < 365) {
-      return '${(diff.inDays / 30).round()} months ago';
+      return l10n.relativeMonthsAgo(
+        (diff.inDays / 30).round(),
+      );
     }
-    return '${(diff.inDays / 365).round()} years ago';
+    return l10n.relativeYearsAgo(
+      (diff.inDays / 365).round(),
+    );
   }
 }
 
@@ -227,18 +275,19 @@ class _ContextMenuButton extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     return PopupMenuButton<_CardAction>(
       icon: const Icon(Icons.more_vert, size: 18),
       onSelected: (action) =>
           _handleAction(context, ref, action),
-      itemBuilder: (_) => const [
+      itemBuilder: (_) => [
         PopupMenuItem(
           value: _CardAction.duplicate,
-          child: Text('Duplicate'),
+          child: Text(l10n.duplicateAction),
         ),
         PopupMenuItem(
           value: _CardAction.delete,
-          child: Text('Delete'),
+          child: Text(l10n.delete),
         ),
       ],
     );
@@ -261,10 +310,11 @@ class _ContextMenuButton extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
   ) async {
+    final l10n = AppLocalizations.of(context)!;
     final now = DateTime.now();
     final copy = project.copyWith(
       id: IdGenerator.newId(),
-      name: '${project.name} (copy)',
+      name: l10n.projectCopyName(project.name),
       createdAt: now,
       modifiedAt: now,
     );
@@ -276,25 +326,28 @@ class _ContextMenuButton extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
   ) async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete project?'),
+        title: Text(l10n.deleteProjectTitle),
         content: Text(
-          'Delete "${project.name}"? This cannot be undone.',
+          l10n.deleteProjectContent(project.name),
         ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            onPressed: () =>
+                Navigator.of(ctx).pop(false),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
               backgroundColor:
                   Theme.of(ctx).colorScheme.error,
             ),
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete'),
+            onPressed: () =>
+                Navigator.of(ctx).pop(true),
+            child: Text(l10n.delete),
           ),
         ],
       ),
@@ -317,6 +370,7 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -324,17 +378,17 @@ class _EmptyState extends StatelessWidget {
           Icon(
             Icons.home_work_outlined,
             size: 80,
-            color:
-                theme.colorScheme.onSurface.withValues(alpha: 0.3),
+            color: theme.colorScheme.onSurface
+                .withValues(alpha: 0.3),
           ),
           const SizedBox(height: Spacing.lg),
           Text(
-            'No projects yet',
+            l10n.noProjectsYet,
             style: theme.textTheme.headlineSmall,
           ),
           const SizedBox(height: Spacing.sm),
           Text(
-            'Create your first heating plan to get started.',
+            l10n.createFirstProject,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -342,7 +396,7 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: Spacing.xl),
           FilledButton.icon(
             icon: const Icon(Icons.add),
-            label: const Text('New Project'),
+            label: Text(l10n.newProject),
             onPressed: onNewProject,
           ),
         ],
@@ -361,7 +415,8 @@ class _NewProjectDialog extends StatefulWidget {
       _NewProjectDialogState();
 }
 
-class _NewProjectDialogState extends State<_NewProjectDialog> {
+class _NewProjectDialogState
+    extends State<_NewProjectDialog> {
   final _nameController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   double _outdoorTempC = -12.0;
@@ -375,35 +430,37 @@ class _NewProjectDialogState extends State<_NewProjectDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return AlertDialog(
-      title: const Text('New Project'),
+      title: Text(l10n.newProject),
       content: SizedBox(
         width: 400,
         child: Form(
           key: _formKey,
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment:
+                CrossAxisAlignment.start,
             children: [
               TextFormField(
                 controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: 'Project name *',
-                  hintText: 'e.g. Villa Schmidt',
+                decoration: InputDecoration(
+                  labelText: l10n.projectNameLabel,
+                  hintText: l10n.projectNameHint,
                 ),
                 autofocus: true,
                 textCapitalization:
                     TextCapitalization.words,
                 validator: (v) {
                   if (v == null || v.trim().isEmpty) {
-                    return 'Name is required';
+                    return l10n.nameIsRequired;
                   }
                   return null;
                 },
               ),
               const SizedBox(height: Spacing.lg),
               _TempSliderRow(
-                label: 'Design outdoor temperature',
+                label: l10n.designOutdoorTemperature,
                 value: _outdoorTempC,
                 min: -30.0,
                 max: 10.0,
@@ -412,7 +469,7 @@ class _NewProjectDialogState extends State<_NewProjectDialog> {
               ),
               const SizedBox(height: Spacing.md),
               _TempSliderRow(
-                label: 'Default indoor temperature',
+                label: l10n.defaultIndoorTemperature,
                 value: _indoorTempC,
                 min: 15.0,
                 max: 30.0,
@@ -426,11 +483,11 @@ class _NewProjectDialogState extends State<_NewProjectDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
+          child: Text(l10n.cancel),
         ),
         FilledButton(
           onPressed: _submit,
-          child: const Text('Create'),
+          child: Text(l10n.create),
         ),
       ],
     );
@@ -477,7 +534,10 @@ class _TempSliderRow extends StatelessWidget {
           mainAxisAlignment:
               MainAxisAlignment.spaceBetween,
           children: [
-            Text(label, style: theme.textTheme.bodyMedium),
+            Text(
+              label,
+              style: theme.textTheme.bodyMedium,
+            ),
             Text(
               '${value.round()} °C',
               style: theme.textTheme.bodyMedium?.copyWith(

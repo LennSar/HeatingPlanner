@@ -8,6 +8,7 @@ import '../../calculation/providers/hydraulic_balance_providers.dart';
 import '../../calculation/providers/pressure_loss_providers.dart';
 import '../../calculation/providers/tube_length_providers.dart';
 import '../../core/theme/app_theme.dart';
+import '../../l10n/app_localizations.dart';
 import '../providers/editor_state_provider.dart';
 
 // ---------------------------------------------------------------------------
@@ -55,6 +56,7 @@ class CircuitOverviewPanel extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     final state = ref.watch(editorStateProvider);
     final circuits = state.circuits;
     final distributor = state.distributor;
@@ -179,28 +181,28 @@ class CircuitOverviewPanel extends ConsumerWidget {
                           ),
                   dataTextStyle:
                       Theme.of(context).textTheme.bodySmall,
-                  columns: const [
-                    DataColumn(label: Text('#')),
+                  columns: [
+                    const DataColumn(label: Text('#')),
                     DataColumn(
-                      label: Text('Zone / Room'),
+                      label: Text(l10n.circuitZoneRoom),
                     ),
                     DataColumn(
-                      label: Text('Length (m)'),
+                      label: Text(l10n.circuitLengthM),
                       numeric: true,
                     ),
                     DataColumn(
-                      label: Text('Flow (kg/h)'),
+                      label: Text(l10n.circuitFlowKgH),
                       numeric: true,
                     ),
                     DataColumn(
-                      label: Text('Δp (kPa)'),
+                      label: Text(l10n.circuitDeltaPKpa),
                       numeric: true,
                     ),
                     DataColumn(
-                      label: Text('Valve (kPa)'),
+                      label: Text(l10n.circuitValveKpa),
                       numeric: true,
                     ),
-                    DataColumn(label: Text('Status')),
+                    DataColumn(label: Text(l10n.circuitStatus)),
                   ],
                   rows: rows,
                 ),
@@ -241,6 +243,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final colors =
         Theme.of(context).extension<HeatingPlannerColors>()!;
     return Container(
@@ -254,7 +257,7 @@ class _Header extends StatelessWidget {
         ),
       ),
       child: Text(
-        'Circuits ($count)',
+        l10n.circuitsWithCount(count),
         style: Theme.of(context).textTheme.headlineSmall,
       ),
     );
@@ -346,6 +349,7 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(Spacing.lg),
@@ -361,7 +365,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: Spacing.sm),
             Text(
-              'No circuits',
+              l10n.noCircuits,
               style:
                   Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: Theme.of(context)
@@ -371,8 +375,7 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: Spacing.xs),
             Text(
-              'Add a distributor and draw heating zones '
-              'to see circuit data here.',
+              l10n.noCircuitsHint,
               style:
                   Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: Theme.of(context)

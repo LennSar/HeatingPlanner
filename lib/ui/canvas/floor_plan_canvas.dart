@@ -13,6 +13,7 @@ import '../../data/models/point2d.dart';
 import '../../data/models/room.dart';
 import '../../data/models/door.dart';
 import '../../data/models/wall_segment.dart';
+import '../../l10n/app_localizations.dart';
 import '../../data/models/window_element.dart';
 import '../providers/editor_state_provider.dart';
 import '../providers/selection_provider.dart';
@@ -428,6 +429,7 @@ class _FloorPlanCanvasState
     final roomNumber =
         ref.read(editorStateProvider.notifier).nextRoomNumber;
 
+    final l10n = AppLocalizations.of(context)!;
     showDialog<String>(
       context: context,
       builder: (ctx) {
@@ -435,23 +437,23 @@ class _FloorPlanCanvasState
           text: 'Room $roomNumber',
         );
         return AlertDialog(
-          title: const Text('New Room Detected'),
+          title: Text(l10n.newRoomDetected),
           content: TextField(
             controller: controller,
             autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'Room name',
+            decoration: InputDecoration(
+              labelText: l10n.roomNameLabel,
             ),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
+              child: Text(l10n.cancel),
             ),
             FilledButton(
               onPressed: () =>
                   Navigator.pop(ctx, controller.text),
-              child: const Text('Create'),
+              child: Text(l10n.create),
             ),
           ],
         );
@@ -564,33 +566,30 @@ class _FloorPlanCanvasState
     required void Function() onMove,
     required void Function() onReplace,
   }) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Distributor already placed'),
-        content: const Text(
-          'A distributor already exists on this floor.\n'
-          'Move it to the new position, or replace it with '
-          'a fresh one?',
-        ),
+        title: Text(l10n.distributorAlreadyPlaced),
+        content: Text(l10n.distributorAlreadyPlacedContent),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(ctx);
               onMove();
             },
-            child: const Text('Move'),
+            child: Text(l10n.move),
           ),
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
               onReplace();
             },
-            child: const Text('Replace'),
+            child: Text(l10n.replace),
           ),
         ],
       ),
@@ -601,24 +600,23 @@ class _FloorPlanCanvasState
   void requestDistributorDeleteDialog({
     required void Function() onConfirmed,
   }) {
+    final l10n = AppLocalizations.of(context)!;
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Delete distributor?'),
-        content: const Text(
-          'This will remove the distributor from the floor plan.',
-        ),
+        title: Text(l10n.deleteDistributorTitle),
+        content: Text(l10n.deleteDistributorContent),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () {
               Navigator.pop(ctx);
               onConfirmed();
             },
-            child: const Text('Delete'),
+            child: Text(l10n.delete),
           ),
         ],
       ),

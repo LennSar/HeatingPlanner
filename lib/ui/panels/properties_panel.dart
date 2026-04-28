@@ -5,6 +5,7 @@ import '../../calculation/engines/geometry_engine.dart';
 import '../../calculation/engines/thermal_engine.dart';
 import '../../calculation/providers/heat_demand_providers.dart';
 import '../../core/theme/app_theme.dart';
+import '../../l10n/app_localizations.dart';
 import '../../repositories/project_repository.dart';
 import '../providers/editor_state_provider.dart';
 import '../providers/selection_provider.dart';
@@ -110,33 +111,33 @@ class _ProjectSummary extends ConsumerWidget {
         ? '\u2014'
         : '${buildingDemandW.round()} W';
 
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.all(Spacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Properties',
+            l10n.properties,
             style: textTheme.headlineMedium,
           ),
           const SizedBox(height: Spacing.lg),
           Text(
-            'Project Summary',
+            l10n.projectSummary,
             style: textTheme.headlineSmall,
           ),
           const SizedBox(height: Spacing.md),
-          _infoRow('Rooms', '$roomCount', textTheme),
-          _infoRow('Walls', '$wallCount', textTheme),
+          _infoRow(l10n.rooms, '$roomCount', textTheme),
+          _infoRow(l10n.walls, '$wallCount', textTheme),
           _infoRow(
-            'Total Area',
+            l10n.totalArea,
             '${totalAreaM2.toStringAsFixed(1)} m\u00B2',
             textTheme,
           ),
-          _infoRow('Total Heat Demand', demandText, textTheme),
+          _infoRow(l10n.totalHeatDemand, demandText, textTheme),
           const SizedBox(height: Spacing.md),
           Text(
-            'Select an element on the canvas to see '
-            'its properties.',
+            l10n.selectElementHint,
             style: textTheme.bodySmall,
           ),
         ],
@@ -184,11 +185,13 @@ class _WallInfo extends ConsumerWidget {
         .where((w) => w.id == wallId)
         .firstOrNull;
 
+    final l10n = AppLocalizations.of(context)!;
+
     if (wall == null) {
       return Padding(
         padding: const EdgeInsets.all(Spacing.md),
         child: Text(
-          'Wall not found',
+          l10n.wallNotFound,
           style: textTheme.bodyMedium,
         ),
       );
@@ -230,25 +233,25 @@ class _WallInfo extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Properties', style: textTheme.headlineMedium),
+          Text(l10n.properties, style: textTheme.headlineMedium),
           const SizedBox(height: Spacing.lg),
-          Text('Wall Segment', style: textTheme.headlineSmall),
+          Text(l10n.wallSegment, style: textTheme.headlineSmall),
           const SizedBox(height: Spacing.md),
           _infoRow(
-            'Length',
+            l10n.lengthLabel,
             '${lengthMm.round()} mm',
             textTheme,
           ),
-          _infoRow('Type', wall.wallType.name, textTheme),
+          _infoRow(l10n.typeWallLabel, wall.wallType.name, textTheme),
           _infoRow(
-            'Orientation',
+            l10n.orientationLabel,
             wall.orientation.name,
             textTheme,
           ),
-          _infoRow('U-Value', uValueText, textTheme),
+          _infoRow(l10n.uValueLabel, uValueText, textTheme),
           if (construction != null)
             _infoRow(
-              'Construction',
+              l10n.constructionLabel,
               construction.name,
               textTheme,
             ),
@@ -260,8 +263,8 @@ class _WallInfo extends ConsumerWidget {
                   size: 16),
               label: Text(
                 construction == null
-                    ? 'Add Construction'
-                    : 'Edit Construction',
+                    ? l10n.addConstruction
+                    : l10n.editConstruction,
               ),
               onPressed: () => showWallConstructionEditor(
                 context,
@@ -284,12 +287,13 @@ class _GenericInfo extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context)!;
     return Padding(
       padding: const EdgeInsets.all(Spacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Properties', style: textTheme.headlineMedium),
+          Text(l10n.properties, style: textTheme.headlineMedium),
           const SizedBox(height: Spacing.lg),
           Text(selection.type, style: textTheme.headlineSmall),
           const SizedBox(height: Spacing.md),

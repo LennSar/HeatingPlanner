@@ -10,6 +10,7 @@ import '../../core/theme/app_theme.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/heating_circuit.dart';
 import '../../data/models/point2d.dart';
+import '../../l10n/app_localizations.dart';
 import '../providers/editor_state_provider.dart';
 import '../providers/selection_provider.dart';
 
@@ -33,6 +34,7 @@ class CircuitProperties extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context)!;
     final editorState = ref.watch(editorStateProvider);
 
     final circuit = editorState.circuits
@@ -42,7 +44,7 @@ class CircuitProperties extends ConsumerWidget {
     if (circuit == null) {
       return Padding(
         padding: const EdgeInsets.all(Spacing.md),
-        child: Text('Circuit not found', style: textTheme.bodyMedium),
+        child: Text(l10n.circuitNotFound, style: textTheme.bodyMedium),
       );
     }
 
@@ -82,14 +84,14 @@ class CircuitProperties extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Properties', style: textTheme.headlineMedium),
+          Text(l10n.properties, style: textTheme.headlineMedium),
           const SizedBox(height: Spacing.lg),
-          Text('Heating Circuit', style: textTheme.headlineSmall),
+          Text(l10n.heatingCircuit, style: textTheme.headlineSmall),
           const SizedBox(height: Spacing.md),
 
           // ── Insulation type ─────────────────────────────────────
           Text(
-            'Supply pipe insulation',
+            l10n.supplyPipeInsulation,
             style: textTheme.labelLarge,
           ),
           const SizedBox(height: Spacing.xs),
@@ -109,27 +111,27 @@ class CircuitProperties extends ConsumerWidget {
           const Divider(height: Spacing.xl),
 
           // ── Route lengths ────────────────────────────────────────
-          Text('Pipe lengths', style: textTheme.labelLarge),
+          Text(l10n.pipeLengths, style: textTheme.labelLarge),
           const SizedBox(height: Spacing.xs),
           _infoRow(
-            'Supply route',
+            l10n.supplyRoute,
             '${supplyM.toStringAsFixed(1)} m',
             textTheme,
           ),
           _infoRow(
-            'Return route',
+            l10n.returnRoute,
             '${returnM.toStringAsFixed(1)} m',
             textTheme,
           ),
           _infoRow(
-            'Zone tube',
+            l10n.zoneTube,
             !zoneM.isNaN && zoneM > 0
                 ? '${zoneM.toStringAsFixed(1)} m'
                 : '\u2014',
             textTheme,
           ),
           _infoRow(
-            'Total tube',
+            l10n.totalTube,
             !totalM.isNaN
                 ? '${totalM.toStringAsFixed(1)} m'
                 : '\u2014',
@@ -139,31 +141,31 @@ class CircuitProperties extends ConsumerWidget {
           const Divider(height: Spacing.xl),
 
           // ── Hydraulic results (placeholders) ─────────────────────
-          Text('Hydraulics', style: textTheme.labelLarge),
+          Text(l10n.hydraulics, style: textTheme.labelLarge),
           const SizedBox(height: Spacing.xs),
           _infoRow(
-            'Flow rate',
+            l10n.flowRate,
             !flowRateKgH.isNaN && flowRateKgH > 0
                 ? '${flowRateKgH.toStringAsFixed(1)} kg/h'
                 : '\u2014',
             textTheme,
           ),
           _infoRow(
-            'Flow velocity',
+            l10n.flowVelocity,
             !flowVelocityMs.isNaN && flowVelocityMs > 0
                 ? '${flowVelocityMs.toStringAsFixed(2)} m/s'
                 : '\u2014',
             textTheme,
           ),
           _infoRow(
-            'Pressure loss',
+            l10n.pressureLossLabel,
             !pressureLossPa.isNaN && pressureLossPa > 0
                 ? '${pressureLossPa.round()} Pa'
                 : '\u2014',
             textTheme,
           ),
           _infoRow(
-            'Heat output',
+            l10n.heatOutput,
             !heatOutputW.isNaN && heatOutputW > 0
                 ? '${heatOutputW.round()} W'
                 : '\u2014',
@@ -202,7 +204,7 @@ class CircuitProperties extends ConsumerWidget {
                     .read(selectedElementProvider.notifier)
                     .select(null);
               },
-              child: const Text('Delete circuit'),
+              child: Text(l10n.deleteCircuit),
             ),
           ),
         ],
@@ -234,20 +236,21 @@ class _InsulationRadioGroup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context)!;
     final options = [
       (
         value: SupplyPipeInsulationType.none,
-        label: 'None (in screed)',
+        label: l10n.insulationNone,
         subtitle: 'Full heat output to transit room',
       ),
       (
         value: SupplyPipeInsulationType.corrugatedConduit,
-        label: 'Corrugated conduit',
+        label: l10n.insulationConduit,
         subtitle: '~25–30\u202f% residual heat output',
       ),
       (
         value: SupplyPipeInsulationType.insulationLayer,
-        label: 'Insulation layer',
+        label: l10n.insulationLayer,
         subtitle: 'No heat output to transit room',
       ),
     ];

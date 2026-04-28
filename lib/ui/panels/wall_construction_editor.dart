@@ -5,6 +5,7 @@ import '../../calculation/engines/thermal_engine.dart';
 import '../../calculation/providers/project_settings_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/id_generator.dart';
+import '../../l10n/app_localizations.dart';
 import '../../data/models/material_layer.dart';
 import '../../data/models/wall_construction.dart';
 import '../../data/models/wall_segment.dart';
@@ -253,28 +254,29 @@ class _SlabConstructionDialogState
   }
 
   Future<void> _saveAsPreset() async {
+    final l10n = AppLocalizations.of(context)!;
     final initialName = _nameCtrl.text.trim();
     final nameCtrl =
         TextEditingController(text: initialName);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Save as preset'),
+        title: Text(l10n.saveAsPreset),
         content: TextField(
           controller: nameCtrl,
-          decoration: const InputDecoration(
-            labelText: 'Preset name',
+          decoration: InputDecoration(
+            labelText: l10n.presetName,
           ),
           autofocus: true,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Save'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -305,11 +307,12 @@ class _SlabConstructionDialogState
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Saved as preset')),
+      SnackBar(content: Text(l10n.savedAsPreset)),
     );
   }
 
   Future<void> _loadPreset() async {
+    final l10n = AppLocalizations.of(context)!;
     final presets = ref
         .read(editorStateProvider)
         .constructions
@@ -320,7 +323,7 @@ class _SlabConstructionDialogState
     final selected = await showDialog<WallConstruction>(
       context: context,
       builder: (ctx) => SimpleDialog(
-        title: const Text('Load preset'),
+        title: Text(l10n.loadPreset),
         children: presets.map((p) {
           final layers = ref
               .read(editorStateProvider)
@@ -423,6 +426,7 @@ class _SlabConstructionDialogState
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
     final settings = ref.watch(projectSettingsProvider);
     final materials =
         ref.watch(materialEntriesProvider).asData?.value ?? [];
@@ -457,7 +461,7 @@ class _SlabConstructionDialogState
                   ),
                   FilledButton(
                     onPressed: _save,
-                    child: const Text('Save'),
+                    child: Text(l10n.save),
                   ),
                   const SizedBox(width: Spacing.sm),
                   IconButton(
@@ -482,8 +486,8 @@ class _SlabConstructionDialogState
               // ---- Name field ----
               TextField(
                 controller: _nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Construction name',
+                decoration: InputDecoration(
+                  labelText: l10n.constructionName,
                   isDense: true,
                 ),
                 style: textTheme.bodyLarge,
@@ -529,7 +533,7 @@ class _SlabConstructionDialogState
 
               // ---- Layer stack ----
               Text(
-                'Layer Stack  (outside \u2192 inside)',
+                l10n.layerStack,
                 style: textTheme.headlineSmall,
               ),
               const SizedBox(height: Spacing.xs),
@@ -544,7 +548,7 @@ class _SlabConstructionDialogState
                     ),
                     child: TextButton.icon(
                       icon: const Icon(Icons.add),
-                      label: const Text('Add Layer'),
+                      label: Text(l10n.addLayer),
                       onPressed: _addLayer,
                     ),
                   ),
@@ -602,7 +606,7 @@ class _SlabConstructionDialogState
               Row(
                 children: [
                   Text(
-                    'Surface resistances (m\u00B2K/W):',
+                    l10n.surfaceResistances,
                     style: textTheme.bodySmall,
                   ),
                   const Spacer(),
@@ -824,28 +828,29 @@ class _WallConstructionDialogState
   }
 
   Future<void> _saveAsPreset() async {
+    final l10n = AppLocalizations.of(context)!;
     final initialName = _nameCtrl.text.trim();
     final nameCtrl =
         TextEditingController(text: initialName);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Save as preset'),
+        title: Text(l10n.saveAsPreset),
         content: TextField(
           controller: nameCtrl,
-          decoration: const InputDecoration(
-            labelText: 'Preset name',
+          decoration: InputDecoration(
+            labelText: l10n.presetName,
           ),
           autofocus: true,
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.cancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Save'),
+            child: Text(l10n.save),
           ),
         ],
       ),
@@ -879,11 +884,12 @@ class _WallConstructionDialogState
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Saved as preset')),
+      SnackBar(content: Text(l10n.savedAsPreset)),
     );
   }
 
   Future<void> _loadPreset() async {
+    final l10n = AppLocalizations.of(context)!;
     final presets = ref
         .read(editorStateProvider)
         .constructions
@@ -894,7 +900,7 @@ class _WallConstructionDialogState
     final selected = await showDialog<WallConstruction>(
       context: context,
       builder: (ctx) => SimpleDialog(
-        title: const Text('Load preset'),
+        title: Text(l10n.loadPreset),
         children: presets.map((p) {
           final layers = ref
               .read(editorStateProvider)
@@ -1008,6 +1014,7 @@ class _WallConstructionDialogState
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
     final settings = ref.watch(projectSettingsProvider);
     final materials =
         ref.watch(materialEntriesProvider).asData?.value ?? [];
@@ -1046,7 +1053,7 @@ class _WallConstructionDialogState
                   ),
                   FilledButton(
                     onPressed: _save,
-                    child: const Text('Save'),
+                    child: Text(l10n.save),
                   ),
                   const SizedBox(width: Spacing.sm),
                   IconButton(
@@ -1071,8 +1078,8 @@ class _WallConstructionDialogState
               // ---- Name field ----
               TextField(
                 controller: _nameCtrl,
-                decoration: const InputDecoration(
-                  labelText: 'Construction name',
+                decoration: InputDecoration(
+                  labelText: l10n.constructionName,
                   isDense: true,
                 ),
                 style: textTheme.bodyLarge,
@@ -1116,7 +1123,7 @@ class _WallConstructionDialogState
 
               // ---- Layer stack ----
               Text(
-                'Layer Stack  (outside \u2192 inside)',
+                l10n.layerStack,
                 style: textTheme.headlineSmall,
               ),
               const SizedBox(height: Spacing.xs),
@@ -1129,7 +1136,7 @@ class _WallConstructionDialogState
                     padding: const EdgeInsets.only(top: Spacing.xs),
                     child: TextButton.icon(
                       icon: const Icon(Icons.add),
-                      label: const Text('Add Layer'),
+                      label: Text(l10n.addLayer),
                       onPressed: _addLayer,
                     ),
                   ),
@@ -1185,7 +1192,7 @@ class _WallConstructionDialogState
               Row(
                 children: [
                   Text(
-                    'Surface resistances (m\u00B2K/W):',
+                    l10n.surfaceResistances,
                     style: textTheme.bodySmall,
                   ),
                   const Spacer(),
@@ -1789,11 +1796,12 @@ class _PresetRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Row(
       children: [
         TextButton.icon(
           icon: const Icon(Icons.upload, size: 16),
-          label: const Text('Save as preset'),
+          label: Text(l10n.saveAsPreset),
           onPressed: onSaveAsPreset,
           style: TextButton.styleFrom(
             visualDensity: VisualDensity.compact,
@@ -1802,7 +1810,7 @@ class _PresetRow extends StatelessWidget {
         const SizedBox(width: Spacing.sm),
         TextButton.icon(
           icon: const Icon(Icons.download, size: 16),
-          label: const Text('Load'),
+          label: Text(l10n.load),
           onPressed: hasPresets ? onLoadPreset : null,
           style: TextButton.styleFrom(
             visualDensity: VisualDensity.compact,

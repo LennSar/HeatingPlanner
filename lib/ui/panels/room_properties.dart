@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../l10n/app_localizations.dart';
 import '../../calculation/engines/geometry_engine.dart';
 import '../../calculation/engines/thermal_engine.dart';
 import '../../calculation/providers/heat_demand_providers.dart';
@@ -14,24 +15,47 @@ import '../canvas/tools/undo_redo_service.dart';
 import '../providers/editor_state_provider.dart';
 import 'wall_construction_editor.dart';
 
-/// Air change rate presets (h⁻¹) per agent-hvac.md §4.
-const Map<String, double> _kAirChangePresets = {
-  'Standard room': 0.5,
-  'Kitchen': 1.0,
-  'Bathroom': 1.5,
-  'Utility room': 2.0,
-  'Server room': 3.0,
+/// Air change rate preset identifiers.
+enum _AcrPreset {
+  standardRoom,
+  kitchen,
+  bathroom,
+  utilityRoom,
+  serverRoom,
+}
+
+/// Air change rate values (h⁻¹) per agent-hvac.md §4.
+const Map<_AcrPreset, double> _kAcrValues = {
+  _AcrPreset.standardRoom: 0.5,
+  _AcrPreset.kitchen: 1.0,
+  _AcrPreset.bathroom: 1.5,
+  _AcrPreset.utilityRoom: 2.0,
+  _AcrPreset.serverRoom: 3.0,
 };
 
-const _kCustomKey = 'Custom';
+/// Returns the localized display name for an ACR preset.
+String _acrPresetLabel(_AcrPreset preset, AppLocalizations l10n) {
+  switch (preset) {
+    case _AcrPreset.standardRoom:
+      return l10n.acrStandardRoom;
+    case _AcrPreset.kitchen:
+      return l10n.acrKitchen;
+    case _AcrPreset.bathroom:
+      return l10n.acrBathroom;
+    case _AcrPreset.utilityRoom:
+      return l10n.acrUtilityRoom;
+    case _AcrPreset.serverRoom:
+      return l10n.acrServerRoom;
+  }
+}
 
-/// Returns the preset label whose value matches [acr], or
-/// [_kCustomKey] when no preset matches (within 0.001 tolerance).
-String _presetKeyFor(double acr) {
-  for (final e in _kAirChangePresets.entries) {
+/// Returns the preset whose value matches [acr], or `null`
+/// when no preset matches (within 0.001 tolerance).
+_AcrPreset? _presetFor(double acr) {
+  for (final e in _kAcrValues.entries) {
     if ((e.value - acr).abs() < 0.001) return e.key;
   }
-  return _kCustomKey;
+  return null;
 }
 
 /// Editable properties panel for a selected room.
@@ -61,12 +85,12 @@ class _RoomPropertiesState
   /// the user selects the "Custom" dropdown option.
   late TextEditingController _acrController;
 
-  /// Currently selected dropdown label. Derived from the room
-  /// model on first load of each room; kept in sync with
-  /// external changes (undo/redo) via [ref.listen].
-  String _selectedAcrKey = _kCustomKey;
+  /// Currently selected preset, or `null` for custom input.
+  /// Derived from the room model on first load of each room;
+  /// kept in sync with external changes (undo/redo) via [ref.listen].
+  _AcrPreset? _selectedAcrPreset;
 
-  /// Last room ID that was synced into [_selectedAcrKey] /
+  /// Last room ID that was synced into [_selectedAcrPreset] /
   /// [_acrController]. Used to detect room selection changes.
   String? _lastSyncedAcrRoomId;
 
@@ -105,8 +129,8 @@ class _RoomPropertiesState
   void _syncAcrOnRoomChange(String roomId, double acr) {
     if (_lastSyncedAcrRoomId == roomId) return;
     _lastSyncedAcrRoomId = roomId;
-    _selectedAcrKey = _presetKeyFor(acr);
-    _acrController.text = _selectedAcrKey == _kCustomKey
+    _selectedAcrPreset = _presetFor(acr);
+    _acrController.text = _selectedAcrPreset == null
         ? acr.toStringAsFixed(1)
         : '';
   }
@@ -144,10 +168,10 @@ class _RoomPropertiesState
       if (nextRoom == null || prevAcr == nextRoom.airChangeRate) {
         return;
       }
-      final key = _presetKeyFor(nextRoom.airChangeRate);
+      final preset = _presetFor(nextRoom.airChangeRate);
       setState(() {
-        _selectedAcrKey = key;
-        _acrController.text = key == _kCustomKey
+        _selectedAcrPreset = preset;
+        _acrController.text = preset == null
             ? nextRoom.airChangeRate.toStringAsFixed(1)
             : '';
       });
@@ -157,11 +181,13 @@ class _RoomPropertiesState
         .where((r) => r.id == widget.roomId)
         .firstOrNull;
 
+    final l10n = AppLocalizations.of(context)!;
+
     if (room == null) {
       return Padding(
         padding: const EdgeInsets.all(Spacing.md),
         child: Text(
-          'Room not found',
+          l10n.roomNotFound,
           style: textTheme.bodyMedium,
         ),
       );
@@ -202,16 +228,16 @@ class _RoomPropertiesState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Properties', style: textTheme.headlineMedium),
+          Text(l10n.properties, style: textTheme.headlineMedium),
           const SizedBox(height: Spacing.lg),
-          Text('Room', style: textTheme.headlineSmall),
+          Text(l10n.room, style: textTheme.headlineSmall),
           const SizedBox(height: Spacing.md),
 
           // Editable name.
           TextField(
             controller: _nameController,
-            decoration: const InputDecoration(
-              labelText: 'Name',
+            decoration: InputDecoration(
+              labelText: l10n.nameLabel,
               isDense: true,
             ),
             onSubmitted: (value) {
@@ -234,8 +260,9 @@ class _RoomPropertiesState
 
           // Temperature slider.
           Text(
-            'Target Temperature: '
-            '${room.targetTempC.toStringAsFixed(0)} \u00B0C',
+            l10n.targetTemperatureValue(
+              room.targetTempC.toStringAsFixed(0),
+            ),
             style: textTheme.bodyMedium,
           ),
           Slider(
@@ -277,16 +304,16 @@ class _RoomPropertiesState
           // Air change rate — preset dropdown + optional custom input.
           const SizedBox(height: Spacing.xs),
           _AcrField(
-            selectedKey: _selectedAcrKey,
+            selectedPreset: _selectedAcrPreset,
             customController: _acrController,
-            onPresetSelected: (key) {
-              final newAcr = _kAirChangePresets[key]!;
-              setState(() => _selectedAcrKey = key);
+            onPresetSelected: (preset) {
+              final newAcr = _kAcrValues[preset]!;
+              setState(() => _selectedAcrPreset = preset);
               _commitAcr(room, newAcr);
             },
             onCustomSelected: () {
               setState(() {
-                _selectedAcrKey = _kCustomKey;
+                _selectedAcrPreset = null;
                 _acrController.text =
                     room.airChangeRate.toStringAsFixed(1);
               });
@@ -309,21 +336,21 @@ class _RoomPropertiesState
 
           // Read-only geometry.
           _readOnlyRow(
-            'Floor Area',
+            l10n.floorArea,
             areaM2 > 0
                 ? '${areaM2.toStringAsFixed(2)} m\u00B2'
                 : '\u2014',
             textTheme,
           ),
           _readOnlyRow(
-            'Room Volume',
+            l10n.roomVolume,
             !volumeM3.isNaN
                 ? '${volumeM3.toStringAsFixed(1)} m\u00B3'
                 : '\u2014',
             textTheme,
           ),
           _readOnlyRow(
-            'Walls',
+            l10n.wallsCount,
             '$wallCount',
             textTheme,
           ),
@@ -331,7 +358,7 @@ class _RoomPropertiesState
 
           // Heat demand breakdown (inline, from editorState).
           Text(
-            'Heat Demand',
+            l10n.heatDemand,
             style: textTheme.headlineSmall,
           ),
           const SizedBox(height: Spacing.xs),
@@ -343,6 +370,7 @@ class _RoomPropertiesState
             totalDemandW,
             tOutdoor,
             textTheme,
+            l10n,
           ),
           const SizedBox(height: Spacing.xs),
           _EnvelopeSection(room: room),
@@ -366,6 +394,7 @@ class _RoomPropertiesState
     double totalDemandW,
     double tOutdoor,
     TextTheme textTheme,
+    AppLocalizations l10n,
   ) {
     const ceilingHeightMm = 2600.0;
     final tIndoor = room.targetTempC;
@@ -615,7 +644,7 @@ class _RoomPropertiesState
     return [
       if (hasAnyConstruction)
         _readOnlyRow(
-          'Transmission Q\u1D40',
+          l10n.transmissionQt,
           '${qTransmission.round()} W',
           textTheme,
         )
@@ -625,24 +654,23 @@ class _RoomPropertiesState
             vertical: Spacing.xs,
           ),
           child: Text(
-            'Assign constructions to walls for '
-            'transmission loss.',
+            l10n.assignConstructionsHint,
             style: textTheme.bodySmall,
           ),
         ),
       _readOnlyRow(
-        'Transmission \u2014 floor',
+        l10n.transmissionFloor,
         qFloor != null ? '${qFloor.round()} W' : '\u2014',
         textTheme,
       ),
       _readOnlyRow(
-        'Transmission \u2014 ceiling',
+        l10n.transmissionCeiling,
         qCeiling != null ? '${qCeiling.round()} W' : '\u2014',
         textTheme,
       ),
       if (!qVent.isNaN)
         _readOnlyRow(
-          'Ventilation Q\u1D20',
+          l10n.ventilationQv,
           '${qVent.round()} W',
           textTheme,
         ),
@@ -657,7 +685,7 @@ class _RoomPropertiesState
           children: [
             Flexible(
               child: Text(
-                'Total Heat Demand',
+                l10n.totalHeatDemand,
                 style: textTheme.bodyLarge?.copyWith(
                   fontWeight: FontWeight.w600,
                 ),
@@ -692,7 +720,7 @@ class _RoomPropertiesState
       ),
       // Specific heat demand (W/m²).
       _readOnlyRow(
-        'Specific Heat Demand',
+        l10n.specificHeatDemand,
         specificW.isNaN
             ? '\u2014'
             : '${specificW.toStringAsFixed(1)} W/m\u00B2',
@@ -715,24 +743,22 @@ class _RoomPropertiesState
 /// can remain a simple [StatelessWidget].
 class _AcrField extends StatelessWidget {
   const _AcrField({
-    required this.selectedKey,
+    required this.selectedPreset,
     required this.customController,
     required this.onPresetSelected,
     required this.onCustomSelected,
     required this.onCustomSubmitted,
   });
 
-  /// Currently active dropdown label (one of [_kAirChangePresets]
-  /// keys or [_kCustomKey]).
-  final String selectedKey;
+  /// Currently active preset, or `null` for custom input.
+  final _AcrPreset? selectedPreset;
 
   /// Controller for the free-entry text field (only visible when
-  /// [selectedKey] == [_kCustomKey]).
+  /// [selectedPreset] is `null`).
   final TextEditingController customController;
 
-  /// Fired when the user picks a named preset. Provides the preset
-  /// label; the caller maps it to its numeric value.
-  final void Function(String key) onPresetSelected;
+  /// Fired when the user picks a named preset.
+  final void Function(_AcrPreset preset) onPresetSelected;
 
   /// Fired when the user picks 'Custom' from the dropdown.
   final VoidCallback onCustomSelected;
@@ -743,55 +769,61 @@ class _AcrField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context)!;
+
+    // Use int index for dropdown value; -1 = custom.
+    final selectedIndex =
+        selectedPreset != null ? selectedPreset!.index : -1;
 
     final items = [
-      ..._kAirChangePresets.entries.map(
-        (e) => DropdownMenuItem<String>(
-          value: e.key,
+      ..._kAcrValues.entries.map(
+        (e) => DropdownMenuItem<int>(
+          value: e.key.index,
           child: Text(
-            '${e.key} \u2014 ${e.value} h\u207B\u00B9',
+            '${_acrPresetLabel(e.key, l10n)}'
+            ' \u2014 ${e.value} h\u207B\u00B9',
             style: textTheme.bodyMedium,
           ),
         ),
       ),
-      DropdownMenuItem<String>(
-        value: _kCustomKey,
-        child: Text('Custom', style: textTheme.bodyMedium),
+      DropdownMenuItem<int>(
+        value: -1,
+        child: Text(l10n.custom, style: textTheme.bodyMedium),
       ),
     ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Air Change Rate', style: textTheme.bodyMedium),
+        Text(l10n.airChangeRate, style: textTheme.bodyMedium),
         const SizedBox(height: Spacing.xs),
         InputDecorator(
           decoration: const InputDecoration(isDense: true),
-          child: DropdownButton<String>(
-            value: selectedKey,
+          child: DropdownButton<int>(
+            value: selectedIndex,
             isDense: true,
             isExpanded: true,
             underline: const SizedBox.shrink(),
             items: items,
-            onChanged: (key) {
-              if (key == null) return;
-              if (key == _kCustomKey) {
+            onChanged: (idx) {
+              if (idx == null) return;
+              if (idx == -1) {
                 onCustomSelected();
               } else {
-                onPresetSelected(key);
+                onPresetSelected(_AcrPreset.values[idx]);
               }
             },
           ),
         ),
-        if (selectedKey == _kCustomKey) ...[
+        if (selectedPreset == null) ...[
           const SizedBox(height: Spacing.xs),
           TextField(
             controller: customController,
             keyboardType: const TextInputType.numberWithOptions(
               decimal: true,
             ),
-            decoration: const InputDecoration(
-              labelText: 'Rate',
+            decoration: InputDecoration(
+              labelText: l10n.rateLabel,
               suffixText: 'h\u207B\u00B9',
               helperText: '0.1 – 5.0',
               isDense: true,
@@ -887,59 +919,52 @@ String? _roomDemandMissingPrereqs(Room room, EditorState state) {
 // Envelope — Floor & Ceiling section
 // ================================================================
 
-/// Dropdown option combining display label and [BoundaryCondition].
-@immutable
-class _BoundaryOption {
-  const _BoundaryOption({
-    required this.label,
-    required this.condition,
-  });
+/// Floor boundary conditions in dropdown order.
+const _kFloorConditions = <BoundaryCondition>[
+  BoundaryCondition.ground,
+  BoundaryCondition.unheatedSpace,
+  BoundaryCondition.interior,
+];
 
-  final String label;
-  final BoundaryCondition condition;
+/// Ceiling boundary conditions in dropdown order.
+const _kCeilingConditions = <BoundaryCondition>[
+  BoundaryCondition.exterior,
+  BoundaryCondition.unheatedSpace,
+  BoundaryCondition.interior,
+];
+
+/// Returns the localized label for a floor boundary condition.
+String _floorBoundaryLabel(
+  BoundaryCondition condition,
+  AppLocalizations l10n,
+) {
+  switch (condition) {
+    case BoundaryCondition.ground:
+      return l10n.boundaryGround;
+    case BoundaryCondition.unheatedSpace:
+      return l10n.boundaryUnheatedBelow;
+    case BoundaryCondition.interior:
+      return l10n.boundaryAdjacentBelow;
+    case BoundaryCondition.exterior:
+      return l10n.boundaryExteriorRoof;
+  }
 }
 
-const _kFloorOptions = <_BoundaryOption>[
-  _BoundaryOption(
-    label: 'Ground (slab on grade)',
-    condition: BoundaryCondition.ground,
-  ),
-  _BoundaryOption(
-    label: 'Unheated space (basement / garage / crawlspace)',
-    condition: BoundaryCondition.unheatedSpace,
-  ),
-  _BoundaryOption(
-    label: 'Adjacent heated room (floor above another room)',
-    condition: BoundaryCondition.interior,
-  ),
-];
-
-const _kCeilingOptions = <_BoundaryOption>[
-  _BoundaryOption(
-    label: 'Exterior / Roof',
-    condition: BoundaryCondition.exterior,
-  ),
-  _BoundaryOption(
-    label: 'Unheated space (attic / garage / crawlspace)',
-    condition: BoundaryCondition.unheatedSpace,
-  ),
-  _BoundaryOption(
-    label: 'Adjacent heated room (ceiling below another room)',
-    condition: BoundaryCondition.interior,
-  ),
-];
-
-/// Returns the label from [options] matching [condition].
-String _boundaryLabel(
-  List<_BoundaryOption> options,
+/// Returns the localized label for a ceiling boundary condition.
+String _ceilingBoundaryLabel(
   BoundaryCondition condition,
+  AppLocalizations l10n,
 ) {
-  return options
-      .firstWhere(
-        (o) => o.condition == condition,
-        orElse: () => options.first,
-      )
-      .label;
+  switch (condition) {
+    case BoundaryCondition.exterior:
+      return l10n.boundaryExteriorRoof;
+    case BoundaryCondition.unheatedSpace:
+      return l10n.boundaryUnheatedAbove;
+    case BoundaryCondition.interior:
+      return l10n.boundaryAdjacentAbove;
+    case BoundaryCondition.ground:
+      return l10n.boundaryGround;
+  }
 }
 
 /// Collapsible "Envelope — Floor & Ceiling" section shown in the
@@ -965,46 +990,43 @@ class _EnvelopeSectionState
     ref.read(editorStateProvider.notifier).updateRoom(updated);
   }
 
-  void _onFloorBoundaryChanged(String label) {
-    final opt =
-        _kFloorOptions.firstWhere((o) => o.label == label);
+  void _onFloorBoundaryChanged(BoundaryCondition condition) {
     _updateRoom(
       widget.room.copyWith(
-        floorBoundary: opt.condition,
-        // Clear the per-room override so the project default applies.
+        floorBoundary: condition,
         floorAdjacentTempC: null,
       ),
     );
   }
 
-  void _onCeilingBoundaryChanged(String label) {
-    final opt =
-        _kCeilingOptions.firstWhere((o) => o.label == label);
+  void _onCeilingBoundaryChanged(BoundaryCondition condition) {
     _updateRoom(
       widget.room.copyWith(
-        ceilingBoundary: opt.condition,
+        ceilingBoundary: condition,
         ceilingAdjacentTempC: null,
       ),
     );
   }
 
   void _openFloorEditor() {
+    final l10n = AppLocalizations.of(context)!;
     final room = widget.room;
     showSlabConstructionEditor(
       context,
       constructionId: room.floorConstructionId,
-      title: 'Floor construction',
+      title: l10n.floorConstruction,
       onSaved: (id) =>
           _updateRoom(room.copyWith(floorConstructionId: id)),
     );
   }
 
   void _openCeilingEditor() {
+    final l10n = AppLocalizations.of(context)!;
     final room = widget.room;
     showSlabConstructionEditor(
       context,
       constructionId: room.ceilingConstructionId,
-      title: 'Roof / ceiling construction',
+      title: l10n.roofCeilingConstruction,
       onSaved: (id) =>
           _updateRoom(room.copyWith(ceilingConstructionId: id)),
     );
@@ -1013,17 +1035,9 @@ class _EnvelopeSectionState
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context)!;
     final room = widget.room;
     final editorState = ref.watch(editorStateProvider);
-
-    final floorLabel = _boundaryLabel(
-      _kFloorOptions,
-      room.floorBoundary,
-    );
-    final ceilingLabel = _boundaryLabel(
-      _kCeilingOptions,
-      room.ceilingBoundary,
-    );
 
     final floorConstruction = room.floorConstructionId == null
         ? null
@@ -1045,7 +1059,7 @@ class _EnvelopeSectionState
 
     return ExpansionTile(
       title: Text(
-        'Envelope \u2014 Floor & Ceiling',
+        l10n.envelopeFloorCeiling,
         style: textTheme.titleSmall,
       ),
       initiallyExpanded: false,
@@ -1055,18 +1069,20 @@ class _EnvelopeSectionState
       ),
       children: [
         // ── Floor subsection ────────────────────────────────
-        Text('Floor', style: textTheme.labelLarge),
+        Text(l10n.floorLabel, style: textTheme.labelLarge),
         const SizedBox(height: Spacing.xs),
         _boundaryDropdown(
-          label: 'What\'s below?',
-          options: _kFloorOptions,
-          selectedLabel: floorLabel,
+          label: l10n.whatsBelow,
+          conditions: _kFloorConditions,
+          selectedCondition: room.floorBoundary,
+          labelFn: (c) => _floorBoundaryLabel(c, l10n),
           onChanged: _onFloorBoundaryChanged,
           textTheme: textTheme,
         ),
         const SizedBox(height: Spacing.xs),
         _constructionButton(
           context: context,
+          l10n: l10n,
           construction: floorConstruction,
           uVal: floorUVal,
           onTap: _openFloorEditor,
@@ -1075,6 +1091,7 @@ class _EnvelopeSectionState
         const SizedBox(height: Spacing.xs),
         _adjacentTempRow(
           context: context,
+          l10n: l10n,
           condition: room.floorBoundary,
           adjacentTempC: room.floorAdjacentTempC,
           onChanged: (v) => _updateRoom(
@@ -1086,18 +1103,20 @@ class _EnvelopeSectionState
         const Divider(height: Spacing.sm),
 
         // ── Ceiling subsection ──────────────────────────────
-        Text('Ceiling', style: textTheme.labelLarge),
+        Text(l10n.ceilingLabel, style: textTheme.labelLarge),
         const SizedBox(height: Spacing.xs),
         _boundaryDropdown(
-          label: 'What\'s above?',
-          options: _kCeilingOptions,
-          selectedLabel: ceilingLabel,
+          label: l10n.whatsAbove,
+          conditions: _kCeilingConditions,
+          selectedCondition: room.ceilingBoundary,
+          labelFn: (c) => _ceilingBoundaryLabel(c, l10n),
           onChanged: _onCeilingBoundaryChanged,
           textTheme: textTheme,
         ),
         const SizedBox(height: Spacing.xs),
         _constructionButton(
           context: context,
+          l10n: l10n,
           construction: ceilConstruction,
           uVal: ceilUVal,
           onTap: _openCeilingEditor,
@@ -1106,6 +1125,7 @@ class _EnvelopeSectionState
         const SizedBox(height: Spacing.xs),
         _adjacentTempRow(
           context: context,
+          l10n: l10n,
           condition: room.ceilingBoundary,
           adjacentTempC: room.ceilingAdjacentTempC,
           onChanged: (v) => _updateRoom(
@@ -1120,9 +1140,10 @@ class _EnvelopeSectionState
 
   Widget _boundaryDropdown({
     required String label,
-    required List<_BoundaryOption> options,
-    required String selectedLabel,
-    required void Function(String) onChanged,
+    required List<BoundaryCondition> conditions,
+    required BoundaryCondition selectedCondition,
+    required String Function(BoundaryCondition) labelFn,
+    required void Function(BoundaryCondition) onChanged,
     required TextTheme textTheme,
   }) {
     return Column(
@@ -1132,17 +1153,17 @@ class _EnvelopeSectionState
         const SizedBox(height: Spacing.xs),
         InputDecorator(
           decoration: const InputDecoration(isDense: true),
-          child: DropdownButton<String>(
-            value: selectedLabel,
+          child: DropdownButton<BoundaryCondition>(
+            value: selectedCondition,
             isDense: true,
             isExpanded: true,
             underline: const SizedBox.shrink(),
-            items: options
+            items: conditions
                 .map(
-                  (o) => DropdownMenuItem<String>(
-                    value: o.label,
+                  (c) => DropdownMenuItem<BoundaryCondition>(
+                    value: c,
                     child: Text(
-                      o.label,
+                      labelFn(c),
                       style: textTheme.bodyMedium,
                     ),
                   ),
@@ -1159,20 +1180,21 @@ class _EnvelopeSectionState
 
   Widget _constructionButton({
     required BuildContext context,
+    required AppLocalizations l10n,
     required WallConstruction? construction,
     required double uVal,
     required VoidCallback onTap,
     required TextTheme textTheme,
   }) {
     final label = construction == null
-        ? 'Not assigned'
+        ? l10n.notAssigned
         : uVal.isNaN
             ? construction.name
             : '${construction.name} \u2014 '
                 'U ${uVal.toStringAsFixed(2)}'
                 ' W/(m\u00B2\u00B7K)';
     final actionLabel =
-        construction == null ? '+ Assign' : 'Edit';
+        construction == null ? l10n.assignAction : l10n.editAction;
 
     return SizedBox(
       width: double.infinity,
@@ -1199,16 +1221,9 @@ class _EnvelopeSectionState
     );
   }
 
-  /// Renders an adjacent-space temperature row.
-  ///
-  /// Shown only for [BoundaryCondition.unheatedSpace] and
-  /// [BoundaryCondition.interior]. For other conditions returns
-  /// [SizedBox.shrink].
-  ///
-  /// Displays the per-room override when set, or the project default
-  /// as hint text. A reset button clears the override back to null.
   Widget _adjacentTempRow({
     required BuildContext context,
+    required AppLocalizations l10n,
     required BoundaryCondition condition,
     required double? adjacentTempC,
     required void Function(double?) onChanged,
@@ -1226,8 +1241,8 @@ class _EnvelopeSectionState
         : tUnheated;
 
     final label = condition == BoundaryCondition.interior
-        ? 'Adjacent room temp.'
-        : 'Unheated space temp.';
+        ? l10n.adjacentRoomTemp
+        : l10n.unheatedSpaceTempShort;
 
     final controller = TextEditingController(
       text: adjacentTempC?.toStringAsFixed(1) ?? '',
@@ -1244,7 +1259,9 @@ class _EnvelopeSectionState
             ),
             decoration: InputDecoration(
               labelText: label,
-              hintText: '${projectDefault.toStringAsFixed(1)} (default)',
+              hintText: l10n.defaultHint(
+                projectDefault.toStringAsFixed(1),
+              ),
               suffixText: '\u00B0C',
               isDense: true,
             ),
@@ -1258,7 +1275,7 @@ class _EnvelopeSectionState
         if (adjacentTempC != null)
           IconButton(
             icon: const Icon(Icons.refresh, size: 16),
-            tooltip: 'Reset to project default',
+            tooltip: l10n.resetToProjectDefault,
             padding: EdgeInsets.zero,
             constraints: const BoxConstraints(
               minWidth: 32,
