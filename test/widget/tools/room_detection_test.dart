@@ -33,9 +33,11 @@
 ///    heat flow is symmetric across both room perspectives.
 library;
 
+import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/calculation/engines/thermal_engine.dart';
+import 'package:heating_planner/data/database/app_database.dart' as $db;
 import 'package:heating_planner/data/models/enums.dart';
 import 'package:heating_planner/data/models/point2d.dart';
 import 'package:heating_planner/data/models/room.dart';
@@ -228,7 +230,13 @@ void main() {
     /// before room detection fires, so all seven walls are present
     /// when [addRoomFromDetection] is called.
     (ProviderContainer, EditorStateNotifier) makeContainer() {
-      final container = ProviderContainer();
+      final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
+      final container = ProviderContainer(
+        overrides: [
+          $db.appDatabaseProvider.overrideWithValue(db),
+        ],
+      );
+      addTearDown(db.close);
       final notifier = container.read(editorStateProvider.notifier);
 
       // Room 1 and its four assigned walls.
@@ -705,7 +713,13 @@ void main() {
     );
 
     (ProviderContainer, EditorStateNotifier) makeContainer() {
-      final container = ProviderContainer();
+      final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
+      final container = ProviderContainer(
+        overrides: [
+          $db.appDatabaseProvider.overrideWithValue(db),
+        ],
+      );
+      addTearDown(db.close);
       final notifier = container.read(editorStateProvider.notifier);
 
       notifier.addRoom(

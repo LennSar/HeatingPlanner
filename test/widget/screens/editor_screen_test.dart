@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 import 'package:heating_planner/core/theme/app_theme.dart';
 import 'package:heating_planner/data/models/point2d.dart';
@@ -11,6 +13,10 @@ import 'package:heating_planner/ui/providers/editor_state_provider.dart';
 import 'package:heating_planner/ui/screens/editor_screen.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
+  });
   /// Pump the editor screen inside a [ProviderScope] with
   /// the correct theme and a desktop-sized viewport.
   Widget buildEditorApp(ProviderContainer container) {

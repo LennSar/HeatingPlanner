@@ -18,11 +18,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/core/theme/app_theme.dart';
 import 'package:heating_planner/data/models/enums.dart';
+import 'package:heating_planner/data/models/material_entry.dart';
 import 'package:heating_planner/l10n/app_localizations.dart';
 import 'package:heating_planner/data/models/material_layer.dart';
 import 'package:heating_planner/data/models/point2d.dart';
 import 'package:heating_planner/data/models/wall_construction.dart';
 import 'package:heating_planner/data/models/wall_segment.dart';
+import 'package:heating_planner/repositories/material_repository.dart';
 import 'package:heating_planner/ui/panels/wall_construction_editor.dart';
 import 'package:heating_planner/ui/providers/editor_state_provider.dart';
 
@@ -78,6 +80,17 @@ const _testWall = WallSegment(
   constructionId: _cid,
 );
 
+// ── Test material entry ───────────────────────────────────────────────────────
+
+const _testMaterial = MaterialEntry(
+  id: 'mat-001',
+  name: 'Solid brick',
+  category: 'Masonry',
+  lambdaDefault: 0.77,
+  densityDefault: 1800,
+  specificHeatDefault: 900,
+);
+
 // ── Widget builder ────────────────────────────────────────────────────────────
 
 /// Renders a trigger button that opens the wall-construction dialog.
@@ -96,6 +109,9 @@ Widget _buildTrigger({
     overrides: [
       editorStateProvider.overrideWith(
         () => _StubEditorNotifier(initialState),
+      ),
+      materialEntriesProvider.overrideWith(
+        (ref) => Stream.value(const [_testMaterial]),
       ),
     ],
     child: MaterialApp(
@@ -122,6 +138,14 @@ Future<void> _openDialog(WidgetTester tester) async {
   await tester.pumpAndSettle();
 }
 
+/// Replaces the widget tree and drains pending timers so the
+/// test framework does not complain about leaked timers from
+/// the dialog's route animation or tooltip hover.
+Future<void> _tearDownDialog(WidgetTester tester) async {
+  await tester.pumpWidget(const SizedBox());
+  await tester.pump(const Duration(seconds: 1));
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 void main() {
@@ -143,6 +167,7 @@ void main() {
       // 200 mm Solid brick (λ=0.77) with Rsi=0.13, Rse=0.04
       // → U ≈ 2.327 W/(m²K)
       expect(find.textContaining('2.327'), findsOneWidget);
+      await _tearDownDialog(tester);
     },
   );
 
@@ -158,6 +183,7 @@ void main() {
 
       // mat-001 is 'Solid brick' in the built-in catalogue.
       expect(find.text('Solid brick'), findsOneWidget);
+      await _tearDownDialog(tester);
     },
   );
 
@@ -172,6 +198,7 @@ void main() {
       await _openDialog(tester);
 
       expect(find.text('Add Layer'), findsOneWidget);
+      await _tearDownDialog(tester);
     },
   );
 
@@ -193,6 +220,7 @@ void main() {
 
       // The default new layer also uses mat-001 (Solid brick), so two rows.
       expect(find.text('Solid brick'), findsNWidgets(2));
+      await _tearDownDialog(tester);
     },
   );
 
@@ -219,6 +247,7 @@ void main() {
       expect(find.textContaining('1.450'), findsOneWidget);
       // Old value is gone.
       expect(find.textContaining('2.327'), findsNothing);
+      await _tearDownDialog(tester);
     },
   );
 
@@ -238,6 +267,7 @@ void main() {
       await tester.pump();
 
       expect(find.text('Solid brick'), findsNothing);
+      await _tearDownDialog(tester);
     },
   );
 
@@ -254,6 +284,7 @@ void main() {
       // The temperature profile bar requires profile.length >= 2, which is
       // satisfied by one layer (profile has indoor + outdoor + 1 interface = 3).
       expect(find.byType(CustomPaint), findsWidgets);
+      await _tearDownDialog(tester);
     },
   );
 }

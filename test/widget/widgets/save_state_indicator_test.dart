@@ -181,13 +181,16 @@ void main() {
 
   group('SaveStateIndicator — tooltip', () {
     testWidgets(
-        'unsaved dot tooltip reads "Changes not yet saved to file"',
+        'unsaved dot tooltip reads the export-out-of-date message',
         (tester) async {
       await tester.pumpWidget(_buildApp(_dirty));
       await tester.pumpAndSettle();
 
       final tooltip = tester.widget<Tooltip>(find.byType(Tooltip));
-      expect(tooltip.message, equals('Changes not yet saved to file'));
+      expect(
+        tooltip.message,
+        equals('File export out of date \u2014 press Ctrl+S to update'),
+      );
     });
   });
 

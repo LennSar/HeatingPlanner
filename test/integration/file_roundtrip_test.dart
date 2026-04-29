@@ -26,9 +26,12 @@ import 'package:heating_planner/app.dart';
 import 'package:heating_planner/data/database/app_database.dart' as $db;
 import 'package:heating_planner/repositories/app_preferences.dart';
 import 'package:heating_planner/repositories/hsp_importer.dart';
+import 'package:heating_planner/repositories/material_repository.dart';
 import 'package:heating_planner/repositories/save_state_notifier.dart';
 import 'package:heating_planner/ui/screens/editor_screen.dart';
 import 'package:heating_planner/ui/screens/project_list_screen.dart';
+import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
+import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 import '../helpers/test_factories.dart';
 
@@ -198,12 +201,24 @@ void main() {
   // ProviderScope and advances fake-time past any Riverpod autoDispose timers.
 
   group('Session restore', () {
+    setUp(() {
+      // Provide an in-memory SharedPreferences with the material DB version
+      // pre-set so _startupProjectIdProvider's ensureMaterialsSeeded() is a
+      // no-op (avoids rootBundle.loadString inside FakeAsync).
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.withData({
+        'materialDbVersion': materialDbVersion,
+      });
+    });
+
     /// Pumps enough frames to let [_startupProjectIdProvider] resolve and the
     /// router rebuild.  Does NOT use pumpAndSettle to avoid infinite looping
-    /// on Drift stream providers.
+    /// on Drift stream providers.  The startup provider seeds the material
+    /// database and queries the project, which needs more than a handful of
+    /// frames to complete.
     Future<void> settle(WidgetTester tester) async {
-      for (var i = 0; i < 6; i++) {
-        await tester.pump();
+      for (var i = 0; i < 20; i++) {
+        await tester.pump(const Duration(milliseconds: 100));
       }
     }
 
@@ -222,7 +237,6 @@ void main() {
       final capturedErrors = <FlutterErrorDetails>[];
       final originalOnError = FlutterError.onError;
       FlutterError.onError = capturedErrors.add;
-      addTearDown(() => FlutterError.onError = originalOnError);
 
       final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
@@ -242,6 +256,10 @@ void main() {
         ),
       );
       await settle(tester);
+
+      // Restore FlutterError.onError before any expect() call — the test
+      // framework asserts it is restored before the test body returns.
+      FlutterError.onError = originalOnError;
 
       expect(
         find.byType(EditorScreen),
