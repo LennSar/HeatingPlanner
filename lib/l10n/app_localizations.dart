@@ -974,6 +974,12 @@ abstract class AppLocalizations {
   /// **'Add Layer'**
   String get addLayer;
 
+  /// Snackbar shown when Add Layer is pressed but the material catalogue is empty
+  ///
+  /// In en, this message translates to:
+  /// **'No materials available — try restarting the app'**
+  String get noMaterialsAvailable;
+
   /// Section heading for material layer list
   ///
   /// In en, this message translates to:

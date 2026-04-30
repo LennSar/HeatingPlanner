@@ -13,6 +13,8 @@
 // with the production code path.  Only editorStateProvider is overridden;
 // all calculations run through ThermalEngine static methods inline.
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -80,6 +82,18 @@ const _testWall = WallSegment(
   constructionId: _cid,
 );
 
+/// Wall without a constructionId — triggers the "New Construction" path
+/// in the dialog, matching the scenario where the user opens the editor
+/// for a wall that has no construction assigned yet.
+const _testWallNew = WallSegment(
+  id: 'wall-2',
+  roomId: 'room-1',
+  startPoint: Point2D(x: 0, y: 0),
+  endPoint: Point2D(x: 5000, y: 0),
+  wallType: WallType.exterior,
+  orientation: CardinalDirection.south,
+);
+
 // ── Test material entry ───────────────────────────────────────────────────────
 
 const _testMaterial = MaterialEntry(
@@ -122,6 +136,79 @@ Widget _buildTrigger({
         body: Builder(
           builder: (ctx) => ElevatedButton(
             onPressed: () => showWallConstructionEditor(ctx, _testWall),
+            child: const Text('Open'),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// German-locale variant of [_buildTrigger].
+Widget _buildTriggerDe({
+  WallConstruction construction = _testConstruction,
+  List<MaterialLayer> layers = const [_testLayer],
+}) {
+  final initialState = EditorState(
+    constructions: [construction],
+    materialLayers: layers,
+  );
+  return ProviderScope(
+    overrides: [
+      editorStateProvider.overrideWith(
+        () => _StubEditorNotifier(initialState),
+      ),
+      materialEntriesProvider.overrideWith(
+        (ref) => Stream.value(const [_testMaterial]),
+      ),
+    ],
+    child: MaterialApp(
+      theme: AppTheme.light(),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: const [Locale('de')],
+      locale: const Locale('de'),
+      home: Scaffold(
+        body: Builder(
+          builder: (ctx) => ElevatedButton(
+            onPressed: () => showWallConstructionEditor(ctx, _testWall),
+            child: const Text('Open'),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
+/// Builds the trigger with a custom [StreamProvider] override for
+/// [materialEntriesProvider], allowing the test to control when and
+/// what the stream emits.
+Widget _buildTriggerWithStreamOverride({
+  WallConstruction construction = _testConstruction,
+  List<MaterialLayer> layers = const [_testLayer],
+  required Stream<List<MaterialEntry>> materialStream,
+  WallSegment wall = _testWall,
+}) {
+  final initialState = EditorState(
+    constructions: [construction],
+    materialLayers: layers,
+  );
+  return ProviderScope(
+    overrides: [
+      editorStateProvider.overrideWith(
+        () => _StubEditorNotifier(initialState),
+      ),
+      materialEntriesProvider.overrideWith(
+        (ref) => materialStream,
+      ),
+    ],
+    child: MaterialApp(
+      theme: AppTheme.light(),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: const [Locale('en')],
+      home: Scaffold(
+        body: Builder(
+          builder: (ctx) => ElevatedButton(
+            onPressed: () => showWallConstructionEditor(ctx, wall),
             child: const Text('Open'),
           ),
         ),
@@ -284,6 +371,140 @@ void main() {
       // The temperature profile bar requires profile.length >= 2, which is
       // satisfied by one layer (profile has indoor + outdoor + 1 interface = 3).
       expect(find.byType(CustomPaint), findsWidgets);
+      await _tearDownDialog(tester);
+    },
+  );
+
+  // WCE-4a ───────────────────────────────────────────────────────────────────
+
+  testWidgets(
+    'WCE-4a: tapping Add Layer works in German locale',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(_buildTriggerDe());
+      await _openDialog(tester);
+
+      // One row before.
+      expect(find.text('Solid brick'), findsOneWidget);
+
+      // German localised button text: "Schicht hinzufügen"
+      await tester.tap(find.text('Schicht hinzufügen'));
+      await tester.pump();
+
+      // The default new layer also uses mat-001 (Solid brick), so two rows.
+      expect(find.text('Solid brick'), findsNWidgets(2));
+      await _tearDownDialog(tester);
+    },
+  );
+
+  // WCE-4b ───────────────────────────────────────────────────────────────────
+
+  testWidgets(
+    'WCE-4b: tapping Add Layer works when starting with zero layers',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+      await tester.pumpWidget(_buildTrigger(layers: const []));
+      await _openDialog(tester);
+
+      // No layer rows initially.
+      expect(find.text('Solid brick'), findsNothing);
+
+      // The Add Layer button should still be present.
+      expect(find.text('Add Layer'), findsOneWidget);
+
+      await tester.tap(find.text('Add Layer'));
+      await tester.pump();
+
+      // One layer row appears.
+      expect(find.text('Solid brick'), findsOneWidget);
+      await _tearDownDialog(tester);
+    },
+  );
+
+  // WCE-4c ───────────────────────────────────────────────────────────────────
+
+  testWidgets(
+    'WCE-4c: Add Layer button onPressed is not null',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      // TextButton.icon uses a private subclass, so find.byType(TextButton)
+      // won't match.  Use an `is` predicate instead.
+      Finder addLayerButton(String label) => find.ancestor(
+            of: find.text(label),
+            matching: find.byWidgetPredicate((w) => w is TextButton),
+          );
+
+      // English locale.
+      await tester.pumpWidget(_buildTrigger());
+      await _openDialog(tester);
+
+      expect(addLayerButton('Add Layer'), findsOneWidget);
+      expect(
+        tester.widget<TextButton>(addLayerButton('Add Layer')).onPressed,
+        isNotNull,
+      );
+      await _tearDownDialog(tester);
+
+      // German locale.
+      await tester.pumpWidget(_buildTriggerDe());
+      await _openDialog(tester);
+
+      expect(addLayerButton('Schicht hinzufügen'), findsOneWidget);
+      expect(
+        tester
+            .widget<TextButton>(addLayerButton('Schicht hinzufügen'))
+            .onPressed,
+        isNotNull,
+      );
+      await _tearDownDialog(tester);
+    },
+  );
+
+  // WCE-4d ───────────────────────────────────────────────────────────────────
+
+  testWidgets(
+    'WCE-4d: Add Layer works with async material delivery (StreamController)',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      final controller = StreamController<List<MaterialEntry>>();
+      addTearDown(controller.close);
+
+      // Use a wall without constructionId — matches the real-app scenario
+      // where the dialog displays "New Construction" with an empty layer
+      // stack.  The material stream has NOT emitted yet.
+      await tester.pumpWidget(
+        _buildTriggerWithStreamOverride(
+          layers: const [],
+          materialStream: controller.stream,
+          wall: _testWallNew,
+        ),
+      );
+      await _openDialog(tester);
+
+      // Dialog shows "New Construction" — no layers yet.
+      expect(find.text('New Construction'), findsOneWidget);
+      expect(find.text('Solid brick'), findsNothing);
+
+      // Emit materials (simulates the database stream delivering data
+      // after the dialog has already opened and rendered).
+      controller.add(const [_testMaterial]);
+      await tester.pumpAndSettle();
+
+      // The provider has now received data via ref.watch in build().
+      // Tapping Add Layer must add a layer using the materials that
+      // build() already resolved — _addLayer must not independently
+      // re-read the provider.
+      await tester.tap(find.text('Add Layer'));
+      await tester.pump();
+
+      // A layer row must appear.
+      expect(find.text('Solid brick'), findsOneWidget);
       await _tearDownDialog(tester);
     },
   );

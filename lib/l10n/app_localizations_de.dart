@@ -508,6 +508,10 @@ class AppLocalizationsDe extends AppLocalizations {
   String get addLayer => 'Schicht hinzufügen';
 
   @override
+  String get noMaterialsAvailable =>
+      'Keine Materialien verfügbar — bitte App neu starten';
+
+  @override
   String get layerStack => 'Schichtaufbau  (außen → innen)';
 
   @override

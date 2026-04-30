@@ -509,6 +509,10 @@ class AppLocalizationsEn extends AppLocalizations {
   String get addLayer => 'Add Layer';
 
   @override
+  String get noMaterialsAvailable =>
+      'No materials available — try restarting the app';
+
+  @override
   String get layerStack => 'Layer Stack  (outside → inside)';
 
   @override

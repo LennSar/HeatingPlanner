@@ -188,7 +188,13 @@ class _SlabConstructionDialogState
     final entries =
         ref.read(materialEntriesProvider).asData?.value ?? [];
     final mat = entries.firstOrNull;
-    if (mat == null) return;
+    if (mat == null) {
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.noMaterialsAvailable)),
+      );
+      return;
+    }
     setState(() {
       _layers = [
         ..._layers,
@@ -763,7 +769,13 @@ class _WallConstructionDialogState
     final entries =
         ref.read(materialEntriesProvider).asData?.value ?? [];
     final mat = entries.firstOrNull;
-    if (mat == null) return;
+    if (mat == null) {
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.noMaterialsAvailable)),
+      );
+      return;
+    }
     setState(() {
       _layers = [
         ..._layers,

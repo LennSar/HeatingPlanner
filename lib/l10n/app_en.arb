@@ -512,6 +512,8 @@
   "@constructionName": { "description": "Label for wall construction name field" },
   "addLayer": "Add Layer",
   "@addLayer": { "description": "Button to add a material layer" },
+  "noMaterialsAvailable": "No materials available — try restarting the app",
+  "@noMaterialsAvailable": { "description": "Snackbar shown when Add Layer is pressed but the material catalogue is empty" },
   "layerStack": "Layer Stack  (outside → inside)",
   "@layerStack": { "description": "Section heading for material layer list" },
   "surfaceResistances": "Surface resistances (m²K/W):",

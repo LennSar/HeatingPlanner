@@ -11,5 +11,10 @@ void main() {
       const ProviderScope(child: HeatingPlannerApp()),
     );
     expect(find.byType(MaterialApp), findsOneWidget);
+
+    // Tear down: replace the widget tree and drain pending timers left by
+    // stream subscriptions (e.g. materialEntriesProvider's drift watch).
+    await tester.pumpWidget(const SizedBox());
+    await tester.pump(const Duration(seconds: 1));
   });
 }

@@ -175,10 +175,17 @@ class AppDatabase extends _$AppDatabase {
             );
           }
           if (from < 14) {
-            await m.database.customStatement(
-              'ALTER TABLE wall_segments ADD COLUMN '
-              'mirror_id TEXT REFERENCES wall_segments(id) ON DELETE SET NULL',
-            );
+            final cols = await m.database.customSelect(
+              "PRAGMA table_info(wall_segments)",
+            ).get();
+            final hasMirrorId =
+                cols.any((r) => r.read<String>('name') == 'mirror_id');
+            if (!hasMirrorId) {
+              await m.database.customStatement(
+                'ALTER TABLE wall_segments ADD COLUMN '
+                'mirror_id TEXT REFERENCES wall_segments(id) ON DELETE SET NULL',
+              );
+            }
           }
         },
       );

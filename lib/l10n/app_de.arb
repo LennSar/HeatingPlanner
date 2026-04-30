@@ -159,6 +159,7 @@
   "load": "Laden",
   "constructionName": "Konstruktionsname",
   "addLayer": "Schicht hinzufügen",
+  "noMaterialsAvailable": "Keine Materialien verfügbar — bitte App neu starten",
   "layerStack": "Schichtaufbau  (außen → innen)",
   "surfaceResistances": "Oberflächenwiderstände (m²K/W):",
 

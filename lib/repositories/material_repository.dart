@@ -85,7 +85,8 @@ class MaterialRepository with SaveStateMixin {
   Future<void> ensureMaterialsSeeded() async {
     final prefs = ref.read(appPreferencesProvider);
     final stored = await prefs.getMaterialDbVersion();
-    if (stored == materialDbVersion) return;
+    final rowCount = await _dao.watchAll().first.then((r) => r.length);
+    if (stored == materialDbVersion && rowCount > 0) return;
 
     final jsonString =
         await rootBundle.loadString('assets/materials.json');
