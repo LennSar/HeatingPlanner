@@ -365,7 +365,7 @@ class _SlabConstructionDialogState
             onPressed: () => Navigator.of(ctx).pop(p),
             child: ListTile(
               title: Text(p.name),
-              subtitle: Text('U = $uLabel'),
+              subtitle: Text(l10n.presetUValueLine(uLabel)),
               dense: true,
             ),
           );
@@ -515,9 +515,8 @@ class _SlabConstructionDialogState
                   children: [
                     Text(
                       uVal.isNaN
-                          ? 'U-Value: —'
-                          : 'U  ${uVal.toStringAsFixed(3)}'
-                              ' W/(m²K)',
+                          ? l10n.uValueEmpty
+                          : l10n.uValueDisplay(uVal.toStringAsFixed(3)),
                       style: textTheme.headlineSmall?.copyWith(
                         color: colorScheme.primary,
                       ),
@@ -525,9 +524,8 @@ class _SlabConstructionDialogState
                     const Spacer(),
                     Text(
                       rTotal.isNaN
-                          ? 'R: —'
-                          : 'R  ${rTotal.toStringAsFixed(3)}'
-                              ' m²K/W',
+                          ? l10n.rValueEmpty
+                          : l10n.rValueDisplay(rTotal.toStringAsFixed(3)),
                       style: textTheme.bodyMedium?.copyWith(
                         color: colorScheme.primary,
                       ),
@@ -589,9 +587,10 @@ class _SlabConstructionDialogState
               // ---- Temperature profile ----
               if (profile.length >= 2) ...[
                 Text(
-                  'Temperature Profile  '
-                  '(${tIndoorC.toStringAsFixed(1)}\u00B0C'
-                  ' \u2192 ${tOutdoorC.toStringAsFixed(1)}\u00B0C)',
+                  l10n.temperatureProfileWithRange(
+                    tIndoorC.toStringAsFixed(1),
+                    tOutdoorC.toStringAsFixed(1),
+                  ),
                   style: textTheme.bodySmall,
                 ),
                 const SizedBox(height: Spacing.xs),
@@ -658,11 +657,25 @@ class _WallConstructionDialogState
   late TextEditingController _nameCtrl;
   late TextEditingController _rsiCtrl;
   late TextEditingController _rseCtrl;
+  bool _isNewConstruction = false;
+  bool _defaultNameApplied = false;
 
   @override
   void initState() {
     super.initState();
     _loadFromState();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_isNewConstruction && !_defaultNameApplied) {
+      final defaultName =
+          AppLocalizations.of(context)!.newConstructionDefault;
+      _nameCtrl.text = defaultName;
+      _construction = _construction.copyWith(name: defaultName);
+      _defaultNameApplied = true;
+    }
   }
 
   void _loadFromState() {
@@ -689,13 +702,15 @@ class _WallConstructionDialogState
       }
     }
 
-    // New construction with empty layer stack.
+    // New construction with empty layer stack. The localized default name
+    // is applied in didChangeDependencies once a BuildContext is available.
+    _isNewConstruction = true;
     _construction = WallConstruction(
       id: IdGenerator.newId(),
-      name: 'New Construction',
+      name: '',
     );
     _layers = [];
-    _nameCtrl = TextEditingController(text: 'New Construction');
+    _nameCtrl = TextEditingController();
     _rsiCtrl = TextEditingController(text: '0.13');
     _rseCtrl = TextEditingController(text: '0.04');
   }
@@ -948,7 +963,7 @@ class _WallConstructionDialogState
             onPressed: () => Navigator.of(ctx).pop(p),
             child: ListTile(
               title: Text(p.name),
-              subtitle: Text('U = $uLabel'),
+              subtitle: Text(l10n.presetUValueLine(uLabel)),
               dense: true,
             ),
           );
@@ -1059,7 +1074,7 @@ class _WallConstructionDialogState
                 children: [
                   Expanded(
                     child: Text(
-                      'Wall Construction',
+                      l10n.wallConstructionTitle,
                       style: textTheme.headlineMedium,
                     ),
                   ),
@@ -1113,8 +1128,8 @@ class _WallConstructionDialogState
                   children: [
                     Text(
                       uVal.isNaN
-                          ? 'U-Value: —'
-                          : 'U  ${uVal.toStringAsFixed(3)} W/(m²K)',
+                          ? l10n.uValueEmpty
+                          : l10n.uValueDisplay(uVal.toStringAsFixed(3)),
                       style: textTheme.headlineSmall?.copyWith(
                         color: colorScheme.primary,
                       ),
@@ -1122,8 +1137,8 @@ class _WallConstructionDialogState
                     const Spacer(),
                     Text(
                       rTotal.isNaN
-                          ? 'R: —'
-                          : 'R  ${rTotal.toStringAsFixed(3)} m²K/W',
+                          ? l10n.rValueEmpty
+                          : l10n.rValueDisplay(rTotal.toStringAsFixed(3)),
                       style: textTheme.bodyMedium?.copyWith(
                         color: colorScheme.primary,
                       ),
@@ -1181,9 +1196,10 @@ class _WallConstructionDialogState
               // ---- Temperature profile ----
               if (profile.length >= 2) ...[
                 Text(
-                  'Temperature Profile  '
-                  '(${tIndoorC.toStringAsFixed(1)}\u00B0C'
-                  ' \u2192 ${tOutdoorC.toStringAsFixed(1)}\u00B0C)',
+                  l10n.temperatureProfileWithRange(
+                    tIndoorC.toStringAsFixed(1),
+                    tOutdoorC.toStringAsFixed(1),
+                  ),
                   style: textTheme.bodySmall,
                 ),
                 const SizedBox(height: Spacing.xs),
@@ -1276,10 +1292,6 @@ class _LayerRowState extends State<_LayerRow> {
 
   // 3px accent colour matching UI/UX §3.1 primaryLight.
   static const _accentColor = Color(0xFF2E86C1);
-
-  static const _clearGapTooltip =
-      'Clear distance between studs, edge to edge — not centre-to-centre.'
-      ' Centre-to-centre spacing = stud width + clear gap.';
 
   bool get _hasStud =>
       widget.layer.studWidthMm != null &&
@@ -1409,6 +1421,7 @@ class _LayerRowState extends State<_LayerRow> {
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final l10n = AppLocalizations.of(context)!;
     final showAccent = _studExpanded || _hasStud;
 
     return Padding(
@@ -1519,8 +1532,8 @@ class _LayerRowState extends State<_LayerRow> {
                 // ⊕ / toggle-stud button.
                 Tooltip(
                   message: _studExpanded
-                      ? 'Remove stud definition'
-                      : 'Add timber stud (inhomogeneous layer)',
+                      ? l10n.removeStudTooltip
+                      : l10n.addStudTooltip,
                   child: IconButton(
                     icon: Icon(
                       _studExpanded ? Icons.remove_circle_outline : Icons.add_circle_outline,
@@ -1546,7 +1559,7 @@ class _LayerRowState extends State<_LayerRow> {
                 child: Row(
                   children: [
                     Text(
-                      'Timber stud:',
+                      l10n.timberStudLabel,
                       style: textTheme.labelSmall?.copyWith(
                         color: _accentColor,
                       ),
@@ -1559,11 +1572,11 @@ class _LayerRowState extends State<_LayerRow> {
                       child: TextField(
                         controller: _studWidthCtrl,
                         keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
+                        decoration: InputDecoration(
                           isDense: true,
                           suffixText: 'mm',
-                          hintText: 'width',
-                          contentPadding: EdgeInsets.symmetric(
+                          hintText: l10n.studWidthHint,
+                          contentPadding: const EdgeInsets.symmetric(
                             horizontal: 6,
                             vertical: 6,
                           ),
@@ -1573,22 +1586,22 @@ class _LayerRowState extends State<_LayerRow> {
                       ),
                     ),
                     const SizedBox(width: Spacing.xs),
-                    Text('stud width', style: textTheme.labelSmall),
+                    Text(l10n.studWidthLabel, style: textTheme.labelSmall),
                     const SizedBox(width: Spacing.sm),
 
                     // Clear gap with tooltip.
                     Tooltip(
-                      message: _clearGapTooltip,
+                      message: l10n.clearGapTooltip,
                       child: SizedBox(
                         width: 60,
                         child: TextField(
                           controller: _studGapCtrl,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(
+                          decoration: InputDecoration(
                             isDense: true,
                             suffixText: 'mm',
-                            hintText: 'gap',
-                            contentPadding: EdgeInsets.symmetric(
+                            hintText: l10n.studGapHint,
+                            contentPadding: const EdgeInsets.symmetric(
                               horizontal: 6,
                               vertical: 6,
                             ),
@@ -1599,7 +1612,7 @@ class _LayerRowState extends State<_LayerRow> {
                       ),
                     ),
                     const SizedBox(width: Spacing.xs),
-                    Text('clear gap', style: textTheme.labelSmall),
+                    Text(l10n.clearGapLabel, style: textTheme.labelSmall),
                     const SizedBox(width: Spacing.sm),
 
                     // Stud lambda.
@@ -1630,7 +1643,7 @@ class _LayerRowState extends State<_LayerRow> {
                       onPressed: _removeStud,
                       visualDensity: VisualDensity.compact,
                       padding: EdgeInsets.zero,
-                      tooltip: 'Remove stud definition',
+                      tooltip: l10n.removeStudTooltip,
                     ),
                   ],
                 ),

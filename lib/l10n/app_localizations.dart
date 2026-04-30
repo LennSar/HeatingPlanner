@@ -992,6 +992,120 @@ abstract class AppLocalizations {
   /// **'Surface resistances (m²K/W):'**
   String get surfaceResistances;
 
+  /// Header title of the wall construction editor dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Wall Construction'**
+  String get wallConstructionTitle;
+
+  /// Default name pre-filled when creating a new wall construction
+  ///
+  /// In en, this message translates to:
+  /// **'New Construction'**
+  String get newConstructionDefault;
+
+  /// Placeholder shown for U-value when the layer stack does not yield a finite result
+  ///
+  /// In en, this message translates to:
+  /// **'U-Value: —'**
+  String get uValueEmpty;
+
+  /// Placeholder shown for total thermal resistance when no finite result is available
+  ///
+  /// In en, this message translates to:
+  /// **'R: —'**
+  String get rValueEmpty;
+
+  /// Formatted U-value display (symbol + numeric value + unit). The symbol U and unit W/(m²K) stay in English in all locales.
+  ///
+  /// In en, this message translates to:
+  /// **'U  {value} W/(m²K)'**
+  String uValueDisplay(String value);
+
+  /// Formatted thermal resistance display (symbol + numeric value + unit). The symbol R and unit m²K/W stay in English in all locales.
+  ///
+  /// In en, this message translates to:
+  /// **'R  {value} m²K/W'**
+  String rValueDisplay(String value);
+
+  /// Header above the temperature gradient bar, showing indoor and outdoor design temperatures
+  ///
+  /// In en, this message translates to:
+  /// **'Temperature Profile  ({indoor}°C → {outdoor}°C)'**
+  String temperatureProfileWithRange(String indoor, String outdoor);
+
+  /// Tooltip explaining how the clear-gap dimension differs from centre-to-centre stud spacing
+  ///
+  /// In en, this message translates to:
+  /// **'Clear distance between studs, edge to edge — not centre-to-centre. Centre-to-centre spacing = stud width + clear gap.'**
+  String get clearGapTooltip;
+
+  /// Tooltip on the add-stud icon button in a layer row
+  ///
+  /// In en, this message translates to:
+  /// **'Add timber stud (inhomogeneous layer)'**
+  String get addStudTooltip;
+
+  /// Tooltip on the remove-stud icon button in a layer row
+  ///
+  /// In en, this message translates to:
+  /// **'Remove stud definition'**
+  String get removeStudTooltip;
+
+  /// Inline label introducing the timber-stud sub-row of an inhomogeneous layer
+  ///
+  /// In en, this message translates to:
+  /// **'Timber stud:'**
+  String get timberStudLabel;
+
+  /// Caption next to the stud width input field
+  ///
+  /// In en, this message translates to:
+  /// **'stud width'**
+  String get studWidthLabel;
+
+  /// Caption next to the clear-gap input field
+  ///
+  /// In en, this message translates to:
+  /// **'clear gap'**
+  String get clearGapLabel;
+
+  /// Placeholder text shown inside the empty stud width field
+  ///
+  /// In en, this message translates to:
+  /// **'width'**
+  String get studWidthHint;
+
+  /// Placeholder text shown inside the empty clear-gap field
+  ///
+  /// In en, this message translates to:
+  /// **'gap'**
+  String get studGapHint;
+
+  /// Error shown in the material picker when the catalogue cannot be loaded
+  ///
+  /// In en, this message translates to:
+  /// **'Failed to load materials.'**
+  String get failedLoadMaterials;
+
+  /// Empty state in the material picker when the catalogue is empty
+  ///
+  /// In en, this message translates to:
+  /// **'No materials available.'**
+  String get noMaterialsInPicker;
+
+  /// Empty state in the material picker when the search query has no matches
+  ///
+  /// In en, this message translates to:
+  /// **'No matching materials.'**
+  String get noMatchingMaterials;
+
+  /// Subtitle line under each construction preset, showing the preset's U-value (the placeholder already includes the unit, or an em dash when not finite). The symbol U stays in English in all locales.
+  ///
+  /// In en, this message translates to:
+  /// **'U = {value}'**
+  String presetUValueLine(String value);
+
   /// Section heading in zone properties
   ///
   /// In en, this message translates to:

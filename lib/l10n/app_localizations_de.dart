@@ -518,6 +518,72 @@ class AppLocalizationsDe extends AppLocalizations {
   String get surfaceResistances => 'Oberflächenwiderstände (m²K/W):';
 
   @override
+  String get wallConstructionTitle => 'Wandkonstruktion';
+
+  @override
+  String get newConstructionDefault => 'Neue Konstruktion';
+
+  @override
+  String get uValueEmpty => 'U-Wert: —';
+
+  @override
+  String get rValueEmpty => 'R: —';
+
+  @override
+  String uValueDisplay(String value) {
+    return 'U  $value W/(m²K)';
+  }
+
+  @override
+  String rValueDisplay(String value) {
+    return 'R  $value m²K/W';
+  }
+
+  @override
+  String temperatureProfileWithRange(String indoor, String outdoor) {
+    return 'Temperaturprofil  ($indoor°C → $outdoor°C)';
+  }
+
+  @override
+  String get clearGapTooltip =>
+      'Lichter Abstand zwischen Ständern, Kante zu Kante — nicht Achsabstand. Achsabstand = Ständerbreite + lichter Abstand.';
+
+  @override
+  String get addStudTooltip => 'Holzständer hinzufügen (inhomogene Schicht)';
+
+  @override
+  String get removeStudTooltip => 'Holzständer-Definition entfernen';
+
+  @override
+  String get timberStudLabel => 'Holzständer:';
+
+  @override
+  String get studWidthLabel => 'Ständerbreite';
+
+  @override
+  String get clearGapLabel => 'lichter Abstand';
+
+  @override
+  String get studWidthHint => 'Breite';
+
+  @override
+  String get studGapHint => 'Abstand';
+
+  @override
+  String get failedLoadMaterials => 'Fehler beim Laden der Materialien.';
+
+  @override
+  String get noMaterialsInPicker => 'Keine Materialien verfügbar.';
+
+  @override
+  String get noMatchingMaterials => 'Keine passenden Materialien.';
+
+  @override
+  String presetUValueLine(String value) {
+    return 'U = $value';
+  }
+
+  @override
   String get heatingZone => 'Heizzone';
 
   @override

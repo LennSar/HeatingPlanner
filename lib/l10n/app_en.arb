@@ -518,6 +518,59 @@
   "@layerStack": { "description": "Section heading for material layer list" },
   "surfaceResistances": "Surface resistances (m²K/W):",
   "@surfaceResistances": { "description": "Label for surface resistance inputs" },
+  "wallConstructionTitle": "Wall Construction",
+  "@wallConstructionTitle": { "description": "Header title of the wall construction editor dialog" },
+  "newConstructionDefault": "New Construction",
+  "@newConstructionDefault": { "description": "Default name pre-filled when creating a new wall construction" },
+  "uValueEmpty": "U-Value: —",
+  "@uValueEmpty": { "description": "Placeholder shown for U-value when the layer stack does not yield a finite result" },
+  "rValueEmpty": "R: —",
+  "@rValueEmpty": { "description": "Placeholder shown for total thermal resistance when no finite result is available" },
+  "uValueDisplay": "U  {value} W/(m²K)",
+  "@uValueDisplay": {
+    "description": "Formatted U-value display (symbol + numeric value + unit). The symbol U and unit W/(m²K) stay in English in all locales.",
+    "placeholders": { "value": { "type": "String" } }
+  },
+  "rValueDisplay": "R  {value} m²K/W",
+  "@rValueDisplay": {
+    "description": "Formatted thermal resistance display (symbol + numeric value + unit). The symbol R and unit m²K/W stay in English in all locales.",
+    "placeholders": { "value": { "type": "String" } }
+  },
+  "temperatureProfileWithRange": "Temperature Profile  ({indoor}°C → {outdoor}°C)",
+  "@temperatureProfileWithRange": {
+    "description": "Header above the temperature gradient bar, showing indoor and outdoor design temperatures",
+    "placeholders": {
+      "indoor": { "type": "String" },
+      "outdoor": { "type": "String" }
+    }
+  },
+  "clearGapTooltip": "Clear distance between studs, edge to edge — not centre-to-centre. Centre-to-centre spacing = stud width + clear gap.",
+  "@clearGapTooltip": { "description": "Tooltip explaining how the clear-gap dimension differs from centre-to-centre stud spacing" },
+  "addStudTooltip": "Add timber stud (inhomogeneous layer)",
+  "@addStudTooltip": { "description": "Tooltip on the add-stud icon button in a layer row" },
+  "removeStudTooltip": "Remove stud definition",
+  "@removeStudTooltip": { "description": "Tooltip on the remove-stud icon button in a layer row" },
+  "timberStudLabel": "Timber stud:",
+  "@timberStudLabel": { "description": "Inline label introducing the timber-stud sub-row of an inhomogeneous layer" },
+  "studWidthLabel": "stud width",
+  "@studWidthLabel": { "description": "Caption next to the stud width input field" },
+  "clearGapLabel": "clear gap",
+  "@clearGapLabel": { "description": "Caption next to the clear-gap input field" },
+  "studWidthHint": "width",
+  "@studWidthHint": { "description": "Placeholder text shown inside the empty stud width field" },
+  "studGapHint": "gap",
+  "@studGapHint": { "description": "Placeholder text shown inside the empty clear-gap field" },
+  "failedLoadMaterials": "Failed to load materials.",
+  "@failedLoadMaterials": { "description": "Error shown in the material picker when the catalogue cannot be loaded" },
+  "noMaterialsInPicker": "No materials available.",
+  "@noMaterialsInPicker": { "description": "Empty state in the material picker when the catalogue is empty" },
+  "noMatchingMaterials": "No matching materials.",
+  "@noMatchingMaterials": { "description": "Empty state in the material picker when the search query has no matches" },
+  "presetUValueLine": "U = {value}",
+  "@presetUValueLine": {
+    "description": "Subtitle line under each construction preset, showing the preset's U-value (the placeholder already includes the unit, or an em dash when not finite). The symbol U stays in English in all locales.",
+    "placeholders": { "value": { "type": "String" } }
+  },
 
   "heatingZone": "Heating Zone",
   "@heatingZone": { "description": "Section heading in zone properties" },

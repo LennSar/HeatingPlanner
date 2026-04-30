@@ -519,6 +519,72 @@ class AppLocalizationsEn extends AppLocalizations {
   String get surfaceResistances => 'Surface resistances (m²K/W):';
 
   @override
+  String get wallConstructionTitle => 'Wall Construction';
+
+  @override
+  String get newConstructionDefault => 'New Construction';
+
+  @override
+  String get uValueEmpty => 'U-Value: —';
+
+  @override
+  String get rValueEmpty => 'R: —';
+
+  @override
+  String uValueDisplay(String value) {
+    return 'U  $value W/(m²K)';
+  }
+
+  @override
+  String rValueDisplay(String value) {
+    return 'R  $value m²K/W';
+  }
+
+  @override
+  String temperatureProfileWithRange(String indoor, String outdoor) {
+    return 'Temperature Profile  ($indoor°C → $outdoor°C)';
+  }
+
+  @override
+  String get clearGapTooltip =>
+      'Clear distance between studs, edge to edge — not centre-to-centre. Centre-to-centre spacing = stud width + clear gap.';
+
+  @override
+  String get addStudTooltip => 'Add timber stud (inhomogeneous layer)';
+
+  @override
+  String get removeStudTooltip => 'Remove stud definition';
+
+  @override
+  String get timberStudLabel => 'Timber stud:';
+
+  @override
+  String get studWidthLabel => 'stud width';
+
+  @override
+  String get clearGapLabel => 'clear gap';
+
+  @override
+  String get studWidthHint => 'width';
+
+  @override
+  String get studGapHint => 'gap';
+
+  @override
+  String get failedLoadMaterials => 'Failed to load materials.';
+
+  @override
+  String get noMaterialsInPicker => 'No materials available.';
+
+  @override
+  String get noMatchingMaterials => 'No matching materials.';
+
+  @override
+  String presetUValueLine(String value) {
+    return 'U = $value';
+  }
+
+  @override
   String get heatingZone => 'Heating Zone';
 
   @override

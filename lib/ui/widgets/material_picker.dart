@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../calculation/providers/grouped_materials_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/material_entry.dart';
+import '../../l10n/app_localizations.dart';
 import '../../repositories/material_repository.dart';
 import 'collapsible_group_tile.dart';
 import 'material_entry_tile.dart';
@@ -65,6 +66,7 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final l10n = AppLocalizations.of(context)!;
 
     // Grouped data from the provider — empty while loading or on error.
     final grouped = ref.watch(groupedMaterialsProvider);
@@ -81,7 +83,7 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
             autofocus: false,
             style: theme.textTheme.bodyMedium,
             decoration: InputDecoration(
-              hintText: 'Search materials…',
+              hintText: l10n.searchMaterials,
               hintStyle: theme.textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -113,7 +115,7 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
             error: (_, __) => Padding(
               padding: const EdgeInsets.all(Spacing.md),
               child: Text(
-                'Failed to load materials.',
+                l10n.failedLoadMaterials,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: colorScheme.error,
                 ),
@@ -135,7 +137,7 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
                 return Padding(
                   padding: const EdgeInsets.all(Spacing.md),
                   child: Text(
-                    'No materials available.',
+                    l10n.noMaterialsInPicker,
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -175,7 +177,7 @@ class _FlatFilteredList extends StatelessWidget {
       return Padding(
         padding: const EdgeInsets.all(Spacing.md),
         child: Text(
-          'No matching materials.',
+          AppLocalizations.of(context)!.noMatchingMaterials,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
