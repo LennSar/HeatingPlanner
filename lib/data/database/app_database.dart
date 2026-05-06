@@ -200,6 +200,7 @@ class AppDatabase extends _$AppDatabase {
             await m.database.customStatement(
               'ALTER TABLE wall_constructions ADD COLUMN name_de TEXT',
             );
+            await heatingDao.seedGermanNamesV15();
           }
         },
       );

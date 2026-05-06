@@ -108,6 +108,10 @@ class MaterialRepository with SaveStateMixin {
       );
     }
 
+    // Populate `name_de` for the catalog rows just inserted. The helper
+    // is idempotent (UPDATE WHERE name = ?) so re-running is safe.
+    await ref.read($db.appDatabaseProvider).heatingDao.seedGermanNamesV15();
+
     await prefs.setMaterialDbVersion(materialDbVersion);
   }
 }

@@ -242,6 +242,7 @@ class HeatingDao extends DatabaseAccessor<AppDatabase>
     }
 
     await _upsertAllSurfaceMaterials();
+    await seedGermanNamesV15();
   }
 
   // ── Seed helpers ───────────────────────────────────────────────────────────
@@ -426,5 +427,160 @@ class HeatingDao extends DatabaseAccessor<AppDatabase>
   /// Custom sentinel.
   Future<void> seedMaterialCorrectionsV5() async {
     await _upsertAllSurfaceMaterials();
+  }
+
+  /// Populates `name_de` for built-in catalog rows seeded with English
+  /// canonical names.
+  ///
+  /// Called from [AppDatabase.onUpgrade] for schema v14 → v15 and from
+  /// the seed entry points ([seedDefaults] and
+  /// [MaterialRepository.ensureMaterialsSeeded]) so that both fresh
+  /// installs and migrating users get the same German catalog terms.
+  ///
+  /// Each UPDATE matches by canonical English `name`, never by id —
+  /// ids may differ across user databases that imported `.hsp` files
+  /// or were seeded by older builds. User-created rows whose names do
+  /// not appear in the lists below are left untouched.
+  ///
+  /// Translations follow established DIN 4108 / EN 1264 / EN 15377
+  /// terminology. Brand-name products (Rockwool, STEICO, Wienerberger,
+  /// etc.) are intentionally NOT translated — the brand name is
+  /// identical in both locales and the JSON catalog already uses the
+  /// German-market spelling.
+  Future<void> seedGermanNamesV15() async {
+    // ── flooring_materials (seeded by HeatingDao.seedDefaults) ──────
+    const flooringTranslations = <String, String>{
+      'Ceramic tile': 'Keramikfliese',
+      'Parquet (oak)': 'Parkett (Eiche)',
+      'Laminate': 'Laminat',
+      'Carpet + underlay': 'Teppich mit Trittschalldämmung',
+      'Vinyl sheet': 'Vinyl-Bahnware',
+      'LVT (Luxury Vinyl Tile)': 'Designvinyl (LVT)',
+      'Cork tiles': 'Korkfliesen',
+      'Micro cement': 'Mikrozement',
+      'Gypsum plaster': 'Gipsputz',
+      'Lime plaster': 'Kalkputz',
+      'Clay plaster': 'Lehmputz',
+      'Gypsum board': 'Gipskarton',
+      'Natural stone': 'Naturstein',
+      'Wood paneling': 'Holzvertäfelung',
+      'Custom': 'Benutzerdefiniert',
+    };
+    for (final entry in flooringTranslations.entries) {
+      await customStatement(
+        'UPDATE flooring_materials SET name_de = ? WHERE name = ?',
+        <Object?>[entry.value, entry.key],
+      );
+    }
+
+    // ── material_entries (seeded from assets/materials.json) ───────
+    //
+    // Translations are limited to DIN 4108 / EN 1264 generic terms.
+    // Manufacturer-branded entries (Poroton, Ytong, Rockwool, STEICO,
+    // Knauf, Isover, Celotex, Kingspan, isofloc, Homatherm, Climacell,
+    // Calsitherm, Multipor, Foamglas, Neopor) are intentionally
+    // omitted because the brand spelling is identical in German.
+    const materialTranslations = <String, String>{
+      // Historic brick (AMz-Bericht 8/2005 / DIN 4108 1952–1981)
+      'Solid brick (pre-1952, ρ≥1900)': 'Vollziegel (vor 1952, ρ≥1900)',
+      'Solid brick (1952–1968, ρ=1800)':
+          'Vollziegel (1952–1968, ρ=1800)',
+      'Hollow brick (1969, ρ=1000)': 'Hochlochziegel (1969, ρ=1000)',
+      'Hollow brick (1969, ρ=1200)': 'Hochlochziegel (1969, ρ=1200)',
+      'Hollow brick (1969, ρ=1400)': 'Hochlochziegel (1969, ρ=1400)',
+      'Solid brick (post-1981, ρ=1800)':
+          'Vollziegel (nach 1981, ρ=1800)',
+      'Solid brick (post-1981, ρ=2000)':
+          'Vollziegel (nach 1981, ρ=2000)',
+      'Clinker brick (ρ=2200)': 'Klinkerziegel (ρ=2200)',
+      'Hollow brick HLz A+B (ρ=700, normal mortar)':
+          'Hochlochziegel HLz A+B (ρ=700, Normalmörtel)',
+      'Hollow brick HLz A+B (ρ=700, lightweight mortar)':
+          'Hochlochziegel HLz A+B (ρ=700, Leichtmörtel)',
+      'Hollow brick HLz A+B (ρ=900)': 'Hochlochziegel HLz A+B (ρ=900)',
+      'Hollow brick HLz A+B (ρ=1000)':
+          'Hochlochziegel HLz A+B (ρ=1000)',
+      'Hollow brick (post-1981, ρ=1200)':
+          'Hochlochziegel (nach 1981, ρ=1200)',
+      'Hollow brick (post-1981, ρ=1400)':
+          'Hochlochziegel (nach 1981, ρ=1400)',
+      'Hollow brick (post-1981, ρ=1600)':
+          'Hochlochziegel (nach 1981, ρ=1600)',
+      // Calcium silicate (DIN 4108-4)
+      'Calcium silicate (ρ=1200)': 'Kalksandstein (ρ=1200)',
+      'Calcium silicate (ρ=1400)': 'Kalksandstein (ρ=1400)',
+      'Calcium silicate (ρ=1600)': 'Kalksandstein (ρ=1600)',
+      'Calcium silicate (ρ=1800)': 'Kalksandstein (ρ=1800)',
+      'Calcium silicate (ρ=2000)': 'Kalksandstein (ρ=2000)',
+      // AAC / Aerated concrete (Porenbeton, DIN 4108-4)
+      'AAC block (ρ=500)': 'Porenbeton (ρ=500)',
+      'AAC block (ρ=600)': 'Porenbeton (ρ=600)',
+      'AAC block (ρ=700)': 'Porenbeton (ρ=700)',
+      // Concrete & screed (DIN 4108-4)
+      'Normal concrete (ρ=2300)': 'Normalbeton (ρ=2300)',
+      'Reinforced concrete (1% steel)': 'Stahlbeton (1 % Bewehrung)',
+      'Reinforced concrete (2% steel)': 'Stahlbeton (2 % Bewehrung)',
+      'Lightweight concrete (ρ=800)': 'Leichtbeton (ρ=800)',
+      'Lightweight concrete (ρ=1000)': 'Leichtbeton (ρ=1000)',
+      'Lightweight concrete (ρ=1200)': 'Leichtbeton (ρ=1200)',
+      'Lightweight concrete (ρ=1400)': 'Leichtbeton (ρ=1400)',
+      'Lightweight concrete (ρ=1600)': 'Leichtbeton (ρ=1600)',
+      'Cement screed': 'Zementestrich',
+      'Calcium sulfate screed': 'Calciumsulfatestrich',
+      'Mastic asphalt screed': 'Gussasphaltestrich',
+      // EPS / PUR / generic mineral wool (DIN 4108-4)
+      'EPS white WLG 040': 'EPS weiß WLG 040',
+      'EPS white WLG 035': 'EPS weiß WLG 035',
+      'EPS white WLG 032': 'EPS weiß WLG 032',
+      'EPS grey (graphite) WLG 032': 'EPS grau (Graphit) WLG 032',
+      'EPS grey (graphite) WLG 031': 'EPS grau (Graphit) WLG 031',
+      'PUR/PIR generic WLG 025': 'PUR/PIR generisch WLG 025',
+      'PUR/PIR generic WLG 023': 'PUR/PIR generisch WLG 023',
+      'Stone wool generic WLG 038': 'Steinwolle generisch WLG 038',
+      'Stone wool generic WLG 035': 'Steinwolle generisch WLG 035',
+      'Glass wool generic WLG 040': 'Glaswolle generisch WLG 040',
+      'Glass wool generic WLG 035': 'Glaswolle generisch WLG 035',
+      'Cork insulation board': 'Korkdämmplatte',
+      // Loose fill / blow-in
+      'Cellulose generic': 'Zellulose generisch',
+      'Perlite (loose fill)': 'Perlit (Schüttdämmung)',
+      'Vermiculite (loose fill)': 'Vermiculit (Schüttdämmung)',
+      'Hemp insulation (loose fill)': 'Hanfdämmung (Schüttdämmung)',
+      "Sheep's wool insulation": 'Schafwolldämmung',
+      'Straw bale': 'Strohballen',
+      // Wood (DIN 4108-4)
+      'Softwood (spruce/pine)': 'Nadelholz (Fichte/Kiefer)',
+      'Hardwood (oak)': 'Laubholz (Eiche)',
+      'Hardwood (beech)': 'Laubholz (Buche)',
+      'Plywood': 'Sperrholz',
+      'OSB': 'OSB-Platte',
+      'Chipboard / particle board': 'Spanplatte',
+      'MDF': 'MDF-Platte',
+      'CLT (cross-laminated timber)': 'Brettsperrholz (BSP)',
+      // Plaster & mortar (DIN 4108-4)
+      'Cement render': 'Zementputz',
+      'Lime-cement plaster': 'Kalkzementputz',
+      'Thermal insulation plaster': 'Wärmedämmputz',
+      'Lightweight plaster': 'Leichtputz',
+      // Board materials
+      'Gypsum plasterboard (12.5mm)': 'Gipskartonplatte (12,5 mm)',
+      // Floor coverings (DIN 4108-4)
+      'Granite': 'Granit',
+      'Marble': 'Marmor',
+      'Limestone': 'Kalkstein',
+      'Sandstone': 'Sandstein',
+      'Laminate flooring': 'Laminatboden',
+      'Carpet': 'Teppich',
+      'Vinyl / PVC flooring': 'Vinyl-/PVC-Bodenbelag',
+      'Linoleum': 'Linoleum',
+      // Glass
+      'Float glass': 'Floatglas',
+    };
+    for (final entry in materialTranslations.entries) {
+      await customStatement(
+        'UPDATE material_entries SET name_de = ? WHERE name = ?',
+        <Object?>[entry.value, entry.key],
+      );
+    }
   }
 }
