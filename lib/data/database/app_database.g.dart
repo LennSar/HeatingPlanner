@@ -1769,6 +1769,15 @@ class $WallConstructionsTable extends WallConstructions
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _nameDeMeta = const VerificationMeta('nameDe');
+  @override
+  late final GeneratedColumn<String> nameDe = GeneratedColumn<String>(
+    'name_de',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _rsiMeta = const VerificationMeta('rsi');
   @override
   late final GeneratedColumn<double> rsi = GeneratedColumn<double>(
@@ -1802,7 +1811,7 @@ class $WallConstructionsTable extends WallConstructions
     defaultValue: const Constant(0),
   );
   @override
-  List<GeneratedColumn> get $columns => [id, name, rsi, rse, isPreset];
+  List<GeneratedColumn> get $columns => [id, name, nameDe, rsi, rse, isPreset];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -1827,6 +1836,12 @@ class $WallConstructionsTable extends WallConstructions
       );
     } else if (isInserting) {
       context.missing(_nameMeta);
+    }
+    if (data.containsKey('name_de')) {
+      context.handle(
+        _nameDeMeta,
+        nameDe.isAcceptableOrUnknown(data['name_de']!, _nameDeMeta),
+      );
     }
     if (data.containsKey('rsi')) {
       context.handle(
@@ -1863,6 +1878,10 @@ class $WallConstructionsTable extends WallConstructions
         DriftSqlType.string,
         data['${effectivePrefix}name'],
       )!,
+      nameDe: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name_de'],
+      ),
       rsi: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}rsi'],
@@ -1888,6 +1907,7 @@ class WallConstruction extends DataClass
     implements Insertable<WallConstruction> {
   final String id;
   final String name;
+  final String? nameDe;
   final double rsi;
   final double rse;
 
@@ -1896,6 +1916,7 @@ class WallConstruction extends DataClass
   const WallConstruction({
     required this.id,
     required this.name,
+    this.nameDe,
     required this.rsi,
     required this.rse,
     required this.isPreset,
@@ -1905,6 +1926,9 @@ class WallConstruction extends DataClass
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
+    if (!nullToAbsent || nameDe != null) {
+      map['name_de'] = Variable<String>(nameDe);
+    }
     map['rsi'] = Variable<double>(rsi);
     map['rse'] = Variable<double>(rse);
     map['is_preset'] = Variable<int>(isPreset);
@@ -1915,6 +1939,9 @@ class WallConstruction extends DataClass
     return WallConstructionsCompanion(
       id: Value(id),
       name: Value(name),
+      nameDe: nameDe == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nameDe),
       rsi: Value(rsi),
       rse: Value(rse),
       isPreset: Value(isPreset),
@@ -1929,6 +1956,7 @@ class WallConstruction extends DataClass
     return WallConstruction(
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
+      nameDe: serializer.fromJson<String?>(json['nameDe']),
       rsi: serializer.fromJson<double>(json['rsi']),
       rse: serializer.fromJson<double>(json['rse']),
       isPreset: serializer.fromJson<int>(json['isPreset']),
@@ -1940,6 +1968,7 @@ class WallConstruction extends DataClass
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
+      'nameDe': serializer.toJson<String?>(nameDe),
       'rsi': serializer.toJson<double>(rsi),
       'rse': serializer.toJson<double>(rse),
       'isPreset': serializer.toJson<int>(isPreset),
@@ -1949,12 +1978,14 @@ class WallConstruction extends DataClass
   WallConstruction copyWith({
     String? id,
     String? name,
+    Value<String?> nameDe = const Value.absent(),
     double? rsi,
     double? rse,
     int? isPreset,
   }) => WallConstruction(
     id: id ?? this.id,
     name: name ?? this.name,
+    nameDe: nameDe.present ? nameDe.value : this.nameDe,
     rsi: rsi ?? this.rsi,
     rse: rse ?? this.rse,
     isPreset: isPreset ?? this.isPreset,
@@ -1963,6 +1994,7 @@ class WallConstruction extends DataClass
     return WallConstruction(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
+      nameDe: data.nameDe.present ? data.nameDe.value : this.nameDe,
       rsi: data.rsi.present ? data.rsi.value : this.rsi,
       rse: data.rse.present ? data.rse.value : this.rse,
       isPreset: data.isPreset.present ? data.isPreset.value : this.isPreset,
@@ -1974,6 +2006,7 @@ class WallConstruction extends DataClass
     return (StringBuffer('WallConstruction(')
           ..write('id: $id, ')
           ..write('name: $name, ')
+          ..write('nameDe: $nameDe, ')
           ..write('rsi: $rsi, ')
           ..write('rse: $rse, ')
           ..write('isPreset: $isPreset')
@@ -1982,13 +2015,14 @@ class WallConstruction extends DataClass
   }
 
   @override
-  int get hashCode => Object.hash(id, name, rsi, rse, isPreset);
+  int get hashCode => Object.hash(id, name, nameDe, rsi, rse, isPreset);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is WallConstruction &&
           other.id == this.id &&
           other.name == this.name &&
+          other.nameDe == this.nameDe &&
           other.rsi == this.rsi &&
           other.rse == this.rse &&
           other.isPreset == this.isPreset);
@@ -1997,6 +2031,7 @@ class WallConstruction extends DataClass
 class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
   final Value<String> id;
   final Value<String> name;
+  final Value<String?> nameDe;
   final Value<double> rsi;
   final Value<double> rse;
   final Value<int> isPreset;
@@ -2004,6 +2039,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
   const WallConstructionsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
+    this.nameDe = const Value.absent(),
     this.rsi = const Value.absent(),
     this.rse = const Value.absent(),
     this.isPreset = const Value.absent(),
@@ -2012,6 +2048,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
   WallConstructionsCompanion.insert({
     required String id,
     required String name,
+    this.nameDe = const Value.absent(),
     this.rsi = const Value.absent(),
     this.rse = const Value.absent(),
     this.isPreset = const Value.absent(),
@@ -2021,6 +2058,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
   static Insertable<WallConstruction> custom({
     Expression<String>? id,
     Expression<String>? name,
+    Expression<String>? nameDe,
     Expression<double>? rsi,
     Expression<double>? rse,
     Expression<int>? isPreset,
@@ -2029,6 +2067,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
+      if (nameDe != null) 'name_de': nameDe,
       if (rsi != null) 'rsi': rsi,
       if (rse != null) 'rse': rse,
       if (isPreset != null) 'is_preset': isPreset,
@@ -2039,6 +2078,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
   WallConstructionsCompanion copyWith({
     Value<String>? id,
     Value<String>? name,
+    Value<String?>? nameDe,
     Value<double>? rsi,
     Value<double>? rse,
     Value<int>? isPreset,
@@ -2047,6 +2087,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
     return WallConstructionsCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
+      nameDe: nameDe ?? this.nameDe,
       rsi: rsi ?? this.rsi,
       rse: rse ?? this.rse,
       isPreset: isPreset ?? this.isPreset,
@@ -2062,6 +2103,9 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
+    }
+    if (nameDe.present) {
+      map['name_de'] = Variable<String>(nameDe.value);
     }
     if (rsi.present) {
       map['rsi'] = Variable<double>(rsi.value);
@@ -2083,6 +2127,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
     return (StringBuffer('WallConstructionsCompanion(')
           ..write('id: $id, ')
           ..write('name: $name, ')
+          ..write('nameDe: $nameDe, ')
           ..write('rsi: $rsi, ')
           ..write('rse: $rse, ')
           ..write('isPreset: $isPreset, ')
@@ -3669,6 +3714,15 @@ class $MaterialEntriesTable extends MaterialEntries
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _nameDeMeta = const VerificationMeta('nameDe');
+  @override
+  late final GeneratedColumn<String> nameDe = GeneratedColumn<String>(
+    'name_de',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _categoryMeta = const VerificationMeta(
     'category',
   );
@@ -3744,6 +3798,7 @@ class $MaterialEntriesTable extends MaterialEntries
   List<GeneratedColumn> get $columns => [
     id,
     name,
+    nameDe,
     category,
     subcategory,
     lambdaDefault,
@@ -3775,6 +3830,12 @@ class $MaterialEntriesTable extends MaterialEntries
       );
     } else if (isInserting) {
       context.missing(_nameMeta);
+    }
+    if (data.containsKey('name_de')) {
+      context.handle(
+        _nameDeMeta,
+        nameDe.isAcceptableOrUnknown(data['name_de']!, _nameDeMeta),
+      );
     }
     if (data.containsKey('category')) {
       context.handle(
@@ -3849,6 +3910,10 @@ class $MaterialEntriesTable extends MaterialEntries
         DriftSqlType.string,
         data['${effectivePrefix}name'],
       )!,
+      nameDe: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name_de'],
+      ),
       category: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}category'],
@@ -3885,6 +3950,7 @@ class $MaterialEntriesTable extends MaterialEntries
 class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
   final String id;
   final String name;
+  final String? nameDe;
   final String category;
   final String subcategory;
   final double lambdaDefault;
@@ -3894,6 +3960,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
   const MaterialEntry({
     required this.id,
     required this.name,
+    this.nameDe,
     required this.category,
     required this.subcategory,
     required this.lambdaDefault,
@@ -3906,6 +3973,9 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
+    if (!nullToAbsent || nameDe != null) {
+      map['name_de'] = Variable<String>(nameDe);
+    }
     map['category'] = Variable<String>(category);
     map['subcategory'] = Variable<String>(subcategory);
     map['lambda_default'] = Variable<double>(lambdaDefault);
@@ -3919,6 +3989,9 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
     return MaterialEntriesCompanion(
       id: Value(id),
       name: Value(name),
+      nameDe: nameDe == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nameDe),
       category: Value(category),
       subcategory: Value(subcategory),
       lambdaDefault: Value(lambdaDefault),
@@ -3936,6 +4009,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
     return MaterialEntry(
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
+      nameDe: serializer.fromJson<String?>(json['nameDe']),
       category: serializer.fromJson<String>(json['category']),
       subcategory: serializer.fromJson<String>(json['subcategory']),
       lambdaDefault: serializer.fromJson<double>(json['lambdaDefault']),
@@ -3952,6 +4026,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
+      'nameDe': serializer.toJson<String?>(nameDe),
       'category': serializer.toJson<String>(category),
       'subcategory': serializer.toJson<String>(subcategory),
       'lambdaDefault': serializer.toJson<double>(lambdaDefault),
@@ -3964,6 +4039,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
   MaterialEntry copyWith({
     String? id,
     String? name,
+    Value<String?> nameDe = const Value.absent(),
     String? category,
     String? subcategory,
     double? lambdaDefault,
@@ -3973,6 +4049,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
   }) => MaterialEntry(
     id: id ?? this.id,
     name: name ?? this.name,
+    nameDe: nameDe.present ? nameDe.value : this.nameDe,
     category: category ?? this.category,
     subcategory: subcategory ?? this.subcategory,
     lambdaDefault: lambdaDefault ?? this.lambdaDefault,
@@ -3984,6 +4061,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
     return MaterialEntry(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
+      nameDe: data.nameDe.present ? data.nameDe.value : this.nameDe,
       category: data.category.present ? data.category.value : this.category,
       subcategory: data.subcategory.present
           ? data.subcategory.value
@@ -4006,6 +4084,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
     return (StringBuffer('MaterialEntry(')
           ..write('id: $id, ')
           ..write('name: $name, ')
+          ..write('nameDe: $nameDe, ')
           ..write('category: $category, ')
           ..write('subcategory: $subcategory, ')
           ..write('lambdaDefault: $lambdaDefault, ')
@@ -4020,6 +4099,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
   int get hashCode => Object.hash(
     id,
     name,
+    nameDe,
     category,
     subcategory,
     lambdaDefault,
@@ -4033,6 +4113,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
       (other is MaterialEntry &&
           other.id == this.id &&
           other.name == this.name &&
+          other.nameDe == this.nameDe &&
           other.category == this.category &&
           other.subcategory == this.subcategory &&
           other.lambdaDefault == this.lambdaDefault &&
@@ -4044,6 +4125,7 @@ class MaterialEntry extends DataClass implements Insertable<MaterialEntry> {
 class MaterialEntriesCompanion extends UpdateCompanion<MaterialEntry> {
   final Value<String> id;
   final Value<String> name;
+  final Value<String?> nameDe;
   final Value<String> category;
   final Value<String> subcategory;
   final Value<double> lambdaDefault;
@@ -4054,6 +4136,7 @@ class MaterialEntriesCompanion extends UpdateCompanion<MaterialEntry> {
   const MaterialEntriesCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
+    this.nameDe = const Value.absent(),
     this.category = const Value.absent(),
     this.subcategory = const Value.absent(),
     this.lambdaDefault = const Value.absent(),
@@ -4065,6 +4148,7 @@ class MaterialEntriesCompanion extends UpdateCompanion<MaterialEntry> {
   MaterialEntriesCompanion.insert({
     required String id,
     required String name,
+    this.nameDe = const Value.absent(),
     required String category,
     this.subcategory = const Value.absent(),
     required double lambdaDefault,
@@ -4081,6 +4165,7 @@ class MaterialEntriesCompanion extends UpdateCompanion<MaterialEntry> {
   static Insertable<MaterialEntry> custom({
     Expression<String>? id,
     Expression<String>? name,
+    Expression<String>? nameDe,
     Expression<String>? category,
     Expression<String>? subcategory,
     Expression<double>? lambdaDefault,
@@ -4092,6 +4177,7 @@ class MaterialEntriesCompanion extends UpdateCompanion<MaterialEntry> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
+      if (nameDe != null) 'name_de': nameDe,
       if (category != null) 'category': category,
       if (subcategory != null) 'subcategory': subcategory,
       if (lambdaDefault != null) 'lambda_default': lambdaDefault,
@@ -4106,6 +4192,7 @@ class MaterialEntriesCompanion extends UpdateCompanion<MaterialEntry> {
   MaterialEntriesCompanion copyWith({
     Value<String>? id,
     Value<String>? name,
+    Value<String?>? nameDe,
     Value<String>? category,
     Value<String>? subcategory,
     Value<double>? lambdaDefault,
@@ -4117,6 +4204,7 @@ class MaterialEntriesCompanion extends UpdateCompanion<MaterialEntry> {
     return MaterialEntriesCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
+      nameDe: nameDe ?? this.nameDe,
       category: category ?? this.category,
       subcategory: subcategory ?? this.subcategory,
       lambdaDefault: lambdaDefault ?? this.lambdaDefault,
@@ -4135,6 +4223,9 @@ class MaterialEntriesCompanion extends UpdateCompanion<MaterialEntry> {
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
+    }
+    if (nameDe.present) {
+      map['name_de'] = Variable<String>(nameDe.value);
     }
     if (category.present) {
       map['category'] = Variable<String>(category.value);
@@ -4167,6 +4258,7 @@ class MaterialEntriesCompanion extends UpdateCompanion<MaterialEntry> {
     return (StringBuffer('MaterialEntriesCompanion(')
           ..write('id: $id, ')
           ..write('name: $name, ')
+          ..write('nameDe: $nameDe, ')
           ..write('category: $category, ')
           ..write('subcategory: $subcategory, ')
           ..write('lambdaDefault: $lambdaDefault, ')
@@ -4918,6 +5010,15 @@ class $TubeTypesTable extends TubeTypes
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _nameDeMeta = const VerificationMeta('nameDe');
+  @override
+  late final GeneratedColumn<String> nameDe = GeneratedColumn<String>(
+    'name_de',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _materialMeta = const VerificationMeta(
     'material',
   );
@@ -5018,6 +5119,7 @@ class $TubeTypesTable extends TubeTypes
   List<GeneratedColumn> get $columns => [
     id,
     name,
+    nameDe,
     material,
     outerDiameterMm,
     innerDiameterMm,
@@ -5051,6 +5153,12 @@ class $TubeTypesTable extends TubeTypes
       );
     } else if (isInserting) {
       context.missing(_nameMeta);
+    }
+    if (data.containsKey('name_de')) {
+      context.handle(
+        _nameDeMeta,
+        nameDe.isAcceptableOrUnknown(data['name_de']!, _nameDeMeta),
+      );
     }
     if (data.containsKey('material')) {
       context.handle(
@@ -5137,6 +5245,10 @@ class $TubeTypesTable extends TubeTypes
         DriftSqlType.string,
         data['${effectivePrefix}name'],
       )!,
+      nameDe: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name_de'],
+      ),
       material: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}material'],
@@ -5181,6 +5293,7 @@ class $TubeTypesTable extends TubeTypes
 class TubeType extends DataClass implements Insertable<TubeType> {
   final String id;
   final String name;
+  final String? nameDe;
   final String material;
   final double outerDiameterMm;
   final double innerDiameterMm;
@@ -5192,6 +5305,7 @@ class TubeType extends DataClass implements Insertable<TubeType> {
   const TubeType({
     required this.id,
     required this.name,
+    this.nameDe,
     required this.material,
     required this.outerDiameterMm,
     required this.innerDiameterMm,
@@ -5206,6 +5320,9 @@ class TubeType extends DataClass implements Insertable<TubeType> {
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
+    if (!nullToAbsent || nameDe != null) {
+      map['name_de'] = Variable<String>(nameDe);
+    }
     map['material'] = Variable<String>(material);
     map['outer_diameter_mm'] = Variable<double>(outerDiameterMm);
     map['inner_diameter_mm'] = Variable<double>(innerDiameterMm);
@@ -5221,6 +5338,9 @@ class TubeType extends DataClass implements Insertable<TubeType> {
     return TubeTypesCompanion(
       id: Value(id),
       name: Value(name),
+      nameDe: nameDe == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nameDe),
       material: Value(material),
       outerDiameterMm: Value(outerDiameterMm),
       innerDiameterMm: Value(innerDiameterMm),
@@ -5240,6 +5360,7 @@ class TubeType extends DataClass implements Insertable<TubeType> {
     return TubeType(
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
+      nameDe: serializer.fromJson<String?>(json['nameDe']),
       material: serializer.fromJson<String>(json['material']),
       outerDiameterMm: serializer.fromJson<double>(json['outerDiameterMm']),
       innerDiameterMm: serializer.fromJson<double>(json['innerDiameterMm']),
@@ -5260,6 +5381,7 @@ class TubeType extends DataClass implements Insertable<TubeType> {
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
+      'nameDe': serializer.toJson<String?>(nameDe),
       'material': serializer.toJson<String>(material),
       'outerDiameterMm': serializer.toJson<double>(outerDiameterMm),
       'innerDiameterMm': serializer.toJson<double>(innerDiameterMm),
@@ -5274,6 +5396,7 @@ class TubeType extends DataClass implements Insertable<TubeType> {
   TubeType copyWith({
     String? id,
     String? name,
+    Value<String?> nameDe = const Value.absent(),
     String? material,
     double? outerDiameterMm,
     double? innerDiameterMm,
@@ -5285,6 +5408,7 @@ class TubeType extends DataClass implements Insertable<TubeType> {
   }) => TubeType(
     id: id ?? this.id,
     name: name ?? this.name,
+    nameDe: nameDe.present ? nameDe.value : this.nameDe,
     material: material ?? this.material,
     outerDiameterMm: outerDiameterMm ?? this.outerDiameterMm,
     innerDiameterMm: innerDiameterMm ?? this.innerDiameterMm,
@@ -5298,6 +5422,7 @@ class TubeType extends DataClass implements Insertable<TubeType> {
     return TubeType(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
+      nameDe: data.nameDe.present ? data.nameDe.value : this.nameDe,
       material: data.material.present ? data.material.value : this.material,
       outerDiameterMm: data.outerDiameterMm.present
           ? data.outerDiameterMm.value
@@ -5326,6 +5451,7 @@ class TubeType extends DataClass implements Insertable<TubeType> {
     return (StringBuffer('TubeType(')
           ..write('id: $id, ')
           ..write('name: $name, ')
+          ..write('nameDe: $nameDe, ')
           ..write('material: $material, ')
           ..write('outerDiameterMm: $outerDiameterMm, ')
           ..write('innerDiameterMm: $innerDiameterMm, ')
@@ -5342,6 +5468,7 @@ class TubeType extends DataClass implements Insertable<TubeType> {
   int get hashCode => Object.hash(
     id,
     name,
+    nameDe,
     material,
     outerDiameterMm,
     innerDiameterMm,
@@ -5357,6 +5484,7 @@ class TubeType extends DataClass implements Insertable<TubeType> {
       (other is TubeType &&
           other.id == this.id &&
           other.name == this.name &&
+          other.nameDe == this.nameDe &&
           other.material == this.material &&
           other.outerDiameterMm == this.outerDiameterMm &&
           other.innerDiameterMm == this.innerDiameterMm &&
@@ -5370,6 +5498,7 @@ class TubeType extends DataClass implements Insertable<TubeType> {
 class TubeTypesCompanion extends UpdateCompanion<TubeType> {
   final Value<String> id;
   final Value<String> name;
+  final Value<String?> nameDe;
   final Value<String> material;
   final Value<double> outerDiameterMm;
   final Value<double> innerDiameterMm;
@@ -5382,6 +5511,7 @@ class TubeTypesCompanion extends UpdateCompanion<TubeType> {
   const TubeTypesCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
+    this.nameDe = const Value.absent(),
     this.material = const Value.absent(),
     this.outerDiameterMm = const Value.absent(),
     this.innerDiameterMm = const Value.absent(),
@@ -5395,6 +5525,7 @@ class TubeTypesCompanion extends UpdateCompanion<TubeType> {
   TubeTypesCompanion.insert({
     required String id,
     required String name,
+    this.nameDe = const Value.absent(),
     required String material,
     this.outerDiameterMm = const Value.absent(),
     this.innerDiameterMm = const Value.absent(),
@@ -5410,6 +5541,7 @@ class TubeTypesCompanion extends UpdateCompanion<TubeType> {
   static Insertable<TubeType> custom({
     Expression<String>? id,
     Expression<String>? name,
+    Expression<String>? nameDe,
     Expression<String>? material,
     Expression<double>? outerDiameterMm,
     Expression<double>? innerDiameterMm,
@@ -5423,6 +5555,7 @@ class TubeTypesCompanion extends UpdateCompanion<TubeType> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
+      if (nameDe != null) 'name_de': nameDe,
       if (material != null) 'material': material,
       if (outerDiameterMm != null) 'outer_diameter_mm': outerDiameterMm,
       if (innerDiameterMm != null) 'inner_diameter_mm': innerDiameterMm,
@@ -5440,6 +5573,7 @@ class TubeTypesCompanion extends UpdateCompanion<TubeType> {
   TubeTypesCompanion copyWith({
     Value<String>? id,
     Value<String>? name,
+    Value<String?>? nameDe,
     Value<String>? material,
     Value<double>? outerDiameterMm,
     Value<double>? innerDiameterMm,
@@ -5453,6 +5587,7 @@ class TubeTypesCompanion extends UpdateCompanion<TubeType> {
     return TubeTypesCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
+      nameDe: nameDe ?? this.nameDe,
       material: material ?? this.material,
       outerDiameterMm: outerDiameterMm ?? this.outerDiameterMm,
       innerDiameterMm: innerDiameterMm ?? this.innerDiameterMm,
@@ -5473,6 +5608,9 @@ class TubeTypesCompanion extends UpdateCompanion<TubeType> {
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
+    }
+    if (nameDe.present) {
+      map['name_de'] = Variable<String>(nameDe.value);
     }
     if (material.present) {
       map['material'] = Variable<String>(material.value);
@@ -5511,6 +5649,7 @@ class TubeTypesCompanion extends UpdateCompanion<TubeType> {
     return (StringBuffer('TubeTypesCompanion(')
           ..write('id: $id, ')
           ..write('name: $name, ')
+          ..write('nameDe: $nameDe, ')
           ..write('material: $material, ')
           ..write('outerDiameterMm: $outerDiameterMm, ')
           ..write('innerDiameterMm: $innerDiameterMm, ')
@@ -5553,6 +5692,15 @@ class $FlooringMaterialsTable extends FlooringMaterials
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _nameDeMeta = const VerificationMeta('nameDe');
+  @override
+  late final GeneratedColumn<String> nameDe = GeneratedColumn<String>(
+    'name_de',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   static const VerificationMeta _thermalResistanceMeta = const VerificationMeta(
     'thermalResistance',
   );
@@ -5581,6 +5729,7 @@ class $FlooringMaterialsTable extends FlooringMaterials
   List<GeneratedColumn> get $columns => [
     id,
     name,
+    nameDe,
     thermalResistance,
     surfaceType,
   ];
@@ -5608,6 +5757,12 @@ class $FlooringMaterialsTable extends FlooringMaterials
       );
     } else if (isInserting) {
       context.missing(_nameMeta);
+    }
+    if (data.containsKey('name_de')) {
+      context.handle(
+        _nameDeMeta,
+        nameDe.isAcceptableOrUnknown(data['name_de']!, _nameDeMeta),
+      );
     }
     if (data.containsKey('thermal_resistance')) {
       context.handle(
@@ -5646,6 +5801,10 @@ class $FlooringMaterialsTable extends FlooringMaterials
         DriftSqlType.string,
         data['${effectivePrefix}name'],
       )!,
+      nameDe: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name_de'],
+      ),
       thermalResistance: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}thermal_resistance'],
@@ -5667,6 +5826,7 @@ class FlooringMaterial extends DataClass
     implements Insertable<FlooringMaterial> {
   final String id;
   final String name;
+  final String? nameDe;
   final double thermalResistance;
 
   /// Serialised [SurfaceType] name; defaults to 'floor' for existing rows.
@@ -5674,6 +5834,7 @@ class FlooringMaterial extends DataClass
   const FlooringMaterial({
     required this.id,
     required this.name,
+    this.nameDe,
     required this.thermalResistance,
     required this.surfaceType,
   });
@@ -5682,6 +5843,9 @@ class FlooringMaterial extends DataClass
     final map = <String, Expression>{};
     map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
+    if (!nullToAbsent || nameDe != null) {
+      map['name_de'] = Variable<String>(nameDe);
+    }
     map['thermal_resistance'] = Variable<double>(thermalResistance);
     map['surface_type'] = Variable<String>(surfaceType);
     return map;
@@ -5691,6 +5855,9 @@ class FlooringMaterial extends DataClass
     return FlooringMaterialsCompanion(
       id: Value(id),
       name: Value(name),
+      nameDe: nameDe == null && nullToAbsent
+          ? const Value.absent()
+          : Value(nameDe),
       thermalResistance: Value(thermalResistance),
       surfaceType: Value(surfaceType),
     );
@@ -5704,6 +5871,7 @@ class FlooringMaterial extends DataClass
     return FlooringMaterial(
       id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
+      nameDe: serializer.fromJson<String?>(json['nameDe']),
       thermalResistance: serializer.fromJson<double>(json['thermalResistance']),
       surfaceType: serializer.fromJson<String>(json['surfaceType']),
     );
@@ -5714,6 +5882,7 @@ class FlooringMaterial extends DataClass
     return <String, dynamic>{
       'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
+      'nameDe': serializer.toJson<String?>(nameDe),
       'thermalResistance': serializer.toJson<double>(thermalResistance),
       'surfaceType': serializer.toJson<String>(surfaceType),
     };
@@ -5722,11 +5891,13 @@ class FlooringMaterial extends DataClass
   FlooringMaterial copyWith({
     String? id,
     String? name,
+    Value<String?> nameDe = const Value.absent(),
     double? thermalResistance,
     String? surfaceType,
   }) => FlooringMaterial(
     id: id ?? this.id,
     name: name ?? this.name,
+    nameDe: nameDe.present ? nameDe.value : this.nameDe,
     thermalResistance: thermalResistance ?? this.thermalResistance,
     surfaceType: surfaceType ?? this.surfaceType,
   );
@@ -5734,6 +5905,7 @@ class FlooringMaterial extends DataClass
     return FlooringMaterial(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
+      nameDe: data.nameDe.present ? data.nameDe.value : this.nameDe,
       thermalResistance: data.thermalResistance.present
           ? data.thermalResistance.value
           : this.thermalResistance,
@@ -5748,6 +5920,7 @@ class FlooringMaterial extends DataClass
     return (StringBuffer('FlooringMaterial(')
           ..write('id: $id, ')
           ..write('name: $name, ')
+          ..write('nameDe: $nameDe, ')
           ..write('thermalResistance: $thermalResistance, ')
           ..write('surfaceType: $surfaceType')
           ..write(')'))
@@ -5755,13 +5928,15 @@ class FlooringMaterial extends DataClass
   }
 
   @override
-  int get hashCode => Object.hash(id, name, thermalResistance, surfaceType);
+  int get hashCode =>
+      Object.hash(id, name, nameDe, thermalResistance, surfaceType);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
       (other is FlooringMaterial &&
           other.id == this.id &&
           other.name == this.name &&
+          other.nameDe == this.nameDe &&
           other.thermalResistance == this.thermalResistance &&
           other.surfaceType == this.surfaceType);
 }
@@ -5769,12 +5944,14 @@ class FlooringMaterial extends DataClass
 class FlooringMaterialsCompanion extends UpdateCompanion<FlooringMaterial> {
   final Value<String> id;
   final Value<String> name;
+  final Value<String?> nameDe;
   final Value<double> thermalResistance;
   final Value<String> surfaceType;
   final Value<int> rowid;
   const FlooringMaterialsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
+    this.nameDe = const Value.absent(),
     this.thermalResistance = const Value.absent(),
     this.surfaceType = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -5782,6 +5959,7 @@ class FlooringMaterialsCompanion extends UpdateCompanion<FlooringMaterial> {
   FlooringMaterialsCompanion.insert({
     required String id,
     required String name,
+    this.nameDe = const Value.absent(),
     required double thermalResistance,
     this.surfaceType = const Value.absent(),
     this.rowid = const Value.absent(),
@@ -5791,6 +5969,7 @@ class FlooringMaterialsCompanion extends UpdateCompanion<FlooringMaterial> {
   static Insertable<FlooringMaterial> custom({
     Expression<String>? id,
     Expression<String>? name,
+    Expression<String>? nameDe,
     Expression<double>? thermalResistance,
     Expression<String>? surfaceType,
     Expression<int>? rowid,
@@ -5798,6 +5977,7 @@ class FlooringMaterialsCompanion extends UpdateCompanion<FlooringMaterial> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
+      if (nameDe != null) 'name_de': nameDe,
       if (thermalResistance != null) 'thermal_resistance': thermalResistance,
       if (surfaceType != null) 'surface_type': surfaceType,
       if (rowid != null) 'rowid': rowid,
@@ -5807,6 +5987,7 @@ class FlooringMaterialsCompanion extends UpdateCompanion<FlooringMaterial> {
   FlooringMaterialsCompanion copyWith({
     Value<String>? id,
     Value<String>? name,
+    Value<String?>? nameDe,
     Value<double>? thermalResistance,
     Value<String>? surfaceType,
     Value<int>? rowid,
@@ -5814,6 +5995,7 @@ class FlooringMaterialsCompanion extends UpdateCompanion<FlooringMaterial> {
     return FlooringMaterialsCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
+      nameDe: nameDe ?? this.nameDe,
       thermalResistance: thermalResistance ?? this.thermalResistance,
       surfaceType: surfaceType ?? this.surfaceType,
       rowid: rowid ?? this.rowid,
@@ -5828,6 +6010,9 @@ class FlooringMaterialsCompanion extends UpdateCompanion<FlooringMaterial> {
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
+    }
+    if (nameDe.present) {
+      map['name_de'] = Variable<String>(nameDe.value);
     }
     if (thermalResistance.present) {
       map['thermal_resistance'] = Variable<double>(thermalResistance.value);
@@ -5846,6 +6031,7 @@ class FlooringMaterialsCompanion extends UpdateCompanion<FlooringMaterial> {
     return (StringBuffer('FlooringMaterialsCompanion(')
           ..write('id: $id, ')
           ..write('name: $name, ')
+          ..write('nameDe: $nameDe, ')
           ..write('thermalResistance: $thermalResistance, ')
           ..write('surfaceType: $surfaceType, ')
           ..write('rowid: $rowid')
@@ -9735,6 +9921,7 @@ typedef $$WallConstructionsTableCreateCompanionBuilder =
     WallConstructionsCompanion Function({
       required String id,
       required String name,
+      Value<String?> nameDe,
       Value<double> rsi,
       Value<double> rse,
       Value<int> isPreset,
@@ -9744,6 +9931,7 @@ typedef $$WallConstructionsTableUpdateCompanionBuilder =
     WallConstructionsCompanion Function({
       Value<String> id,
       Value<String> name,
+      Value<String?> nameDe,
       Value<double> rsi,
       Value<double> rse,
       Value<int> isPreset,
@@ -9822,6 +10010,11 @@ class $$WallConstructionsTableFilterComposer
 
   ColumnFilters<String> get name => $composableBuilder(
     column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nameDe => $composableBuilder(
+    column: $table.nameDe,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -9910,6 +10103,11 @@ class $$WallConstructionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get nameDe => $composableBuilder(
+    column: $table.nameDe,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get rsi => $composableBuilder(
     column: $table.rsi,
     builder: (column) => ColumnOrderings(column),
@@ -9940,6 +10138,9 @@ class $$WallConstructionsTableAnnotationComposer
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get nameDe =>
+      $composableBuilder(column: $table.nameDe, builder: (column) => column);
 
   GeneratedColumn<double> get rsi =>
       $composableBuilder(column: $table.rsi, builder: (column) => column);
@@ -10039,6 +10240,7 @@ class $$WallConstructionsTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
+                Value<String?> nameDe = const Value.absent(),
                 Value<double> rsi = const Value.absent(),
                 Value<double> rse = const Value.absent(),
                 Value<int> isPreset = const Value.absent(),
@@ -10046,6 +10248,7 @@ class $$WallConstructionsTableTableManager
               }) => WallConstructionsCompanion(
                 id: id,
                 name: name,
+                nameDe: nameDe,
                 rsi: rsi,
                 rse: rse,
                 isPreset: isPreset,
@@ -10055,6 +10258,7 @@ class $$WallConstructionsTableTableManager
               ({
                 required String id,
                 required String name,
+                Value<String?> nameDe = const Value.absent(),
                 Value<double> rsi = const Value.absent(),
                 Value<double> rse = const Value.absent(),
                 Value<int> isPreset = const Value.absent(),
@@ -10062,6 +10266,7 @@ class $$WallConstructionsTableTableManager
               }) => WallConstructionsCompanion.insert(
                 id: id,
                 name: name,
+                nameDe: nameDe,
                 rsi: rsi,
                 rse: rse,
                 isPreset: isPreset,
@@ -11854,6 +12059,7 @@ typedef $$MaterialEntriesTableCreateCompanionBuilder =
     MaterialEntriesCompanion Function({
       required String id,
       required String name,
+      Value<String?> nameDe,
       required String category,
       Value<String> subcategory,
       required double lambdaDefault,
@@ -11866,6 +12072,7 @@ typedef $$MaterialEntriesTableUpdateCompanionBuilder =
     MaterialEntriesCompanion Function({
       Value<String> id,
       Value<String> name,
+      Value<String?> nameDe,
       Value<String> category,
       Value<String> subcategory,
       Value<double> lambdaDefault,
@@ -11922,6 +12129,11 @@ class $$MaterialEntriesTableFilterComposer
 
   ColumnFilters<String> get name => $composableBuilder(
     column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nameDe => $composableBuilder(
+    column: $table.nameDe,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12000,6 +12212,11 @@ class $$MaterialEntriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get nameDe => $composableBuilder(
+    column: $table.nameDe,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get category => $composableBuilder(
     column: $table.category,
     builder: (column) => ColumnOrderings(column),
@@ -12045,6 +12262,9 @@ class $$MaterialEntriesTableAnnotationComposer
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get nameDe =>
+      $composableBuilder(column: $table.nameDe, builder: (column) => column);
 
   GeneratedColumn<String> get category =>
       $composableBuilder(column: $table.category, builder: (column) => column);
@@ -12130,6 +12350,7 @@ class $$MaterialEntriesTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
+                Value<String?> nameDe = const Value.absent(),
                 Value<String> category = const Value.absent(),
                 Value<String> subcategory = const Value.absent(),
                 Value<double> lambdaDefault = const Value.absent(),
@@ -12140,6 +12361,7 @@ class $$MaterialEntriesTableTableManager
               }) => MaterialEntriesCompanion(
                 id: id,
                 name: name,
+                nameDe: nameDe,
                 category: category,
                 subcategory: subcategory,
                 lambdaDefault: lambdaDefault,
@@ -12152,6 +12374,7 @@ class $$MaterialEntriesTableTableManager
               ({
                 required String id,
                 required String name,
+                Value<String?> nameDe = const Value.absent(),
                 required String category,
                 Value<String> subcategory = const Value.absent(),
                 required double lambdaDefault,
@@ -12162,6 +12385,7 @@ class $$MaterialEntriesTableTableManager
               }) => MaterialEntriesCompanion.insert(
                 id: id,
                 name: name,
+                nameDe: nameDe,
                 category: category,
                 subcategory: subcategory,
                 lambdaDefault: lambdaDefault,
@@ -12783,6 +13007,7 @@ typedef $$TubeTypesTableCreateCompanionBuilder =
     TubeTypesCompanion Function({
       required String id,
       required String name,
+      Value<String?> nameDe,
       required String material,
       Value<double> outerDiameterMm,
       Value<double> innerDiameterMm,
@@ -12797,6 +13022,7 @@ typedef $$TubeTypesTableUpdateCompanionBuilder =
     TubeTypesCompanion Function({
       Value<String> id,
       Value<String> name,
+      Value<String?> nameDe,
       Value<String> material,
       Value<double> outerDiameterMm,
       Value<double> innerDiameterMm,
@@ -12850,6 +13076,11 @@ class $$TubeTypesTableFilterComposer
 
   ColumnFilters<String> get name => $composableBuilder(
     column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get nameDe => $composableBuilder(
+    column: $table.nameDe,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -12938,6 +13169,11 @@ class $$TubeTypesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get nameDe => $composableBuilder(
+    column: $table.nameDe,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get material => $composableBuilder(
     column: $table.material,
     builder: (column) => ColumnOrderings(column),
@@ -12993,6 +13229,9 @@ class $$TubeTypesTableAnnotationComposer
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get nameDe =>
+      $composableBuilder(column: $table.nameDe, builder: (column) => column);
 
   GeneratedColumn<String> get material =>
       $composableBuilder(column: $table.material, builder: (column) => column);
@@ -13086,6 +13325,7 @@ class $$TubeTypesTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
+                Value<String?> nameDe = const Value.absent(),
                 Value<String> material = const Value.absent(),
                 Value<double> outerDiameterMm = const Value.absent(),
                 Value<double> innerDiameterMm = const Value.absent(),
@@ -13098,6 +13338,7 @@ class $$TubeTypesTableTableManager
               }) => TubeTypesCompanion(
                 id: id,
                 name: name,
+                nameDe: nameDe,
                 material: material,
                 outerDiameterMm: outerDiameterMm,
                 innerDiameterMm: innerDiameterMm,
@@ -13112,6 +13353,7 @@ class $$TubeTypesTableTableManager
               ({
                 required String id,
                 required String name,
+                Value<String?> nameDe = const Value.absent(),
                 required String material,
                 Value<double> outerDiameterMm = const Value.absent(),
                 Value<double> innerDiameterMm = const Value.absent(),
@@ -13124,6 +13366,7 @@ class $$TubeTypesTableTableManager
               }) => TubeTypesCompanion.insert(
                 id: id,
                 name: name,
+                nameDe: nameDe,
                 material: material,
                 outerDiameterMm: outerDiameterMm,
                 innerDiameterMm: innerDiameterMm,
@@ -13194,6 +13437,7 @@ typedef $$FlooringMaterialsTableCreateCompanionBuilder =
     FlooringMaterialsCompanion Function({
       required String id,
       required String name,
+      Value<String?> nameDe,
       required double thermalResistance,
       Value<String> surfaceType,
       Value<int> rowid,
@@ -13202,6 +13446,7 @@ typedef $$FlooringMaterialsTableUpdateCompanionBuilder =
     FlooringMaterialsCompanion Function({
       Value<String> id,
       Value<String> name,
+      Value<String?> nameDe,
       Value<double> thermalResistance,
       Value<String> surfaceType,
       Value<int> rowid,
@@ -13261,6 +13506,11 @@ class $$FlooringMaterialsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get nameDe => $composableBuilder(
+    column: $table.nameDe,
+    builder: (column) => ColumnFilters(column),
+  );
+
   ColumnFilters<double> get thermalResistance => $composableBuilder(
     column: $table.thermalResistance,
     builder: (column) => ColumnFilters(column),
@@ -13316,6 +13566,11 @@ class $$FlooringMaterialsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get nameDe => $composableBuilder(
+    column: $table.nameDe,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get thermalResistance => $composableBuilder(
     column: $table.thermalResistance,
     builder: (column) => ColumnOrderings(column),
@@ -13341,6 +13596,9 @@ class $$FlooringMaterialsTableAnnotationComposer
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get nameDe =>
+      $composableBuilder(column: $table.nameDe, builder: (column) => column);
 
   GeneratedColumn<double> get thermalResistance => $composableBuilder(
     column: $table.thermalResistance,
@@ -13413,12 +13671,14 @@ class $$FlooringMaterialsTableTableManager
               ({
                 Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
+                Value<String?> nameDe = const Value.absent(),
                 Value<double> thermalResistance = const Value.absent(),
                 Value<String> surfaceType = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FlooringMaterialsCompanion(
                 id: id,
                 name: name,
+                nameDe: nameDe,
                 thermalResistance: thermalResistance,
                 surfaceType: surfaceType,
                 rowid: rowid,
@@ -13427,12 +13687,14 @@ class $$FlooringMaterialsTableTableManager
               ({
                 required String id,
                 required String name,
+                Value<String?> nameDe = const Value.absent(),
                 required double thermalResistance,
                 Value<String> surfaceType = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => FlooringMaterialsCompanion.insert(
                 id: id,
                 name: name,
+                nameDe: nameDe,
                 thermalResistance: thermalResistance,
                 surfaceType: surfaceType,
                 rowid: rowid,

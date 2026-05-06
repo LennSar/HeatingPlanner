@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 class FlooringMaterials extends Table {
   TextColumn get id => text()();
   TextColumn get name => text().withLength(min: 1, max: 200)();
+  TextColumn get nameDe => text().nullable()();
   RealColumn get thermalResistance => real()();
 
   /// Serialised [SurfaceType] name; defaults to 'floor' for existing rows.

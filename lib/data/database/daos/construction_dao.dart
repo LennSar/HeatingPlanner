@@ -1,3 +1,5 @@
+import 'dart:ui' show Locale;
+
 import 'package:drift/drift.dart';
 
 import '../app_database.dart';
@@ -44,6 +46,13 @@ class ConstructionDao extends DatabaseAccessor<AppDatabase>
   /// Deletes the wall construction with the given [id].
   Future<void> deleteConstruction(String id) =>
       (delete(wallConstructions)..where((t) => t.id.equals(id))).go();
+
+  /// Returns the locale-appropriate display name for [row].
+  ///
+  /// Falls back to the canonical English [WallConstruction.name] when the
+  /// requested locale is German but no German translation has been set.
+  String localizedNameFor(WallConstruction row, Locale locale) =>
+      locale.languageCode == 'de' ? (row.nameDe ?? row.name) : row.name;
 
   // ── MaterialLayers ────────────────────────────────────────────────────────
 

@@ -65,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 14;
+  int get schemaVersion => 15;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -186,6 +186,20 @@ class AppDatabase extends _$AppDatabase {
                 'mirror_id TEXT REFERENCES wall_segments(id) ON DELETE SET NULL',
               );
             }
+          }
+          if (from < 15) {
+            await m.database.customStatement(
+              'ALTER TABLE material_entries ADD COLUMN name_de TEXT',
+            );
+            await m.database.customStatement(
+              'ALTER TABLE flooring_materials ADD COLUMN name_de TEXT',
+            );
+            await m.database.customStatement(
+              'ALTER TABLE tube_types ADD COLUMN name_de TEXT',
+            );
+            await m.database.customStatement(
+              'ALTER TABLE wall_constructions ADD COLUMN name_de TEXT',
+            );
           }
         },
       );

@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 class MaterialEntries extends Table {
   TextColumn get id => text()();
   TextColumn get name => text().withLength(min: 1, max: 200)();
+  TextColumn get nameDe => text().nullable()();
   TextColumn get category => text()();
   TextColumn get subcategory => text().withDefault(const Constant(''))();
   RealColumn get lambdaDefault => real()();

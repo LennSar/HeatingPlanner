@@ -1,3 +1,5 @@
+import 'dart:ui' show Locale;
+
 import 'package:drift/drift.dart';
 
 import '../app_database.dart';
@@ -32,4 +34,11 @@ class MaterialDao extends DatabaseAccessor<AppDatabase>
   /// Deletes the material entry with the given [id].
   Future<void> deleteById(String id) =>
       (delete(materialEntries)..where((t) => t.id.equals(id))).go();
+
+  /// Returns the locale-appropriate display name for [row].
+  ///
+  /// Falls back to the canonical English [MaterialEntry.name] when the
+  /// requested locale is German but no German translation has been set.
+  String localizedNameFor(MaterialEntry row, Locale locale) =>
+      locale.languageCode == 'de' ? (row.nameDe ?? row.name) : row.name;
 }

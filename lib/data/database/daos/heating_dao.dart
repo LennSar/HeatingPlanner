@@ -1,3 +1,5 @@
+import 'dart:ui' show Locale;
+
 import 'package:drift/drift.dart';
 
 import '../../models/flooring_material.dart' show kCustomFlooringMaterialId;
@@ -153,6 +155,26 @@ class HeatingDao extends DatabaseAccessor<AppDatabase>
   /// Deletes the heating circuit with the given [id].
   Future<void> deleteCircuit(String id) =>
       (delete(heatingCircuits)..where((t) => t.id.equals(id))).go();
+
+  // ── Localized name helpers ────────────────────────────────────────
+
+  /// Returns the locale-appropriate display name for the tube-type [row].
+  ///
+  /// Falls back to the canonical English [TubeType.name] when the
+  /// requested locale is German but no German translation has been set.
+  String localizedTubeTypeNameFor(TubeType row, Locale locale) =>
+      locale.languageCode == 'de' ? (row.nameDe ?? row.name) : row.name;
+
+  /// Returns the locale-appropriate display name for the
+  /// flooring-material [row].
+  ///
+  /// Falls back to the canonical English [FlooringMaterial.name] when
+  /// the requested locale is German but no German translation has been set.
+  String localizedFlooringMaterialNameFor(
+    FlooringMaterial row,
+    Locale locale,
+  ) =>
+      locale.languageCode == 'de' ? (row.nameDe ?? row.name) : row.name;
 
   // ── Seed data ─────────────────────────────────────────────────────
 

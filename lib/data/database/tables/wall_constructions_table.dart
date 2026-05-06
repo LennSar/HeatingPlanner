@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 class WallConstructions extends Table {
   TextColumn get id => text()();
   TextColumn get name => text().withLength(min: 1, max: 200)();
+  TextColumn get nameDe => text().nullable()();
   RealColumn get rsi => real().withDefault(const Constant(0.13))();
   RealColumn get rse => real().withDefault(const Constant(0.04))();
 

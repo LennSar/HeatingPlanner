@@ -4,6 +4,7 @@ import 'package:drift/drift.dart';
 class TubeTypes extends Table {
   TextColumn get id => text()();
   TextColumn get name => text().withLength(min: 1, max: 100)();
+  TextColumn get nameDe => text().nullable()();
   TextColumn get material => text()();
   RealColumn get outerDiameterMm =>
       real().withDefault(const Constant(16.0))();
