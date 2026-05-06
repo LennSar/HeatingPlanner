@@ -16,8 +16,9 @@ T _$identity<T>(T value) => value;
 mixin _$TubeType {
 
 /// UUID v4 primary key.
- String get id;/// Display name (1–100 chars).
- String get name;/// Pipe material.
+ String get id;/// Canonical English display name (1–100 chars).
+ String get name;/// Optional German display name. Falls back to [name] when absent.
+ String? get nameDe;/// Pipe material.
  TubeMaterial get material;/// Outer diameter in millimetres. Range: 8.0–32.0.
  double get outerDiameterMm;/// Inner (bore) diameter in millimetres. Must be < [outerDiameterMm].
  double get innerDiameterMm;/// Wall thickness in millimetres (may be derived or explicitly set).
@@ -38,16 +39,16 @@ $TubeTypeCopyWith<TubeType> get copyWith => _$TubeTypeCopyWithImpl<TubeType>(thi
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is TubeType&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.material, material) || other.material == material)&&(identical(other.outerDiameterMm, outerDiameterMm) || other.outerDiameterMm == outerDiameterMm)&&(identical(other.innerDiameterMm, innerDiameterMm) || other.innerDiameterMm == innerDiameterMm)&&(identical(other.wallThicknessMm, wallThicknessMm) || other.wallThicknessMm == wallThicknessMm)&&(identical(other.thermalConductivity, thermalConductivity) || other.thermalConductivity == thermalConductivity)&&(identical(other.roughness, roughness) || other.roughness == roughness)&&(identical(other.maxOperatingTempC, maxOperatingTempC) || other.maxOperatingTempC == maxOperatingTempC)&&(identical(other.maxOperatingPressure, maxOperatingPressure) || other.maxOperatingPressure == maxOperatingPressure));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is TubeType&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.nameDe, nameDe) || other.nameDe == nameDe)&&(identical(other.material, material) || other.material == material)&&(identical(other.outerDiameterMm, outerDiameterMm) || other.outerDiameterMm == outerDiameterMm)&&(identical(other.innerDiameterMm, innerDiameterMm) || other.innerDiameterMm == innerDiameterMm)&&(identical(other.wallThicknessMm, wallThicknessMm) || other.wallThicknessMm == wallThicknessMm)&&(identical(other.thermalConductivity, thermalConductivity) || other.thermalConductivity == thermalConductivity)&&(identical(other.roughness, roughness) || other.roughness == roughness)&&(identical(other.maxOperatingTempC, maxOperatingTempC) || other.maxOperatingTempC == maxOperatingTempC)&&(identical(other.maxOperatingPressure, maxOperatingPressure) || other.maxOperatingPressure == maxOperatingPressure));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,material,outerDiameterMm,innerDiameterMm,wallThicknessMm,thermalConductivity,roughness,maxOperatingTempC,maxOperatingPressure);
+int get hashCode => Object.hash(runtimeType,id,name,nameDe,material,outerDiameterMm,innerDiameterMm,wallThicknessMm,thermalConductivity,roughness,maxOperatingTempC,maxOperatingPressure);
 
 @override
 String toString() {
-  return 'TubeType(id: $id, name: $name, material: $material, outerDiameterMm: $outerDiameterMm, innerDiameterMm: $innerDiameterMm, wallThicknessMm: $wallThicknessMm, thermalConductivity: $thermalConductivity, roughness: $roughness, maxOperatingTempC: $maxOperatingTempC, maxOperatingPressure: $maxOperatingPressure)';
+  return 'TubeType(id: $id, name: $name, nameDe: $nameDe, material: $material, outerDiameterMm: $outerDiameterMm, innerDiameterMm: $innerDiameterMm, wallThicknessMm: $wallThicknessMm, thermalConductivity: $thermalConductivity, roughness: $roughness, maxOperatingTempC: $maxOperatingTempC, maxOperatingPressure: $maxOperatingPressure)';
 }
 
 
@@ -58,7 +59,7 @@ abstract mixin class $TubeTypeCopyWith<$Res>  {
   factory $TubeTypeCopyWith(TubeType value, $Res Function(TubeType) _then) = _$TubeTypeCopyWithImpl;
 @useResult
 $Res call({
- String id, String name, TubeMaterial material, double outerDiameterMm, double innerDiameterMm, double wallThicknessMm, double thermalConductivity, double roughness, double maxOperatingTempC, double maxOperatingPressure
+ String id, String name, String? nameDe, TubeMaterial material, double outerDiameterMm, double innerDiameterMm, double wallThicknessMm, double thermalConductivity, double roughness, double maxOperatingTempC, double maxOperatingPressure
 });
 
 
@@ -75,11 +76,12 @@ class _$TubeTypeCopyWithImpl<$Res>
 
 /// Create a copy of TubeType
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? material = null,Object? outerDiameterMm = null,Object? innerDiameterMm = null,Object? wallThicknessMm = null,Object? thermalConductivity = null,Object? roughness = null,Object? maxOperatingTempC = null,Object? maxOperatingPressure = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? nameDe = freezed,Object? material = null,Object? outerDiameterMm = null,Object? innerDiameterMm = null,Object? wallThicknessMm = null,Object? thermalConductivity = null,Object? roughness = null,Object? maxOperatingTempC = null,Object? maxOperatingPressure = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
-as String,material: null == material ? _self.material : material // ignore: cast_nullable_to_non_nullable
+as String,nameDe: freezed == nameDe ? _self.nameDe : nameDe // ignore: cast_nullable_to_non_nullable
+as String?,material: null == material ? _self.material : material // ignore: cast_nullable_to_non_nullable
 as TubeMaterial,outerDiameterMm: null == outerDiameterMm ? _self.outerDiameterMm : outerDiameterMm // ignore: cast_nullable_to_non_nullable
 as double,innerDiameterMm: null == innerDiameterMm ? _self.innerDiameterMm : innerDiameterMm // ignore: cast_nullable_to_non_nullable
 as double,wallThicknessMm: null == wallThicknessMm ? _self.wallThicknessMm : wallThicknessMm // ignore: cast_nullable_to_non_nullable
@@ -172,10 +174,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  TubeMaterial material,  double outerDiameterMm,  double innerDiameterMm,  double wallThicknessMm,  double thermalConductivity,  double roughness,  double maxOperatingTempC,  double maxOperatingPressure)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  String? nameDe,  TubeMaterial material,  double outerDiameterMm,  double innerDiameterMm,  double wallThicknessMm,  double thermalConductivity,  double roughness,  double maxOperatingTempC,  double maxOperatingPressure)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _TubeType() when $default != null:
-return $default(_that.id,_that.name,_that.material,_that.outerDiameterMm,_that.innerDiameterMm,_that.wallThicknessMm,_that.thermalConductivity,_that.roughness,_that.maxOperatingTempC,_that.maxOperatingPressure);case _:
+return $default(_that.id,_that.name,_that.nameDe,_that.material,_that.outerDiameterMm,_that.innerDiameterMm,_that.wallThicknessMm,_that.thermalConductivity,_that.roughness,_that.maxOperatingTempC,_that.maxOperatingPressure);case _:
   return orElse();
 
 }
@@ -193,10 +195,10 @@ return $default(_that.id,_that.name,_that.material,_that.outerDiameterMm,_that.i
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  TubeMaterial material,  double outerDiameterMm,  double innerDiameterMm,  double wallThicknessMm,  double thermalConductivity,  double roughness,  double maxOperatingTempC,  double maxOperatingPressure)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  String? nameDe,  TubeMaterial material,  double outerDiameterMm,  double innerDiameterMm,  double wallThicknessMm,  double thermalConductivity,  double roughness,  double maxOperatingTempC,  double maxOperatingPressure)  $default,) {final _that = this;
 switch (_that) {
 case _TubeType():
-return $default(_that.id,_that.name,_that.material,_that.outerDiameterMm,_that.innerDiameterMm,_that.wallThicknessMm,_that.thermalConductivity,_that.roughness,_that.maxOperatingTempC,_that.maxOperatingPressure);case _:
+return $default(_that.id,_that.name,_that.nameDe,_that.material,_that.outerDiameterMm,_that.innerDiameterMm,_that.wallThicknessMm,_that.thermalConductivity,_that.roughness,_that.maxOperatingTempC,_that.maxOperatingPressure);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -213,10 +215,10 @@ return $default(_that.id,_that.name,_that.material,_that.outerDiameterMm,_that.i
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  TubeMaterial material,  double outerDiameterMm,  double innerDiameterMm,  double wallThicknessMm,  double thermalConductivity,  double roughness,  double maxOperatingTempC,  double maxOperatingPressure)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  String? nameDe,  TubeMaterial material,  double outerDiameterMm,  double innerDiameterMm,  double wallThicknessMm,  double thermalConductivity,  double roughness,  double maxOperatingTempC,  double maxOperatingPressure)?  $default,) {final _that = this;
 switch (_that) {
 case _TubeType() when $default != null:
-return $default(_that.id,_that.name,_that.material,_that.outerDiameterMm,_that.innerDiameterMm,_that.wallThicknessMm,_that.thermalConductivity,_that.roughness,_that.maxOperatingTempC,_that.maxOperatingPressure);case _:
+return $default(_that.id,_that.name,_that.nameDe,_that.material,_that.outerDiameterMm,_that.innerDiameterMm,_that.wallThicknessMm,_that.thermalConductivity,_that.roughness,_that.maxOperatingTempC,_that.maxOperatingPressure);case _:
   return null;
 
 }
@@ -228,13 +230,15 @@ return $default(_that.id,_that.name,_that.material,_that.outerDiameterMm,_that.i
 @JsonSerializable()
 
 class _TubeType implements TubeType {
-  const _TubeType({required this.id, required this.name, required this.material, this.outerDiameterMm = 16.0, this.innerDiameterMm = 13.0, this.wallThicknessMm = 1.5, this.thermalConductivity = 0.35, this.roughness = 0.007, this.maxOperatingTempC = 60.0, this.maxOperatingPressure = 6.0});
+  const _TubeType({required this.id, required this.name, this.nameDe, required this.material, this.outerDiameterMm = 16.0, this.innerDiameterMm = 13.0, this.wallThicknessMm = 1.5, this.thermalConductivity = 0.35, this.roughness = 0.007, this.maxOperatingTempC = 60.0, this.maxOperatingPressure = 6.0});
   factory _TubeType.fromJson(Map<String, dynamic> json) => _$TubeTypeFromJson(json);
 
 /// UUID v4 primary key.
 @override final  String id;
-/// Display name (1–100 chars).
+/// Canonical English display name (1–100 chars).
 @override final  String name;
+/// Optional German display name. Falls back to [name] when absent.
+@override final  String? nameDe;
 /// Pipe material.
 @override final  TubeMaterial material;
 /// Outer diameter in millimetres. Range: 8.0–32.0.
@@ -265,16 +269,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TubeType&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.material, material) || other.material == material)&&(identical(other.outerDiameterMm, outerDiameterMm) || other.outerDiameterMm == outerDiameterMm)&&(identical(other.innerDiameterMm, innerDiameterMm) || other.innerDiameterMm == innerDiameterMm)&&(identical(other.wallThicknessMm, wallThicknessMm) || other.wallThicknessMm == wallThicknessMm)&&(identical(other.thermalConductivity, thermalConductivity) || other.thermalConductivity == thermalConductivity)&&(identical(other.roughness, roughness) || other.roughness == roughness)&&(identical(other.maxOperatingTempC, maxOperatingTempC) || other.maxOperatingTempC == maxOperatingTempC)&&(identical(other.maxOperatingPressure, maxOperatingPressure) || other.maxOperatingPressure == maxOperatingPressure));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _TubeType&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.nameDe, nameDe) || other.nameDe == nameDe)&&(identical(other.material, material) || other.material == material)&&(identical(other.outerDiameterMm, outerDiameterMm) || other.outerDiameterMm == outerDiameterMm)&&(identical(other.innerDiameterMm, innerDiameterMm) || other.innerDiameterMm == innerDiameterMm)&&(identical(other.wallThicknessMm, wallThicknessMm) || other.wallThicknessMm == wallThicknessMm)&&(identical(other.thermalConductivity, thermalConductivity) || other.thermalConductivity == thermalConductivity)&&(identical(other.roughness, roughness) || other.roughness == roughness)&&(identical(other.maxOperatingTempC, maxOperatingTempC) || other.maxOperatingTempC == maxOperatingTempC)&&(identical(other.maxOperatingPressure, maxOperatingPressure) || other.maxOperatingPressure == maxOperatingPressure));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,material,outerDiameterMm,innerDiameterMm,wallThicknessMm,thermalConductivity,roughness,maxOperatingTempC,maxOperatingPressure);
+int get hashCode => Object.hash(runtimeType,id,name,nameDe,material,outerDiameterMm,innerDiameterMm,wallThicknessMm,thermalConductivity,roughness,maxOperatingTempC,maxOperatingPressure);
 
 @override
 String toString() {
-  return 'TubeType(id: $id, name: $name, material: $material, outerDiameterMm: $outerDiameterMm, innerDiameterMm: $innerDiameterMm, wallThicknessMm: $wallThicknessMm, thermalConductivity: $thermalConductivity, roughness: $roughness, maxOperatingTempC: $maxOperatingTempC, maxOperatingPressure: $maxOperatingPressure)';
+  return 'TubeType(id: $id, name: $name, nameDe: $nameDe, material: $material, outerDiameterMm: $outerDiameterMm, innerDiameterMm: $innerDiameterMm, wallThicknessMm: $wallThicknessMm, thermalConductivity: $thermalConductivity, roughness: $roughness, maxOperatingTempC: $maxOperatingTempC, maxOperatingPressure: $maxOperatingPressure)';
 }
 
 
@@ -285,7 +289,7 @@ abstract mixin class _$TubeTypeCopyWith<$Res> implements $TubeTypeCopyWith<$Res>
   factory _$TubeTypeCopyWith(_TubeType value, $Res Function(_TubeType) _then) = __$TubeTypeCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String name, TubeMaterial material, double outerDiameterMm, double innerDiameterMm, double wallThicknessMm, double thermalConductivity, double roughness, double maxOperatingTempC, double maxOperatingPressure
+ String id, String name, String? nameDe, TubeMaterial material, double outerDiameterMm, double innerDiameterMm, double wallThicknessMm, double thermalConductivity, double roughness, double maxOperatingTempC, double maxOperatingPressure
 });
 
 
@@ -302,11 +306,12 @@ class __$TubeTypeCopyWithImpl<$Res>
 
 /// Create a copy of TubeType
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? material = null,Object? outerDiameterMm = null,Object? innerDiameterMm = null,Object? wallThicknessMm = null,Object? thermalConductivity = null,Object? roughness = null,Object? maxOperatingTempC = null,Object? maxOperatingPressure = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? nameDe = freezed,Object? material = null,Object? outerDiameterMm = null,Object? innerDiameterMm = null,Object? wallThicknessMm = null,Object? thermalConductivity = null,Object? roughness = null,Object? maxOperatingTempC = null,Object? maxOperatingPressure = null,}) {
   return _then(_TubeType(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
-as String,material: null == material ? _self.material : material // ignore: cast_nullable_to_non_nullable
+as String,nameDe: freezed == nameDe ? _self.nameDe : nameDe // ignore: cast_nullable_to_non_nullable
+as String?,material: null == material ? _self.material : material // ignore: cast_nullable_to_non_nullable
 as TubeMaterial,outerDiameterMm: null == outerDiameterMm ? _self.outerDiameterMm : outerDiameterMm // ignore: cast_nullable_to_non_nullable
 as double,innerDiameterMm: null == innerDiameterMm ? _self.innerDiameterMm : innerDiameterMm // ignore: cast_nullable_to_non_nullable
 as double,wallThicknessMm: null == wallThicknessMm ? _self.wallThicknessMm : wallThicknessMm // ignore: cast_nullable_to_non_nullable

@@ -1057,6 +1057,11 @@ class _EnvelopeSectionState
         ? double.nan
         : ref.watch(uValueProvider(ceilConstruction.id));
 
+    final localizedConstructionsById = {
+      for (final lr in ref.watch(localizedWallConstructionsProvider))
+        lr.row.id: lr.displayName,
+    };
+
     return ExpansionTile(
       title: Text(
         l10n.envelopeFloorCeiling,
@@ -1084,6 +1089,9 @@ class _EnvelopeSectionState
           context: context,
           l10n: l10n,
           construction: floorConstruction,
+          displayName: floorConstruction == null
+              ? null
+              : localizedConstructionsById[floorConstruction.id],
           uVal: floorUVal,
           onTap: _openFloorEditor,
           textTheme: textTheme,
@@ -1118,6 +1126,9 @@ class _EnvelopeSectionState
           context: context,
           l10n: l10n,
           construction: ceilConstruction,
+          displayName: ceilConstruction == null
+              ? null
+              : localizedConstructionsById[ceilConstruction.id],
           uVal: ceilUVal,
           onTap: _openCeilingEditor,
           textTheme: textTheme,
@@ -1182,15 +1193,17 @@ class _EnvelopeSectionState
     required BuildContext context,
     required AppLocalizations l10n,
     required WallConstruction? construction,
+    required String? displayName,
     required double uVal,
     required VoidCallback onTap,
     required TextTheme textTheme,
   }) {
+    final shownName = displayName ?? construction?.name ?? '';
     final label = construction == null
         ? l10n.notAssigned
         : uVal.isNaN
-            ? construction.name
-            : '${construction.name} \u2014 '
+            ? shownName
+            : '$shownName \u2014 '
                 'U ${uVal.toStringAsFixed(2)}'
                 ' W/(m\u00B2\u00B7K)';
     final actionLabel =

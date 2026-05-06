@@ -326,6 +326,11 @@ class _SlabConstructionDialogState
         .toList();
     if (presets.isEmpty) return;
 
+    final localizedById = {
+      for (final lr in ref.read(localizedWallConstructionsProvider))
+        lr.row.id: lr.displayName,
+    };
+
     final selected = await showDialog<WallConstruction>(
       context: context,
       builder: (ctx) => SimpleDialog(
@@ -364,7 +369,7 @@ class _SlabConstructionDialogState
           return SimpleDialogOption(
             onPressed: () => Navigator.of(ctx).pop(p),
             child: ListTile(
-              title: Text(p.name),
+              title: Text(localizedById[p.id] ?? p.name),
               subtitle: Text(l10n.presetUValueLine(uLabel)),
               dense: true,
             ),
@@ -398,7 +403,8 @@ class _SlabConstructionDialogState
             ),
           )
           .toList();
-      _nameCtrl.text = selected.name;
+      // Show the user the same name they just clicked on.
+      _nameCtrl.text = localizedById[selected.id] ?? selected.name;
       _rsiCtrl.text = selected.rsi.toStringAsFixed(2);
       _rseCtrl.text = selected.rse.toStringAsFixed(2);
     });
@@ -434,8 +440,7 @@ class _SlabConstructionDialogState
     final colorScheme = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final settings = ref.watch(projectSettingsProvider);
-    final materials =
-        ref.watch(materialEntriesProvider).asData?.value ?? [];
+    final materials = ref.watch(localizedMaterialEntriesProvider);
     final tOutdoorC = settings.designOutdoorTempC;
     final tIndoorC = settings.defaultIndoorTempC;
     final uVal = _uVal;
@@ -559,13 +564,13 @@ class _SlabConstructionDialogState
                   itemBuilder: (context, i) {
                     final layer = _layers[i];
                     final mat = materials
-                        .where((m) => m.id == layer.materialId)
+                        .where((m) => m.row.id == layer.materialId)
                         .firstOrNull;
                     return _LayerRow(
                       key: ValueKey(layer.id),
                       index: i,
                       layer: layer,
-                      materialName: mat?.name ?? layer.materialId,
+                      materialName: mat?.displayName ?? layer.materialId,
                       onPickMaterial: () => _pickMaterial(i),
                       onThicknessChanged: (v) => _updateLayer(
                         i,
@@ -924,6 +929,11 @@ class _WallConstructionDialogState
         .toList();
     if (presets.isEmpty) return;
 
+    final localizedById = {
+      for (final lr in ref.read(localizedWallConstructionsProvider))
+        lr.row.id: lr.displayName,
+    };
+
     final selected = await showDialog<WallConstruction>(
       context: context,
       builder: (ctx) => SimpleDialog(
@@ -962,7 +972,7 @@ class _WallConstructionDialogState
           return SimpleDialogOption(
             onPressed: () => Navigator.of(ctx).pop(p),
             child: ListTile(
-              title: Text(p.name),
+              title: Text(localizedById[p.id] ?? p.name),
               subtitle: Text(l10n.presetUValueLine(uLabel)),
               dense: true,
             ),
@@ -996,7 +1006,8 @@ class _WallConstructionDialogState
             ),
           )
           .toList();
-      _nameCtrl.text = selected.name;
+      // Show the user the same name they just clicked on.
+      _nameCtrl.text = localizedById[selected.id] ?? selected.name;
       _rsiCtrl.text = selected.rsi.toStringAsFixed(2);
       _rseCtrl.text = selected.rse.toStringAsFixed(2);
     });
@@ -1043,8 +1054,7 @@ class _WallConstructionDialogState
     final colorScheme = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
     final settings = ref.watch(projectSettingsProvider);
-    final materials =
-        ref.watch(materialEntriesProvider).asData?.value ?? [];
+    final materials = ref.watch(localizedMaterialEntriesProvider);
     final tOutdoorC = settings.designOutdoorTempC;
     final editorState = ref.watch(editorStateProvider);
     final room = editorState.rooms
@@ -1170,13 +1180,13 @@ class _WallConstructionDialogState
                   itemBuilder: (context, i) {
                     final layer = _layers[i];
                     final mat = materials
-                        .where((m) => m.id == layer.materialId)
+                        .where((m) => m.row.id == layer.materialId)
                         .firstOrNull;
                     return _LayerRow(
                       key: ValueKey(layer.id),
                       index: i,
                       layer: layer,
-                      materialName: mat?.name ?? layer.materialId,
+                      materialName: mat?.displayName ?? layer.materialId,
                       onPickMaterial: () => _pickMaterialForLayer(i),
                       onThicknessChanged: (v) =>
                           _updateLayer(i, layer.copyWith(thicknessMm: v)),

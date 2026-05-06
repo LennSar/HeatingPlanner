@@ -11,6 +11,7 @@ import '../../data/models/enums.dart';
 import '../../l10n/app_localizations.dart';
 import '../../data/models/flooring_material.dart';
 import '../../data/models/heating_zone.dart';
+import '../../data/models/localized_catalog_row.dart';
 import '../../data/models/tube_type.dart';
 import '../../repositories/heating_repository.dart';
 import '../canvas/tools/undo_redo_service.dart';
@@ -114,7 +115,6 @@ class _HeatingZonePropertiesState
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
-    final colorScheme = Theme.of(context).colorScheme;
     final l10n = AppLocalizations.of(context)!;
 
     final editorState = ref.watch(editorStateProvider);
@@ -202,8 +202,8 @@ class _HeatingZonePropertiesState
       areaM2 = double.nan;
     }
 
-    final tubeTypesAsync = ref.watch(tubeTypesProvider);
-    final flooringAsync = ref.watch(flooringMaterialsProvider);
+    final tubeTypes = ref.watch(localizedTubeTypesProvider);
+    final flooringMaterials = ref.watch(localizedFlooringMaterialsProvider);
 
     final specificOutputWPerM2 =
         ref.watch(zoneHeatOutputProvider(widget.zoneId));
@@ -218,8 +218,8 @@ class _HeatingZonePropertiesState
         ? _zoneMissingPrereqs(
             zone,
             editorState,
-            tubeTypesAsync.asData?.value,
-            flooringAsync.asData?.value,
+            tubeTypes.map((lr) => lr.row).toList(growable: false),
+            flooringMaterials.map((lr) => lr.row).toList(growable: false),
           )
         : null;
 
@@ -433,22 +433,13 @@ class _HeatingZonePropertiesState
           // ── Tube type dropdown ───────────────────────────────────
           Text(l10n.tubeType, style: textTheme.bodyMedium),
           const SizedBox(height: Spacing.xs),
-          tubeTypesAsync.when(
-            data: (tubes) => _TubeTypeDropdown(
-              tubes: tubes,
-              selectedId: zone.tubeTypeId,
-              onChanged: (id) {
-                if (id == zone.tubeTypeId) return;
-                _commit(zone, zone.copyWith(tubeTypeId: id));
-              },
-            ),
-            loading: () => const LinearProgressIndicator(),
-            error: (e, _) => Text(
-              l10n.errorLoadingTubeTypes,
-              style: textTheme.bodySmall?.copyWith(
-                color: colorScheme.error,
-              ),
-            ),
+          _TubeTypeDropdown(
+            tubes: tubeTypes,
+            selectedId: zone.tubeTypeId,
+            onChanged: (id) {
+              if (id == zone.tubeTypeId) return;
+              _commit(zone, zone.copyWith(tubeTypeId: id));
+            },
           ),
 
           const SizedBox(height: Spacing.md),
@@ -459,20 +450,20 @@ class _HeatingZonePropertiesState
             style: textTheme.bodyMedium,
           ),
           const SizedBox(height: Spacing.xs),
-          flooringAsync.when(
-            data: (allMaterials) {
+          Builder(
+            builder: (_) {
               // Filter to zone-appropriate materials; the Custom
               // sentinel is appended manually below.
-              final filtered = allMaterials.where((m) {
-                if (m.id == kCustomFlooringMaterialId) {
+              final filtered = flooringMaterials.where((m) {
+                if (m.row.id == kCustomFlooringMaterialId) {
                   return false;
                 }
                 if (isWallZone) {
-                  return m.surfaceType == SurfaceType.wall ||
-                      m.surfaceType == SurfaceType.both;
+                  return m.row.surfaceType == SurfaceType.wall ||
+                      m.row.surfaceType == SurfaceType.both;
                 }
-                return m.surfaceType == SurfaceType.floor ||
-                    m.surfaceType == SurfaceType.both;
+                return m.row.surfaceType == SurfaceType.floor ||
+                    m.row.surfaceType == SurfaceType.both;
               }).toList();
 
               final isCustom = zone.flooringMaterialId ==
@@ -480,12 +471,12 @@ class _HeatingZonePropertiesState
               final effectiveId = isCustom
                   ? kCustomFlooringMaterialId
                   : (filtered.any(
-                        (m) => m.id == zone.flooringMaterialId,
+                        (m) => m.row.id == zone.flooringMaterialId,
                       )
                         ? zone.flooringMaterialId
                         : (filtered.isEmpty
                             ? kCustomFlooringMaterialId
-                            : filtered.first.id));
+                            : filtered.first.row.id));
 
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -501,11 +492,11 @@ class _HeatingZonePropertiesState
                       items: [
                         ...filtered.map(
                           (m) => DropdownMenuItem(
-                            value: m.id,
+                            value: m.row.id,
                             child: Text(
-                              '${m.name}'
+                              '${m.displayName}'
                               ' (R\u03BB\u202F'
-                              '${m.thermalResistance.toStringAsFixed(3)}'
+                              '${m.row.thermalResistance.toStringAsFixed(3)}'
                               '\u202Fm\u00B2K/W)',
                               style: textTheme.bodyMedium,
                               overflow: TextOverflow.ellipsis,
@@ -553,13 +544,6 @@ class _HeatingZonePropertiesState
                 ],
               );
             },
-            loading: () => const LinearProgressIndicator(),
-            error: (e, _) => Text(
-              l10n.errorLoadingFlooringMaterials,
-              style: textTheme.bodySmall?.copyWith(
-                color: colorScheme.error,
-              ),
-            ),
           ),
 
           const Divider(height: Spacing.lg),
@@ -765,7 +749,7 @@ class _TubeTypeDropdown extends StatelessWidget {
     required this.onChanged,
   });
 
-  final List<TubeType> tubes;
+  final List<LocalizedCatalogRow<TubeType>> tubes;
   final String selectedId;
   final void Function(String id) onChanged;
 
@@ -780,9 +764,9 @@ class _TubeTypeDropdown extends StatelessWidget {
     }
 
     // Ensure selectedId is a valid option; fall back to first.
-    final effectiveId = tubes.any((t) => t.id == selectedId)
+    final effectiveId = tubes.any((t) => t.row.id == selectedId)
         ? selectedId
-        : tubes.first.id;
+        : tubes.first.row.id;
 
     return InputDecorator(
       decoration: const InputDecoration(isDense: true),
@@ -794,9 +778,9 @@ class _TubeTypeDropdown extends StatelessWidget {
         items: tubes
             .map(
               (t) => DropdownMenuItem(
-                value: t.id,
+                value: t.row.id,
                 child: Text(
-                  '${t.name} \u2300${t.outerDiameterMm.toStringAsFixed(0)}\u202Fmm',
+                  '${t.displayName} \u2300${t.row.outerDiameterMm.toStringAsFixed(0)}\u202Fmm',
                   style: textTheme.bodyMedium,
                   overflow: TextOverflow.ellipsis,
                 ),

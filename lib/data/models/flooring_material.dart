@@ -22,8 +22,11 @@ abstract class FlooringMaterial with _$FlooringMaterial {
     /// UUID v4 primary key.
     required String id,
 
-    /// Display name (1–200 chars).
+    /// Canonical English display name (1–200 chars).
     required String name,
+
+    /// Optional German display name. Falls back to [name] when absent.
+    String? nameDe,
 
     /// Total thermal resistance of the covering in m²·K/W.
     required double thermalResistance,

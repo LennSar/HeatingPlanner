@@ -12,8 +12,11 @@ abstract class TubeType with _$TubeType {
     /// UUID v4 primary key.
     required String id,
 
-    /// Display name (1–100 chars).
+    /// Canonical English display name (1–100 chars).
     required String name,
+
+    /// Optional German display name. Falls back to [name] when absent.
+    String? nameDe,
 
     /// Pipe material.
     required TubeMaterial material,

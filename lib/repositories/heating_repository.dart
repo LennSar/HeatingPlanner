@@ -80,59 +80,56 @@ final flooringMaterialsProvider =
       .map((rows) => rows.map(_flooringMaterialFromRow).toList());
 });
 
-/// Reactive stream of all [TubeType]s paired with their locale-resolved
-/// display name, sorted by display name (case-insensitive).
+/// All [TubeType]s paired with their locale-resolved display name,
+/// sorted by display name (case-insensitive).
 ///
-/// Reacts to [currentLocaleProvider] so a language switch re-emits with
-/// the updated display strings. Search consumers should match against
-/// both [LocalizedCatalogRow.displayName] and
-/// [LocalizedCatalogRow.alternateName] (use [catalogRowMatchesQuery]).
+/// Derives from [tubeTypesProvider] (canonical) and
+/// [currentLocaleProvider]. Tests that override [tubeTypesProvider]
+/// drive this provider as well — no separate Drift stream is opened.
+/// Returns an empty list while the canonical stream is loading.
 final localizedTubeTypesProvider =
-    StreamProvider<List<LocalizedCatalogRow<TubeType>>>((ref) {
+    Provider<List<LocalizedCatalogRow<TubeType>>>((ref) {
   final locale = ref.watch(currentLocaleProvider);
-  final dao = ref.watch(heatingDaoProvider);
-  return dao.watchTubeTypes().map((rows) {
-    final list = [
-      for (final row in rows)
-        LocalizedCatalogRow<TubeType>(
-          row: _tubeTypeFromRow(row),
-          displayName: dao.localizedTubeTypeNameFor(row, locale),
-          alternateName:
-              locale.languageCode == 'de' ? row.name : row.nameDe,
-        ),
-    ];
-    list.sort(
-      (a, b) =>
-          a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
-    );
-    return list;
-  });
+  final tubes = ref.watch(tubeTypesProvider).asData?.value ?? const [];
+  final isDe = locale.languageCode == 'de';
+  final list = [
+    for (final t in tubes)
+      LocalizedCatalogRow<TubeType>(
+        row: t,
+        displayName: isDe ? (t.nameDe ?? t.name) : t.name,
+        alternateName: isDe ? t.name : t.nameDe,
+      ),
+  ];
+  list.sort(
+    (a, b) =>
+        a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
+  );
+  return list;
 });
 
-/// Reactive stream of all [FlooringMaterial]s paired with their
-/// locale-resolved display name, sorted by display name (case-insensitive).
+/// All [FlooringMaterial]s paired with their locale-resolved display
+/// name, sorted by display name (case-insensitive).
 ///
 /// See [localizedTubeTypesProvider] for semantics.
 final localizedFlooringMaterialsProvider =
-    StreamProvider<List<LocalizedCatalogRow<FlooringMaterial>>>((ref) {
+    Provider<List<LocalizedCatalogRow<FlooringMaterial>>>((ref) {
   final locale = ref.watch(currentLocaleProvider);
-  final dao = ref.watch(heatingDaoProvider);
-  return dao.watchFlooringMaterials().map((rows) {
-    final list = [
-      for (final row in rows)
-        LocalizedCatalogRow<FlooringMaterial>(
-          row: _flooringMaterialFromRow(row),
-          displayName: dao.localizedFlooringMaterialNameFor(row, locale),
-          alternateName:
-              locale.languageCode == 'de' ? row.name : row.nameDe,
-        ),
-    ];
-    list.sort(
-      (a, b) =>
-          a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
-    );
-    return list;
-  });
+  final materials =
+      ref.watch(flooringMaterialsProvider).asData?.value ?? const [];
+  final isDe = locale.languageCode == 'de';
+  final list = [
+    for (final m in materials)
+      LocalizedCatalogRow<FlooringMaterial>(
+        row: m,
+        displayName: isDe ? (m.nameDe ?? m.name) : m.name,
+        alternateName: isDe ? m.name : m.nameDe,
+      ),
+  ];
+  list.sort(
+    (a, b) =>
+        a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
+  );
+  return list;
 });
 
 // ── Per-ID stream providers ───────────────────────────────────────────────────
@@ -273,6 +270,7 @@ TubeType _tubeTypeFromRow($db.TubeType row) {
   return TubeType(
     id: row.id,
     name: row.name,
+    nameDe: row.nameDe,
     material: TubeMaterial.values.byName(row.material),
     outerDiameterMm: row.outerDiameterMm,
     innerDiameterMm: row.innerDiameterMm,
@@ -290,6 +288,7 @@ FlooringMaterial _flooringMaterialFromRow(
   return FlooringMaterial(
     id: row.id,
     name: row.name,
+    nameDe: row.nameDe,
     thermalResistance: row.thermalResistance,
     surfaceType: SurfaceType.values.byName(row.surfaceType),
   );
@@ -348,6 +347,7 @@ $db.TubeTypesCompanion _tubeTypeToCompanion(TubeType tube) {
   return $db.TubeTypesCompanion(
     id: Value(tube.id),
     name: Value(tube.name),
+    nameDe: Value(tube.nameDe),
     material: Value(tube.material.name),
     outerDiameterMm: Value(tube.outerDiameterMm),
     innerDiameterMm: Value(tube.innerDiameterMm),
@@ -365,6 +365,7 @@ $db.FlooringMaterialsCompanion _flooringMaterialToCompanion(
   return $db.FlooringMaterialsCompanion(
     id: Value(material.id),
     name: Value(material.name),
+    nameDe: Value(material.nameDe),
     thermalResistance: Value(material.thermalResistance),
     surfaceType: Value(material.surfaceType.name),
   );

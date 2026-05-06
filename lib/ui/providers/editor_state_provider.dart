@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/engines/geometry_engine.dart';
+import '../../repositories/app_preferences.dart';
 import '../../repositories/building_repository.dart';
 import '../../repositories/construction_repository.dart';
 import '../../repositories/heating_repository.dart';
@@ -15,6 +16,7 @@ import '../../data/models/door.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/heating_circuit.dart';
 import '../../data/models/heating_zone.dart';
+import '../../data/models/localized_catalog_row.dart';
 import '../../data/models/material_layer.dart';
 import '../../data/models/point2d.dart';
 import '../../data/models/room.dart';
@@ -894,6 +896,28 @@ final editorStateProvider =
     NotifierProvider<EditorStateNotifier, EditorState>(
   EditorStateNotifier.new,
 );
+
+/// In-memory wall constructions paired with their locale-resolved
+/// display name and the alternate-locale name (for cross-locale search).
+///
+/// Sourced from [editorStateProvider]'s `constructions` list rather than
+/// the DAO so any test that overrides the editor state automatically
+/// drives this provider — no Drift stream is opened. Returns an empty
+/// list when no constructions exist yet.
+final localizedWallConstructionsProvider =
+    Provider<List<LocalizedCatalogRow<WallConstruction>>>((ref) {
+  final locale = ref.watch(currentLocaleProvider);
+  final state = ref.watch(editorStateProvider);
+  final isDe = locale.languageCode == 'de';
+  return [
+    for (final c in state.constructions)
+      LocalizedCatalogRow<WallConstruction>(
+        row: c,
+        displayName: isDe ? (c.nameDe ?? c.name) : c.name,
+        alternateName: isDe ? c.name : c.nameDe,
+      ),
+  ];
+});
 
 /// Notifier for cursor position in world coordinates.
 class CursorPositionNotifier extends Notifier<Point2D?> {

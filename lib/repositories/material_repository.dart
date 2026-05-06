@@ -44,34 +44,38 @@ final materialEntryProvider =
       .map(_entryFromRow);
 });
 
-/// Reactive stream of all [MaterialEntry] records paired with their
-/// locale-resolved display name, sorted by display name (case-insensitive).
+/// All [MaterialEntry] records paired with their locale-resolved display
+/// name, sorted by display name (case-insensitive).
 ///
-/// Reacts to [currentLocaleProvider] so a language switch re-emits with the
-/// updated display strings. Search/filter consumers should use
-/// [catalogRowMatchesQuery], which inspects both [LocalizedCatalogRow.displayName]
-/// and [LocalizedCatalogRow.alternateName] so a query typed in either
+/// Derives from [materialEntriesProvider] (canonical data) and
+/// [currentLocaleProvider] (current language), so any test that
+/// overrides [materialEntriesProvider] also drives this provider —
+/// no separate Drift stream subscription is opened. Returns an empty
+/// list while the canonical stream is loading or has errored.
+///
+/// Search/filter consumers should use [catalogRowMatchesQuery], which
+/// inspects both [LocalizedCatalogRow.displayName] and
+/// [LocalizedCatalogRow.alternateName] so a query typed in either
 /// supported language matches.
 final localizedMaterialEntriesProvider =
-    StreamProvider<List<LocalizedCatalogRow<MaterialEntry>>>((ref) {
+    Provider<List<LocalizedCatalogRow<MaterialEntry>>>((ref) {
   final locale = ref.watch(currentLocaleProvider);
-  final dao = ref.watch(materialDaoProvider);
-  return dao.watchAll().map((rows) {
-    final list = [
-      for (final row in rows)
-        LocalizedCatalogRow<MaterialEntry>(
-          row: _entryFromRow(row),
-          displayName: dao.localizedNameFor(row, locale),
-          alternateName:
-              locale.languageCode == 'de' ? row.name : row.nameDe,
-        ),
-    ];
-    list.sort(
-      (a, b) =>
-          a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
-    );
-    return list;
-  });
+  final entries =
+      ref.watch(materialEntriesProvider).asData?.value ?? const [];
+  final isDe = locale.languageCode == 'de';
+  final list = [
+    for (final e in entries)
+      LocalizedCatalogRow<MaterialEntry>(
+        row: e,
+        displayName: isDe ? (e.nameDe ?? e.name) : e.name,
+        alternateName: isDe ? e.name : e.nameDe,
+      ),
+  ];
+  list.sort(
+    (a, b) =>
+        a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
+  );
+  return list;
 });
 
 // ── Repository class ──────────────────────────────────────────────────────────
@@ -158,6 +162,7 @@ MaterialEntry _entryFromRow($db.MaterialEntry row) {
   return MaterialEntry(
     id: row.id,
     name: row.name,
+    nameDe: row.nameDe,
     category: row.category,
     subcategory: row.subcategory,
     lambdaDefault: row.lambdaDefault,
@@ -173,6 +178,7 @@ $db.MaterialEntriesCompanion _entryToCompanion(MaterialEntry entry) {
   return $db.MaterialEntriesCompanion(
     id: Value(entry.id),
     name: Value(entry.name),
+    nameDe: Value(entry.nameDe),
     category: Value(entry.category),
     subcategory: Value(entry.subcategory),
     lambdaDefault: Value(entry.lambdaDefault),

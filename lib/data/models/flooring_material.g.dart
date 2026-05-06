@@ -10,6 +10,7 @@ _FlooringMaterial _$FlooringMaterialFromJson(Map<String, dynamic> json) =>
     _FlooringMaterial(
       id: json['id'] as String,
       name: json['name'] as String,
+      nameDe: json['nameDe'] as String?,
       thermalResistance: (json['thermalResistance'] as num).toDouble(),
       surfaceType:
           $enumDecodeNullable(_$SurfaceTypeEnumMap, json['surfaceType']) ??
@@ -20,6 +21,7 @@ Map<String, dynamic> _$FlooringMaterialToJson(_FlooringMaterial instance) =>
     <String, dynamic>{
       'id': instance.id,
       'name': instance.name,
+      'nameDe': instance.nameDe,
       'thermalResistance': instance.thermalResistance,
       'surfaceType': _$SurfaceTypeEnumMap[instance.surfaceType]!,
     };

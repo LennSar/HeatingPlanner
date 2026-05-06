@@ -252,7 +252,12 @@ class _WallInfo extends ConsumerWidget {
           if (construction != null)
             _infoRow(
               l10n.constructionLabel,
-              construction.name,
+              ref
+                      .watch(localizedWallConstructionsProvider)
+                      .where((lr) => lr.row.id == construction.id)
+                      .firstOrNull
+                      ?.displayName ??
+                  construction.name,
               textTheme,
             ),
           const SizedBox(height: Spacing.md),

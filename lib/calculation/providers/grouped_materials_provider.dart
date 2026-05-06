@@ -85,15 +85,14 @@ Map<String, Map<String, List<MaterialEntry>>> _buildGrouped(
 /// (matching `material_entries.category` / `subcategory` columns) — the
 /// picker maps those to localized headers via its own AppLocalizations.
 ///
-/// Returns an empty map while the underlying stream is loading or has errored.
+/// Returns an empty map while the underlying entries provider is loading
+/// or has errored.
 final localizedGroupedMaterialsProvider = Provider<
     Map<String, Map<String, List<LocalizedCatalogRow<MaterialEntry>>>>>(
   (ref) {
-    return ref.watch(localizedMaterialEntriesProvider).when(
-          data: _buildGroupedLocalized,
-          loading: () => const {},
-          error: (_, __) => const {},
-        );
+    final entries = ref.watch(localizedMaterialEntriesProvider);
+    if (entries.isEmpty) return const {};
+    return _buildGroupedLocalized(entries);
   },
 );
 

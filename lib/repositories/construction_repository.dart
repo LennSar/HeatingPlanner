@@ -3,10 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/database/app_database.dart' as $db;
 import '../data/database/daos/construction_dao.dart';
-import '../data/models/localized_catalog_row.dart';
 import '../data/models/material_layer.dart';
 import '../data/models/wall_construction.dart';
-import 'app_preferences.dart';
 import 'save_state_notifier.dart';
 
 // ── DAO provider ──────────────────────────────────────────────────────────────
@@ -44,35 +42,6 @@ final layersProvider =
   },
 );
 
-/// Reactive stream of all [WallConstruction]s paired with their
-/// locale-resolved display name, sorted by display name (case-insensitive).
-///
-/// Reacts to [currentLocaleProvider] so a language switch re-emits with
-/// the updated display strings. Search consumers should match against
-/// both [LocalizedCatalogRow.displayName] and
-/// [LocalizedCatalogRow.alternateName] (use [catalogRowMatchesQuery]).
-final localizedWallConstructionsProvider =
-    StreamProvider<List<LocalizedCatalogRow<WallConstruction>>>((ref) {
-  final locale = ref.watch(currentLocaleProvider);
-  final dao = ref.watch(constructionDaoProvider);
-  return dao.watchAll().map((rows) {
-    final list = [
-      for (final row in rows)
-        LocalizedCatalogRow<WallConstruction>(
-          row: _constructionFromRow(row),
-          displayName: dao.localizedNameFor(row, locale),
-          alternateName:
-              locale.languageCode == 'de' ? row.name : row.nameDe,
-        ),
-    ];
-    list.sort(
-      (a, b) =>
-          a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
-    );
-    return list;
-  });
-});
-
 // ── WallConstruction CRUD ─────────────────────────────────────────────────────
 
 /// Inserts or replaces [construction] in the database.
@@ -105,6 +74,7 @@ WallConstruction _constructionFromRow($db.WallConstruction row) {
   return WallConstruction(
     id: row.id,
     name: row.name,
+    nameDe: row.nameDe,
     rsi: row.rsi,
     rse: row.rse,
     isPreset: row.isPreset == 1,
@@ -135,6 +105,7 @@ $db.WallConstructionsCompanion _constructionToCompanion(
   return $db.WallConstructionsCompanion(
     id: Value(construction.id),
     name: Value(construction.name),
+    nameDe: Value(construction.nameDe),
     rsi: Value(construction.rsi),
     rse: Value(construction.rse),
     isPreset: Value(construction.isPreset ? 1 : 0),

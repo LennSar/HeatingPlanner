@@ -13,8 +13,11 @@ abstract class MaterialEntry with _$MaterialEntry {
     /// UUID v4 primary key.
     required String id,
 
-    /// Display name (1–200 chars).
+    /// Canonical English display name (1–200 chars).
     required String name,
+
+    /// Optional German display name. Falls back to [name] when absent.
+    String? nameDe,
 
     /// Material category string (e.g. "Masonry", "Insulation boards").
     required String category,

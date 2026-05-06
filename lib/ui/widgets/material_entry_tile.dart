@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../data/models/localized_catalog_row.dart';
 import '../../data/models/material_entry.dart';
 
 /// A selectable row for an individual [MaterialEntry] inside a picker dropdown.
 ///
-/// Displays [entry.name] as primary text and the λ value as secondary text
-/// styled in [ColorScheme.onSurfaceVariant] (the `onSurfaceSecondary` design
-/// token). Tapping the row invokes [onTap].
+/// Displays [LocalizedCatalogRow.displayName] (locale-resolved) as primary
+/// text and the λ value as secondary text styled in
+/// [ColorScheme.onSurfaceVariant] (the `onSurfaceSecondary` design token).
+/// Tapping the row invokes [onTap].
 ///
 /// [indentLevel] controls left-padding depth so material rows nest cleanly
 /// inside [CollapsibleGroupTile] headers:
@@ -29,8 +31,8 @@ class MaterialEntryTile extends StatelessWidget {
     this.indentLevel = 2,
   });
 
-  /// The material to display.
-  final MaterialEntry entry;
+  /// The material to display, paired with its locale-resolved display name.
+  final LocalizedCatalogRow<MaterialEntry> entry;
 
   /// Called when the user taps the tile.
   final VoidCallback onTap;
@@ -44,9 +46,9 @@ class MaterialEntryTile extends StatelessWidget {
   /// Secondary label: λ value formatted to 3 d.p. with unit.
   ///
   /// When `manufacturer` is added to [MaterialEntry], prefix it here:
-  /// `'${entry.manufacturer} · λ ...'`
+  /// `'${entry.row.manufacturer} · λ ...'`
   String get _secondaryText =>
-      'λ ${entry.lambdaDefault.toStringAsFixed(3)} W/(m·K)';
+      'λ ${entry.row.lambdaDefault.toStringAsFixed(3)} W/(m·K)';
 
   @override
   Widget build(BuildContext context) {
@@ -57,7 +59,7 @@ class MaterialEntryTile extends StatelessWidget {
     final leftPad = Spacing.sm + indentLevel * Spacing.md;
 
     return Semantics(
-      label: '${entry.name}, $_secondaryText',
+      label: '${entry.displayName}, $_secondaryText',
       button: true,
       excludeSemantics: true,
       child: InkWell(
@@ -74,7 +76,7 @@ class MaterialEntryTile extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                entry.name,
+                entry.displayName,
                 style: theme.textTheme.bodyMedium,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

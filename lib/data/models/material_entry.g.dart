@@ -10,6 +10,7 @@ _MaterialEntry _$MaterialEntryFromJson(Map<String, dynamic> json) =>
     _MaterialEntry(
       id: json['id'] as String,
       name: json['name'] as String,
+      nameDe: json['nameDe'] as String?,
       category: json['category'] as String,
       subcategory: json['subcategory'] as String? ?? '',
       lambdaDefault: (json['lambdaDefault'] as num).toDouble(),
@@ -22,6 +23,7 @@ Map<String, dynamic> _$MaterialEntryToJson(_MaterialEntry instance) =>
     <String, dynamic>{
       'id': instance.id,
       'name': instance.name,
+      'nameDe': instance.nameDe,
       'category': instance.category,
       'subcategory': instance.subcategory,
       'lambdaDefault': instance.lambdaDefault,

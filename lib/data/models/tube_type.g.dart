@@ -9,6 +9,7 @@ part of 'tube_type.dart';
 _TubeType _$TubeTypeFromJson(Map<String, dynamic> json) => _TubeType(
   id: json['id'] as String,
   name: json['name'] as String,
+  nameDe: json['nameDe'] as String?,
   material: $enumDecode(_$TubeMaterialEnumMap, json['material']),
   outerDiameterMm: (json['outerDiameterMm'] as num?)?.toDouble() ?? 16.0,
   innerDiameterMm: (json['innerDiameterMm'] as num?)?.toDouble() ?? 13.0,
@@ -24,6 +25,7 @@ _TubeType _$TubeTypeFromJson(Map<String, dynamic> json) => _TubeType(
 Map<String, dynamic> _$TubeTypeToJson(_TubeType instance) => <String, dynamic>{
   'id': instance.id,
   'name': instance.name,
+  'nameDe': instance.nameDe,
   'material': _$TubeMaterialEnumMap[instance.material]!,
   'outerDiameterMm': instance.outerDiameterMm,
   'innerDiameterMm': instance.innerDiameterMm,

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/providers/grouped_materials_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../data/models/localized_catalog_row.dart';
 import '../../data/models/material_entry.dart';
 import '../../l10n/app_localizations.dart';
 import '../../repositories/material_repository.dart';
@@ -24,11 +25,11 @@ import 'material_entry_tile.dart';
 ///
 /// ## Paths
 /// - **Search inactive**: grouped three-level tree via [_GroupedList] backed
-///   by [groupedMaterialsProvider].
+///   by [localizedGroupedMaterialsProvider].
 /// - **Search active**: flat [_FlatFilteredList] — case-insensitive substring
-///   match on [MaterialEntry.name] and [MaterialEntry.subcategory]; group
-///   headers are hidden. Matches on `manufacturer` will be added once that
-///   field is available in [MaterialEntry].
+///   match against the row's display name *and* its alternate-locale name
+///   (so a query typed in English finds DE rows and vice versa) plus the
+///   canonical subcategory.
 class MaterialPicker extends ConsumerStatefulWidget {
   /// Creates a [MaterialPicker].
   const MaterialPicker({super.key, required this.onSelected});
@@ -52,15 +53,18 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
     super.dispose();
   }
 
-  /// Returns true when [m] matches [lowerQuery] on any searchable field.
+  /// Returns true when [entry] matches [lowerQuery] on any searchable field.
   ///
   /// [lowerQuery] must already be lower-cased by the caller (done once per
-  /// build, not per item). Matches on [MaterialEntry.name] and
-  /// [MaterialEntry.subcategory]. Extend to `m.manufacturer` once that field
-  /// is added to [MaterialEntry] and the database schema.
-  static bool _matches(MaterialEntry m, String lowerQuery) =>
-      m.name.toLowerCase().contains(lowerQuery) ||
-      m.subcategory.toLowerCase().contains(lowerQuery);
+  /// build, not per item). Matches on the locale-resolved display name,
+  /// the alternate-locale name (so English queries match DE rows and
+  /// vice versa), and the canonical subcategory.
+  static bool _matches(
+    LocalizedCatalogRow<MaterialEntry> entry,
+    String lowerQuery,
+  ) =>
+      catalogRowMatchesQuery(entry, lowerQuery) ||
+      entry.row.subcategory.toLowerCase().contains(lowerQuery);
 
   @override
   Widget build(BuildContext context) {
@@ -69,7 +73,7 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
     final l10n = AppLocalizations.of(context)!;
 
     // Grouped data from the provider — empty while loading or on error.
-    final grouped = ref.watch(groupedMaterialsProvider);
+    final grouped = ref.watch(localizedGroupedMaterialsProvider);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -105,23 +109,16 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
           ),
         ),
 
-        // ── List area — handles all three async states (§2.3) ────────────
+        // ── List area ────────────────────────────────────────────────────
+        // Loading and error states are surfaced through the canonical
+        // `materialEntriesProvider` (handled by parent consumers); the
+        // localized variant is a plain Provider that emits an empty list
+        // until canonical data is ready.
         Flexible(
-          child: ref.watch(materialEntriesProvider).when(
-            loading: () => const Padding(
-              padding: EdgeInsets.all(Spacing.md),
-              child: Center(child: CircularProgressIndicator()),
-            ),
-            error: (_, __) => Padding(
-              padding: const EdgeInsets.all(Spacing.md),
-              child: Text(
-                l10n.failedLoadMaterials,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.error,
-                ),
-              ),
-            ),
-            data: (materials) {
+          child: Builder(
+            builder: (_) {
+              final materials =
+                  ref.watch(localizedMaterialEntriesProvider);
               // ── Search-active path ──────────────────────────────────────
               final q = _query.trim().toLowerCase();
               if (q.isNotEmpty) {
@@ -168,7 +165,7 @@ class _FlatFilteredList extends StatelessWidget {
     required this.onSelected,
   });
 
-  final List<MaterialEntry> materials;
+  final List<LocalizedCatalogRow<MaterialEntry>> materials;
   final void Function(MaterialEntry) onSelected;
 
   @override
@@ -193,7 +190,7 @@ class _FlatFilteredList extends StatelessWidget {
       itemBuilder: (_, i) => MaterialEntryTile(
         entry: materials[i],
         indentLevel: 0,
-        onTap: () => onSelected(materials[i]),
+        onTap: () => onSelected(materials[i].row),
       ),
     );
   }
@@ -201,18 +198,20 @@ class _FlatFilteredList extends StatelessWidget {
 
 // ── Private: grouped list (search-inactive path) ───────────────────────────
 
-/// Scrollable three-level grouped list backed by [groupedMaterialsProvider].
+/// Scrollable three-level grouped list backed by
+/// [localizedGroupedMaterialsProvider].
 ///
 /// Extracted into its own [StatelessWidget] so the list is not rebuilt when
-/// the search field text changes (the search-active path will be a separate
-/// sibling widget at that point).
+/// the search field text changes (the search-active path is a separate
+/// sibling widget).
 class _GroupedList extends StatelessWidget {
   const _GroupedList({
     required this.grouped,
     required this.onSelected,
   });
 
-  final Map<String, Map<String, List<MaterialEntry>>> grouped;
+  final Map<String, Map<String, List<LocalizedCatalogRow<MaterialEntry>>>>
+      grouped;
   final void Function(MaterialEntry) onSelected;
 
   @override
@@ -237,7 +236,7 @@ class _GroupedList extends StatelessWidget {
                     MaterialEntryTile(
                       entry: material,
                       indentLevel: 1,
-                      onTap: () => onSelected(material),
+                      onTap: () => onSelected(material.row),
                     )
                 else
                   // Level 1 — subcategory header.
@@ -249,7 +248,7 @@ class _GroupedList extends StatelessWidget {
                         // Level 2 — leaf material row.
                         MaterialEntryTile(
                           entry: material,
-                          onTap: () => onSelected(material),
+                          onTap: () => onSelected(material.row),
                         ),
                     ],
                   ),

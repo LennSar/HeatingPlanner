@@ -14,8 +14,11 @@ abstract class WallConstruction with _$WallConstruction {
     /// UUID v4 primary key.
     required String id,
 
-    /// Descriptive name (1–200 chars).
+    /// Canonical English descriptive name (1–200 chars).
     required String name,
+
+    /// Optional German display name. Falls back to [name] when absent.
+    String? nameDe,
 
     /// Interior surface resistance in m²·K/W (default per ISO 6946).
     @Default(0.13) double rsi,
