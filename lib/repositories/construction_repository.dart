@@ -3,8 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/database/app_database.dart' as $db;
 import '../data/database/daos/construction_dao.dart';
+import '../data/models/localized_catalog_row.dart';
 import '../data/models/material_layer.dart';
 import '../data/models/wall_construction.dart';
+import 'app_preferences.dart';
 import 'save_state_notifier.dart';
 
 // ── DAO provider ──────────────────────────────────────────────────────────────
@@ -41,6 +43,35 @@ final layersProvider =
         .map((rows) => rows.map(_layerFromRow).toList());
   },
 );
+
+/// Reactive stream of all [WallConstruction]s paired with their
+/// locale-resolved display name, sorted by display name (case-insensitive).
+///
+/// Reacts to [currentLocaleProvider] so a language switch re-emits with
+/// the updated display strings. Search consumers should match against
+/// both [LocalizedCatalogRow.displayName] and
+/// [LocalizedCatalogRow.alternateName] (use [catalogRowMatchesQuery]).
+final localizedWallConstructionsProvider =
+    StreamProvider<List<LocalizedCatalogRow<WallConstruction>>>((ref) {
+  final locale = ref.watch(currentLocaleProvider);
+  final dao = ref.watch(constructionDaoProvider);
+  return dao.watchAll().map((rows) {
+    final list = [
+      for (final row in rows)
+        LocalizedCatalogRow<WallConstruction>(
+          row: _constructionFromRow(row),
+          displayName: dao.localizedNameFor(row, locale),
+          alternateName:
+              locale.languageCode == 'de' ? row.name : row.nameDe,
+        ),
+    ];
+    list.sort(
+      (a, b) =>
+          a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
+    );
+    return list;
+  });
+});
 
 // ── WallConstruction CRUD ─────────────────────────────────────────────────────
 

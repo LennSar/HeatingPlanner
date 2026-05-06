@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/models/localized_catalog_row.dart';
 import '../../data/models/material_entry.dart';
 import '../../repositories/material_repository.dart';
 
@@ -68,6 +69,65 @@ Map<String, Map<String, List<MaterialEntry>>> _buildGrouped(
     result[category] = {
       for (final sub in sortedSubcategories)
         sub: bySubcategory[sub]!..sort((a, b) => a.name.compareTo(b.name)),
+    };
+  }
+
+  return result;
+}
+
+/// Locale-aware variant of [groupedMaterialsProvider].
+///
+/// Same three-level shape, but each leaf is a
+/// [LocalizedCatalogRow] of [MaterialEntry] so the picker can render
+/// the locale-appropriate name without a second lookup, and
+/// material-level sort uses the localized display name (case-insensitive).
+/// Category and subcategory keys remain the canonical English values
+/// (matching `material_entries.category` / `subcategory` columns) — the
+/// picker maps those to localized headers via its own AppLocalizations.
+///
+/// Returns an empty map while the underlying stream is loading or has errored.
+final localizedGroupedMaterialsProvider = Provider<
+    Map<String, Map<String, List<LocalizedCatalogRow<MaterialEntry>>>>>(
+  (ref) {
+    return ref.watch(localizedMaterialEntriesProvider).when(
+          data: _buildGroupedLocalized,
+          loading: () => const {},
+          error: (_, __) => const {},
+        );
+  },
+);
+
+Map<String, Map<String, List<LocalizedCatalogRow<MaterialEntry>>>>
+    _buildGroupedLocalized(
+  List<LocalizedCatalogRow<MaterialEntry>> entries,
+) {
+  final allCategories = entries.map((e) => e.row.category).toSet();
+  final knownInOrder =
+      _categoryOrder.where(allCategories.contains).toList();
+  final extra = (allCategories.difference(knownInOrder.toSet()).toList()
+    ..sort());
+  final orderedCategories = [...knownInOrder, ...extra];
+
+  final result =
+      <String, Map<String, List<LocalizedCatalogRow<MaterialEntry>>>>{};
+
+  for (final category in orderedCategories) {
+    final inCategory =
+        entries.where((e) => e.row.category == category).toList();
+
+    final bySubcategory =
+        <String, List<LocalizedCatalogRow<MaterialEntry>>>{};
+    for (final e in inCategory) {
+      bySubcategory.putIfAbsent(e.row.subcategory, () => []).add(e);
+    }
+
+    final sortedSubcategories = bySubcategory.keys.toList()..sort();
+    result[category] = {
+      for (final sub in sortedSubcategories)
+        sub: bySubcategory[sub]!
+          ..sort((a, b) => a.displayName
+              .toLowerCase()
+              .compareTo(b.displayName.toLowerCase())),
     };
   }
 

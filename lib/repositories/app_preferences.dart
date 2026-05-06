@@ -1,3 +1,5 @@
+import 'dart:ui' show Locale;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -242,3 +244,21 @@ final languageCodeProvider =
     AsyncNotifierProvider<LanguageCodeNotifier, String>(
   LanguageCodeNotifier.new,
 );
+
+// ── currentLocaleProvider ────────────────────────────────────────────────────
+
+/// Current UI [Locale] derived from [languageCodeProvider].
+///
+/// Synchronous: emits `Locale('en')` while the underlying preference is
+/// still loading (or has errored), then switches to the persisted code as
+/// soon as the [LanguageCodeNotifier] resolves. Catalog providers and
+/// DAO `localizedNameFor` helpers consume this to apply the correct
+/// fallback rules without each call site having to repeat the
+/// `AsyncValue.maybeWhen` boilerplate.
+final currentLocaleProvider = Provider<Locale>((ref) {
+  final code = ref.watch(languageCodeProvider).maybeWhen(
+        data: (v) => v,
+        orElse: () => 'en',
+      );
+  return Locale(code);
+});

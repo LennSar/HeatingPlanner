@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/database/app_database.dart' as $db;
 import '../data/database/daos/material_dao.dart';
+import '../data/models/localized_catalog_row.dart';
 import '../data/models/material_entry.dart';
 import 'app_preferences.dart';
 import 'save_state_notifier.dart';
@@ -41,6 +42,36 @@ final materialEntryProvider =
       .watch(materialDaoProvider)
       .watchById(id)
       .map(_entryFromRow);
+});
+
+/// Reactive stream of all [MaterialEntry] records paired with their
+/// locale-resolved display name, sorted by display name (case-insensitive).
+///
+/// Reacts to [currentLocaleProvider] so a language switch re-emits with the
+/// updated display strings. Search/filter consumers should use
+/// [catalogRowMatchesQuery], which inspects both [LocalizedCatalogRow.displayName]
+/// and [LocalizedCatalogRow.alternateName] so a query typed in either
+/// supported language matches.
+final localizedMaterialEntriesProvider =
+    StreamProvider<List<LocalizedCatalogRow<MaterialEntry>>>((ref) {
+  final locale = ref.watch(currentLocaleProvider);
+  final dao = ref.watch(materialDaoProvider);
+  return dao.watchAll().map((rows) {
+    final list = [
+      for (final row in rows)
+        LocalizedCatalogRow<MaterialEntry>(
+          row: _entryFromRow(row),
+          displayName: dao.localizedNameFor(row, locale),
+          alternateName:
+              locale.languageCode == 'de' ? row.name : row.nameDe,
+        ),
+    ];
+    list.sort(
+      (a, b) =>
+          a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
+    );
+    return list;
+  });
 });
 
 // ── Repository class ──────────────────────────────────────────────────────────

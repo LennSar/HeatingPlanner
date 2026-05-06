@@ -8,6 +8,8 @@ import '../data/database/daos/heating_dao.dart';
 import '../data/models/distributor.dart';
 import '../data/models/enums.dart';
 import '../data/models/flooring_material.dart';
+import '../data/models/localized_catalog_row.dart';
+import 'app_preferences.dart';
 import 'save_state_notifier.dart';
 import '../data/models/heating_circuit.dart';
 import '../data/models/heating_zone.dart';
@@ -76,6 +78,61 @@ final flooringMaterialsProvider =
       .watch(heatingDaoProvider)
       .watchFlooringMaterials()
       .map((rows) => rows.map(_flooringMaterialFromRow).toList());
+});
+
+/// Reactive stream of all [TubeType]s paired with their locale-resolved
+/// display name, sorted by display name (case-insensitive).
+///
+/// Reacts to [currentLocaleProvider] so a language switch re-emits with
+/// the updated display strings. Search consumers should match against
+/// both [LocalizedCatalogRow.displayName] and
+/// [LocalizedCatalogRow.alternateName] (use [catalogRowMatchesQuery]).
+final localizedTubeTypesProvider =
+    StreamProvider<List<LocalizedCatalogRow<TubeType>>>((ref) {
+  final locale = ref.watch(currentLocaleProvider);
+  final dao = ref.watch(heatingDaoProvider);
+  return dao.watchTubeTypes().map((rows) {
+    final list = [
+      for (final row in rows)
+        LocalizedCatalogRow<TubeType>(
+          row: _tubeTypeFromRow(row),
+          displayName: dao.localizedTubeTypeNameFor(row, locale),
+          alternateName:
+              locale.languageCode == 'de' ? row.name : row.nameDe,
+        ),
+    ];
+    list.sort(
+      (a, b) =>
+          a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
+    );
+    return list;
+  });
+});
+
+/// Reactive stream of all [FlooringMaterial]s paired with their
+/// locale-resolved display name, sorted by display name (case-insensitive).
+///
+/// See [localizedTubeTypesProvider] for semantics.
+final localizedFlooringMaterialsProvider =
+    StreamProvider<List<LocalizedCatalogRow<FlooringMaterial>>>((ref) {
+  final locale = ref.watch(currentLocaleProvider);
+  final dao = ref.watch(heatingDaoProvider);
+  return dao.watchFlooringMaterials().map((rows) {
+    final list = [
+      for (final row in rows)
+        LocalizedCatalogRow<FlooringMaterial>(
+          row: _flooringMaterialFromRow(row),
+          displayName: dao.localizedFlooringMaterialNameFor(row, locale),
+          alternateName:
+              locale.languageCode == 'de' ? row.name : row.nameDe,
+        ),
+    ];
+    list.sort(
+      (a, b) =>
+          a.displayName.toLowerCase().compareTo(b.displayName.toLowerCase()),
+    );
+    return list;
+  });
 });
 
 // ── Per-ID stream providers ───────────────────────────────────────────────────
