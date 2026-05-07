@@ -1,16 +1,19 @@
-// Round-trip test for the v15 German-name field on the wall construction
-// editor.
+// Tests covering the wall-construction editor's behaviour around
+// the localised display name column.
 //
-//   WCE-NDE-1  Editor pre-fills the German name field from
-//              `WallConstruction.nameDe` when reopened, and persists
-//              empty input as null (not '').
-//   WCE-NDE-2  Editor persists a typed German name when Save is pressed
-//              and round-trips on reopen.
+// Prompt 6 added a "German name" / "Deutscher Name" field directly to
+// the editor. Prompt 8 reverted that decision: the editor again
+// surfaces a single name field, and the `wall_constructions.name_de`
+// column is written by other code paths (built-in seed, .hsp import,
+// localised provider). The editor must NOT clobber an existing
+// German name when the user saves an unrelated change.
 //
-// Per agent-test.md §6.1 these run as widget tests through the
-// production code path (`showWallConstructionEditor`) so the test
-// validates the controllers, the save handler, and the editor's
-// re-init path together.
+//   WCE-NDE-1  The editor renders only one name field — no German /
+//              Deutscher labels appear and the existing `nameDe`
+//              value is not exposed as a user-editable string.
+//   WCE-NDE-2  Editing the canonical name and saving preserves the
+//              row's pre-existing `nameDe`; reopening shows the same
+//              persisted value.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -32,8 +35,8 @@ import 'package:heating_planner/ui/providers/editor_state_provider.dart';
 /// Editor-state notifier that mutates state directly and skips every
 /// repository write. The production [EditorStateNotifier] writes to
 /// the DAO via `unawaited(upsertConstruction(...))`, which would
-/// require an in-memory database; for this round-trip we only need
-/// the in-memory state path.
+/// require an in-memory database; the localised-name preservation
+/// contract only depends on the in-memory state path.
 class _StubEditorNotifier extends EditorStateNotifier {
   _StubEditorNotifier(this._initial);
   final EditorState _initial;
@@ -136,13 +139,13 @@ Widget _buildTrigger({required WallConstruction initialConstruction}) {
     ],
     child: Consumer(
       builder: (ctx, ref, _) {
-        // Capture the container so the test can read the editor state
+        // Capture the container so the test can read editor state
         // directly after Save closes the dialog.
         _capturedContainer = ProviderScope.containerOf(ctx);
         return MaterialApp(
           theme: AppTheme.light(),
           localizationsDelegates: AppLocalizations.localizationsDelegates,
-          supportedLocales: const [Locale('en')],
+          supportedLocales: const [Locale('en'), Locale('de')],
           home: Scaffold(
             body: Builder(
               builder: (innerCtx) => ElevatedButton(
@@ -182,94 +185,41 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets(
-    'WCE-NDE-1: editor opens with empty German-name field for a '
-    'construction whose nameDe is null',
+    'WCE-NDE-1: editor renders a single name field — no localised-name '
+    'label is visible',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 900));
       addTearDown(() => tester.binding.setSurfaceSize(null));
 
+      // The construction starts with a localised display name set by
+      // some other code path (built-in seed / .hsp import / earlier
+      // build with the deprecated field).
       const initial = WallConstruction(
         id: _cid,
         name: 'Brick wall',
+        nameDe: 'Ziegelwand',
       );
       await tester.pumpWidget(
         _buildTrigger(initialConstruction: initial),
       );
       await _openDialog(tester);
 
-      // The English name is pre-filled.
+      // The canonical name field is pre-filled.
       expect(find.widgetWithText(TextField, 'Brick wall'), findsOneWidget);
 
-      // Locate the German-name TextField via its label and verify it
-      // is empty rather than showing the English fallback.
-      final germanField = tester.widget<TextField>(
-        find.ancestor(
-          of: find.text('German name'),
-          matching: find.byType(TextField),
-        ),
-      );
-      expect(germanField.controller!.text, '');
+      // The localised display value must NOT be surfaced as an
+      // editable field, and neither label variant may appear.
+      expect(find.widgetWithText(TextField, 'Ziegelwand'), findsNothing);
+      expect(find.text('German name'), findsNothing);
+      expect(find.text('Deutscher Name'), findsNothing);
 
       await _tearDownDialog(tester);
     },
   );
 
   testWidgets(
-    'WCE-NDE-2: typing a German name and saving persists nameDe; '
-    'reopening the editor pre-fills both fields',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 900));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-
-      const initial = WallConstruction(
-        id: _cid,
-        name: 'Brick wall',
-      );
-      await tester.pumpWidget(
-        _buildTrigger(initialConstruction: initial),
-      );
-      await _openDialog(tester);
-
-      // Pre-condition: nameDe is null in state.
-      expect(_readConstruction(_capturedContainer!).nameDe, isNull);
-
-      // Type a German translation into the German-name field.
-      await tester.enterText(
-        find.ancestor(
-          of: find.text('German name'),
-          matching: find.byType(TextField),
-        ),
-        'Ziegelwand',
-      );
-      await tester.pump();
-
-      // Save and dismiss.
-      await _tapSave(tester);
-
-      // State should now carry nameDe = 'Ziegelwand'.
-      final afterSave = _readConstruction(_capturedContainer!);
-      expect(afterSave.name, 'Brick wall');
-      expect(afterSave.nameDe, 'Ziegelwand');
-
-      // Re-open the editor; both fields should be pre-filled.
-      await _openDialog(tester);
-
-      expect(
-        find.widgetWithText(TextField, 'Brick wall'),
-        findsOneWidget,
-      );
-      expect(
-        find.widgetWithText(TextField, 'Ziegelwand'),
-        findsOneWidget,
-      );
-
-      await _tearDownDialog(tester);
-    },
-  );
-
-  testWidgets(
-    'WCE-NDE-3: clearing the German-name field persists nameDe as null, '
-    'not as the empty string',
+    'WCE-NDE-2: editing the canonical name and saving preserves the '
+    'row\'s pre-existing localised display name',
     (tester) async {
       await tester.binding.setSurfaceSize(const Size(800, 900));
       addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -284,26 +234,34 @@ void main() {
       );
       await _openDialog(tester);
 
-      // Clear the German-name field (empty string + whitespace both
-      // round-trip to null per the v15 editor contract).
+      // Edit the canonical name only.
       await tester.enterText(
-        find.ancestor(
-          of: find.text('German name'),
-          matching: find.byType(TextField),
-        ),
-        '   ',
+        find.widgetWithText(TextField, 'Brick wall'),
+        'Brick wall (renamed)',
       );
       await tester.pump();
 
       await _tapSave(tester);
 
+      // The edit lands and the localised display value is untouched.
       final afterSave = _readConstruction(_capturedContainer!);
-      expect(afterSave.name, 'Brick wall');
+      expect(afterSave.name, 'Brick wall (renamed)');
       expect(
         afterSave.nameDe,
-        isNull,
-        reason: 'whitespace-only input must persist as NULL, not "" or "   "',
+        'Ziegelwand',
+        reason:
+            'Saving from this editor must preserve any pre-existing '
+            'localised display name written by other code paths.',
       );
+
+      // Reopening shows the new canonical name; the localised value
+      // is still in state but never surfaced in the UI.
+      await _openDialog(tester);
+      expect(
+        find.widgetWithText(TextField, 'Brick wall (renamed)'),
+        findsOneWidget,
+      );
+      expect(find.widgetWithText(TextField, 'Ziegelwand'), findsNothing);
 
       await _tearDownDialog(tester);
     },

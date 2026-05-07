@@ -505,24 +505,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get constructionName => 'Konstruktionsname';
 
   @override
-  String get constructionNameDe => 'Deutscher Name';
-
-  @override
-  String get constructionNameDeHelp =>
-      'Optional — fällt auf den englischen Namen zurück, wenn leer.';
-
-  @override
-  String get constructionNameEnHelp =>
-      'Optional — fällt auf den deutschen Namen zurück, wenn leer.';
-
-  @override
-  String get presetNameDe => 'Deutscher Vorlagenname';
-
-  @override
-  String get presetNameDeHelp =>
-      'Optional — fällt auf den englischen Vorlagennamen zurück, wenn leer.';
-
-  @override
   String get addLayer => 'Schicht hinzufügen';
 
   @override
