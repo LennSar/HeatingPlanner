@@ -506,6 +506,24 @@ class AppLocalizationsEn extends AppLocalizations {
   String get constructionName => 'Construction name';
 
   @override
+  String get constructionNameDe => 'German name';
+
+  @override
+  String get constructionNameDeHelp =>
+      'Optional — falls back to the English name if empty.';
+
+  @override
+  String get constructionNameEnHelp =>
+      'Optional — falls back to the German name if empty.';
+
+  @override
+  String get presetNameDe => 'German preset name';
+
+  @override
+  String get presetNameDeHelp =>
+      'Optional — falls back to the English preset name if empty.';
+
+  @override
   String get addLayer => 'Add Layer';
 
   @override

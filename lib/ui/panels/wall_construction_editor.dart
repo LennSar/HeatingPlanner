@@ -82,6 +82,7 @@ class _SlabConstructionDialogState
   late WallConstruction _construction;
   late List<MaterialLayer> _layers;
   late TextEditingController _nameCtrl;
+  late TextEditingController _nameDeCtrl;
   late TextEditingController _rsiCtrl;
   late TextEditingController _rseCtrl;
 
@@ -106,6 +107,9 @@ class _SlabConstructionDialogState
           ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
         _nameCtrl =
             TextEditingController(text: _construction.name);
+        _nameDeCtrl = TextEditingController(
+          text: _construction.nameDe ?? '',
+        );
         _rsiCtrl = TextEditingController(
           text: _construction.rsi.toStringAsFixed(2),
         );
@@ -122,6 +126,7 @@ class _SlabConstructionDialogState
     );
     _layers = [];
     _nameCtrl = TextEditingController(text: widget.title);
+    _nameDeCtrl = TextEditingController();
     _rsiCtrl = TextEditingController(text: '0.13');
     _rseCtrl = TextEditingController(text: '0.04');
   }
@@ -129,6 +134,7 @@ class _SlabConstructionDialogState
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _nameDeCtrl.dispose();
     _rsiCtrl.dispose();
     _rseCtrl.dispose();
     super.dispose();
@@ -261,19 +267,34 @@ class _SlabConstructionDialogState
 
   Future<void> _saveAsPreset() async {
     final l10n = AppLocalizations.of(context)!;
-    final initialName = _nameCtrl.text.trim();
     final nameCtrl =
-        TextEditingController(text: initialName);
+        TextEditingController(text: _nameCtrl.text.trim());
+    final nameDeCtrl =
+        TextEditingController(text: _nameDeCtrl.text.trim());
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(l10n.saveAsPreset),
-        content: TextField(
-          controller: nameCtrl,
-          decoration: InputDecoration(
-            labelText: l10n.presetName,
-          ),
-          autofocus: true,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: InputDecoration(
+                labelText: l10n.presetName,
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: Spacing.sm),
+            TextField(
+              controller: nameDeCtrl,
+              decoration: InputDecoration(
+                labelText: l10n.presetNameDe,
+                helperText: l10n.presetNameDeHelp,
+                helperMaxLines: 2,
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -287,9 +308,12 @@ class _SlabConstructionDialogState
         ],
       ),
     );
-    nameCtrl.dispose();
-    if (confirmed != true || !mounted) return;
     final presetName = nameCtrl.text.trim();
+    final presetNameDeRaw = nameDeCtrl.text.trim();
+    final presetNameDe = presetNameDeRaw.isEmpty ? null : presetNameDeRaw;
+    nameCtrl.dispose();
+    nameDeCtrl.dispose();
+    if (confirmed != true || !mounted) return;
     if (presetName.isEmpty) return;
 
     final notifier = ref.read(editorStateProvider.notifier);
@@ -298,8 +322,13 @@ class _SlabConstructionDialogState
         .any((c) => c.id == _construction.id);
     final rsi = double.tryParse(_rsiCtrl.text) ?? 0.13;
     final rse = double.tryParse(_rseCtrl.text) ?? 0.04;
+    final editorNameDeRaw = _nameDeCtrl.text.trim();
     final current = _construction.copyWith(
-        name: _nameCtrl.text.trim(), rsi: rsi, rse: rse);
+      name: _nameCtrl.text.trim(),
+      nameDe: editorNameDeRaw.isEmpty ? null : editorNameDeRaw,
+      rsi: rsi,
+      rse: rse,
+    );
     if (isNew) {
       notifier.addConstruction(current);
     } else {
@@ -309,7 +338,10 @@ class _SlabConstructionDialogState
         current.id, _layers);
 
     notifier.saveConstructionAsPreset(
-        _construction.id, presetName);
+      _construction.id,
+      presetName,
+      presetNameDe: presetNameDe,
+    );
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -403,8 +435,8 @@ class _SlabConstructionDialogState
             ),
           )
           .toList();
-      // Show the user the same name they just clicked on.
-      _nameCtrl.text = localizedById[selected.id] ?? selected.name;
+      _nameCtrl.text = selected.name;
+      _nameDeCtrl.text = selected.nameDe ?? '';
       _rsiCtrl.text = selected.rsi.toStringAsFixed(2);
       _rseCtrl.text = selected.rse.toStringAsFixed(2);
     });
@@ -413,10 +445,13 @@ class _SlabConstructionDialogState
   void _save() {
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) return;
+    final nameDeRaw = _nameDeCtrl.text.trim();
+    final nameDe = nameDeRaw.isEmpty ? null : nameDeRaw;
     final rsi = double.tryParse(_rsiCtrl.text) ?? 0.13;
     final rse = double.tryParse(_rseCtrl.text) ?? 0.04;
     final updated = _construction.copyWith(
       name: name,
+      nameDe: nameDe,
       rsi: rsi,
       rse: rse,
     );
@@ -499,6 +534,20 @@ class _SlabConstructionDialogState
                 controller: _nameCtrl,
                 decoration: InputDecoration(
                   labelText: l10n.constructionName,
+                  isDense: true,
+                ),
+                style: textTheme.bodyLarge,
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: Spacing.xs),
+
+              // ---- German name field (optional) ----
+              TextField(
+                controller: _nameDeCtrl,
+                decoration: InputDecoration(
+                  labelText: l10n.constructionNameDe,
+                  helperText: l10n.constructionNameDeHelp,
+                  helperMaxLines: 2,
                   isDense: true,
                 ),
                 style: textTheme.bodyLarge,
@@ -660,6 +709,7 @@ class _WallConstructionDialogState
   late WallConstruction _construction;
   late List<MaterialLayer> _layers;
   late TextEditingController _nameCtrl;
+  late TextEditingController _nameDeCtrl;
   late TextEditingController _rsiCtrl;
   late TextEditingController _rseCtrl;
   bool _isNewConstruction = false;
@@ -697,6 +747,9 @@ class _WallConstructionDialogState
             .toList()
           ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
         _nameCtrl = TextEditingController(text: _construction.name);
+        _nameDeCtrl = TextEditingController(
+          text: _construction.nameDe ?? '',
+        );
         _rsiCtrl = TextEditingController(
           text: _construction.rsi.toStringAsFixed(2),
         );
@@ -716,6 +769,7 @@ class _WallConstructionDialogState
     );
     _layers = [];
     _nameCtrl = TextEditingController();
+    _nameDeCtrl = TextEditingController();
     _rsiCtrl = TextEditingController(text: '0.13');
     _rseCtrl = TextEditingController(text: '0.04');
   }
@@ -723,6 +777,7 @@ class _WallConstructionDialogState
   @override
   void dispose() {
     _nameCtrl.dispose();
+    _nameDeCtrl.dispose();
     _rsiCtrl.dispose();
     _rseCtrl.dispose();
     super.dispose();
@@ -861,19 +916,34 @@ class _WallConstructionDialogState
 
   Future<void> _saveAsPreset() async {
     final l10n = AppLocalizations.of(context)!;
-    final initialName = _nameCtrl.text.trim();
     final nameCtrl =
-        TextEditingController(text: initialName);
+        TextEditingController(text: _nameCtrl.text.trim());
+    final nameDeCtrl =
+        TextEditingController(text: _nameDeCtrl.text.trim());
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: Text(l10n.saveAsPreset),
-        content: TextField(
-          controller: nameCtrl,
-          decoration: InputDecoration(
-            labelText: l10n.presetName,
-          ),
-          autofocus: true,
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: nameCtrl,
+              decoration: InputDecoration(
+                labelText: l10n.presetName,
+              ),
+              autofocus: true,
+            ),
+            const SizedBox(height: Spacing.sm),
+            TextField(
+              controller: nameDeCtrl,
+              decoration: InputDecoration(
+                labelText: l10n.presetNameDe,
+                helperText: l10n.presetNameDeHelp,
+                helperMaxLines: 2,
+              ),
+            ),
+          ],
         ),
         actions: [
           TextButton(
@@ -887,9 +957,12 @@ class _WallConstructionDialogState
         ],
       ),
     );
-    nameCtrl.dispose();
-    if (confirmed != true || !mounted) return;
     final presetName = nameCtrl.text.trim();
+    final presetNameDeRaw = nameDeCtrl.text.trim();
+    final presetNameDe = presetNameDeRaw.isEmpty ? null : presetNameDeRaw;
+    nameCtrl.dispose();
+    nameDeCtrl.dispose();
+    if (confirmed != true || !mounted) return;
     if (presetName.isEmpty) return;
 
     // Ensure the current construction exists in state so the
@@ -900,9 +973,13 @@ class _WallConstructionDialogState
         .any((c) => c.id == _construction.id);
     final rsi = double.tryParse(_rsiCtrl.text) ?? 0.13;
     final rse = double.tryParse(_rseCtrl.text) ?? 0.04;
-    final current =
-        _construction.copyWith(name: _nameCtrl.text.trim(),
-        rsi: rsi, rse: rse);
+    final editorNameDeRaw = _nameDeCtrl.text.trim();
+    final current = _construction.copyWith(
+      name: _nameCtrl.text.trim(),
+      nameDe: editorNameDeRaw.isEmpty ? null : editorNameDeRaw,
+      rsi: rsi,
+      rse: rse,
+    );
     if (isNew) {
       notifier.addConstruction(current);
     } else {
@@ -912,7 +989,10 @@ class _WallConstructionDialogState
         current.id, _layers);
 
     notifier.saveConstructionAsPreset(
-        _construction.id, presetName);
+      _construction.id,
+      presetName,
+      presetNameDe: presetNameDe,
+    );
 
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -1006,8 +1086,8 @@ class _WallConstructionDialogState
             ),
           )
           .toList();
-      // Show the user the same name they just clicked on.
-      _nameCtrl.text = localizedById[selected.id] ?? selected.name;
+      _nameCtrl.text = selected.name;
+      _nameDeCtrl.text = selected.nameDe ?? '';
       _rsiCtrl.text = selected.rsi.toStringAsFixed(2);
       _rseCtrl.text = selected.rse.toStringAsFixed(2);
     });
@@ -1017,10 +1097,13 @@ class _WallConstructionDialogState
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) return;
 
+    final nameDeRaw = _nameDeCtrl.text.trim();
+    final nameDe = nameDeRaw.isEmpty ? null : nameDeRaw;
     final rsi = double.tryParse(_rsiCtrl.text) ?? 0.13;
     final rse = double.tryParse(_rseCtrl.text) ?? 0.04;
     final updated = _construction.copyWith(
       name: name,
+      nameDe: nameDe,
       rsi: rsi,
       rse: rse,
     );
@@ -1117,6 +1200,20 @@ class _WallConstructionDialogState
                 controller: _nameCtrl,
                 decoration: InputDecoration(
                   labelText: l10n.constructionName,
+                  isDense: true,
+                ),
+                style: textTheme.bodyLarge,
+                onChanged: (_) => setState(() {}),
+              ),
+              const SizedBox(height: Spacing.xs),
+
+              // ---- German name field (optional) ----
+              TextField(
+                controller: _nameDeCtrl,
+                decoration: InputDecoration(
+                  labelText: l10n.constructionNameDe,
+                  helperText: l10n.constructionNameDeHelp,
+                  helperMaxLines: 2,
                   isDense: true,
                 ),
                 style: textTheme.bodyLarge,

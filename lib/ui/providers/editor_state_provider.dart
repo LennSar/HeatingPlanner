@@ -687,14 +687,16 @@ class EditorStateNotifier extends Notifier<EditorState>
   /// Save a deep copy of [constructionId] as a named preset.
   ///
   /// Creates a new [WallConstruction] with a fresh UUID, [presetName]
-  /// as its name, `isPreset = true`, and the same rsi/rse as the
-  /// original. All layers are deep-copied with new UUIDs pointing at
-  /// the new construction ID. The preset is persisted immediately;
-  /// the original construction is not modified.
+  /// as its name, optional [presetNameDe] as the German label,
+  /// `isPreset = true`, and the same rsi/rse as the original. All
+  /// layers are deep-copied with new UUIDs pointing at the new
+  /// construction ID. The preset is persisted immediately; the
+  /// original construction is not modified.
   void saveConstructionAsPreset(
     String constructionId,
-    String presetName,
-  ) {
+    String presetName, {
+    String? presetNameDe,
+  }) {
     final original = state.constructions
         .where((c) => c.id == constructionId)
         .firstOrNull;
@@ -704,6 +706,7 @@ class EditorStateNotifier extends Notifier<EditorState>
     final preset = original.copyWith(
       id: newId,
       name: presetName,
+      nameDe: presetNameDe,
       isPreset: true,
     );
 

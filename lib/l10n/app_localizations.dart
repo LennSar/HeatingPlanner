@@ -968,6 +968,36 @@ abstract class AppLocalizations {
   /// **'Construction name'**
   String get constructionName;
 
+  /// Label for the optional German-language name of a wall construction
+  ///
+  /// In en, this message translates to:
+  /// **'German name'**
+  String get constructionNameDe;
+
+  /// Helper text shown beneath the German wall-construction name field
+  ///
+  /// In en, this message translates to:
+  /// **'Optional — falls back to the English name if empty.'**
+  String get constructionNameDeHelp;
+
+  /// Helper text shown beneath the English wall-construction name field when the user is otherwise on the German UI
+  ///
+  /// In en, this message translates to:
+  /// **'Optional — falls back to the German name if empty.'**
+  String get constructionNameEnHelp;
+
+  /// Label for the optional German-language name of a saved preset
+  ///
+  /// In en, this message translates to:
+  /// **'German preset name'**
+  String get presetNameDe;
+
+  /// Helper text shown beneath the German preset-name field
+  ///
+  /// In en, this message translates to:
+  /// **'Optional — falls back to the English preset name if empty.'**
+  String get presetNameDeHelp;
+
   /// Button to add a material layer
   ///
   /// In en, this message translates to:
