@@ -72,6 +72,50 @@ void main() {
     );
 
     test(
+      'seedGermanNamesV15 translates the catalog plasters and the '
+      'calcium-silicate insulation board (regression: these were '
+      'missing from materialTranslations until materialDbVersion=4)',
+      () async {
+        // material_entries is normally seeded from assets/materials.json
+        // by MaterialRepository.ensureMaterialsSeeded, which we don't
+        // run inside Drift's onCreate. Insert the four catalog names
+        // directly and re-invoke the idempotent helper to drive the
+        // UPDATE-by-name path.
+        const samples = [
+          ('m-lime', 'Lime plaster', 'Kalkputz'),
+          ('m-gypsum', 'Gypsum plaster', 'Gipsputz'),
+          ('m-clay', 'Clay plaster', 'Lehmputz'),
+          (
+            'm-calsil',
+            'Calcium silicate insulation board',
+            'Kalziumsilikat-Dämmplatte',
+          ),
+        ];
+        for (final (id, name, _) in samples) {
+          await db.into(db.materialEntries).insert(
+                $db.MaterialEntriesCompanion.insert(
+                  id: id,
+                  name: name,
+                  category: 'Plaster & Mortar',
+                  lambdaDefault: 0.7,
+                  densityDefault: 1600,
+                  specificHeatDefault: 1000,
+                ),
+              );
+        }
+
+        await db.heatingDao.seedGermanNamesV15();
+
+        for (final (id, _, expectedDe) in samples) {
+          final row = await (db.select(db.materialEntries)
+                ..where((t) => t.id.equals(id)))
+              .getSingle();
+          expect(row.nameDe, expectedDe);
+        }
+      },
+    );
+
+    test(
       'seedGermanNamesV15 leaves user-created rows untouched',
       () async {
         // Insert a row with a name that isn't in the translation map.

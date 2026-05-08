@@ -541,6 +541,7 @@ class HeatingDao extends DatabaseAccessor<AppDatabase>
       'Glass wool generic WLG 040': 'Glaswolle generisch WLG 040',
       'Glass wool generic WLG 035': 'Glaswolle generisch WLG 035',
       'Cork insulation board': 'Korkdämmplatte',
+      'Calcium silicate insulation board': 'Kalziumsilikat-Dämmplatte',
       // Loose fill / blow-in
       'Cellulose generic': 'Zellulose generisch',
       'Perlite (loose fill)': 'Perlit (Schüttdämmung)',
@@ -559,7 +560,10 @@ class HeatingDao extends DatabaseAccessor<AppDatabase>
       'CLT (cross-laminated timber)': 'Brettsperrholz (BSP)',
       // Plaster & mortar (DIN 4108-4)
       'Cement render': 'Zementputz',
+      'Lime plaster': 'Kalkputz',
       'Lime-cement plaster': 'Kalkzementputz',
+      'Gypsum plaster': 'Gipsputz',
+      'Clay plaster': 'Lehmputz',
       'Thermal insulation plaster': 'Wärmedämmputz',
       'Lightweight plaster': 'Leichtputz',
       // Board materials

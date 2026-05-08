@@ -15,7 +15,7 @@ import 'save_state_notifier.dart';
 /// Increment this whenever [assets/materials.json] is updated. On next
 /// launch [MaterialRepository.ensureMaterialsSeeded] will detect the
 /// mismatch and re-upsert all entries.
-const materialDbVersion = 3;
+const materialDbVersion = 4;
 
 // ── DAO provider ──────────────────────────────────────────────────────────────
 
