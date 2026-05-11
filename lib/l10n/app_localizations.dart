@@ -1735,6 +1735,252 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Surface Temperature'**
   String get surfaceTemperature;
+
+  /// Material picker category header — masonry materials
+  ///
+  /// In en, this message translates to:
+  /// **'Masonry'**
+  String get materialCategory_masonry;
+
+  /// Material picker category header — concrete and screed
+  ///
+  /// In en, this message translates to:
+  /// **'Concrete & Screed'**
+  String get materialCategory_concreteScreed;
+
+  /// Material picker category header — insulation boards
+  ///
+  /// In en, this message translates to:
+  /// **'Insulation boards'**
+  String get materialCategory_insulationBoards;
+
+  /// Material picker category header — loose-fill / blow-in insulation
+  ///
+  /// In en, this message translates to:
+  /// **'Loose fill / Blow-in'**
+  String get materialCategory_looseFillBlowIn;
+
+  /// Material picker category header — wood
+  ///
+  /// In en, this message translates to:
+  /// **'Wood'**
+  String get materialCategory_wood;
+
+  /// Material picker category header — plaster and mortar
+  ///
+  /// In en, this message translates to:
+  /// **'Plaster & Mortar'**
+  String get materialCategory_plasterMortar;
+
+  /// Material picker category header — board materials (gypsum board, etc.)
+  ///
+  /// In en, this message translates to:
+  /// **'Board materials'**
+  String get materialCategory_boardMaterials;
+
+  /// Material picker category header — floor coverings
+  ///
+  /// In en, this message translates to:
+  /// **'Floor covering'**
+  String get materialCategory_floorCovering;
+
+  /// Material picker category header — glass
+  ///
+  /// In en, this message translates to:
+  /// **'Glass'**
+  String get materialCategory_glass;
+
+  /// Material picker subcategory — historic brick (AMz / DIN 4108 era)
+  ///
+  /// In en, this message translates to:
+  /// **'Historic brick'**
+  String get materialSubcategory_historicBrick;
+
+  /// Material picker subcategory — modern thermal brick (Poroton, Unipor, …)
+  ///
+  /// In en, this message translates to:
+  /// **'Modern thermal brick'**
+  String get materialSubcategory_modernThermalBrick;
+
+  /// Material picker subcategory — calcium silicate (Kalksandstein) masonry
+  ///
+  /// In en, this message translates to:
+  /// **'Calcium silicate'**
+  String get materialSubcategory_calciumSilicate;
+
+  /// Material picker subcategory — autoclaved aerated concrete (Porenbeton)
+  ///
+  /// In en, this message translates to:
+  /// **'AAC / Aerated concrete'**
+  String get materialSubcategory_aacAeratedConcrete;
+
+  /// Material picker subcategory — normal concrete
+  ///
+  /// In en, this message translates to:
+  /// **'Normal concrete'**
+  String get materialSubcategory_normalConcrete;
+
+  /// Material picker subcategory — lightweight concrete
+  ///
+  /// In en, this message translates to:
+  /// **'Lightweight concrete'**
+  String get materialSubcategory_lightweightConcrete;
+
+  /// Material picker subcategory — screed
+  ///
+  /// In en, this message translates to:
+  /// **'Screed'**
+  String get materialSubcategory_screed;
+
+  /// Material picker subcategory — EPS rigid foam
+  ///
+  /// In en, this message translates to:
+  /// **'Rigid foam, EPS'**
+  String get materialSubcategory_rigidFoamEps;
+
+  /// Material picker subcategory — XPS rigid foam
+  ///
+  /// In en, this message translates to:
+  /// **'Rigid foam, XPS'**
+  String get materialSubcategory_rigidFoamXps;
+
+  /// Material picker subcategory — PUR/PIR rigid foam
+  ///
+  /// In en, this message translates to:
+  /// **'Rigid foam, PUR/PIR'**
+  String get materialSubcategory_rigidFoamPurPir;
+
+  /// Material picker subcategory — phenolic rigid foam
+  ///
+  /// In en, this message translates to:
+  /// **'Rigid foam, phenolic'**
+  String get materialSubcategory_rigidFoamPhenolic;
+
+  /// Material picker subcategory — stone wool insulation board
+  ///
+  /// In en, this message translates to:
+  /// **'Stone wool board'**
+  String get materialSubcategory_stoneWoolBoard;
+
+  /// Material picker subcategory — glass wool board or roll
+  ///
+  /// In en, this message translates to:
+  /// **'Glass wool board/roll'**
+  String get materialSubcategory_glassWoolBoardRoll;
+
+  /// Material picker subcategory — wood-fibre insulation
+  ///
+  /// In en, this message translates to:
+  /// **'Wood fibre'**
+  String get materialSubcategory_woodFibre;
+
+  /// Material picker subcategory — calcium silicate insulation board
+  ///
+  /// In en, this message translates to:
+  /// **'Calcium silicate board'**
+  String get materialSubcategory_calciumSilicateBoard;
+
+  /// Material picker subcategory — cellular glass (Foamglas)
+  ///
+  /// In en, this message translates to:
+  /// **'Cellular glass'**
+  String get materialSubcategory_cellularGlass;
+
+  /// Material picker subcategory — cork insulation
+  ///
+  /// In en, this message translates to:
+  /// **'Cork'**
+  String get materialSubcategory_cork;
+
+  /// Material picker subcategory — vacuum insulation panels (VIP)
+  ///
+  /// In en, this message translates to:
+  /// **'Vacuum insulation'**
+  String get materialSubcategory_vacuumInsulation;
+
+  /// Material picker subcategory — cellulose loose-fill / blow-in
+  ///
+  /// In en, this message translates to:
+  /// **'Cellulose'**
+  String get materialSubcategory_cellulose;
+
+  /// Material picker subcategory — mineral wool blow-in
+  ///
+  /// In en, this message translates to:
+  /// **'Mineral wool blow-in'**
+  String get materialSubcategory_mineralWoolBlowIn;
+
+  /// Material picker subcategory — perlite loose-fill
+  ///
+  /// In en, this message translates to:
+  /// **'Perlite'**
+  String get materialSubcategory_perlite;
+
+  /// Material picker subcategory — vermiculite loose-fill
+  ///
+  /// In en, this message translates to:
+  /// **'Vermiculite'**
+  String get materialSubcategory_vermiculite;
+
+  /// Material picker subcategory — natural-fibre loose-fill (hemp, sheep's wool, straw)
+  ///
+  /// In en, this message translates to:
+  /// **'Natural fibre'**
+  String get materialSubcategory_naturalFibre;
+
+  /// Material picker subcategory — structural timber (Bauholz)
+  ///
+  /// In en, this message translates to:
+  /// **'Structural timber'**
+  String get materialSubcategory_structuralTimber;
+
+  /// Material picker subcategory — engineered wood (plywood, OSB, MDF, CLT)
+  ///
+  /// In en, this message translates to:
+  /// **'Engineered wood'**
+  String get materialSubcategory_engineeredWood;
+
+  /// Material picker subcategory — cement and lime plasters/mortars
+  ///
+  /// In en, this message translates to:
+  /// **'Cement/Lime'**
+  String get materialSubcategory_cementLime;
+
+  /// Material picker subcategory — clay plaster
+  ///
+  /// In en, this message translates to:
+  /// **'Clay'**
+  String get materialSubcategory_clay;
+
+  /// Material picker subcategory — gypsum plaster
+  ///
+  /// In en, this message translates to:
+  /// **'Gypsum'**
+  String get materialSubcategory_gypsum;
+
+  /// Material picker subcategory — insulating render / thermal-insulation plaster
+  ///
+  /// In en, this message translates to:
+  /// **'Insulation plaster'**
+  String get materialSubcategory_insulationPlaster;
+
+  /// Material picker subcategory — gypsum plasterboard
+  ///
+  /// In en, this message translates to:
+  /// **'Gypsum board'**
+  String get materialSubcategory_gypsumBoard;
+
+  /// Material picker subcategory — tile and natural stone floor coverings
+  ///
+  /// In en, this message translates to:
+  /// **'Tile / Natural stone'**
+  String get materialSubcategory_tileNaturalStone;
+
+  /// Material picker subcategory — wood, laminate, and vinyl floor coverings
+  ///
+  /// In en, this message translates to:
+  /// **'Wood / Laminate / Vinyl'**
+  String get materialSubcategory_woodLaminateVinyl;
 }
 
 class _AppLocalizationsDelegate

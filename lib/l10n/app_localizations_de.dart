@@ -926,4 +926,131 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get surfaceTemperature => 'Oberflächentemperatur';
+
+  @override
+  String get materialCategory_masonry => 'Mauerwerk';
+
+  @override
+  String get materialCategory_concreteScreed => 'Beton & Estrich';
+
+  @override
+  String get materialCategory_insulationBoards => 'Dämmplatten';
+
+  @override
+  String get materialCategory_looseFillBlowIn =>
+      'Schüttdämmung / Einblasdämmung';
+
+  @override
+  String get materialCategory_wood => 'Holz';
+
+  @override
+  String get materialCategory_plasterMortar => 'Putz & Mörtel';
+
+  @override
+  String get materialCategory_boardMaterials => 'Plattenwerkstoffe';
+
+  @override
+  String get materialCategory_floorCovering => 'Bodenbelag';
+
+  @override
+  String get materialCategory_glass => 'Glas';
+
+  @override
+  String get materialSubcategory_historicBrick => 'Historischer Ziegel';
+
+  @override
+  String get materialSubcategory_modernThermalBrick =>
+      'Moderner Wärmedämmziegel';
+
+  @override
+  String get materialSubcategory_calciumSilicate => 'Kalksandstein';
+
+  @override
+  String get materialSubcategory_aacAeratedConcrete => 'Porenbeton';
+
+  @override
+  String get materialSubcategory_normalConcrete => 'Normalbeton';
+
+  @override
+  String get materialSubcategory_lightweightConcrete => 'Leichtbeton';
+
+  @override
+  String get materialSubcategory_screed => 'Estrich';
+
+  @override
+  String get materialSubcategory_rigidFoamEps => 'Hartschaum, EPS';
+
+  @override
+  String get materialSubcategory_rigidFoamXps => 'Hartschaum, XPS';
+
+  @override
+  String get materialSubcategory_rigidFoamPurPir => 'Hartschaum, PUR/PIR';
+
+  @override
+  String get materialSubcategory_rigidFoamPhenolic => 'Hartschaum, Phenol';
+
+  @override
+  String get materialSubcategory_stoneWoolBoard => 'Steinwolle-Platte';
+
+  @override
+  String get materialSubcategory_glassWoolBoardRoll =>
+      'Glaswolle-Platte/-Rolle';
+
+  @override
+  String get materialSubcategory_woodFibre => 'Holzfaserplatte';
+
+  @override
+  String get materialSubcategory_calciumSilicateBoard => 'Kalziumsilikatplatte';
+
+  @override
+  String get materialSubcategory_cellularGlass => 'Schaumglas';
+
+  @override
+  String get materialSubcategory_cork => 'Kork';
+
+  @override
+  String get materialSubcategory_vacuumInsulation => 'Vakuumdämmung';
+
+  @override
+  String get materialSubcategory_cellulose => 'Zellulose';
+
+  @override
+  String get materialSubcategory_mineralWoolBlowIn =>
+      'Mineralwolle-Einblasdämmung';
+
+  @override
+  String get materialSubcategory_perlite => 'Perlit';
+
+  @override
+  String get materialSubcategory_vermiculite => 'Vermiculit';
+
+  @override
+  String get materialSubcategory_naturalFibre => 'Naturfaser';
+
+  @override
+  String get materialSubcategory_structuralTimber => 'Bauholz';
+
+  @override
+  String get materialSubcategory_engineeredWood => 'Holzwerkstoff';
+
+  @override
+  String get materialSubcategory_cementLime => 'Zement/Kalk';
+
+  @override
+  String get materialSubcategory_clay => 'Lehm';
+
+  @override
+  String get materialSubcategory_gypsum => 'Gips';
+
+  @override
+  String get materialSubcategory_insulationPlaster => 'Wärmedämmputz';
+
+  @override
+  String get materialSubcategory_gypsumBoard => 'Gipskartonplatte';
+
+  @override
+  String get materialSubcategory_tileNaturalStone => 'Fliesen / Naturstein';
+
+  @override
+  String get materialSubcategory_woodLaminateVinyl => 'Holz / Laminat / Vinyl';
 }

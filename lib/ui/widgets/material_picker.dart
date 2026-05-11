@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/providers/grouped_materials_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../core/utils/material_category_localizer.dart';
 import '../../data/models/localized_catalog_row.dart';
 import '../../data/models/material_entry.dart';
 import '../../l10n/app_localizations.dart';
@@ -224,8 +225,10 @@ class _GroupedList extends StatelessWidget {
       children: [
         for (final catEntry in grouped.entries)
           // Level 0 — category header. All groups start collapsed (spec).
+          // The map keys are canonical English; translation happens here
+          // at render time so storage / search / sort stay locale-free.
           CollapsibleGroupTile(
-            title: catEntry.key,
+            title: localizeMaterialCategory(context, catEntry.key),
             indentLevel: 0,
             children: [
               for (final subcatEntry in catEntry.value.entries)
@@ -241,7 +244,10 @@ class _GroupedList extends StatelessWidget {
                 else
                   // Level 1 — subcategory header.
                   CollapsibleGroupTile(
-                    title: subcatEntry.key,
+                    title: localizeMaterialSubcategory(
+                      context,
+                      subcatEntry.key,
+                    ),
                     indentLevel: 1,
                     children: [
                       for (final material in subcatEntry.value)

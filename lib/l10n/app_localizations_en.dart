@@ -926,4 +926,128 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get surfaceTemperature => 'Surface Temperature';
+
+  @override
+  String get materialCategory_masonry => 'Masonry';
+
+  @override
+  String get materialCategory_concreteScreed => 'Concrete & Screed';
+
+  @override
+  String get materialCategory_insulationBoards => 'Insulation boards';
+
+  @override
+  String get materialCategory_looseFillBlowIn => 'Loose fill / Blow-in';
+
+  @override
+  String get materialCategory_wood => 'Wood';
+
+  @override
+  String get materialCategory_plasterMortar => 'Plaster & Mortar';
+
+  @override
+  String get materialCategory_boardMaterials => 'Board materials';
+
+  @override
+  String get materialCategory_floorCovering => 'Floor covering';
+
+  @override
+  String get materialCategory_glass => 'Glass';
+
+  @override
+  String get materialSubcategory_historicBrick => 'Historic brick';
+
+  @override
+  String get materialSubcategory_modernThermalBrick => 'Modern thermal brick';
+
+  @override
+  String get materialSubcategory_calciumSilicate => 'Calcium silicate';
+
+  @override
+  String get materialSubcategory_aacAeratedConcrete => 'AAC / Aerated concrete';
+
+  @override
+  String get materialSubcategory_normalConcrete => 'Normal concrete';
+
+  @override
+  String get materialSubcategory_lightweightConcrete => 'Lightweight concrete';
+
+  @override
+  String get materialSubcategory_screed => 'Screed';
+
+  @override
+  String get materialSubcategory_rigidFoamEps => 'Rigid foam, EPS';
+
+  @override
+  String get materialSubcategory_rigidFoamXps => 'Rigid foam, XPS';
+
+  @override
+  String get materialSubcategory_rigidFoamPurPir => 'Rigid foam, PUR/PIR';
+
+  @override
+  String get materialSubcategory_rigidFoamPhenolic => 'Rigid foam, phenolic';
+
+  @override
+  String get materialSubcategory_stoneWoolBoard => 'Stone wool board';
+
+  @override
+  String get materialSubcategory_glassWoolBoardRoll => 'Glass wool board/roll';
+
+  @override
+  String get materialSubcategory_woodFibre => 'Wood fibre';
+
+  @override
+  String get materialSubcategory_calciumSilicateBoard =>
+      'Calcium silicate board';
+
+  @override
+  String get materialSubcategory_cellularGlass => 'Cellular glass';
+
+  @override
+  String get materialSubcategory_cork => 'Cork';
+
+  @override
+  String get materialSubcategory_vacuumInsulation => 'Vacuum insulation';
+
+  @override
+  String get materialSubcategory_cellulose => 'Cellulose';
+
+  @override
+  String get materialSubcategory_mineralWoolBlowIn => 'Mineral wool blow-in';
+
+  @override
+  String get materialSubcategory_perlite => 'Perlite';
+
+  @override
+  String get materialSubcategory_vermiculite => 'Vermiculite';
+
+  @override
+  String get materialSubcategory_naturalFibre => 'Natural fibre';
+
+  @override
+  String get materialSubcategory_structuralTimber => 'Structural timber';
+
+  @override
+  String get materialSubcategory_engineeredWood => 'Engineered wood';
+
+  @override
+  String get materialSubcategory_cementLime => 'Cement/Lime';
+
+  @override
+  String get materialSubcategory_clay => 'Clay';
+
+  @override
+  String get materialSubcategory_gypsum => 'Gypsum';
+
+  @override
+  String get materialSubcategory_insulationPlaster => 'Insulation plaster';
+
+  @override
+  String get materialSubcategory_gypsumBoard => 'Gypsum board';
+
+  @override
+  String get materialSubcategory_tileNaturalStone => 'Tile / Natural stone';
+
+  @override
+  String get materialSubcategory_woodLaminateVinyl => 'Wood / Laminate / Vinyl';
 }
