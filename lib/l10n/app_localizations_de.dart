@@ -1053,4 +1053,120 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get materialSubcategory_woodLaminateVinyl => 'Holz / Laminat / Vinyl';
+
+  @override
+  String get perfDashboard_tabHeatBalance => 'Wärmebilanz';
+
+  @override
+  String get perfDashboard_tabHydraulic => 'Hydraulik';
+
+  @override
+  String get perfDashboard_tabWarnings => 'Warnungen';
+
+  @override
+  String perfDashboard_warningsHeader(int count) {
+    return 'Warnungen ($count)';
+  }
+
+  @override
+  String get perfDashboard_filterErrorsOnly => 'Nur Fehler';
+
+  @override
+  String get perfDashboard_filterWarningsOnly => 'Nur Warnungen';
+
+  @override
+  String get perfDashboard_filterInfoOnly => 'Nur Hinweise';
+
+  @override
+  String get perfDashboard_noIssuesFound => 'Keine Probleme gefunden';
+
+  @override
+  String get perfDashboard_emptyHeatBalance =>
+      'Räume zeichnen, um die Wärmebilanz zu sehen.';
+
+  @override
+  String get perfDashboard_legendDemand => 'Bedarf';
+
+  @override
+  String get perfDashboard_legendOutput => 'Leistung';
+
+  @override
+  String get perfDashboard_legendBalance => 'Bilanz';
+
+  @override
+  String get perfDashboard_legendPipeLoss => 'Rohrreibungsverlust';
+
+  @override
+  String get perfDashboard_legendValveThrottling => 'Ventildrosselung';
+
+  @override
+  String get severity_error => 'Fehler';
+
+  @override
+  String get severity_warning => 'Warnung';
+
+  @override
+  String get severity_info => 'Hinweis';
+
+  @override
+  String get zoneMissing_noCircuitConnected => 'Kein Heizkreis verbunden';
+
+  @override
+  String get zoneMissing_noDistributorPlaced => 'Kein Verteiler platziert';
+
+  @override
+  String get zoneMissing_noTubeTypeSelected => 'Kein Rohrtyp ausgewählt';
+
+  @override
+  String get zoneMissing_noFlooringMaterialSelected =>
+      'Kein Bodenbelag ausgewählt';
+
+  @override
+  String get zoneMissing_noTubeTypesAvailable => 'Keine Rohrtypen verfügbar';
+
+  @override
+  String get roomMissing_noExteriorWallsDefined => 'Keine Außenwände definiert';
+
+  @override
+  String get circuit_fullHeatOutputToTransitRoom =>
+      'Vollständige Wärmeabgabe an den Durchgangsraum';
+
+  @override
+  String get circuit_noHeatOutputToTransitRoom =>
+      'Keine Wärmeabgabe an den Durchgangsraum';
+
+  @override
+  String get opening_updateWindow => 'Fenster aktualisieren';
+
+  @override
+  String get opening_updateDoor => 'Tür aktualisieren';
+
+  @override
+  String get undo_rotateDistributor => 'Verteiler drehen';
+
+  @override
+  String get undo_deleteWall => 'Wand löschen';
+
+  @override
+  String get undo_deleteRoom => 'Raum löschen';
+
+  @override
+  String get undo_deleteWindow => 'Fenster löschen';
+
+  @override
+  String get undo_deleteDoor => 'Tür löschen';
+
+  @override
+  String get undo_deleteCircuit => 'Heizkreis löschen';
+
+  @override
+  String get undo_deleteZone => 'Heizzone löschen';
+
+  @override
+  String get undo_deleteDistributor => 'Verteiler löschen';
+
+  @override
+  String canvas_defaultRoomName(int roomNumber) {
+    return 'Raum $roomNumber';
+  }
 }

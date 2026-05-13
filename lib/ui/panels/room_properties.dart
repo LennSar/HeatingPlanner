@@ -639,6 +639,7 @@ class _RoomPropertiesState
     final demandTooltip = _roomDemandMissingPrereqs(
       room,
       editorState,
+      l10n,
     );
 
     return [
@@ -888,26 +889,31 @@ Widget _readOnlyRow(
 
 /// Returns a newline-separated list of unmet prerequisites for
 /// room heat demand, or null when all prerequisites are met.
-String? _roomDemandMissingPrereqs(Room room, EditorState state) {
+String? _roomDemandMissingPrereqs(
+  Room room,
+  EditorState state,
+  AppLocalizations l10n,
+) {
   final roomWalls =
       state.walls.where((w) => w.roomId == room.id).toList();
 
   final missing = <String>[];
 
   if (roomWalls.isEmpty) {
-    missing.add('No exterior walls defined');
+    missing.add(l10n.roomMissing_noExteriorWallsDefined);
     return missing.join('\n');
   }
 
   final hasExterior =
       roomWalls.any((w) => w.wallType == WallType.exterior);
   if (!hasExterior) {
-    missing.add('No exterior walls defined');
+    missing.add(l10n.roomMissing_noExteriorWallsDefined);
   } else {
     final hasConstruction = roomWalls
         .where((w) => w.wallType == WallType.exterior)
         .any((w) => w.constructionId != null);
     if (!hasConstruction) {
+      // Out of scope for this localisation pass.
       missing.add('No wall construction assigned to exterior walls');
     }
   }

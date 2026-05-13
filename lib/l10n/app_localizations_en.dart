@@ -1050,4 +1050,120 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get materialSubcategory_woodLaminateVinyl => 'Wood / Laminate / Vinyl';
+
+  @override
+  String get perfDashboard_tabHeatBalance => 'Heat Balance';
+
+  @override
+  String get perfDashboard_tabHydraulic => 'Hydraulic';
+
+  @override
+  String get perfDashboard_tabWarnings => 'Warnings';
+
+  @override
+  String perfDashboard_warningsHeader(int count) {
+    return 'Warnings ($count)';
+  }
+
+  @override
+  String get perfDashboard_filterErrorsOnly => 'Errors only';
+
+  @override
+  String get perfDashboard_filterWarningsOnly => 'Warnings only';
+
+  @override
+  String get perfDashboard_filterInfoOnly => 'Info only';
+
+  @override
+  String get perfDashboard_noIssuesFound => 'No issues found';
+
+  @override
+  String get perfDashboard_emptyHeatBalance =>
+      'Draw rooms to see the heat balance.';
+
+  @override
+  String get perfDashboard_legendDemand => 'Demand';
+
+  @override
+  String get perfDashboard_legendOutput => 'Output';
+
+  @override
+  String get perfDashboard_legendBalance => 'Balance';
+
+  @override
+  String get perfDashboard_legendPipeLoss => 'Pipe loss';
+
+  @override
+  String get perfDashboard_legendValveThrottling => 'Valve throttling';
+
+  @override
+  String get severity_error => 'Error';
+
+  @override
+  String get severity_warning => 'Warning';
+
+  @override
+  String get severity_info => 'Info';
+
+  @override
+  String get zoneMissing_noCircuitConnected => 'No circuit connected';
+
+  @override
+  String get zoneMissing_noDistributorPlaced => 'No distributor placed';
+
+  @override
+  String get zoneMissing_noTubeTypeSelected => 'No tube type selected';
+
+  @override
+  String get zoneMissing_noFlooringMaterialSelected =>
+      'No flooring material selected';
+
+  @override
+  String get zoneMissing_noTubeTypesAvailable => 'No tube types available';
+
+  @override
+  String get roomMissing_noExteriorWallsDefined => 'No exterior walls defined';
+
+  @override
+  String get circuit_fullHeatOutputToTransitRoom =>
+      'Full heat output to transit room';
+
+  @override
+  String get circuit_noHeatOutputToTransitRoom =>
+      'No heat output to transit room';
+
+  @override
+  String get opening_updateWindow => 'Update window';
+
+  @override
+  String get opening_updateDoor => 'Update door';
+
+  @override
+  String get undo_rotateDistributor => 'Rotate distributor';
+
+  @override
+  String get undo_deleteWall => 'Delete wall';
+
+  @override
+  String get undo_deleteRoom => 'Delete room';
+
+  @override
+  String get undo_deleteWindow => 'Delete window';
+
+  @override
+  String get undo_deleteDoor => 'Delete door';
+
+  @override
+  String get undo_deleteCircuit => 'Delete circuit';
+
+  @override
+  String get undo_deleteZone => 'Delete zone';
+
+  @override
+  String get undo_deleteDistributor => 'Delete distributor';
+
+  @override
+  String canvas_defaultRoomName(int roomNumber) {
+    return 'Room $roomNumber';
+  }
 }

@@ -20,6 +20,8 @@ import 'package:heating_planner/data/models/point2d.dart';
 import 'package:heating_planner/data/models/room.dart';
 import 'package:heating_planner/data/models/wall_segment.dart';
 import 'package:heating_planner/data/models/window_element.dart';
+import 'package:heating_planner/l10n/app_localizations.dart';
+import 'package:heating_planner/l10n/app_localizations_en.dart';
 import 'package:heating_planner/ui/canvas/tools/editor_callbacks.dart';
 import 'package:heating_planner/ui/canvas/tools/select_tool.dart';
 import 'package:heating_planner/ui/canvas/tools/undo_redo_service.dart';
@@ -27,6 +29,12 @@ import 'package:heating_planner/ui/canvas/tools/undo_redo_service.dart';
 // ── Stub EditorCallbacks ─────────────────────────────────────────────────────
 
 class _StubCallbacks implements EditorCallbacks {
+  // ST-4 deletes a circuit, which now reads a localised label for the
+  // undo entry. Return a real EN instance so the command can resolve
+  // it without a surrounding widget tree.
+  @override
+  final AppLocalizations l10n = AppLocalizationsEn();
+
   final List<WallSegment> _walls;
   final List<Room> _rooms;
   final List<HeatingZone> _zones;

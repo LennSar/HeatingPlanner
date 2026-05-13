@@ -220,6 +220,7 @@ class _HeatingZonePropertiesState
             editorState,
             tubeTypes.map((lr) => lr.row).toList(growable: false),
             flooringMaterials.map((lr) => lr.row).toList(growable: false),
+            l10n,
           )
         : null;
 
@@ -664,18 +665,21 @@ String? _zoneMissingPrereqs(
   EditorState state,
   List<TubeType>? loadedTubeTypes,
   List<FlooringMaterial>? loadedMaterials,
+  AppLocalizations l10n,
 ) {
   final missing = <String>[];
 
   if (zone.circuitId == null) {
-    missing.add('No circuit connected');
+    missing.add(l10n.zoneMissing_noCircuitConnected);
   }
 
   if (state.distributor == null) {
-    missing.add('No distributor placed');
+    missing.add(l10n.zoneMissing_noDistributorPlaced);
   } else {
     final d = state.distributor!;
     if ((d.supplyTempC - d.returnTempC).abs() < 0.5) {
+      // Out of scope for this localisation pass; left as canonical
+      // English until the matching ARB key is added.
       missing.add('Supply/return temperature not set');
     }
   }
@@ -683,14 +687,14 @@ String? _zoneMissingPrereqs(
   if (loadedTubeTypes != null &&
       loadedTubeTypes.isNotEmpty &&
       !loadedTubeTypes.any((t) => t.id == zone.tubeTypeId)) {
-    missing.add('No tube type selected');
+    missing.add(l10n.zoneMissing_noTubeTypeSelected);
   }
 
   if (loadedMaterials != null &&
       loadedMaterials.isNotEmpty &&
       zone.flooringMaterialId != kCustomFlooringMaterialId &&
       !loadedMaterials.any((m) => m.id == zone.flooringMaterialId)) {
-    missing.add('No flooring material selected');
+    missing.add(l10n.zoneMissing_noFlooringMaterialSelected);
   }
 
   return missing.isEmpty ? null : missing.join('\n');
@@ -758,7 +762,7 @@ class _TubeTypeDropdown extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     if (tubes.isEmpty) {
       return Text(
-        'No tube types available',
+        AppLocalizations.of(context)!.zoneMissing_noTubeTypesAvailable,
         style: textTheme.bodySmall,
       );
     }

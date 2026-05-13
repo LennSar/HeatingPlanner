@@ -1981,6 +1981,222 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Wood / Laminate / Vinyl'**
   String get materialSubcategory_woodLaminateVinyl;
+
+  /// Performance dashboard tab — heat-balance view
+  ///
+  /// In en, this message translates to:
+  /// **'Heat Balance'**
+  String get perfDashboard_tabHeatBalance;
+
+  /// Performance dashboard tab — hydraulic view
+  ///
+  /// In en, this message translates to:
+  /// **'Hydraulic'**
+  String get perfDashboard_tabHydraulic;
+
+  /// Performance dashboard tab — warnings/validation view
+  ///
+  /// In en, this message translates to:
+  /// **'Warnings'**
+  String get perfDashboard_tabWarnings;
+
+  /// Header on the Warnings tab showing the number of issues
+  ///
+  /// In en, this message translates to:
+  /// **'Warnings ({count})'**
+  String perfDashboard_warningsHeader(int count);
+
+  /// Severity filter — show only errors
+  ///
+  /// In en, this message translates to:
+  /// **'Errors only'**
+  String get perfDashboard_filterErrorsOnly;
+
+  /// Severity filter — show only warnings
+  ///
+  /// In en, this message translates to:
+  /// **'Warnings only'**
+  String get perfDashboard_filterWarningsOnly;
+
+  /// Severity filter — show only info-level entries
+  ///
+  /// In en, this message translates to:
+  /// **'Info only'**
+  String get perfDashboard_filterInfoOnly;
+
+  /// Empty state on the Warnings tab when validation found nothing
+  ///
+  /// In en, this message translates to:
+  /// **'No issues found'**
+  String get perfDashboard_noIssuesFound;
+
+  /// Empty state on the Heat Balance tab before any rooms exist
+  ///
+  /// In en, this message translates to:
+  /// **'Draw rooms to see the heat balance.'**
+  String get perfDashboard_emptyHeatBalance;
+
+  /// Heat-balance legend — total heating demand (W)
+  ///
+  /// In en, this message translates to:
+  /// **'Demand'**
+  String get perfDashboard_legendDemand;
+
+  /// Heat-balance legend — total heating output (W)
+  ///
+  /// In en, this message translates to:
+  /// **'Output'**
+  String get perfDashboard_legendOutput;
+
+  /// Heat-balance legend — output minus demand (W)
+  ///
+  /// In en, this message translates to:
+  /// **'Balance'**
+  String get perfDashboard_legendBalance;
+
+  /// Hydraulic legend — pressure loss in the pipe run
+  ///
+  /// In en, this message translates to:
+  /// **'Pipe loss'**
+  String get perfDashboard_legendPipeLoss;
+
+  /// Hydraulic legend — pressure drop across the balancing valve
+  ///
+  /// In en, this message translates to:
+  /// **'Valve throttling'**
+  String get perfDashboard_legendValveThrottling;
+
+  /// Severity badge label — error
+  ///
+  /// In en, this message translates to:
+  /// **'Error'**
+  String get severity_error;
+
+  /// Severity badge label — warning
+  ///
+  /// In en, this message translates to:
+  /// **'Warning'**
+  String get severity_warning;
+
+  /// Severity badge label — info
+  ///
+  /// In en, this message translates to:
+  /// **'Info'**
+  String get severity_info;
+
+  /// Zone prerequisite missing — no heating circuit linked to this zone
+  ///
+  /// In en, this message translates to:
+  /// **'No circuit connected'**
+  String get zoneMissing_noCircuitConnected;
+
+  /// Zone prerequisite missing — no distributor placed on this floor
+  ///
+  /// In en, this message translates to:
+  /// **'No distributor placed'**
+  String get zoneMissing_noDistributorPlaced;
+
+  /// Zone prerequisite missing — no tube type chosen
+  ///
+  /// In en, this message translates to:
+  /// **'No tube type selected'**
+  String get zoneMissing_noTubeTypeSelected;
+
+  /// Zone prerequisite missing — no flooring material chosen
+  ///
+  /// In en, this message translates to:
+  /// **'No flooring material selected'**
+  String get zoneMissing_noFlooringMaterialSelected;
+
+  /// Tube-type dropdown empty-state label
+  ///
+  /// In en, this message translates to:
+  /// **'No tube types available'**
+  String get zoneMissing_noTubeTypesAvailable;
+
+  /// Room prerequisite missing — no exterior walls available for heat-demand calculation
+  ///
+  /// In en, this message translates to:
+  /// **'No exterior walls defined'**
+  String get roomMissing_noExteriorWallsDefined;
+
+  /// Supply-pipe insulation option subtitle — uninsulated pipe emits 100% to the transit room
+  ///
+  /// In en, this message translates to:
+  /// **'Full heat output to transit room'**
+  String get circuit_fullHeatOutputToTransitRoom;
+
+  /// Supply-pipe insulation option subtitle — pipe routed inside insulation layer emits 0% to the transit room
+  ///
+  /// In en, this message translates to:
+  /// **'No heat output to transit room'**
+  String get circuit_noHeatOutputToTransitRoom;
+
+  /// Undo/redo label — committing edits to a window
+  ///
+  /// In en, this message translates to:
+  /// **'Update window'**
+  String get opening_updateWindow;
+
+  /// Undo/redo label — committing edits to a door
+  ///
+  /// In en, this message translates to:
+  /// **'Update door'**
+  String get opening_updateDoor;
+
+  /// Undo/redo label — rotating the distributor in place
+  ///
+  /// In en, this message translates to:
+  /// **'Rotate distributor'**
+  String get undo_rotateDistributor;
+
+  /// Undo/redo label — deleting a wall segment
+  ///
+  /// In en, this message translates to:
+  /// **'Delete wall'**
+  String get undo_deleteWall;
+
+  /// Undo/redo label — deleting a room and its boundary walls
+  ///
+  /// In en, this message translates to:
+  /// **'Delete room'**
+  String get undo_deleteRoom;
+
+  /// Undo/redo label — deleting a window opening
+  ///
+  /// In en, this message translates to:
+  /// **'Delete window'**
+  String get undo_deleteWindow;
+
+  /// Undo/redo label — deleting a door opening
+  ///
+  /// In en, this message translates to:
+  /// **'Delete door'**
+  String get undo_deleteDoor;
+
+  /// Undo/redo label — deleting a heating circuit
+  ///
+  /// In en, this message translates to:
+  /// **'Delete circuit'**
+  String get undo_deleteCircuit;
+
+  /// Undo/redo label — deleting a heating zone
+  ///
+  /// In en, this message translates to:
+  /// **'Delete zone'**
+  String get undo_deleteZone;
+
+  /// Undo/redo label — deleting the distributor
+  ///
+  /// In en, this message translates to:
+  /// **'Delete distributor'**
+  String get undo_deleteDistributor;
+
+  /// Default name for a newly detected room before the user renames it
+  ///
+  /// In en, this message translates to:
+  /// **'Room {roomNumber}'**
+  String canvas_defaultRoomName(int roomNumber);
 }
 
 class _AppLocalizationsDelegate

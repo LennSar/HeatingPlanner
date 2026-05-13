@@ -338,5 +338,49 @@
   "materialSubcategory_insulationPlaster": "Wärmedämmputz",
   "materialSubcategory_gypsumBoard": "Gipskartonplatte",
   "materialSubcategory_tileNaturalStone": "Fliesen / Naturstein",
-  "materialSubcategory_woodLaminateVinyl": "Holz / Laminat / Vinyl"
+  "materialSubcategory_woodLaminateVinyl": "Holz / Laminat / Vinyl",
+
+  "perfDashboard_tabHeatBalance": "Wärmebilanz",
+  "perfDashboard_tabHydraulic": "Hydraulik",
+  "perfDashboard_tabWarnings": "Warnungen",
+  "perfDashboard_warningsHeader": "Warnungen ({count})",
+  "perfDashboard_filterErrorsOnly": "Nur Fehler",
+  "perfDashboard_filterWarningsOnly": "Nur Warnungen",
+  "perfDashboard_filterInfoOnly": "Nur Hinweise",
+  "perfDashboard_noIssuesFound": "Keine Probleme gefunden",
+  "perfDashboard_emptyHeatBalance": "Räume zeichnen, um die Wärmebilanz zu sehen.",
+  "perfDashboard_legendDemand": "Bedarf",
+  "perfDashboard_legendOutput": "Leistung",
+  "perfDashboard_legendBalance": "Bilanz",
+  "perfDashboard_legendPipeLoss": "Rohrreibungsverlust",
+  "perfDashboard_legendValveThrottling": "Ventildrosselung",
+
+  "severity_error": "Fehler",
+  "severity_warning": "Warnung",
+  "severity_info": "Hinweis",
+
+  "zoneMissing_noCircuitConnected": "Kein Heizkreis verbunden",
+  "zoneMissing_noDistributorPlaced": "Kein Verteiler platziert",
+  "zoneMissing_noTubeTypeSelected": "Kein Rohrtyp ausgewählt",
+  "zoneMissing_noFlooringMaterialSelected": "Kein Bodenbelag ausgewählt",
+  "zoneMissing_noTubeTypesAvailable": "Keine Rohrtypen verfügbar",
+
+  "roomMissing_noExteriorWallsDefined": "Keine Außenwände definiert",
+
+  "circuit_fullHeatOutputToTransitRoom": "Vollständige Wärmeabgabe an den Durchgangsraum",
+  "circuit_noHeatOutputToTransitRoom": "Keine Wärmeabgabe an den Durchgangsraum",
+
+  "opening_updateWindow": "Fenster aktualisieren",
+  "opening_updateDoor": "Tür aktualisieren",
+
+  "undo_rotateDistributor": "Verteiler drehen",
+  "undo_deleteWall": "Wand löschen",
+  "undo_deleteRoom": "Raum löschen",
+  "undo_deleteWindow": "Fenster löschen",
+  "undo_deleteDoor": "Tür löschen",
+  "undo_deleteCircuit": "Heizkreis löschen",
+  "undo_deleteZone": "Heizzone löschen",
+  "undo_deleteDistributor": "Verteiler löschen",
+
+  "canvas_defaultRoomName": "Raum {roomNumber}"
 }

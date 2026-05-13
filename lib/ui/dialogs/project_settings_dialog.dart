@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/providers/project_settings_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../l10n/app_localizations.dart';
 import '../../repositories/app_preferences.dart';
 import '../providers/editor_state_provider.dart';
 
@@ -218,7 +219,7 @@ class _ProjectSettingsDialogState
                     icon: const Icon(Icons.close),
                     onPressed: () =>
                         Navigator.of(context).pop(),
-                    tooltip: 'Close',
+                    tooltip: AppLocalizations.of(context)!.close,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(
                       minWidth: 32,
@@ -429,7 +430,8 @@ class _ProjectSettingsDialogState
                       child: TextButton(
                         onPressed: () =>
                             Navigator.of(context).pop(),
-                        child: const Text('Close'),
+                        child:
+                            Text(AppLocalizations.of(context)!.close),
                       ),
                     ),
                   ],

@@ -30,6 +30,11 @@ import 'package:heating_planner/ui/canvas/tools/zone_draw_tool.dart';
 // ── Stub EditorCallbacks ─────────────────────────────────────────────────────
 
 class _StubCallbacks implements EditorCallbacks {
+  // Tool tests don't exercise localized labels; throw to flag any
+  // future test that needs them.
+  @override
+  Never get l10n => throw UnimplementedError();
+
   final List<Room> _rooms;
   final List<HeatingZone> _zones = [];
   final List<String> _toasts = [];

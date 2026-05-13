@@ -250,7 +250,7 @@ class _WindowPropertiesState
             oldValue: oldWindow,
             newValue: newWindow,
             update: notifier.updateWindow,
-            label: 'Update window',
+            label: AppLocalizations.of(context)!.opening_updateWindow,
           ),
         );
   }
@@ -513,7 +513,7 @@ class _DoorPropertiesState
             oldValue: oldDoor,
             newValue: newDoor,
             update: notifier.updateDoor,
-            label: 'Update door',
+            label: AppLocalizations.of(context)!.opening_updateDoor,
           ),
         );
   }

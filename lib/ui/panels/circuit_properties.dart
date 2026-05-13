@@ -241,7 +241,7 @@ class _InsulationRadioGroup extends StatelessWidget {
       (
         value: SupplyPipeInsulationType.none,
         label: l10n.insulationNone,
-        subtitle: 'Full heat output to transit room',
+        subtitle: l10n.circuit_fullHeatOutputToTransitRoom,
       ),
       (
         value: SupplyPipeInsulationType.corrugatedConduit,
@@ -251,7 +251,7 @@ class _InsulationRadioGroup extends StatelessWidget {
       (
         value: SupplyPipeInsulationType.insulationLayer,
         label: l10n.insulationLayer,
-        subtitle: 'No heat output to transit room',
+        subtitle: l10n.circuit_noHeatOutputToTransitRoom,
       ),
     ];
 

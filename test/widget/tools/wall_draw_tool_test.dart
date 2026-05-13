@@ -36,6 +36,11 @@ import 'package:heating_planner/ui/canvas/tools/wall_draw_tool.dart';
 // ── Stub EditorCallbacks ─────────────────────────────────────────────────────
 
 class _StubCallbacks implements EditorCallbacks {
+  // Tool tests don't exercise localized labels; throw to flag any
+  // future test that needs them.
+  @override
+  Never get l10n => throw UnimplementedError();
+
   final List<WallSegment> _walls = [];
   final List<String> _toasts = [];
 
@@ -165,6 +170,11 @@ WallDrawTool _makeTool(_StubCallbacks callbacks) {
 //     Then calls onCreated so that _RectDrawCommand.newWalls is updated.
 
 class _RoomAwareStubCallbacks implements EditorCallbacks {
+  // Tool tests don't exercise localized labels; throw to flag any
+  // future test that needs them.
+  @override
+  Never get l10n => throw UnimplementedError();
+
   final List<WallSegment> _walls = [];
   final List<Room> _rooms = [];
   int _roomSeq = 0;

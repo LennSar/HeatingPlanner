@@ -15,6 +15,7 @@ import '../../core/theme/app_theme.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/heating_zone.dart';
 import '../../data/models/validation_result.dart';
+import '../../l10n/app_localizations.dart';
 import '../../validation/validation_service.dart';
 import '../providers/editor_state_provider.dart';
 import '../providers/selection_provider.dart';
@@ -86,6 +87,7 @@ class _PerformanceDashboardPanelState
   Widget build(BuildContext context) {
     final colors =
         Theme.of(context).extension<HeatingPlannerColors>()!;
+    final l10n = AppLocalizations.of(context)!;
 
     return Container(
       decoration: BoxDecoration(
@@ -110,10 +112,10 @@ class _PerformanceDashboardPanelState
                   ),
               unselectedLabelStyle:
                   Theme.of(context).textTheme.bodySmall,
-              tabs: const [
-                Tab(text: 'Heat Balance'),
-                Tab(text: 'Hydraulic'),
-                Tab(text: 'Warnings'),
+              tabs: [
+                Tab(text: l10n.perfDashboard_tabHeatBalance),
+                Tab(text: l10n.perfDashboard_tabHydraulic),
+                Tab(text: l10n.perfDashboard_tabWarnings),
               ],
             ),
           ),
@@ -219,7 +221,8 @@ class _WarningsHeader extends StatelessWidget {
         children: [
           Flexible(
             child: Text(
-              'Warnings ($count)',
+              AppLocalizations.of(context)!
+                  .perfDashboard_warningsHeader(count),
               style:
                   Theme.of(context).textTheme.headlineSmall,
               overflow: TextOverflow.ellipsis,
@@ -249,15 +252,15 @@ class _FilterDropdown extends StatelessWidget {
   final WarningSeverity? value;
   final ValueChanged<WarningSeverity?> onChanged;
 
-  static const _items = [
-    (null, 'All'),
-    (WarningSeverity.error, 'Errors only'),
-    (WarningSeverity.warning, 'Warnings only'),
-    (WarningSeverity.info, 'Info only'),
-  ];
-
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    final items = <(WarningSeverity?, String)>[
+      (null, 'All'),
+      (WarningSeverity.error, l10n.perfDashboard_filterErrorsOnly),
+      (WarningSeverity.warning, l10n.perfDashboard_filterWarningsOnly),
+      (WarningSeverity.info, l10n.perfDashboard_filterInfoOnly),
+    ];
     return DropdownButton<WarningSeverity?>(
       value: value,
       isDense: true,
@@ -267,7 +270,7 @@ class _FilterDropdown extends StatelessWidget {
         'Filter',
         style: Theme.of(context).textTheme.bodySmall,
       ),
-      items: _items
+      items: items
           .map(
             (entry) => DropdownMenuItem<WarningSeverity?>(
               value: entry.$1,
@@ -413,7 +416,7 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: Spacing.sm),
           Text(
-            'No issues found',
+            AppLocalizations.of(context)!.perfDashboard_noIssuesFound,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: Theme.of(context)
                       .colorScheme
@@ -467,8 +470,9 @@ class _HeatBalanceTab extends ConsumerWidget {
     final zones = state.zones;
 
     if (rooms.isEmpty) {
-      return const _TabEmptyState(
-        message: 'Draw rooms to see the heat balance.',
+      return _TabEmptyState(
+        message: AppLocalizations.of(context)!
+            .perfDashboard_emptyHeatBalance,
       );
     }
 
@@ -660,6 +664,7 @@ class _HeatSummaryRow extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors =
         Theme.of(context).extension<HeatingPlannerColors>()!;
+    final l10n = AppLocalizations.of(context)!;
     final balanceColor =
         balance >= 0 ? colors.zoneGreen : colors.zoneRed;
     return Container(
@@ -676,15 +681,15 @@ class _HeatSummaryRow extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
           _SummaryItem(
-            label: 'Demand',
+            label: l10n.perfDashboard_legendDemand,
             value: '${totalDemandW.toStringAsFixed(0)} W',
           ),
           _SummaryItem(
-            label: 'Output',
+            label: l10n.perfDashboard_legendOutput,
             value: '${totalOutputW.toStringAsFixed(0)} W',
           ),
           _SummaryItem(
-            label: 'Balance',
+            label: l10n.perfDashboard_legendBalance,
             value: '${balance >= 0 ? "+" : ""}'
                 '${balance.toStringAsFixed(0)} W',
             valueColor: balanceColor,
@@ -969,12 +974,14 @@ class _HydraulicTab extends ConsumerWidget {
             children: [
               _LegendDot(
                 color: colors.zoneGreen,
-                label: 'Pipe loss',
+                label: AppLocalizations.of(context)!
+                    .perfDashboard_legendPipeLoss,
               ),
               const SizedBox(width: Spacing.md),
               _LegendDot(
                 color: colors.gridLine,
-                label: 'Valve throttling',
+                label: AppLocalizations.of(context)!
+                    .perfDashboard_legendValveThrottling,
               ),
             ],
           ),

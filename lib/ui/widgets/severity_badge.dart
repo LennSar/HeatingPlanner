@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../data/models/enums.dart';
+import '../../l10n/app_localizations.dart';
 
 /// A small chip badge indicating a [WarningSeverity] level.
 ///
@@ -38,11 +39,13 @@ class SeverityBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors =
         Theme.of(context).extension<HeatingPlannerColors>()!;
+    final l10n = AppLocalizations.of(context)!;
 
     final (color, label) = switch (severity) {
-      WarningSeverity.error => (colors.errorRed, 'Error'),
-      WarningSeverity.warning => (colors.warningAmber, 'Warning'),
-      WarningSeverity.info => (colors.infoBlue, 'Info'),
+      WarningSeverity.error => (colors.errorRed, l10n.severity_error),
+      WarningSeverity.warning =>
+        (colors.warningAmber, l10n.severity_warning),
+      WarningSeverity.info => (colors.infoBlue, l10n.severity_info),
     };
 
     final text = _count != null ? '$_count' : label;

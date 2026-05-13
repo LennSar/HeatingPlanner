@@ -1582,6 +1582,7 @@ class SelectTool extends CanvasTool {
       window: window,
       remove: callbacks.removeWindow,
       add: callbacks.commitWindow,
+      label: callbacks.l10n.undo_deleteWindow,
     ));
     _selectedWindow = null;
     callbacks.selectElement(null, null);
@@ -1594,6 +1595,7 @@ class SelectTool extends CanvasTool {
       door: door,
       remove: callbacks.removeDoor,
       add: callbacks.commitDoor,
+      label: callbacks.l10n.undo_deleteDoor,
     ));
     _selectedDoor = null;
     callbacks.selectElement(null, null);
@@ -1612,6 +1614,7 @@ class SelectTool extends CanvasTool {
       remove: callbacks.removeCircuit,
       add: callbacks.commitCircuit,
       updateZone: callbacks.updateZone,
+      label: callbacks.l10n.undo_deleteCircuit,
     ));
     _selectedCircuit = null;
     callbacks.selectElement(null, null);
@@ -1624,6 +1627,7 @@ class SelectTool extends CanvasTool {
       zone: zone,
       remove: callbacks.removeZone,
       add: callbacks.commitZone,
+      label: callbacks.l10n.undo_deleteZone,
     ));
     _selectedZone = null;
     callbacks.selectElement(null, null);
@@ -1950,6 +1954,7 @@ class SelectTool extends CanvasTool {
       wall: wall,
       destroyedRoom: destroyedRoom,
       roomWallIds: roomWallIds,
+      label: callbacks.l10n.undo_deleteWall,
     ));
     _selectedWall = null;
     callbacks.selectElement(null, null);
@@ -1966,6 +1971,7 @@ class SelectTool extends CanvasTool {
       callbacks: callbacks,
       room: room,
       wallIds: wallIds,
+      label: callbacks.l10n.undo_deleteRoom,
     ));
     _selectedRoom = null;
     callbacks.selectElement(null, null);
@@ -2298,7 +2304,7 @@ class SelectTool extends CanvasTool {
       oldDistributor: d,
       newDistributor: updated,
       update: callbacks.updateDistributor,
-      label: 'Rotate distributor',
+      label: callbacks.l10n.undo_rotateDistributor,
     ));
     onStateChanged();
   }
@@ -2334,6 +2340,7 @@ class SelectTool extends CanvasTool {
           distributor: d,
           add: callbacks.commitDistributor,
           remove: callbacks.removeDistributor,
+          label: callbacks.l10n.undo_deleteDistributor,
         ));
         _selectedDistributor = false;
         callbacks.selectElement(null, null);
@@ -2460,6 +2467,7 @@ class _DeleteWallCommand extends Command {
   _DeleteWallCommand({
     required this.callbacks,
     required this.wall,
+    required this.label,
     this.destroyedRoom,
     this.roomWallIds = const [],
   });
@@ -2470,7 +2478,7 @@ class _DeleteWallCommand extends Command {
   final List<String> roomWallIds;
 
   @override
-  String get label => 'Delete wall';
+  final String label;
 
   @override
   void execute() {
@@ -2495,6 +2503,7 @@ class _DeleteRoomCommand extends Command {
     required this.callbacks,
     required this.room,
     required this.wallIds,
+    required this.label,
   });
 
   final EditorCallbacks callbacks;
@@ -2502,7 +2511,7 @@ class _DeleteRoomCommand extends Command {
   final List<String> wallIds;
 
   @override
-  String get label => 'Delete room';
+  final String label;
 
   @override
   void execute() => callbacks.destroyRoom(room.id);
@@ -2563,6 +2572,7 @@ class _DeleteWindowCommand extends Command {
     required this.window,
     required this.remove,
     required this.add,
+    required this.label,
   });
 
   final WindowElement window;
@@ -2570,7 +2580,7 @@ class _DeleteWindowCommand extends Command {
   final void Function(WindowElement) add;
 
   @override
-  String get label => 'Delete window';
+  final String label;
 
   @override
   void execute() => remove(window.id);
@@ -2585,6 +2595,7 @@ class _DeleteDoorCommand extends Command {
     required this.door,
     required this.remove,
     required this.add,
+    required this.label,
   });
 
   final Door door;
@@ -2592,7 +2603,7 @@ class _DeleteDoorCommand extends Command {
   final void Function(Door) add;
 
   @override
-  String get label => 'Delete door';
+  final String label;
 
   @override
   void execute() => remove(door.id);
@@ -2609,6 +2620,7 @@ class _DeleteCircuitCommand extends Command {
     required this.remove,
     required this.add,
     required this.updateZone,
+    required this.label,
   });
 
   final HeatingCircuit circuit;
@@ -2618,7 +2630,7 @@ class _DeleteCircuitCommand extends Command {
   final void Function(HeatingZone) updateZone;
 
   @override
-  String get label => 'Delete circuit';
+  final String label;
 
   @override
   void execute() => remove(circuit.id);
@@ -2638,6 +2650,7 @@ class _DeleteZoneCommand extends Command {
     required this.zone,
     required this.remove,
     required this.add,
+    required this.label,
   });
 
   final HeatingZone zone;
@@ -2645,7 +2658,7 @@ class _DeleteZoneCommand extends Command {
   final void Function(HeatingZone) add;
 
   @override
-  String get label => 'Delete zone';
+  final String label;
 
   @override
   void execute() => remove(zone.id);
@@ -2707,6 +2720,7 @@ class _DeleteDistributorCommand extends Command {
     required this.distributor,
     required this.add,
     required this.remove,
+    required this.label,
   });
 
   final Distributor distributor;
@@ -2714,7 +2728,7 @@ class _DeleteDistributorCommand extends Command {
   final void Function() remove;
 
   @override
-  String get label => 'Delete distributor';
+  final String label;
 
   @override
   void execute() => remove();

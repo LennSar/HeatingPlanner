@@ -6,11 +6,17 @@ import '../../../data/models/point2d.dart';
 import '../../../data/models/room.dart';
 import '../../../data/models/wall_segment.dart';
 import '../../../data/models/window_element.dart';
+import '../../../l10n/app_localizations.dart';
 
 /// Callback interface that canvas tools use to mutate
 /// editor state. Implemented by the canvas widget which
 /// has access to Riverpod providers.
 abstract class EditorCallbacks {
+  /// Locale-resolved UI strings. Implemented by the canvas widget
+  /// via `AppLocalizations.of(context)!`. Tools read this when they
+  /// construct undo/redo commands so the labels match the active UI
+  /// locale.
+  AppLocalizations get l10n;
   // ---- Walls ----
 
   /// Commit a new wall segment to the editor state.

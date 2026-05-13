@@ -19,6 +19,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/core/theme/app_theme.dart';
 import 'package:heating_planner/data/models/enums.dart';
 import 'package:heating_planner/data/models/validation_result.dart';
+import 'package:heating_planner/l10n/app_localizations.dart';
 import 'package:heating_planner/ui/panels/performance_dashboard.dart';
 import 'package:heating_planner/ui/providers/selection_provider.dart';
 import 'package:heating_planner/validation/validation_service.dart';
@@ -51,6 +52,8 @@ Widget _buildPanel(List<ValidationResult> results) {
     ],
     child: MaterialApp(
       theme: AppTheme.light(),
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: const [Locale('en'), Locale('de')],
       // Full-screen Scaffold avoids layout overflow in the warnings header.
       home: const Scaffold(
         body: PerformanceDashboardPanel(initialIndex: 2),

@@ -247,6 +247,9 @@ class _FloorPlanCanvasState
   // ---- EditorCallbacks implementation ----
 
   @override
+  AppLocalizations get l10n => AppLocalizations.of(context)!;
+
+  @override
   void commitWall(WallSegment wall) {
     ref.read(editorStateProvider.notifier).addWall(wall);
   }
@@ -434,7 +437,7 @@ class _FloorPlanCanvasState
       context: context,
       builder: (ctx) {
         final controller = TextEditingController(
-          text: 'Room $roomNumber',
+          text: l10n.canvas_defaultRoomName(roomNumber),
         );
         return AlertDialog(
           title: Text(l10n.newRoomDetected),
