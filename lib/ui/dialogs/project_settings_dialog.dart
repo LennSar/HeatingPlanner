@@ -157,6 +157,7 @@ class _ProjectSettingsDialogState
     final settings = ref.watch(projectSettingsProvider);
     final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = AppLocalizations.of(context)!;
 
     // Keep text fields in sync with external state changes
     // (e.g. slider moving while text field is not focused).
@@ -211,7 +212,7 @@ class _ProjectSettingsDialogState
                 children: [
                   Expanded(
                     child: Text(
-                      'Project Settings',
+                      l10n.projectSettings,
                       style: textTheme.headlineMedium,
                     ),
                   ),
@@ -219,7 +220,7 @@ class _ProjectSettingsDialogState
                     icon: const Icon(Icons.close),
                     onPressed: () =>
                         Navigator.of(context).pop(),
-                    tooltip: AppLocalizations.of(context)!.close,
+                    tooltip: l10n.close,
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(
                       minWidth: 32,
@@ -244,13 +245,12 @@ class _ProjectSettingsDialogState
                   children: [
                     // ── Design outdoor temperature ──────────
                     Text(
-                      'Design Outdoor Temperature',
+                      l10n.designOutdoorTemperature,
                       style: textTheme.headlineSmall,
                     ),
                     const SizedBox(height: Spacing.xs),
                     Text(
-                      'Used in all heat-demand calculations'
-                      ' (EN 12831).',
+                      l10n.designOutdoorTempDesc,
                       style: textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -274,7 +274,7 @@ class _ProjectSettingsDialogState
                             v.toStringAsFixed(1);
                       },
                       onFieldSubmitted: _applyOutdoor,
-                      rangeLabel: '−50 to +10 °C',
+                      rangeLabel: l10n.designOutdoorTempRange,
                     ),
 
                     const SizedBox(height: Spacing.lg),
@@ -283,13 +283,12 @@ class _ProjectSettingsDialogState
 
                     // ── Default indoor temperature ───────────
                     Text(
-                      'Default Indoor Temperature',
+                      l10n.defaultIndoorTemperature,
                       style: textTheme.headlineSmall,
                     ),
                     const SizedBox(height: Spacing.xs),
                     Text(
-                      'Applied to new rooms when they are'
-                      ' created.',
+                      l10n.defaultIndoorTempDesc,
                       style: textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -313,7 +312,7 @@ class _ProjectSettingsDialogState
                             v.toStringAsFixed(1);
                       },
                       onFieldSubmitted: _applyIndoor,
-                      rangeLabel: '15 to 30 °C',
+                      rangeLabel: l10n.defaultIndoorTempRange,
                     ),
 
                     const SizedBox(height: Spacing.lg),
@@ -322,13 +321,12 @@ class _ProjectSettingsDialogState
 
                     // ── Default room height ──────────────────
                     Text(
-                      'Default Room Height',
+                      l10n.defaultRoomHeight,
                       style: textTheme.headlineSmall,
                     ),
                     const SizedBox(height: Spacing.xs),
                     Text(
-                      'Used as the default height for wall'
-                      ' heating zones.',
+                      l10n.defaultRoomHeightDesc,
                       style: textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -359,7 +357,7 @@ class _ProjectSettingsDialogState
                             );
                       },
                       onFieldSubmitted: _applyHeight,
-                      rangeLabel: '2000 to 6000 mm',
+                      rangeLabel: l10n.defaultRoomHeightRange,
                     ),
 
                     const SizedBox(height: Spacing.lg),
@@ -368,14 +366,12 @@ class _ProjectSettingsDialogState
 
                     // ── Unheated space temperature ───────────
                     Text(
-                      'Unheated Space Temperature',
+                      l10n.unheatedSpaceTemp,
                       style: textTheme.headlineSmall,
                     ),
                     const SizedBox(height: Spacing.xs),
                     Text(
-                      'Default temperature used for unheated'
-                      ' basements, attics, and adjacent'
-                      ' unheated spaces.',
+                      l10n.unheatedSpaceTempDesc,
                       style: textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -399,7 +395,7 @@ class _ProjectSettingsDialogState
                             v.toStringAsFixed(1);
                       },
                       onFieldSubmitted: _applyUnheated,
-                      rangeLabel: '0 to 25 °C',
+                      rangeLabel: l10n.unheatedSpaceTempRange,
                     ),
 
                     const SizedBox(height: Spacing.lg),
@@ -408,14 +404,12 @@ class _ProjectSettingsDialogState
 
                     // ── Drawing grid size ────────────────────
                     Text(
-                      AppLocalizations.of(context)!
-                          .settingsDrawingGridSize,
+                      l10n.settingsDrawingGridSize,
                       style: textTheme.headlineSmall,
                     ),
                     const SizedBox(height: Spacing.xs),
                     Text(
-                      'Snap interval for walls, zones, and'
-                      ' other elements on the canvas.',
+                      l10n.drawingGridSizeDesc,
                       style: textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -429,8 +423,7 @@ class _ProjectSettingsDialogState
 
                     // ── Language ─────────────────────────────
                     Text(
-                      AppLocalizations.of(context)!
-                          .settingsLanguageLabel,
+                      l10n.settingsLanguageLabel,
                       style: textTheme.headlineSmall,
                     ),
                     const SizedBox(height: Spacing.sm),
@@ -444,8 +437,7 @@ class _ProjectSettingsDialogState
                       child: TextButton(
                         onPressed: () =>
                             Navigator.of(context).pop(),
-                        child:
-                            Text(AppLocalizations.of(context)!.close),
+                        child: Text(l10n.close),
                       ),
                     ),
                   ],

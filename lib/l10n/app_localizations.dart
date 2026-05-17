@@ -1208,6 +1208,30 @@ abstract class AppLocalizations {
   /// **'Snap interval for walls, zones, and other elements on the canvas.'**
   String get drawingGridSizeDesc;
 
+  /// Slider range hint under the outdoor design temperature input
+  ///
+  /// In en, this message translates to:
+  /// **'−50 to +10 °C'**
+  String get designOutdoorTempRange;
+
+  /// Slider range hint under the default indoor temperature input
+  ///
+  /// In en, this message translates to:
+  /// **'15 to 30 °C'**
+  String get defaultIndoorTempRange;
+
+  /// Slider range hint under the default room height input
+  ///
+  /// In en, this message translates to:
+  /// **'2000 to 6000 mm'**
+  String get defaultRoomHeightRange;
+
+  /// Slider range hint under the unheated space temperature input
+  ///
+  /// In en, this message translates to:
+  /// **'0 to 25 °C'**
+  String get unheatedSpaceTempRange;
+
   /// Dashboard tab for heat balance
   ///
   /// In en, this message translates to:

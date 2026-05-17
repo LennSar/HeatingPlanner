@@ -200,6 +200,10 @@
   "unheatedSpaceTemp": "Temperatur unbeheizter Räume",
   "unheatedSpaceTempDesc": "Standardtemperatur für unbeheizte Keller, Dachböden und angrenzende unbeheizte Räume.",
   "drawingGridSizeDesc": "Rasterabstand für Wände, Zonen und andere Elemente auf der Zeichenfläche.",
+  "designOutdoorTempRange": "−50 bis +10 °C",
+  "defaultIndoorTempRange": "15 bis 30 °C",
+  "defaultRoomHeightRange": "2000 bis 6000 mm",
+  "unheatedSpaceTempRange": "0 bis 25 °C",
 
   "tabHeatBalance": "Wärmebilanz",
   "tabHydraulic": "Hydraulik",

@@ -646,6 +646,18 @@ class AppLocalizationsDe extends AppLocalizations {
       'Rasterabstand für Wände, Zonen und andere Elemente auf der Zeichenfläche.';
 
   @override
+  String get designOutdoorTempRange => '−50 bis +10 °C';
+
+  @override
+  String get defaultIndoorTempRange => '15 bis 30 °C';
+
+  @override
+  String get defaultRoomHeightRange => '2000 bis 6000 mm';
+
+  @override
+  String get unheatedSpaceTempRange => '0 bis 25 °C';
+
+  @override
   String get tabHeatBalance => 'Wärmebilanz';
 
   @override

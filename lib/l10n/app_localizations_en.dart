@@ -647,6 +647,18 @@ class AppLocalizationsEn extends AppLocalizations {
       'Snap interval for walls, zones, and other elements on the canvas.';
 
   @override
+  String get designOutdoorTempRange => '−50 to +10 °C';
+
+  @override
+  String get defaultIndoorTempRange => '15 to 30 °C';
+
+  @override
+  String get defaultRoomHeightRange => '2000 to 6000 mm';
+
+  @override
+  String get unheatedSpaceTempRange => '0 to 25 °C';
+
+  @override
   String get tabHeatBalance => 'Heat Balance';
 
   @override
