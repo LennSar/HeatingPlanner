@@ -578,12 +578,6 @@ abstract class AppLocalizations {
   /// **'Documentation'**
   String get menuDocumentation;
 
-  /// Menu item and screen title for application settings
-  ///
-  /// In en, this message translates to:
-  /// **'Settings'**
-  String get menuSettings;
-
   /// Title of the system save-file dialog
   ///
   /// In en, this message translates to:

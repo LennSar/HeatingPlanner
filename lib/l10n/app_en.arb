@@ -362,11 +362,6 @@
     "description": "Help > Documentation menu item"
   },
 
-  "menuSettings": "Settings",
-  "@menuSettings": {
-    "description": "Menu item and screen title for application settings"
-  },
-
   "dialogSaveProjectAs": "Save Project As",
   "@dialogSaveProjectAs": {
     "description": "Title of the system save-file dialog"

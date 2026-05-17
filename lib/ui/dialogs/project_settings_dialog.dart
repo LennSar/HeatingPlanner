@@ -408,7 +408,8 @@ class _ProjectSettingsDialogState
 
                     // ── Drawing grid size ────────────────────
                     Text(
-                      'Drawing Grid Size',
+                      AppLocalizations.of(context)!
+                          .settingsDrawingGridSize,
                       style: textTheme.headlineSmall,
                     ),
                     const SizedBox(height: Spacing.xs),
@@ -421,6 +422,19 @@ class _ProjectSettingsDialogState
                     ),
                     const SizedBox(height: Spacing.sm),
                     _GridSpacingRow(),
+
+                    const SizedBox(height: Spacing.lg),
+                    const Divider(),
+                    const SizedBox(height: Spacing.md),
+
+                    // ── Language ─────────────────────────────
+                    Text(
+                      AppLocalizations.of(context)!
+                          .settingsLanguageLabel,
+                      style: textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: Spacing.sm),
+                    const _LanguageRow(),
 
                     const SizedBox(height: Spacing.lg),
 
@@ -465,6 +479,39 @@ class _GridSpacingRow extends ConsumerWidget {
       onChanged: (v) {
         if (v != null) {
           ref.read(gridSpacingMmProvider.notifier).set(v);
+        }
+      },
+    );
+  }
+}
+
+/// Dropdown row for selecting the UI language.
+class _LanguageRow extends ConsumerWidget {
+  const _LanguageRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
+    final current = ref.watch(languageCodeProvider).maybeWhen(
+          data: (v) => v,
+          orElse: () => 'en',
+        );
+
+    return DropdownButton<String>(
+      value: current,
+      items: [
+        DropdownMenuItem(
+          value: 'en',
+          child: Text(l10n.languageEnglish),
+        ),
+        DropdownMenuItem(
+          value: 'de',
+          child: Text(l10n.languageGerman),
+        ),
+      ],
+      onChanged: (value) {
+        if (value != null) {
+          ref.read(languageCodeProvider.notifier).set(value);
         }
       },
     );

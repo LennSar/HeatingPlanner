@@ -12,7 +12,6 @@ import '../../repositories/app_preferences.dart';
 import '../../repositories/building_repository.dart';
 import '../../repositories/project_repository.dart';
 import 'editor_screen.dart';
-import 'settings_screen.dart';
 
 /// Entry screen showing all saved projects as a card grid.
 ///
@@ -31,15 +30,6 @@ class ProjectListScreen extends ConsumerWidget {
       appBar: AppBar(
         title: Text(l10n.appTitle),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.settings),
-            tooltip: l10n.menuSettings,
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const SettingsScreen(),
-              ),
-            ),
-          ),
           Padding(
             padding:
                 const EdgeInsets.only(right: Spacing.md),

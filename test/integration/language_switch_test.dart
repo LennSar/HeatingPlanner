@@ -4,8 +4,10 @@
 // Exercises the end-to-end flow:
 //   1. App starts with English (no persisted preference).
 //   2. Verify English strings on the project list screen.
-//   3. Navigate to Settings and switch to "Deutsch".
-//   4. Navigate back — project list renders German strings.
+//   3. Open the Project Settings dialog and switch to
+//      "Deutsch".
+//   4. Close the dialog — project list renders German
+//      strings.
 //   5. Simulate restart (re-pump the root widget).
 //   6. Verify "Deutsch" persisted — German strings still
 //      shown after restart.
@@ -13,8 +15,9 @@
 //
 // Uses a standard testWidgets approach with ProviderScope
 // since IntegrationTestWidgetsFlutterBinding is not
-// configured. Navigation uses Navigator.push / pop on the
-// test widget tree.
+// configured. The Project Settings dialog is invoked
+// directly via showProjectSettingsDialog because the
+// project list screen no longer has a settings entry point.
 //
 // pumpAndSettle is safe here because projectsProvider is
 // overridden with a synchronous stream (no drift timers).
@@ -30,8 +33,8 @@ import 'package:heating_planner/data/models/project.dart';
 import 'package:heating_planner/l10n/app_localizations.dart';
 import 'package:heating_planner/repositories/app_preferences.dart';
 import 'package:heating_planner/repositories/project_repository.dart';
+import 'package:heating_planner/ui/dialogs/project_settings_dialog.dart';
 import 'package:heating_planner/ui/screens/project_list_screen.dart';
-import 'package:heating_planner/ui/screens/settings_screen.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
@@ -62,6 +65,32 @@ class _TestApp extends ConsumerWidget {
       home: const ProjectListScreen(),
     );
   }
+}
+
+Future<void> _selectLanguage(
+  WidgetTester tester,
+  String optionText,
+) async {
+  // The Project Settings dialog's language dropdown is the
+  // only DropdownButton<String> in the tree. The dialog is
+  // taller than the test viewport, so scroll its
+  // SingleChildScrollView to bring the dropdown into view.
+  final dropdown = find.byType(DropdownButton<String>);
+  final scrollable = find
+      .descendant(
+        of: find.byType(ProjectSettingsDialog),
+        matching: find.byType(Scrollable),
+      )
+      .first;
+  await tester.scrollUntilVisible(
+    dropdown,
+    100,
+    scrollable: scrollable,
+  );
+  await tester.tap(dropdown);
+  await tester.pumpAndSettle();
+  await tester.tap(find.text(optionText).last);
+  await tester.pumpAndSettle();
 }
 
 // ── Tests ────────────────────────────────────────────────
@@ -117,36 +146,23 @@ void main() {
         reason: 'Empty state heading should be English',
       );
 
-      // ── 2. Navigate to Settings ───────────────────────
+      // ── 2. Open Project Settings dialog ───────────────
       final ctx = tester
           .element(find.byType(ProjectListScreen));
-      Navigator.of(ctx).push(
-        MaterialPageRoute<void>(
-          builder: (_) => const SettingsScreen(),
-        ),
-      );
+      unawaitedShow(showProjectSettingsDialog(ctx));
       await tester.pumpAndSettle();
 
-      // Settings is now visible with English labels.
-      // AppBar title is "Settings"; row label is
-      // "Language".
-      expect(find.text('Settings'), findsOneWidget);
+      // Dialog now visible with English labels.
       expect(find.text('Language'), findsOneWidget);
+      expect(
+        find.text('Drawing Grid Size'),
+        findsOneWidget,
+      );
 
       // ── 3. Switch to Deutsch ──────────────────────────
-      await tester.tap(
-        find.byType(DropdownButton<String>).first,
-      );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('Deutsch').last);
-      await tester.pumpAndSettle();
+      await _selectLanguage(tester, 'Deutsch');
 
-      // Settings labels are now in German.
-      expect(
-        find.text('Einstellungen'),
-        findsOneWidget,
-        reason: 'Settings AppBar should switch to German',
-      );
+      // Dialog labels are now in German.
       expect(
         find.text('Sprache'),
         findsOneWidget,
@@ -158,9 +174,9 @@ void main() {
         reason: 'Grid size label should be German',
       );
 
-      // ── 4. Navigate back to project list ──────────────
+      // ── 4. Close dialog and verify project list ───────
       Navigator.of(
-        tester.element(find.byType(SettingsScreen)),
+        tester.element(find.byType(ProjectSettingsDialog)),
       ).pop();
       await tester.pumpAndSettle();
 
@@ -201,32 +217,19 @@ void main() {
       // ── 7. Switch back to English ─────────────────────
       final ctx2 = tester
           .element(find.byType(ProjectListScreen));
-      Navigator.of(ctx2).push(
-        MaterialPageRoute<void>(
-          builder: (_) => const SettingsScreen(),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      // Open the language dropdown (now showing German
-      // labels).
-      await tester.tap(
-        find.byType(DropdownButton<String>).first,
-      );
+      unawaitedShow(showProjectSettingsDialog(ctx2));
       await tester.pumpAndSettle();
 
       // In the German locale, the English option is
       // labelled "Englisch".
-      await tester.tap(find.text('Englisch').last);
-      await tester.pumpAndSettle();
+      await _selectLanguage(tester, 'Englisch');
 
-      // Settings labels back to English.
-      expect(find.text('Settings'), findsOneWidget);
+      // Dialog labels back to English.
       expect(find.text('Language'), findsOneWidget);
 
-      // Go back to the project list.
+      // Close the dialog.
       Navigator.of(
-        tester.element(find.byType(SettingsScreen)),
+        tester.element(find.byType(ProjectSettingsDialog)),
       ).pop();
       await tester.pumpAndSettle();
 
@@ -245,3 +248,8 @@ void main() {
     },
   );
 }
+
+/// Fire-and-forget for a dialog future — the test does not
+/// await dismissal of the dialog (the test pops it
+/// explicitly), so silence the unused-future lint.
+void unawaitedShow(Future<void> _) {}

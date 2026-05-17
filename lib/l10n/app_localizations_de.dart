@@ -303,9 +303,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get menuDocumentation => 'Dokumentation';
 
   @override
-  String get menuSettings => 'Einstellungen';
-
-  @override
   String get dialogSaveProjectAs => 'Projekt speichern unter';
 
   @override

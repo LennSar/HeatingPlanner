@@ -14,7 +14,6 @@ import '../../repositories/save_state_notifier.dart';
 import '../canvas/canvas_controller.dart';
 import '../canvas/floor_plan_canvas.dart';
 import '../dialogs/project_settings_dialog.dart';
-import 'settings_screen.dart';
 import '../panels/performance_dashboard.dart';
 import '../panels/properties_panel.dart';
 import '../providers/editor_state_provider.dart';
@@ -495,19 +494,6 @@ class _Toolbar extends StatelessWidget {
                         .onSurfaceVariant,
                   ),
                 ),
-              ),
-            ),
-          ),
-
-          // App settings
-          _ToolbarFileButton(
-            icon: Icons.settings,
-            tooltip: l10n.menuSettings,
-            width: toolbarWidth,
-            iconSize: isCompact ? 20.0 : 22.0,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute<void>(
-                builder: (_) => const SettingsScreen(),
               ),
             ),
           ),

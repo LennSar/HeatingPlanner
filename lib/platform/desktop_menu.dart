@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../data/models/enums.dart';
 import '../l10n/app_localizations.dart';
-import '../ui/screens/settings_screen.dart';
+import '../ui/dialogs/project_settings_dialog.dart';
 import 'keyboard_shortcuts.dart';
 
 /// Wraps [child] with a native desktop menu bar on macOS, Windows,
@@ -179,16 +179,13 @@ class DesktopMenuBar extends ConsumerWidget {
         PlatformMenuItemGroup(
           members: [
             PlatformMenuItem(
-              label: l10n.menuSettings,
+              label: l10n.projectSettings,
               shortcut: const SingleActivator(
                 LogicalKeyboardKey.comma,
                 control: true,
               ),
-              onSelected: () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) => const SettingsScreen(),
-                ),
-              ),
+              onSelected: () =>
+                  showProjectSettingsDialog(context),
             ),
           ],
         ),
