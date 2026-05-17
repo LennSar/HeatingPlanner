@@ -333,6 +333,17 @@ When a wall segment is selected, three circular drag handles appear on the wall:
 5. **If the wall belongs to a completed room:** the connected wall at the dragged endpoint adjusts its length and orientation to stay connected. The room polygon updates in real time.
 6. Release to commit. Wall length validation applies (min 100mm). If the resulting wall is too short, revert to the pre-drag position and show a transient toast.
 
+**Endpoint handle drag — modifier keys (desktop):**
+
+| Modifier | Behaviour |
+|----------|-----------|
+| *(none)* | Default behaviour above: drag one endpoint, the opposite endpoint stays fixed, the wall pivots, the single connected wall at the dragged endpoint follows. |
+| **Ctrl** | **Rectangle reshape.** Only applies when the dragged corner belongs to a rectangular room (exactly 4 walls, all axis-aligned, four 90° corners). The diagonally opposite corner becomes the fixed anchor; the dragged corner moves to the cursor; the two adjacent corners reposition so the room remains an axis-aligned rectangle. All four walls are updated atomically. On non-rectangular rooms, Ctrl has no effect — default behaviour applies. See `DECISIONS.md ADR-012`. |
+| **Shift** | **No effect — intentional.** Shift is reserved for ortho constraint in wall *drawing*, where the drawing direction is well-defined. On corner drag, the user is moving a point shared by two walls and the system cannot decide which wall should remain axis-aligned versus which should rotate. Documented as a no-op so users do not expect ortho behaviour here. |
+| **Alt** | Reserved — same free-placement semantics as wall drawing (disables grid snap). Implementation may apply when convenient; not load-bearing for the rectangle-reshape feature. |
+
+Mid-handle drag (move-entire-wall) is unaffected by modifier keys.
+
 **Endpoint handle right-click (Ctrl+click on Mac) — disconnect wall:**
 1. Right-click (or Ctrl+click on macOS) on a start or end handle that is connected to another wall.
 2. The wall is disconnected from the adjacent wall at that endpoint. The two walls no longer share the endpoint; each retains its own position.
@@ -741,6 +752,8 @@ Ceiling
 | Shift (hold, Wall tool) | Constrain to horizontal/vertical only (0°/90°) | Wall tool active |
 | Ctrl (hold, Wall tool) | Rectangle mode — drag corner to corner to place 4 walls | Wall tool active |
 | Alt (hold, Wall tool) | Free placement — disable grid snap | Wall tool active |
+| Ctrl (hold, endpoint handle drag) | Rectangle reshape on rectangular rooms (see §5.6.1, ADR-012) | Select tool, endpoint handle drag |
+| Shift (hold, endpoint handle drag) | No effect — documented no-op (see §5.6.1) | Select tool, endpoint handle drag |
 | N | Window place tool | Editor (N for "wiNdow" — W is taken) |
 | D | Door place tool | Editor |
 | H | Heating zone tool | Editor |

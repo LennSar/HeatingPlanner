@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
 
 import '../../../calculation/engines/geometry_engine.dart';
@@ -103,6 +104,41 @@ class SelectTool extends CanvasTool {
   // ADR-011: snapshot of the mirror wall's room at drag start.
   Room? _dragStartMirrorRoom;
 
+  // -- ADR-012: Ctrl-endpoint rectangle-reshape state --
+
+  /// Ctrl modifier held (sampled by [updateModifiers]).
+  bool _ctrlHeld = false;
+
+  /// True when the current endpoint drag is in rect-reshape mode.
+  ///
+  /// Sampled at drag-start and held for the duration of the drag —
+  /// releasing Ctrl mid-drag does not switch modes (ADR-012 Rule 7).
+  bool _rectReshapeMode = false;
+
+  /// Diagonally opposite (fixed) corner during a rect-reshape drag.
+  Point2D? _rectReshapeAnchor;
+
+  /// Original (pre-drag) position of the dragged corner.
+  Point2D? _rectReshapeOriginalCorner;
+
+  /// Live raw cursor position used for the ghost preview (no snap).
+  Point2D? _rectReshapeCursor;
+
+  /// The 4 walls of the rectangle being reshaped.
+  List<WallSegment> _rectReshapeWalls = const [];
+
+  /// All walls snapshot before the drag started (for undo).
+  List<WallSegment> _rectReshapeOldWalls = const [];
+
+  /// All rooms snapshot before the drag started (for undo).
+  List<Room> _rectReshapeOldRooms = const [];
+
+  /// True when hovering an endpoint handle of a rectangle-eligible room.
+  ///
+  /// Read by the canvas to swap the cursor to the rect-crosshair when
+  /// Ctrl is held (ADR-012 Rule 8).
+  bool _hoverEndpointOnRectRoom = false;
+
   // -- Opening selection state --
 
   /// Currently selected window, if any.
@@ -204,6 +240,137 @@ class SelectTool extends CanvasTool {
 
   @override
   String get name => 'Select';
+
+  // ================================================================
+  // Modifier-key tracking (ADR-012 Rule 7)
+  // ================================================================
+
+  /// Update the Ctrl-held flag from the canvas keyboard handler.
+  ///
+  /// Cmd on macOS maps to the same flag via the keyboard shortcut
+  /// layer. Call on both key-down and key-up so the flag stays in
+  /// sync (mirrors [WallDrawTool.updateModifiers]).
+  void updateModifiers({required bool ctrl}) {
+    if (_ctrlHeld == ctrl) return;
+    _ctrlHeld = ctrl;
+    onStateChanged();
+  }
+
+  /// True when the canvas should swap the cursor to the rect-crosshair
+  /// for the rect-reshape affordance (ADR-012 Rule 8).
+  ///
+  /// True iff Ctrl is held and the pointer is currently hovering an
+  /// endpoint handle of a wall whose room is rectangle-eligible.
+  bool get shouldUseRectCrosshair =>
+      _ctrlHeld && _hoverEndpointOnRectRoom;
+
+  // ================================================================
+  // ADR-012 rectangle helpers
+  // ================================================================
+
+  /// Axis-aligned tolerance (mm) for rectangle-eligibility and
+  /// corner-identity checks (ADR-012 Rule 1).
+  static const double _rectTolMm = 1.0;
+
+  /// Returns the 4 corners of a rectangular room when [walls] satisfies
+  /// the eligibility rules (ADR-012 Rule 1); otherwise returns null.
+  ///
+  /// Rules: exactly 4 walls, all axis-aligned within 1 mm, with 4
+  /// distinct corner points using exactly 2 distinct x-values and 2
+  /// distinct y-values (which implies 90° interior angles for any
+  /// closed cycle through those 4 corners with axis-aligned segments).
+  @visibleForTesting
+  static List<Point2D>? rectangleCorners(List<WallSegment> walls) {
+    if (walls.length != 4) return null;
+    const tol = _rectTolMm;
+
+    // Every wall must be axis-aligned: either Δx < tol or Δy < tol.
+    for (final w in walls) {
+      final dx = (w.startPoint.x - w.endPoint.x).abs();
+      final dy = (w.startPoint.y - w.endPoint.y).abs();
+      if (dx >= tol && dy >= tol) return null;
+    }
+
+    // Collect distinct corner points (within tolerance).
+    final corners = <Point2D>[];
+    bool addUnique(Point2D p) {
+      for (final c in corners) {
+        if ((c.x - p.x).abs() < tol && (c.y - p.y).abs() < tol) {
+          return false;
+        }
+      }
+      corners.add(p);
+      return true;
+    }
+    for (final w in walls) {
+      addUnique(w.startPoint);
+      addUnique(w.endPoint);
+    }
+    if (corners.length != 4) return null;
+
+    // Exactly 2 distinct x and 2 distinct y → axis-aligned rectangle.
+    final xs = <double>[];
+    final ys = <double>[];
+    for (final c in corners) {
+      if (!xs.any((v) => (v - c.x).abs() < tol)) xs.add(c.x);
+      if (!ys.any((v) => (v - c.y).abs() < tol)) ys.add(c.y);
+    }
+    if (xs.length != 2 || ys.length != 2) return null;
+
+    return corners;
+  }
+
+  /// Identifies the dragged corner, the diagonal anchor, and the two
+  /// adjacent corners around [dragCorner] within a rectangle defined by
+  /// [corners] (ADR-012 Rule 2).
+  ///
+  /// Returns null when [dragCorner] does not match any of the 4 corners
+  /// within 1 mm tolerance, or when the rectangle is degenerate.
+  ///
+  /// - `anchor`: the corner whose x and y both differ from [dragCorner].
+  /// - `xAdj`:   the corner sharing [dragCorner]'s x-coordinate (same
+  ///             vertical edge as dragCorner).
+  /// - `yAdj`:   the corner sharing [dragCorner]'s y-coordinate (same
+  ///             horizontal edge as dragCorner).
+  @visibleForTesting
+  static ({
+    Point2D dragCorner,
+    Point2D anchor,
+    Point2D xAdj,
+    Point2D yAdj,
+  })? identifyRectCornersAroundDrag(
+    List<Point2D> corners,
+    Point2D dragCorner,
+  ) {
+    const tol = _rectTolMm;
+    Point2D? exact;
+    for (final c in corners) {
+      if ((c.x - dragCorner.x).abs() < tol &&
+          (c.y - dragCorner.y).abs() < tol) {
+        exact = c;
+        break;
+      }
+    }
+    if (exact == null) return null;
+
+    Point2D? anchor;
+    Point2D? xAdj;
+    Point2D? yAdj;
+    for (final c in corners) {
+      if (identical(c, exact)) continue;
+      final sameX = (c.x - exact.x).abs() < tol;
+      final sameY = (c.y - exact.y).abs() < tol;
+      if (sameX && !sameY) {
+        xAdj = c;
+      } else if (!sameX && sameY) {
+        yAdj = c;
+      } else if (!sameX && !sameY) {
+        anchor = c;
+      }
+    }
+    if (anchor == null || xAdj == null || yAdj == null) return null;
+    return (dragCorner: exact, anchor: anchor, xAdj: xAdj, yAdj: yAdj);
+  }
 
   // ================================================================
   // onTap
@@ -447,6 +614,37 @@ class SelectTool extends CanvasTool {
     } else {
       _dragStartRoom = null;
     }
+
+    // ADR-012: decide rect-reshape mode at drag-start. The flag is
+    // sampled once and held for the entire drag — releasing Ctrl
+    // mid-drag does not switch modes.
+    _rectReshapeMode = false;
+    if (_ctrlHeld &&
+        (handleType == DragHandleType.start ||
+            handleType == DragHandleType.end) &&
+        _selectedWall!.roomId.isNotEmpty) {
+      final roomWalls = callbacks.currentWalls
+          .where((w) => w.roomId == _selectedWall!.roomId)
+          .toList();
+      final corners = rectangleCorners(roomWalls);
+      if (corners != null) {
+        final draggedPoint = handleType == DragHandleType.start
+            ? _selectedWall!.startPoint
+            : _selectedWall!.endPoint;
+        final ids = identifyRectCornersAroundDrag(corners, draggedPoint);
+        if (ids != null) {
+          _rectReshapeMode = true;
+          _rectReshapeAnchor = ids.anchor;
+          _rectReshapeOriginalCorner = ids.dragCorner;
+          _rectReshapeCursor = ids.dragCorner;
+          _rectReshapeWalls = List<WallSegment>.unmodifiable(roomWalls);
+          _rectReshapeOldWalls =
+              List<WallSegment>.unmodifiable(callbacks.currentWalls);
+          _rectReshapeOldRooms =
+              List<Room>.unmodifiable(callbacks.currentRooms);
+        }
+      }
+    }
     // ADR-011: snapshot the mirror wall's room so we can keep it in sync.
     final mirrorWallId = _selectedWall!.mirrorId;
     if (mirrorWallId != null) {
@@ -532,6 +730,15 @@ class SelectTool extends CanvasTool {
 
     // Wall drag.
     if (_dragHandle == null || _dragStartWall == null) return;
+
+    // ADR-012 rect-reshape: ghost preview only, no state mutation.
+    // Uses raw cursor (no snap) for a responsive ghost; the snap
+    // pipeline applies at onDragEnd (Rule 4).
+    if (_rectReshapeMode) {
+      _rectReshapeCursor = worldPoint;
+      onStateChanged();
+      return;
+    }
 
     final excludedIds = {
       _dragStartWall!.id,
@@ -619,6 +826,14 @@ class SelectTool extends CanvasTool {
     // Wall drag end.
     if (_dragHandle == null || _dragStartWall == null) {
       _clearDragState();
+      return;
+    }
+
+    // ADR-012 rect-reshape commit.
+    if (_rectReshapeMode) {
+      _commitRectReshape(worldPoint);
+      _clearDragState();
+      onStateChanged();
       return;
     }
 
@@ -717,7 +932,27 @@ class SelectTool extends CanvasTool {
 
   @override
   void onPointerMove(Point2D worldPoint) {
-    // No hover behaviour for select tool currently.
+    // Track whether the pointer is hovering an endpoint handle of a
+    // rectangle-eligible room so the canvas can swap the cursor when
+    // Ctrl is held (ADR-012 Rule 8).
+    final wasHover = _hoverEndpointOnRectRoom;
+    var hovering = false;
+    if (_selectedWall != null && _dragHandle == null) {
+      final handle = _hitTestHandle(worldPoint);
+      if (handle == DragHandleType.start || handle == DragHandleType.end) {
+        final roomId = _selectedWall!.roomId;
+        if (roomId.isNotEmpty) {
+          final roomWalls = callbacks.currentWalls
+              .where((w) => w.roomId == roomId)
+              .toList();
+          if (rectangleCorners(roomWalls) != null) {
+            hovering = true;
+          }
+        }
+      }
+    }
+    _hoverEndpointOnRectRoom = hovering;
+    if (wasHover != hovering) onStateChanged();
   }
 
   @override
@@ -793,7 +1028,11 @@ class SelectTool extends CanvasTool {
 
     // Revert wall drag.
     if (_dragHandle != null) {
-      _revertDrag();
+      // ADR-012 rect-reshape mutates no state during onDragUpdate,
+      // so no revert is needed — just drop the ghost.
+      if (!_rectReshapeMode) {
+        _revertDrag();
+      }
       _clearDragState();
       onStateChanged();
       return;
@@ -811,6 +1050,20 @@ class SelectTool extends CanvasTool {
 
   @override
   InteractionData? getInteractionData() {
+    // ADR-012 rect-reshape ghost preview takes priority while
+    // the drag is in progress. Uses RectDrawData so the painter
+    // renders the same four-wall outline + width/height
+    // annotations as rect-mode wall drawing.
+    if (_rectReshapeMode &&
+        _dragHandle != null &&
+        _rectReshapeAnchor != null &&
+        _rectReshapeCursor != null) {
+      return RectDrawData(
+        corner1: _rectReshapeAnchor!,
+        corner2: _rectReshapeCursor!,
+      );
+    }
+
     // Circuit selection — no handles needed.
     if (_selectedCircuit != null) return null;
 
@@ -2004,6 +2257,133 @@ class SelectTool extends CanvasTool {
     _dragStartConnected = const [];
     _dragStartRoom = null;
     _dragStartMirrorRoom = null;
+    _clearRectReshapeState();
+  }
+
+  void _clearRectReshapeState() {
+    _rectReshapeMode = false;
+    _rectReshapeAnchor = null;
+    _rectReshapeOriginalCorner = null;
+    _rectReshapeCursor = null;
+    _rectReshapeWalls = const [];
+    _rectReshapeOldWalls = const [];
+    _rectReshapeOldRooms = const [];
+  }
+
+  // ================================================================
+  // ADR-012 rectangle reshape commit
+  // ================================================================
+
+  /// Apply the snap pipeline, validate, and commit the four wall
+  /// updates as a single undo batch (ADR-012 Rules 4–6).
+  void _commitRectReshape(Point2D rawCursor) {
+    final anchor = _rectReshapeAnchor;
+    final original = _rectReshapeOriginalCorner;
+    final roomWalls = _rectReshapeWalls;
+    if (anchor == null || original == null || roomWalls.isEmpty) return;
+
+    // Exclude the room being reshaped from snap candidates — snapping a
+    // corner onto its own diagonal would collapse the room (ADR-012 Rule 4).
+    final excluded = roomWalls.map((w) => w.id).toSet();
+    final snapCandidates = callbacks.currentWalls
+        .where((w) => !excluded.contains(w.id))
+        .toList();
+
+    // (a) grid + endpoint snap.
+    final snap = SnapService.snap(
+      rawCursor,
+      snapCandidates,
+      callbacks.currentGridSpacingMm,
+    );
+    // (b) rect-corner snap to other rooms' corners.
+    final cornerSnapped = SnapService.snapRectCorner(
+      snap.point,
+      snapCandidates,
+      callbacks.currentGridSpacingMm,
+    );
+    // (c) rect-dimension snap with the diagonal anchor as the
+    // "drag-start" reference.
+    final cNew = SnapService.snapRectDimension(
+      anchor,
+      cornerSnapped,
+      snapCandidates,
+    );
+
+    // ADR-012 Rule 6: minimum-dimension validation. Both rectangle
+    // width and height must be ≥ 100 mm; otherwise reject.
+    final w = (cNew.x - anchor.x).abs();
+    final h = (cNew.y - anchor.y).abs();
+    if (w < _minLengthMm || h < _minLengthMm) {
+      callbacks.showToast('Room too small (min 100×100 mm)');
+      return;
+    }
+
+    // Build the remap table from old corners → new corners (Rule 3).
+    final a1Old = Point2D(x: original.x, y: anchor.y);
+    final a2Old = Point2D(x: anchor.x, y: original.y);
+    final a1New = Point2D(x: cNew.x, y: anchor.y);
+    final a2New = Point2D(x: anchor.x, y: cNew.y);
+
+    bool eq(Point2D a, Point2D b) =>
+        (a.x - b.x).abs() < _rectTolMm && (a.y - b.y).abs() < _rectTolMm;
+    Point2D remap(Point2D p) {
+      if (eq(p, original)) return cNew;
+      if (eq(p, anchor)) return anchor;
+      if (eq(p, a1Old)) return a1New;
+      if (eq(p, a2Old)) return a2New;
+      return p; // safety fallback — should not occur for a true rectangle
+    }
+
+    // Apply remap to each of the 4 walls. Routing through
+    // EditorStateNotifier.updateWall lets ADR-011 mirror sync
+    // propagate to any shared-wall partner automatically.
+    for (final wall in roomWalls) {
+      final updated = wall.copyWith(
+        startPoint: remap(wall.startPoint),
+        endPoint: remap(wall.endPoint),
+      );
+      callbacks.updateWall(updated);
+    }
+
+    // Update the dragged room's polygon to the new rectangle.
+    final roomId = _selectedWall?.roomId ?? '';
+    if (roomId.isNotEmpty) {
+      final room = callbacks.currentRooms
+          .where((r) => r.id == roomId)
+          .firstOrNull;
+      if (room != null) {
+        final tlx = math.min(anchor.x, cNew.x);
+        final tly = math.min(anchor.y, cNew.y);
+        final brx = math.max(anchor.x, cNew.x);
+        final bry = math.max(anchor.y, cNew.y);
+        final polygon = [
+          Point2D(x: tlx, y: tly),
+          Point2D(x: brx, y: tly),
+          Point2D(x: brx, y: bry),
+          Point2D(x: tlx, y: bry),
+        ];
+        callbacks.updateRoom(room.copyWith(polygon: polygon));
+      }
+    }
+
+    // Snapshot the post-state so the undo command can replay the
+    // entire batch as a single atomic step (ADR-012 Rule 5).
+    final newWalls = callbacks.currentWalls.toList();
+    final newRooms = callbacks.currentRooms.toList();
+
+    undoRedo.execute(_RectReshapeCommand(
+      callbacks: callbacks,
+      oldWalls: _rectReshapeOldWalls,
+      oldRooms: _rectReshapeOldRooms,
+      newWalls: newWalls,
+      newRooms: newRooms,
+    ));
+
+    // Refresh the selected-wall reference to the post-update state.
+    final updatedSelected = callbacks.currentWalls
+        .where((wall) => wall.id == _selectedWall?.id)
+        .firstOrNull;
+    if (updatedSelected != null) _selectedWall = updatedSelected;
   }
 
   // ================================================================
@@ -2735,6 +3115,40 @@ class _DeleteDistributorCommand extends Command {
 
   @override
   void undo() => add(distributor);
+}
+
+/// Command: ADR-012 rectangle-reshape — four wall updates + room polygon
+/// update committed as a single atomic snapshot.
+///
+/// Stores the full walls/rooms lists before and after the reshape so
+/// the entire batch (including any ADR-011 mirror-wall partner updates
+/// triggered by the four `updateWall` calls) can be reverted as one
+/// undo step.
+class _RectReshapeCommand extends Command {
+  _RectReshapeCommand({
+    required this.callbacks,
+    required this.oldWalls,
+    required this.oldRooms,
+    required this.newWalls,
+    required this.newRooms,
+  });
+
+  final EditorCallbacks callbacks;
+  final List<WallSegment> oldWalls;
+  final List<Room> oldRooms;
+  final List<WallSegment> newWalls;
+  final List<Room> newRooms;
+
+  @override
+  String get label => 'Reshape rectangle';
+
+  @override
+  void execute() =>
+      callbacks.replaceAllWallsAndRooms(newWalls, newRooms);
+
+  @override
+  void undo() =>
+      callbacks.replaceAllWallsAndRooms(oldWalls, oldRooms);
 }
 
 /// Command: move a zone polygon (vertex drag or body drag).

@@ -749,15 +749,20 @@ class _FloorPlanCanvasState
       if (t is SelectTool) t.onRotateDistributor();
     });
 
-    // Forward wall modifier flags to the WallDrawTool.
+    // Forward wall modifier flags to the WallDrawTool, and the Ctrl
+    // flag to the SelectTool (ADR-012 Rule 7).
     ref.listen<WallModifiers>(wallModifiersProvider, (_, mods) {
-      final t = _tools[DrawingTool.drawWall];
-      if (t is WallDrawTool) {
-        t.updateModifiers(
+      final wt = _tools[DrawingTool.drawWall];
+      if (wt is WallDrawTool) {
+        wt.updateModifiers(
           shift: mods.orthoSnap,
           ctrl: mods.rectMode,
           alt: mods.freePlacement,
         );
+      }
+      final st = _tools[DrawingTool.select];
+      if (st is SelectTool) {
+        st.updateModifiers(ctrl: mods.rectMode);
       }
     });
 
@@ -1005,6 +1010,16 @@ class _FloorPlanCanvasState
   }
 
   MouseCursor _cursorForTool(DrawingTool tool) {
+    // ADR-012 Rule 8: swap to the rect-crosshair (same cursor used by
+    // rect-mode drawing) when Ctrl is held over an endpoint handle of
+    // a rectangle-eligible room.
+    if (tool == DrawingTool.select) {
+      final st = _tools[DrawingTool.select];
+      if (st is SelectTool && st.shouldUseRectCrosshair) {
+        return SystemMouseCursors.precise;
+      }
+      return SystemMouseCursors.basic;
+    }
     return switch (tool) {
       DrawingTool.select => SystemMouseCursors.basic,
       DrawingTool.drawWall => SystemMouseCursors.precise,

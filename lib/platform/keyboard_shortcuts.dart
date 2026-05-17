@@ -353,10 +353,16 @@ class EditorShortcuts extends ConsumerWidget {
                 key == LogicalKeyboardKey.shiftLeft ||
                 key == LogicalKeyboardKey.shiftRight ||
                 key == LogicalKeyboardKey.shift;
+            // Cmd on macOS maps to logical "meta" — treat the same as
+            // Ctrl so rect-mode (wall draw) and rect-reshape
+            // (ADR-012) work cross-platform.
             final isCtrl =
                 key == LogicalKeyboardKey.controlLeft ||
                 key == LogicalKeyboardKey.controlRight ||
-                key == LogicalKeyboardKey.control;
+                key == LogicalKeyboardKey.control ||
+                key == LogicalKeyboardKey.metaLeft ||
+                key == LogicalKeyboardKey.metaRight ||
+                key == LogicalKeyboardKey.meta;
             final isAlt =
                 key == LogicalKeyboardKey.altLeft ||
                 key == LogicalKeyboardKey.altRight ||

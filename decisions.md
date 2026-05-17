@@ -428,3 +428,116 @@ manipulation, and makes the pairing visible in the data model and Drift schema.
 6. `.hsp` format: `mirrorId` is included automatically once `build_runner`
    regenerates `WallSegment.toJson`/`fromJson`. No manual exporter change
    required.
+
+---
+
+## ADR-012 — Ctrl+endpoint-handle drag reshapes a rectangular room
+
+**What.**
+When a user drags an endpoint handle (corner) of a wall whose room is a
+strictly rectangular room — exactly 4 wall segments, all axis-aligned
+(horizontal or vertical), all interior angles 90° — and holds **Ctrl**, the
+room is reshaped as a rectangle defined by:
+- the diagonally opposite corner (fixed anchor), and
+- the cursor position (the new location of the dragged corner).
+
+All four corners of the room are repositioned in a single atomic update so the
+room remains an axis-aligned rectangle. **Shift** held during endpoint handle
+drag is an explicit no-op. **Modifier keys never apply to mid-handle drag.**
+
+This mirrors the semantics of `WallDrawTool`'s rect mode (Ctrl-drag during
+wall drawing): the user thinks of the room as a rectangle defined by two
+diagonal corners, and resizing one corner reshapes all four walls together.
+
+**Why.**
+Without this feature, reshaping a rectangular room to a different size
+requires four separate endpoint drags (one per corner) and careful
+coordination to keep edges axis-aligned. Ctrl-drag for reshape is the natural
+inverse of Ctrl-drag for creation.
+
+Shift is deliberately a no-op because a corner is shared by two walls and the
+system cannot decide which wall should keep its angle versus which should
+rotate to follow the cursor. Silently picking one would be surprising; falling
+back to default behaviour matches the principle of least astonishment.
+
+Non-rectangular rooms (L-shapes, polygons with > 4 walls, walls not
+axis-aligned) fall back to default endpoint-drag behaviour when Ctrl is held.
+A "rectangle reshape" has no well-defined meaning on those shapes, and
+attempting one would either silently rectangularise the room (destructive) or
+require complex per-wall heuristics (fragile).
+
+**Rules.**
+
+1. **Rectangle eligibility check.** Before applying Ctrl-reshape, the
+   `SelectTool` evaluates the dragged wall's `Room`:
+   - `wallSegmentsProvider(roomId)` returns **exactly 4** segments;
+   - every segment is axis-aligned within a 1 mm tolerance
+     (`|startPoint.x − endPoint.x| < 1 mm` OR
+     `|startPoint.y − endPoint.y| < 1 mm`);
+   - the 4 segments form a closed loop with 4 distinct corners and
+     90° interior angles (perpendicular adjacent edges).
+
+   If any check fails, Ctrl has **no effect** — the drag proceeds with
+   default endpoint-drag behaviour.
+
+2. **Diagonal-corner identification.** From the 4 corners, the dragged
+   corner `C_drag` is the endpoint being moved. The fixed anchor `D` is the
+   corner whose x **and** y both differ from `C_drag`. The two adjacent
+   corners share exactly one coordinate with `C_drag`.
+
+3. **New corner positions.** Let `C_new` be the snapped cursor position.
+   The four new corners are:
+   - dragged corner → `C_new`
+   - diagonal corner → `D` (unchanged)
+   - the corner sharing `C_drag`'s x-axis → `(C_new.x, D.y)`
+   - the corner sharing `C_drag`'s y-axis → `(D.x, C_new.y)`
+
+4. **Snap pipeline for `C_new`.** Apply the same order used by rect-mode
+   draw at `onDragEnd` (see ADR-009 / ADR-010):
+   a. `SnapService.snap` (grid + endpoint snap)
+   b. `SnapService.snapRectCorner(C_new, walls, gridSpacingMm)` — snap to
+      other rooms' corners within `2 × gridSpacingMm`. Walls of the room
+      being reshaped are excluded from the candidate list (snapping a
+      corner onto its own diagonal would collapse the room).
+   c. `SnapService.snapRectDimension(D, C_new, walls)` — match adjacent
+      rooms' dimensions within 100 mm. Same exclusion: the room being
+      reshaped is omitted from the candidate list.
+
+5. **Wall updates.** Each of the 4 walls is updated via
+   `EditorStateNotifier.updateWall` so that ADR-011 mirror synchronization
+   propagates changes to any shared-wall partners automatically. All four
+   `updateWall` calls happen in a single `state.copyWith(walls: ...)`
+   transaction grouped into one `UndoRedoService` batch so a single Ctrl+Z
+   reverts the entire reshape.
+
+6. **Minimum dimension validation.** If the reshape would produce any wall
+   shorter than 100 mm (either rectangle width or height < 100 mm), the
+   commit at `onDragEnd` is **rejected**: revert all four walls to their
+   pre-drag positions and show a transient toast: *"Room too small (min
+   100×100 mm)"*. During `onDragUpdate` (live preview), the ghost may
+   shrink below 100 mm — the rejection only fires on release.
+
+7. **Modifier-key tracking in `SelectTool`.** `SelectTool` tracks `_ctrlHeld`
+   in the same pattern `WallDrawTool` uses (see Frontend agent §4.4):
+   listen to key-down and key-up events for `LogicalKeyboardKey.controlLeft`
+   / `controlRight` / `metaLeft` / `metaRight` (Cmd on macOS maps via
+   Flutter's `Shortcuts` infra to the same logical Ctrl). The flag is
+   sampled at `onDragStart` to decide which drag mode to enter; toggling
+   Ctrl mid-drag does **not** switch modes (avoids jarring shape jumps).
+   This matches the WallDrawTool rect-mode convention.
+
+8. **Cursor.** When `_ctrlHeld` is true and hovering over an endpoint
+   handle of a rectangle-eligible room, the cursor changes to the same
+   rectangle-crosshair used by rect-mode draw, signalling the alternate
+   behaviour. On non-eligible rooms the cursor stays as the default
+   endpoint-drag cursor (bidirectional arrow) — visual feedback that Ctrl
+   will not apply.
+
+9. **Shift and Alt during endpoint drag.** Shift is a documented no-op
+   (UI/UX §5.6.1). Alt is reserved for future free-placement semantics; the
+   initial implementation may leave it unhandled.
+
+**Scope.**
+Applies only to `SelectTool` endpoint handle drag. Mid-handle drag, wall
+selection, multi-select, and marquee select are unaffected. Wall *drawing*
+modifier keys (ADR-009 / ADR-010) are unchanged.
