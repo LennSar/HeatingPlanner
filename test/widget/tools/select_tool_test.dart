@@ -239,6 +239,12 @@ const _testCircuit = HeatingCircuit(
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 void main() {
+  // The rect-reshape gate (ADR-012) consults
+  // HardwareKeyboard.instance.logicalKeysPressed at drag-start to
+  // catch missed key-up events. That class requires the binding to
+  // be initialized — ensure it once for the whole file.
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   // ST-1 ────────────────────────────────────────────────────────────────────
 
   test(
@@ -530,7 +536,7 @@ void main() {
 
       // Enter rect-reshape mode: Ctrl held, then pointer down on the
       // top-left endpoint handle of the selected top wall.
-      tool.updateModifiers(ctrl: true);
+      tool.debugCtrlHeldOverride = true;
       tool.onPointerDown(tl, 1);
 
       // Drag the corner to (-1000, -500) — on-grid, no snap surprise.
@@ -572,7 +578,7 @@ void main() {
 
       // Ctrl-drag top-left corner to an off-grid point. Grid is 100 mm,
       // so (1230, -1270) snaps to (1200, -1300).
-      tool.updateModifiers(ctrl: true);
+      tool.debugCtrlHeldOverride = true;
       tool.onPointerDown(tl, 1);
       tool.onDragEnd(const Point2D(x: 1230, y: -1270));
 
@@ -601,7 +607,7 @@ void main() {
       final tool = _makeTool(cb);
 
       tool.onTap(const Point2D(x: 1500, y: 0), PointerDeviceKind.mouse);
-      tool.updateModifiers(ctrl: true);
+      tool.debugCtrlHeldOverride = true;
       tool.onPointerDown(tl, 1);
       // Drag to nearly coincide with the diagonal anchor — height/width
       // collapse below the 100 mm threshold.
@@ -626,11 +632,11 @@ void main() {
       final tool = _makeTool(cb);
 
       tool.onTap(const Point2D(x: 1500, y: 0), PointerDeviceKind.mouse);
-      tool.updateModifiers(ctrl: true);
+      tool.debugCtrlHeldOverride = true;
       tool.onPointerDown(tl, 1);
 
       // Release Ctrl mid-drag — mode must remain rect-reshape.
-      tool.updateModifiers(ctrl: false);
+      tool.debugCtrlHeldOverride = false;
 
       tool.onDragEnd(const Point2D(x: -1000, y: -500));
 
@@ -680,6 +686,263 @@ void main() {
         (w) => w.startPoint == bl || w.endPoint == bl,
       );
       expect(blStillPresent, isTrue);
+    });
+
+    test(
+        'ST-RR-11: rect-reshape + undo + rect-reshape — second drag still '
+        'engages rect-reshape (refreshes stale _selectedWall after undo)',
+        () {
+      // Regression for the "wall detaches after undo" bug. Sequence:
+      //   1. Select top wall, Ctrl-drag top-left to a new corner — commits
+      //      rect-reshape, pushes _RectReshapeCommand.
+      //   2. Undo via UndoRedoService — state is restored, but the cached
+      //      _selectedWall in SelectTool still carries post-reshape geometry.
+      //   3. Ctrl-drag top-left again. If _selectedWall is not refreshed,
+      //      the rect-reshape eligibility check fails (the stale endpoint
+      //      doesn't match any corner of the restored rectangle), the tool
+      //      falls through to default endpoint drag, _dragStartConnected is
+      //      empty, and only the top wall moves while the other three stay
+      //      put — the rectangle "detaches".
+      const roomId = 'room-undo-redo';
+      final initialWalls = buildRectWalls(roomId);
+      final cb = _ReshapeStubCallbacks(
+        walls: initialWalls,
+        rooms: [buildRoom(roomId)],
+      );
+      final undoRedo = UndoRedoService();
+      final tool = SelectTool(
+        callbacks: cb,
+        onStateChanged: () {},
+        undoRedo: undoRedo,
+      );
+
+      // Select top wall.
+      tool.onTap(const Point2D(x: 1500, y: 0), PointerDeviceKind.mouse);
+
+      // First reshape: drag top-left from (0,0) to (-1000,-500).
+      tool.debugCtrlHeldOverride = true;
+      tool.onPointerDown(tl, 1);
+      tool.onDragEnd(const Point2D(x: -1000, y: -500));
+
+      // Confirm the rectangle moved.
+      final xsAfterFirst = <double>{};
+      final ysAfterFirst = <double>{};
+      for (final w in cb._walls) {
+        xsAfterFirst..add(w.startPoint.x)..add(w.endPoint.x);
+        ysAfterFirst..add(w.startPoint.y)..add(w.endPoint.y);
+      }
+      expect(xsAfterFirst, {-1000.0, 3000.0});
+      expect(ysAfterFirst, {-500.0, 2000.0});
+
+      // Undo.
+      undoRedo.undo();
+      // State must be back to the original rectangle.
+      final xsAfterUndo = <double>{};
+      final ysAfterUndo = <double>{};
+      for (final w in cb._walls) {
+        xsAfterUndo..add(w.startPoint.x)..add(w.endPoint.x);
+        ysAfterUndo..add(w.startPoint.y)..add(w.endPoint.y);
+      }
+      expect(xsAfterUndo, {0.0, 3000.0});
+      expect(ysAfterUndo, {0.0, 2000.0});
+
+      // Second Ctrl-drag — must engage rect-reshape, not default
+      // endpoint pivot. Drag the (now-restored) top-left corner to
+      // (-500,-300).
+      tool.onPointerDown(tl, 1);
+      tool.onDragEnd(const Point2D(x: -500, y: -300));
+
+      // All 4 walls must move: distinct x-values {-500, 3000} and
+      // y-values {-300, 2000}.  If the bug had occurred, only the top
+      // wall would have shifted and the corner set would still contain
+      // 0.0 from the unmoved left/right/bottom walls.
+      final xsAfterSecond = <double>{};
+      final ysAfterSecond = <double>{};
+      for (final w in cb._walls) {
+        xsAfterSecond..add(w.startPoint.x)..add(w.endPoint.x);
+        ysAfterSecond..add(w.startPoint.y)..add(w.endPoint.y);
+      }
+      expect(xsAfterSecond, {-500.0, 3000.0});
+      expect(ysAfterSecond, {-300.0, 2000.0});
+    });
+
+    test(
+        'ST-RR-12: user scenario — non-Ctrl corner drag deforms the room; '
+        'Ctrl+Z restores rectangle; subsequent Ctrl-drag rect-reshapes', () {
+      // Reproduces the exact sequence the user described:
+      //   1. Have a rectangular room.
+      //   2. Drag a corner WITHOUT Ctrl → only that corner moves; the room
+      //      becomes non-rectangular but remains a closed room.
+      //   3. Ctrl+Z (undo) → rectangle restored to its original geometry.
+      //   4. Drag the same corner WITH Ctrl → rect-reshape kicks in; all
+      //      four corners reposition and the room remains an axis-aligned
+      //      rectangle.
+      const roomId = 'room-user-scenario';
+      final cb = _ReshapeStubCallbacks(
+        walls: buildRectWalls(roomId),
+        rooms: [buildRoom(roomId)],
+      );
+      final undoRedo = UndoRedoService();
+      final tool = SelectTool(
+        callbacks: cb,
+        onStateChanged: () {},
+        undoRedo: undoRedo,
+      );
+
+      // Step 1: confirm the starting rectangle.
+      {
+        final xs = <double>{};
+        final ys = <double>{};
+        for (final w in cb._walls) {
+          xs..add(w.startPoint.x)..add(w.endPoint.x);
+          ys..add(w.startPoint.y)..add(w.endPoint.y);
+        }
+        expect(xs, {0.0, 3000.0},
+            reason: 'starting room must be a 3000×2000 rectangle');
+        expect(ys, {0.0, 2000.0},
+            reason: 'starting room must be a 3000×2000 rectangle');
+      }
+
+      // Step 2: select the top wall, then drag the top-left corner WITHOUT
+      // Ctrl from (0,0) to (-500, -300). Default endpoint pivot must move
+      // ONLY the dragged corner and the single adjacent wall that shares
+      // that endpoint; the diagonally opposite corner (3000, 2000) and the
+      // far-side corners must stay put.
+      tool.onTap(const Point2D(x: 1500, y: 0), PointerDeviceKind.mouse);
+      // Ctrl explicitly NOT held.
+      tool.debugCtrlHeldOverride = false;
+      tool.onPointerDown(tl, 1);
+      tool.onDragUpdate(const Point2D(x: -500, y: -300));
+      tool.onDragEnd(const Point2D(x: -500, y: -300));
+
+      // The dragged corner must be at (-500, -300).
+      final cornersAfterDeform = <Point2D>{};
+      for (final w in cb._walls) {
+        cornersAfterDeform.add(w.startPoint);
+        cornersAfterDeform.add(w.endPoint);
+      }
+      expect(cornersAfterDeform.length, 4,
+          reason: 'room must still have exactly 4 distinct corners');
+      expect(cornersAfterDeform, contains(const Point2D(x: -500, y: -300)),
+          reason: 'the dragged corner must be at the new position');
+
+      // The other three corners must be the original ones — the three
+      // walls NOT connected to the moved endpoint stay in place.
+      expect(cornersAfterDeform, contains(tr),
+          reason: '(3000,0) must remain — top wall endPoint unchanged');
+      expect(cornersAfterDeform, contains(br),
+          reason: '(3000,2000) must remain — diagonally opposite corner');
+      expect(cornersAfterDeform, contains(bl),
+          reason: '(0,2000) must remain — left wall startPoint unchanged');
+
+      // The deformed room must NOT be a rectangle — three distinct
+      // y-values is the signature of the diagonal corner break.
+      final ysAfterDeform =
+          cornersAfterDeform.map((p) => p.y).toSet();
+      expect(ysAfterDeform.length, greaterThan(2),
+          reason: 'after non-Ctrl drag the room must NOT be rectangular');
+
+      // The 4 walls must still form a closed chain (room remains a room).
+      // We verify this by checking that every corner is touched by exactly
+      // two distinct walls' endpoints.
+      for (final corner in cornersAfterDeform) {
+        final touching = cb._walls
+            .where(
+              (w) => w.startPoint == corner || w.endPoint == corner,
+            )
+            .toList();
+        expect(touching, hasLength(2),
+            reason: 'each corner $corner must connect exactly 2 walls');
+      }
+
+      // Step 3: Ctrl+Z. The original rectangle must be restored.
+      undoRedo.undo();
+      final cornersAfterUndo = <Point2D>{};
+      for (final w in cb._walls) {
+        cornersAfterUndo.add(w.startPoint);
+        cornersAfterUndo.add(w.endPoint);
+      }
+      expect(cornersAfterUndo, equals({tl, tr, br, bl}),
+          reason: 'undo must restore the original four corners');
+      final xsAfterUndo =
+          cornersAfterUndo.map((p) => p.x).toSet();
+      final ysAfterUndo =
+          cornersAfterUndo.map((p) => p.y).toSet();
+      expect(xsAfterUndo, {0.0, 3000.0});
+      expect(ysAfterUndo, {0.0, 2000.0});
+
+      // Step 4: Ctrl-drag the same corner — rect-reshape this time.
+      tool.debugCtrlHeldOverride = true;
+      tool.onPointerDown(tl, 1);
+      tool.onDragUpdate(const Point2D(x: -500, y: -300));
+      tool.onDragEnd(const Point2D(x: -500, y: -300));
+
+      final cornersAfterReshape = <Point2D>{};
+      for (final w in cb._walls) {
+        cornersAfterReshape.add(w.startPoint);
+        cornersAfterReshape.add(w.endPoint);
+      }
+      // Rect-reshape: the room must still be an axis-aligned rectangle
+      // with corners (-500,-300), (3000,-300), (3000,2000), (-500,2000).
+      expect(cornersAfterReshape, hasLength(4));
+      expect(cornersAfterReshape.map((p) => p.x).toSet(), {-500.0, 3000.0},
+          reason: 'rect-reshape must leave exactly 2 distinct x-values');
+      expect(cornersAfterReshape.map((p) => p.y).toSet(), {-300.0, 2000.0},
+          reason: 'rect-reshape must leave exactly 2 distinct y-values');
+    });
+
+    test(
+        'ST-RR-13: a stranded cached _ctrlHeld (no override, no hardware key) '
+        'does NOT engage rect-reshape — drag-start re-syncs from hardware', () {
+      // This guards the exact symptom the user reported ("now it always
+      // moves as a rectangular"): the cached `_ctrlHeld` flag is stuck
+      // "on" because a Cmd-up event was swallowed during Cmd+Z. With
+      // the live-hardware re-sync at drag-start, the gate now ignores
+      // the stale cache and falls back to default endpoint pivot.
+      const roomId = 'room-stuck-ctrl';
+      final cb = _ReshapeStubCallbacks(
+        walls: buildRectWalls(roomId),
+        rooms: [buildRoom(roomId)],
+      );
+      final tool = _makeTool(cb);
+
+      tool.onTap(const Point2D(x: 1500, y: 0), PointerDeviceKind.mouse);
+
+      // Strand the cached flag: pretend Cmd-down was processed but
+      // Cmd-up was lost. `updateModifiers(ctrl: true)` mirrors the
+      // canvas's ref.listen handler exactly.
+      tool.updateModifiers(ctrl: true);
+      // Debug override stays null → drag-start polls real hardware
+      // (no keys pressed in unit-test isolate) and resets _ctrlHeld.
+      expect(tool.debugCtrlHeldOverride, isNull);
+
+      tool.onPointerDown(tl, 1);
+      tool.onDragUpdate(const Point2D(x: -500, y: -300));
+      tool.onDragEnd(const Point2D(x: -500, y: -300));
+
+      // Default endpoint pivot must have run — only the dragged corner
+      // moved; the diagonally opposite corner (3000, 2000) and the
+      // far-side corners (3000, 0) and (0, 2000) stay put. Rect-reshape
+      // would have moved ALL four corners onto two distinct x-/y-values
+      // each — assert the room is now NON-rectangular.
+      final corners = <Point2D>{};
+      for (final w in cb._walls) {
+        corners
+          ..add(w.startPoint)
+          ..add(w.endPoint);
+      }
+      expect(corners, contains(const Point2D(x: -500, y: -300)),
+          reason: 'dragged corner must have moved');
+      expect(corners, contains(tr),
+          reason: 'far top-right corner must stay put');
+      expect(corners, contains(br),
+          reason: 'diagonally opposite corner must stay put');
+      expect(corners, contains(bl),
+          reason: 'far bottom-left corner must stay put');
+      // Non-rectangular signature.
+      expect(corners.map((p) => p.y).toSet().length, greaterThan(2),
+          reason: 'stuck _ctrlHeld must NOT engage rect-reshape — '
+              'the room must end up non-rectangular');
     });
   });
 
@@ -800,7 +1063,7 @@ void main() {
       tool.onTap(const Point2D(x: 1500, y: 0), PointerDeviceKind.mouse);
 
       // Ctrl-drag from top-left to (-1000, -500).
-      tool.updateModifiers(ctrl: true);
+      tool.debugCtrlHeldOverride = true;
       tool.onPointerDown(aTL, 1);
       tool.onDragEnd(const Point2D(x: -1000, y: -500));
 

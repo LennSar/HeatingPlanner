@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter/services.dart';
 
 import '../../../calculation/engines/geometry_engine.dart';
 import '../../../core/utils/geometry_utils.dart';
@@ -255,6 +256,45 @@ class SelectTool extends CanvasTool {
     _ctrlHeld = ctrl;
     onStateChanged();
   }
+
+  /// Set of logical keys that count as "Ctrl" for the rect-reshape
+  /// gate (ADR-012). Cmd on macOS maps via the keyboard layer to the
+  /// same logical role.
+  static final Set<LogicalKeyboardKey> _ctrlLogicalKeys = {
+    LogicalKeyboardKey.controlLeft,
+    LogicalKeyboardKey.controlRight,
+    LogicalKeyboardKey.control,
+    LogicalKeyboardKey.metaLeft,
+    LogicalKeyboardKey.metaRight,
+    LogicalKeyboardKey.meta,
+  };
+
+  /// Re-sync [_ctrlHeld] from the live hardware key state.
+  ///
+  /// The cached flag tracks key-down/up events forwarded from the
+  /// canvas keyboard handler, but those events can be lost when focus
+  /// shifts mid-shortcut (e.g., the Cmd-up after Cmd+Z when a dialog
+  /// opens during undo) — leaving the cache stranded "on" and
+  /// erroneously engaging rect-reshape on subsequent corner drags.
+  /// Polling [HardwareKeyboard.instance.logicalKeysPressed] at
+  /// drag-start makes the gate reflect the actual key state.
+  ///
+  /// [debugCtrlHeldOverride] lets stub-based tool tests assert the
+  /// gate's logic without simulating real hardware key events.
+  void _syncCtrlHeldFromHardware() {
+    if (debugCtrlHeldOverride != null) {
+      _ctrlHeld = debugCtrlHeldOverride!;
+      return;
+    }
+    final pressed = HardwareKeyboard.instance.logicalKeysPressed;
+    _ctrlHeld = pressed.any(_ctrlLogicalKeys.contains);
+  }
+
+  /// Test-only override for the live-hardware sync in
+  /// [_syncCtrlHeldFromHardware]. When non-null, the rect-reshape gate
+  /// uses this value instead of polling [HardwareKeyboard].
+  @visibleForTesting
+  bool? debugCtrlHeldOverride;
 
   /// True when the canvas should swap the cursor to the rect-crosshair
   /// for the rect-reshape affordance (ADR-012 Rule 8).
@@ -601,6 +641,23 @@ class SelectTool extends CanvasTool {
 
     // Wall handle hit-test.
     if (_selectedWall == null) return;
+    // Refresh the cached _selectedWall reference from current state.
+    // After an undo (or any mutation routed through
+    // replaceAllWallsAndRooms), the cached instance keeps the
+    // post-commit geometry while its ID still resolves — letting a
+    // stale instance reach _findConnectedWalls or the rect-reshape
+    // eligibility check breaks both connected-wall follow and the
+    // ADR-012 corner identification.
+    final refreshedSelected = callbacks.currentWalls
+        .where((w) => w.id == _selectedWall!.id)
+        .firstOrNull;
+    if (refreshedSelected == null) {
+      _selectedWall = null;
+      callbacks.selectElement(null, null);
+      return;
+    }
+    _selectedWall = refreshedSelected;
+
     final handleType = _hitTestHandle(worldPoint);
     if (handleType == null) return;
 
@@ -617,7 +674,11 @@ class SelectTool extends CanvasTool {
 
     // ADR-012: decide rect-reshape mode at drag-start. The flag is
     // sampled once and held for the entire drag — releasing Ctrl
-    // mid-drag does not switch modes.
+    // mid-drag does not switch modes. Re-sync from the live hardware
+    // state first so a missed key-up (e.g., Cmd-up swallowed when a
+    // dialog opens mid-Cmd+Z) cannot strand the gate "on" and force
+    // rect-reshape on a plain corner drag.
+    _syncCtrlHeldFromHardware();
     _rectReshapeMode = false;
     if (_ctrlHeld &&
         (handleType == DragHandleType.start ||
