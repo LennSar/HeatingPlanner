@@ -240,6 +240,9 @@ class AppLocalizationsDe extends AppLocalizations {
   String get menuExportCsv => 'CSV exportieren…';
 
   @override
+  String get closeProject => 'Projekt schließen';
+
+  @override
   String get menuEdit => 'Bearbeiten';
 
   @override
@@ -731,6 +734,12 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get saveFileAndQuit => 'Datei speichern und beenden';
+
+  @override
+  String get closeWithoutSaving => 'Ohne Speichern schließen';
+
+  @override
+  String get saveFileAndClose => 'Datei speichern und schließen';
 
   @override
   String get roomNotFound => 'Raum nicht gefunden';

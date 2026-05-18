@@ -277,6 +277,10 @@
   "@menuExportCsv": {
     "description": "File > Export CSV menu item"
   },
+  "closeProject": "Close Project",
+  "@closeProject": {
+    "description": "File > Close Project menu item — returns to the Project List screen"
+  },
   "menuEdit": "Edit",
   "@menuEdit": {
     "description": "Top-level Edit menu label"
@@ -676,6 +680,10 @@
   "@quitAnyway": { "description": "Button to close without saving" },
   "saveFileAndQuit": "Save File and Quit",
   "@saveFileAndQuit": { "description": "Button to save and close" },
+  "closeWithoutSaving": "Close Without Saving",
+  "@closeWithoutSaving": { "description": "Button to close the project without saving the .hsp export" },
+  "saveFileAndClose": "Save File and Close",
+  "@saveFileAndClose": { "description": "Button to save the .hsp export and then close the project" },
 
   "roomNotFound": "Room not found",
   "@roomNotFound": { "description": "Error when selected room no longer exists" },

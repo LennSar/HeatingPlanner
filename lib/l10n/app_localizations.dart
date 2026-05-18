@@ -452,6 +452,12 @@ abstract class AppLocalizations {
   /// **'Export CSV…'**
   String get menuExportCsv;
 
+  /// File > Close Project menu item — returns to the Project List screen
+  ///
+  /// In en, this message translates to:
+  /// **'Close Project'**
+  String get closeProject;
+
   /// Top-level Edit menu label
   ///
   /// In en, this message translates to:
@@ -1369,6 +1375,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Save File and Quit'**
   String get saveFileAndQuit;
+
+  /// Button to close the project without saving the .hsp export
+  ///
+  /// In en, this message translates to:
+  /// **'Close Without Saving'**
+  String get closeWithoutSaving;
+
+  /// Button to save the .hsp export and then close the project
+  ///
+  /// In en, this message translates to:
+  /// **'Save File and Close'**
+  String get saveFileAndClose;
 
   /// Error when selected room no longer exists
   ///

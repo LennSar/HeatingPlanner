@@ -63,6 +63,7 @@
   "menuSaveAs": "Speichern unter…",
   "menuExportPdf": "PDF exportieren…",
   "menuExportCsv": "CSV exportieren…",
+  "closeProject": "Projekt schließen",
   "menuEdit": "Bearbeiten",
   "menuUndo": "Rückgängig",
   "menuRedo": "Wiederholen",
@@ -229,6 +230,8 @@
   "unsavedExportContent": "\"{name}\" hat Änderungen, die nicht in die .hsp-Datei gespeichert wurden.\n\nIhre Projektdaten sind sicher in der App gespeichert — nur die portable Exportdatei ist nicht aktuell.",
   "quitAnyway": "Trotzdem beenden",
   "saveFileAndQuit": "Datei speichern und beenden",
+  "closeWithoutSaving": "Ohne Speichern schließen",
+  "saveFileAndClose": "Datei speichern und schließen",
 
   "roomNotFound": "Raum nicht gefunden",
   "floorArea": "Bodenfläche",

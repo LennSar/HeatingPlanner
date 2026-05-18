@@ -22,6 +22,7 @@ import '../ui/panels/properties_panel.dart'
 import '../ui/providers/editor_state_provider.dart'
     show currentProjectNameProvider;
 import '../ui/screens/editor_screen.dart';
+import '../ui/screens/project_list_screen.dart';
 import '../ui/widgets/save_flash_notifier.dart';
 
 // ----------------------------------------------------------
@@ -108,6 +109,16 @@ class SaveAsIntent extends Intent {
 class OpenIntent extends Intent {
   /// Creates an [OpenIntent].
   const OpenIntent();
+}
+
+/// Close the current project and return to the Project List screen.
+///
+/// Honours the unsaved-`.hsp`-export prompt (§12.5), clears
+/// `lastOpenedProjectId` so the next launch shows the project list, then
+/// replaces the navigation stack with [ProjectListScreen].
+class CloseProjectIntent extends Intent {
+  /// Creates a [CloseProjectIntent].
+  const CloseProjectIntent();
 }
 
 // ----------------------------------------------------------
@@ -326,6 +337,13 @@ class EditorShortcuts extends ConsumerWidget {
               return null;
             },
           ),
+          CloseProjectIntent:
+              CallbackAction<CloseProjectIntent>(
+            onInvoke: (_) {
+              unawaited(_performCloseProject(context, ref));
+              return null;
+            },
+          ),
           SaveIntent: CallbackAction<SaveIntent>(
             onInvoke: (_) {
               unawaited(_performSave(context, ref));
@@ -470,4 +488,90 @@ Future<void> _performOpen(
       builder: (_) => EditorScreen(projectId: newId),
     ),
   );
+}
+
+/// Closes the current project and returns to [ProjectListScreen].
+///
+/// Reuses the existing dirty-state check ([SaveState.isDirty] +
+/// [SaveState.lastExportPath]) and the same [SaveStateNotifier.exportNow]
+/// save action as the window-close flow (§12.5) — the prompt is only shown
+/// when there are unsaved `.hsp` changes, and "Cancel" aborts the close.
+///
+/// On confirm: clears `lastOpenedProjectId` (so the next launch shows the
+/// project list instead of auto-reopening) and replaces the entire
+/// navigation stack with the project list, which works regardless of how
+/// the editor was reached (pushed, pushReplacement, or startup home route).
+Future<void> _performCloseProject(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  final saveState = ref.read(saveStateProvider);
+  if (saveState.isDirty && saveState.lastExportPath != null) {
+    final choice = await showDialog<_CloseChoice>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _CloseProjectUnsavedDialog(
+        projectName: ref.read(currentProjectNameProvider),
+      ),
+    );
+    switch (choice) {
+      case _CloseChoice.saveAndClose:
+        await ref.read(saveStateProvider.notifier).exportNow();
+      case _CloseChoice.closeAnyway:
+        break;
+      case null:
+      case _CloseChoice.cancel:
+        return;
+    }
+  }
+
+  await ref
+      .read(lastOpenedProjectIdProvider.notifier)
+      .set(null);
+
+  if (!context.mounted) return;
+  await Navigator.of(context).pushAndRemoveUntil(
+    MaterialPageRoute<void>(
+      builder: (_) => const ProjectListScreen(),
+    ),
+    (route) => false,
+  );
+}
+
+/// User's choice in [_CloseProjectUnsavedDialog].
+enum _CloseChoice { saveAndClose, closeAnyway, cancel }
+
+/// Shown when the user closes a project while the `.hsp` export is out of
+/// date. Mirrors the window-close dialog (§12.5) wording — the project data
+/// is safe in the app; only the portable export file is at risk.
+class _CloseProjectUnsavedDialog extends StatelessWidget {
+  const _CloseProjectUnsavedDialog({required this.projectName});
+
+  final String projectName;
+
+  @override
+  Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
+    return AlertDialog(
+      title: Text(l10n.unsavedExportFile),
+      content: Text(l10n.unsavedExportContent(projectName)),
+      actions: [
+        TextButton(
+          onPressed: () =>
+              Navigator.of(context).pop(_CloseChoice.cancel),
+          child: Text(l10n.cancel),
+        ),
+        TextButton(
+          onPressed: () => Navigator.of(context)
+              .pop(_CloseChoice.closeAnyway),
+          child: Text(l10n.closeWithoutSaving),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(context)
+              .pop(_CloseChoice.saveAndClose),
+          child: Text(l10n.saveFileAndClose),
+        ),
+      ],
+    );
+  }
 }

@@ -117,6 +117,19 @@ class DesktopMenuBar extends ConsumerWidget {
             ),
           ],
         ),
+        PlatformMenuItemGroup(
+          members: [
+            // Close Project — returns to the Project List screen
+            // (honours the unsaved-`.hsp` prompt).
+            PlatformMenuItem(
+              label: l10n.closeProject,
+              onSelected: () => Actions.invoke(
+                context,
+                const CloseProjectIntent(),
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
