@@ -735,6 +735,18 @@ class _FloorPlanCanvasState
     // Watch selected tool to react to tool switches.
     ref.watch(selectedToolProvider);
 
+    // Discard any in-progress drawing when the user switches tools.
+    // Tool instances are cached in [_tools], so a multi-point tool
+    // (zone, route, wall) would otherwise retain its uncommitted
+    // points and re-emit them the next time it is selected. Resetting
+    // the *previous* tool via its cancel() — the same reset path used
+    // by Escape — ensures only fully committed elements persist and
+    // every draw session starts from a clean, empty state.
+    ref.listen<DrawingTool>(selectedToolProvider, (previous, next) {
+      if (previous == null || previous == next) return;
+      _tools[previous]?.cancel();
+    });
+
     // React to cancel/delete signals after the build frame
     // completes. ref.listen fires its callback post-build,
     // avoiding "modified provider during build" errors.
