@@ -431,10 +431,9 @@ A wall is a stack of layers. Each layer's resistance is its thickness
 divided by its thermal conductivity λ. The total resistance adds the inside
 and outside surface resistances:
 
-```
-R_total = Rsi + Σ (d_i / λ_i) + Rse        [m²K/W]
-U        = 1 / R_total                      [W/(m²K)]
-```
+$$R_\text{total} = R_{si} + \sum_i \frac{d_i}{\lambda_i} + R_{se} \quad \left[\mathrm{m^2K/W}\right]$$
+
+$$U = \frac{1}{R_\text{total}} \quad \left[\mathrm{W/(m^2K)}\right]$$
 
 - `d_i` = layer thickness in **metres** (the editor's mm value ÷ 1000)
 - `λ_i` = layer conductivity from the material database (W/(m·K))
@@ -448,11 +447,13 @@ U        = 1 / R_total                      [W/(m²K)]
 | Hollow brick | 200 | 0.44 | 0.4545 |
 | Gypsum plaster | 15 | 0.40 | 0.0375 |
 
-```
-R_total = 0.13 (Rsi) + 0.0150 + 2.8571 + 0.4545 + 0.0375 + 0.04 (Rse)
-        = 3.534 m²K/W
-U       = 1 / 3.534 = 0.283 W/(m²K)
-```
+$$
+\begin{aligned}
+R_\text{total} &= 0.13\,(R_{si}) + 0.0150 + 2.8571 + 0.4545 + 0.0375 + 0.04\,(R_{se}) \\
+&= 3.534\ \mathrm{m^2K/W} \\
+U &= \frac{1}{3.534} = 0.283\ \mathrm{W/(m^2K)}
+\end{aligned}
+$$
 
 This is the U-value shown live at the top of the wall construction editor.
 The **temperature profile** bar splits the indoor→outdoor temperature drop
@@ -468,9 +469,7 @@ Total demand = transmission loss through the envelope + ventilation loss.
 
 **Transmission loss**, per wall / window / door / slab:
 
-```
-Q_T = U × A × f × (T_indoor − T_outdoor)        [W]
-```
+$$Q_T = U \cdot A \cdot f \cdot (T_\text{indoor} - T_\text{outdoor}) \quad [\mathrm{W}]$$
 
 - `A` = net area (wall area minus the openings in it)
 - `f` = correction factor:
@@ -478,15 +477,13 @@ Q_T = U × A × f × (T_indoor − T_outdoor)        [W]
   - **0.60** for slab-on-grade (ground)
   - **0.0** when the other side is a room at the same temperature
   - For an **interior wall** to a differently-heated room:
-    `f = (T_this − T_adjacent) / (T_this − T_outdoor)`.
+    $f = \dfrac{T_\text{this} - T_\text{adjacent}}{T_\text{this} - T_\text{outdoor}}$.
     If the neighbour is warmer, `f` goes negative — the wall is a heat
     *gain* and reduces this room's demand.
 
 **Ventilation loss** (air exchanged with outside):
 
-```
-Q_V = V × n × ρ_air × c_air × (T_indoor − T_outdoor) / 3600     [W]
-```
+$$Q_V = \frac{V \cdot n \cdot \rho_\text{air} \cdot c_\text{air} \cdot (T_\text{indoor} - T_\text{outdoor})}{3600} \quad [\mathrm{W}]$$
 
 - `V` = room volume (m³), `n` = air change rate (1/h, from the room's ACH
   preset: standard 0.5, kitchen 1.0, bathroom 1.5, …)
@@ -496,14 +493,16 @@ Q_V = V × n × ρ_air × c_air × (T_indoor − T_outdoor) / 3600     [W]
 −12 °C outdoor, one 5 m exterior wall U = 0.283 with a 1.5 × 1.4 m window
 U = 1.3, ACH 0.5):
 
-```
-Net wall area = 5.0×2.6 − 1.5×1.4 = 10.9 m²
-Q_T(wall)   = 0.283 × 10.9 × 1.0 × 32 =  98.7 W
-Q_T(window) = 1.3   ×  2.1 × 1.0 × 32 =  87.4 W
-V_room      = 5 × 4 × 2.6 = 52 m³
-Q_V         = 52 × 0.5 × 1.2 × 1005 × 32 / 3600 = 277.9 W
-Q_total     ≈ 464 W
-```
+$$
+\begin{aligned}
+A_\text{net} &= 5.0\times 2.6 - 1.5\times 1.4 = 10.9\ \mathrm{m^2} \\
+Q_{T,\text{wall}} &= 0.283 \times 10.9 \times 1.0 \times 32 = 98.7\ \mathrm{W} \\
+Q_{T,\text{window}} &= 1.3 \times 2.1 \times 1.0 \times 32 = 87.4\ \mathrm{W} \\
+V_\text{room} &= 5 \times 4 \times 2.6 = 52\ \mathrm{m^3} \\
+Q_V &= \frac{52 \times 0.5 \times 1.2 \times 1005 \times 32}{3600} = 277.9\ \mathrm{W} \\
+Q_\text{total} &\approx 464\ \mathrm{W}
+\end{aligned}
+$$
 
 That `Q_total` is the per-room demand bar in the Heat Balance dashboard tab.
 
@@ -512,18 +511,15 @@ That `Q_total` is the per-room demand bar in the Heat Balance dashboard tab.
 The driving temperature difference uses the **logarithmic mean**, because
 the water cools as it travels the loop:
 
-```
-ΔT = (T_supply − T_return) / ln( (T_supply − T_room) / (T_return − T_room) )
-```
+$$\Delta T = \frac{T_\text{supply} - T_\text{return}}{\ln\!\left(\dfrac{T_\text{supply} - T_\text{room}}{T_\text{return} - T_\text{room}}\right)}$$
 
 (falls back to the arithmetic mean if the denominator is tiny.)
 
 **Specific output** per square metre, then total:
 
-```
-q = B · a_B · a_T · a_U · a_D · ΔT^n     [W/m²]
-Q_zone = q × A_zone                       [W]
-```
+$$q = B \cdot a_B \cdot a_T \cdot a_U \cdot a_D \cdot \Delta T^{\,n} \quad [\mathrm{W/m^2}]$$
+
+$$Q_\text{zone} = q \times A_\text{zone} \quad [\mathrm{W}]$$
 
 | Factor | Meaning | Driven by |
 |--------|---------|-----------|
@@ -540,9 +536,7 @@ Q_zone = q × A_zone                       [W]
 
 **Surface temperature** (comfort/standards limit):
 
-```
-T_surface ≈ T_room + q / α_total      with α_total ≈ 10.8 W/(m²K)
-```
+$$T_\text{surface} \approx T_\text{room} + \frac{q}{\alpha_\text{total}} \qquad (\alpha_\text{total} \approx 10.8\ \mathrm{W/(m^2K)})$$
 
 Hard limits enforced as warnings: occupied floor **29 °C**, bathroom
 **33 °C**, peripheral/border zone **35 °C**, wall heating **40 °C**.
@@ -551,60 +545,58 @@ Hard limits enforced as warnings: occupied floor **29 °C**, bathroom
 
 **Tube length in a zone** (meander approximation):
 
-```
-L_zone ≈ A_zone / (spacing / 1000)        [m]
-L_total = L_zone + supply run + return run
-```
+$$L_\text{zone} \approx \frac{A_\text{zone}}{\text{spacing}/1000} \quad [\mathrm{m}]$$
+
+$$L_\text{total} = L_\text{zone} + L_\text{supply} + L_\text{return}$$
 
 **Mass flow rate** — how much water the circuit needs to carry its heat:
 
-```
-ṁ = Q / ( c_w × (T_supply − T_return) ) × 3600      [kg/h]
-```
+$$\dot m = \frac{Q}{c_w \cdot (T_\text{supply} - T_\text{return})} \times 3600 \quad [\mathrm{kg/h}]$$
 
 **Flow velocity** in the pipe:
 
-```
-v = (ṁ / 3600) / ( ρ_w × π × (d_i/2)² )             [m/s]
-```
+$$v = \frac{\dot m / 3600}{\rho_w \cdot \pi \,(d_i/2)^2} \quad [\mathrm{m/s}]$$
 
 **Reynolds number** (laminar vs turbulent):
 
-```
-Re = v × d_i / ν_w
-```
+$$Re = \frac{v \cdot d_i}{\nu_w}$$
 
-**Darcy friction factor** `f`:
-- `Re < 2300` (laminar): `f = 64 / Re`
-- `Re > 5000` (turbulent): Swamee–Jain
-  `f = 0.25 / [ log₁₀( ε/(3.7 d) + 5.74 / Re^0.9 ) ]²`
-- `2300 ≤ Re ≤ 5000`: linear interpolation between the two
+**Darcy friction factor** $f$:
+
+- **Laminar** ($Re < 2300$):  $f = \dfrac{64}{Re}$
+- **Turbulent** ($Re > 5000$) — Swamee–Jain:
+
+$$f = \frac{0.25}{\left[\log_{10}\!\left(\dfrac{\varepsilon}{3.7\,d} + \dfrac{5.74}{Re^{0.9}}\right)\right]^{2}}$$
+
+- **Transition** ($2300 \le Re \le 5000$): linear interpolation between the
+  laminar value at $Re = 2300$ and the turbulent value at $Re = 5000$
 
 **Pressure loss** — Darcy–Weisbach, plus a fittings surcharge (default 40 %
 of the friction loss for manifold connections, bends, valves):
 
-```
-Δp_friction = f × (L / d_i) × (ρ_w × v² / 2)        [Pa]
-Δp_total    = Δp_friction + Δp_fittings
-```
+$$\Delta p_\text{friction} = f \cdot \frac{L}{d_i} \cdot \frac{\rho_w \, v^2}{2} \quad [\mathrm{Pa}]$$
+
+$$\Delta p_\text{total} = \Delta p_\text{friction} + \Delta p_\text{fittings}$$
 
 **Worked example** (case HY-1: PE-Xa 16/13 mm, ε = 0.007 mm, L = 80 m,
 Q = 1500 W, 35 → 28 °C):
 
-```
-ṁ  = 1500 / (4186 × 7) × 3600       = 184 kg/h
-v  = (184/3600) / (992.2 × π×0.0065²) = 0.39 m/s
-Re = 0.39 × 0.013 / 6.58e-7          ≈ 7700  (turbulent)
-f  (Swamee–Jain)                     ≈ 0.034
-Δp_friction = 0.034 × (80/0.013) × (992.2 × 0.39²/2) ≈ 15 700 Pa
-Δp_fittings (40 %)                   ≈  6 300 Pa
-Δp_total                             ≈ 22 000 Pa  (≈ 22 kPa)
-```
+$$
+\begin{aligned}
+\dot m &= \frac{1500}{4186 \times 7}\times 3600 = 184\ \mathrm{kg/h} \\
+v &= \frac{184/3600}{992.2 \times \pi \times 0.0065^2} = 0.39\ \mathrm{m/s} \\
+Re &= \frac{0.39 \times 0.013}{6.58\times10^{-7}} \approx 7700 \quad (\text{turbulent}) \\
+f &\approx 0.034 \quad (\text{Swamee–Jain}) \\
+\Delta p_\text{friction} &= 0.034 \times \frac{80}{0.013} \times \frac{992.2 \times 0.39^2}{2} \approx 15{,}700\ \mathrm{Pa} \\
+\Delta p_\text{fittings} &\approx 6{,}300\ \mathrm{Pa} \quad (40\%) \\
+\Delta p_\text{total} &\approx 22{,}000\ \mathrm{Pa} \approx 22\ \mathrm{kPa}
+\end{aligned}
+$$
 
 **Hydraulic balance:** the circuit with the highest Δp is the *reference
 circuit* — its valve stays fully open and it sets the required pump head.
 Every other circuit must throttle away the difference at its manifold
-valve: `Δp_valve(i) = Δp_max − Δp(i)`. That throttling amount is what the
+valve: $\Delta p_{\text{valve},i} = \Delta p_\text{max} - \Delta p_i$. That throttling amount is what the
 Hydraulic dashboard tab plots as the lighter bar segment.
 
 ---
@@ -616,7 +608,7 @@ turn. Work in this order.
 
 ### 1. Make every zone green (output ≥ demand)
 
-If a zone is red/yellow, raise output `q = B·a_B·a_T·a_U·a_D·ΔT^n`:
+If a zone is red/yellow, raise output $q = B\cdot a_B\cdot a_T\cdot a_U\cdot a_D\cdot \Delta T^{\,n}$:
 
 | Lever | Effect | Cost / trade-off |
 |-------|--------|------------------|
