@@ -761,12 +761,21 @@ class _FloorPlanCanvasState
       if (t is SelectTool) t.onRotateDistributor();
     });
 
-    // Forward wall modifier flags to the WallDrawTool, and the Ctrl
-    // flag to the SelectTool (ADR-012 Rule 7).
+    // Forward the modifier flags to the WallDrawTool and ZoneDrawTool
+    // (Shift/Ctrl/Alt — ADR-009/010/013), and the Ctrl flag to the
+    // SelectTool (ADR-012 Rule 7).
     ref.listen<WallModifiers>(wallModifiersProvider, (_, mods) {
       final wt = _tools[DrawingTool.drawWall];
       if (wt is WallDrawTool) {
         wt.updateModifiers(
+          shift: mods.orthoSnap,
+          ctrl: mods.rectMode,
+          alt: mods.freePlacement,
+        );
+      }
+      final zt = _tools[DrawingTool.drawZone];
+      if (zt is ZoneDrawTool) {
+        zt.updateModifiers(
           shift: mods.orthoSnap,
           ctrl: mods.rectMode,
           alt: mods.freePlacement,

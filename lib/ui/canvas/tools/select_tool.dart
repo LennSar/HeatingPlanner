@@ -134,10 +134,11 @@ class SelectTool extends CanvasTool {
   /// All rooms snapshot before the drag started (for undo).
   List<Room> _rectReshapeOldRooms = const [];
 
-  /// True when hovering an endpoint handle of a rectangle-eligible room.
+  /// True when hovering an endpoint handle of a rectangle-eligible
+  /// room (ADR-012) or a corner of a rectangle-eligible zone (ADR-013).
   ///
   /// Read by the canvas to swap the cursor to the rect-crosshair when
-  /// Ctrl is held (ADR-012 Rule 8).
+  /// Ctrl is held (ADR-012 Rule 8; same affordance for zones).
   bool _hoverEndpointOnRectRoom = false;
 
   // -- Opening selection state --
@@ -198,6 +199,20 @@ class SelectTool extends CanvasTool {
 
   /// Zone snapshot captured at the start of a zone drag (for revert/undo).
   HeatingZone? _zoneAtDragStart;
+
+  // -- Zone rect-reshape state (Ctrl + corner drag, ADR-013) --
+
+  /// True when the current zone vertex drag is a rectangle reshape.
+  ///
+  /// Sampled at drag-start and held for the whole drag — releasing
+  /// Ctrl mid-drag does not switch modes (mirrors ADR-012 Rule 7).
+  bool _zoneRectReshapeMode = false;
+
+  /// Diagonally-opposite (fixed) zone corner during a rect reshape.
+  Point2D? _zoneRectAnchor;
+
+  /// Live raw cursor for the rect-reshape ghost (no commit until end).
+  Point2D? _zoneRectCursor;
 
   // -- Deferred-tap state (zone pointer-down suppresses onTap) --
 
@@ -300,7 +315,8 @@ class SelectTool extends CanvasTool {
   /// for the rect-reshape affordance (ADR-012 Rule 8).
   ///
   /// True iff Ctrl is held and the pointer is currently hovering an
-  /// endpoint handle of a wall whose room is rectangle-eligible.
+  /// endpoint handle of a wall whose room is rectangle-eligible, or a
+  /// corner of a rectangle-eligible selected zone (ADR-013).
   bool get shouldUseRectCrosshair =>
       _ctrlHeld && _hoverEndpointOnRectRoom;
 
@@ -410,6 +426,26 @@ class SelectTool extends CanvasTool {
     }
     if (anchor == null || xAdj == null || yAdj == null) return null;
     return (dragCorner: exact, anchor: anchor, xAdj: xAdj, yAdj: yAdj);
+  }
+
+  /// Returns the 4 corners of a rectangular zone [polygon] when it is
+  /// an axis-aligned rectangle (exactly 4 vertices, 2 distinct x and
+  /// 2 distinct y within 1 mm); otherwise null (ADR-013).
+  ///
+  /// Zone-polygon analogue of [rectangleCorners] (which inspects wall
+  /// segments). Used to gate the Ctrl + corner-drag rectangle reshape.
+  @visibleForTesting
+  static List<Point2D>? rectangleZoneCorners(List<Point2D> polygon) {
+    if (polygon.length != 4) return null;
+    const tol = _rectTolMm;
+    final xs = <double>[];
+    final ys = <double>[];
+    for (final p in polygon) {
+      if (!xs.any((v) => (v - p.x).abs() < tol)) xs.add(p.x);
+      if (!ys.any((v) => (v - p.y).abs() < tol)) ys.add(p.y);
+    }
+    if (xs.length != 2 || ys.length != 2) return null;
+    return List<Point2D>.from(polygon);
   }
 
   // ================================================================
@@ -591,6 +627,27 @@ class SelectTool extends CanvasTool {
           _zoneDragAnchorPoint = worldPoint;
           _zoneAtDragStart = zone;
           _zonePointerOnZone = true;
+
+          // ADR-013 / ADR-012-style: Ctrl + corner drag reshapes a
+          // rectangular zone (diagonal corner fixed, dragged corner
+          // follows). Re-sync the live key state first so a missed
+          // key-up cannot strand the gate "on".
+          _syncCtrlHeldFromHardware();
+          _zoneRectReshapeMode = false;
+          if (_ctrlHeld) {
+            final corners = rectangleZoneCorners(zone.polygon);
+            if (corners != null) {
+              final ids = identifyRectCornersAroundDrag(
+                corners,
+                zone.polygon[handleIdx],
+              );
+              if (ids != null) {
+                _zoneRectReshapeMode = true;
+                _zoneRectAnchor = ids.anchor;
+                _zoneRectCursor = ids.dragCorner;
+              }
+            }
+          }
           onStateChanged();
           return;
         }
@@ -776,7 +833,14 @@ class SelectTool extends CanvasTool {
         }
       }
       if (_zoneDragActive) {
-        _applyZoneDrag(worldPoint);
+        if (_zoneRectReshapeMode) {
+          // Ghost only — no state mutation until onDragEnd. Uses the
+          // raw cursor for a responsive preview; the grid snap is
+          // applied at commit (mirrors ADR-012 rect-reshape).
+          _zoneRectCursor = worldPoint;
+        } else {
+          _applyZoneDrag(worldPoint);
+        }
         onStateChanged();
       }
       return;
@@ -860,7 +924,11 @@ class SelectTool extends CanvasTool {
     // Zone drag end.
     if (_zoneDragAnchorPoint != null) {
       if (_zoneDragActive) {
-        _commitZoneDrag();
+        if (_zoneRectReshapeMode) {
+          _commitZoneRectReshape(worldPoint);
+        } else {
+          _commitZoneDrag();
+        }
       } else if (_deferredTap != null) {
         // Pointer moved but stayed under the 5 px threshold —
         // treat as a click and execute the deferred tap.
@@ -994,8 +1062,9 @@ class SelectTool extends CanvasTool {
   @override
   void onPointerMove(Point2D worldPoint) {
     // Track whether the pointer is hovering an endpoint handle of a
-    // rectangle-eligible room so the canvas can swap the cursor when
-    // Ctrl is held (ADR-012 Rule 8).
+    // rectangle-eligible room (ADR-012 Rule 8) or a corner of a
+    // rectangle-eligible zone (ADR-013) so the canvas can swap the
+    // cursor when Ctrl is held.
     final wasHover = _hoverEndpointOnRectRoom;
     var hovering = false;
     if (_selectedWall != null && _dragHandle == null) {
@@ -1010,6 +1079,19 @@ class SelectTool extends CanvasTool {
             hovering = true;
           }
         }
+      }
+    }
+    if (!hovering &&
+        _selectedZone != null &&
+        _zoneDragAnchorPoint == null) {
+      final zone = callbacks.currentZones
+          .where((z) => z.id == _selectedZone!.id)
+          .firstOrNull;
+      if (zone != null &&
+          zone.zoneType != ZoneType.wallHeating &&
+          rectangleZoneCorners(zone.polygon) != null &&
+          _hitTestZoneHandle(worldPoint) != null) {
+        hovering = true;
       }
     }
     _hoverEndpointOnRectRoom = hovering;
@@ -1122,6 +1204,20 @@ class SelectTool extends CanvasTool {
       return RectDrawData(
         corner1: _rectReshapeAnchor!,
         corner2: _rectReshapeCursor!,
+      );
+    }
+
+    // Zone rect-reshape ghost (Ctrl + corner drag on a rectangular
+    // zone). Shown once the drag passes the threshold; before that the
+    // normal vertex handles stay visible. Reuses the rect ghost so the
+    // preview matches Ctrl-drawing a new zone (ADR-013).
+    if (_zoneRectReshapeMode &&
+        _zoneDragActive &&
+        _zoneRectAnchor != null &&
+        _zoneRectCursor != null) {
+      return RectDrawData(
+        corner1: _zoneRectAnchor!,
+        corner2: _zoneRectCursor!,
       );
     }
 
@@ -1287,6 +1383,72 @@ class SelectTool extends CanvasTool {
     _selectedZone = zone;
   }
 
+  /// Reshape a rectangular zone from a Ctrl + corner drag (ADR-013).
+  ///
+  /// The diagonally-opposite corner ([_zoneRectAnchor]) stays fixed;
+  /// the dragged corner moves to the snapped cursor; the two adjacent
+  /// corners reposition so the zone stays an axis-aligned rectangle —
+  /// the same model as drawing a new rectangular zone with Ctrl
+  /// (ZoneDrawTool) and as ADR-012's room reshape.
+  ///
+  /// Per ADR-013 zones use **pure grid snap** (Alt-aware, matching the
+  /// existing zone vertex drag) — no `snapRectCorner`,
+  /// `snapRectDimension`, or wall-endpoint snap. Rejects (with a toast,
+  /// no mutation) when the result is < 100 mm on a side or any corner
+  /// leaves a valid room (ADR-006).
+  void _commitZoneRectReshape(Point2D rawCursor) {
+    final anchor = _zoneRectAnchor;
+    final zone0 = _zoneAtDragStart;
+    if (anchor == null || zone0 == null) return;
+
+    final zone = callbacks.currentZones
+            .where((z) => z.id == zone0.id)
+            .firstOrNull ??
+        zone0;
+
+    final cNew = SnapService.snapToGrid(
+      rawCursor,
+      callbacks.currentGridSpacingMm,
+    );
+
+    // Minimum-dimension validation (mirror ADR-012 Rule 6).
+    final w = (cNew.x - anchor.x).abs();
+    final h = (cNew.y - anchor.y).abs();
+    if (w < _minLengthMm || h < _minLengthMm) {
+      callbacks.showToast('Zone too small (min 100×100 mm)');
+      return;
+    }
+
+    final tlx = math.min(anchor.x, cNew.x);
+    final tly = math.min(anchor.y, cNew.y);
+    final brx = math.max(anchor.x, cNew.x);
+    final bry = math.max(anchor.y, cNew.y);
+    final newPolygon = [
+      Point2D(x: tlx, y: tly),
+      Point2D(x: brx, y: tly),
+      Point2D(x: brx, y: bry),
+      Point2D(x: tlx, y: bry),
+    ];
+
+    // ADR-006: every corner must remain in a valid room.
+    if (!newPolygon.every((p) => _isZonePointValid(p, zone))) {
+      callbacks.showToast('Zone must stay within valid rooms');
+      return;
+    }
+
+    final newZone = zone.copyWith(polygon: newPolygon);
+    callbacks.updateZone(newZone);
+    if (zone != newZone) {
+      undoRedo.execute(_MoveZoneCommand(
+        oldZone: zone,
+        newZone: newZone,
+        update: callbacks.updateZone,
+        label: 'Resize zone',
+      ));
+    }
+    _selectedZone = newZone;
+  }
+
   void _clearZoneDragState() {
     _zoneHandleDragIndex = null;
     _zoneDragActive = false;
@@ -1294,6 +1456,9 @@ class SelectTool extends CanvasTool {
     _zoneAtDragStart = null;
     _deferredTap = null;
     _zonePointerOnZone = false;
+    _zoneRectReshapeMode = false;
+    _zoneRectAnchor = null;
+    _zoneRectCursor = null;
   }
 
   /// Valid rooms for a zone drag: primary room + door-adjacent rooms (ADR-006).

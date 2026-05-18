@@ -8,10 +8,12 @@ import '../../../data/models/point2d.dart';
 import '../../../data/models/room.dart';
 import '../painters/interaction_data.dart';
 import 'editor_callbacks.dart';
+import 'modifier_draw_tool.dart';
 import 'snap_service.dart';
 import 'tool_base.dart';
 
-/// Tool for drawing heating zone polygons by successive clicks.
+/// Tool for drawing heating zone polygons by successive clicks,
+/// or — with Ctrl held — by dragging a rectangle corner to corner.
 ///
 /// Interaction flow (UI/UX §5.3 + ADR-006):
 ///  1. First click is only accepted inside a room polygon. That
@@ -26,10 +28,27 @@ import 'tool_base.dart';
 ///  5. While the cursor is outside all valid placement areas, a
 ///     red prohibition indicator is painted near the cursor.
 ///
+/// Desktop modifier vocabulary (shared [ModifierDrawTool] flags,
+/// mirroring [WallDrawTool] — see `DECISIONS.md` ADR-013):
+/// - **Shift** ([orthoSnap]): constrain the ghost edge from the
+///   previous vertex (polygon mode) or the rect drag endpoint to
+///   0° or 90°.
+/// - **Ctrl** ([rectMode]): drag from corner A to corner B to
+///   commit a four-vertex rectangular zone in one gesture.
+/// - **Alt** ([freePlacement]): skip grid snap for the current
+///   vertex / corner; the raw world coordinate is used instead.
+///
+/// Per ADR-013 the rectangle corners are **not** passed through
+/// [SnapService.snapRectCorner] / [SnapService.snapRectDimension]
+/// (those are wall/room-graph features). The §5.3 / ADR-006
+/// vertex-in-room validation applies to every rectangle corner,
+/// and both polygon and rectangle closes commit through the same
+/// [_commitZone] path.
+///
 /// On close the tool calls [EditorCallbacks.commitZone] with a
 /// [HeatingZone] filled with defaults (tubeSpacingMm 150,
 /// meander, borderDistanceMm 100, floorHeating).
-class ZoneDrawTool extends CanvasTool {
+class ZoneDrawTool extends CanvasTool with ModifierDrawTool {
   /// Creates a [ZoneDrawTool].
   ZoneDrawTool({
     required super.callbacks,
@@ -48,8 +67,21 @@ class ZoneDrawTool extends CanvasTool {
   /// The room where the first vertex was placed (ADR-006).
   Room? _primaryRoom;
 
+  // ---- Rect-mode drag state (Ctrl, ADR-013) ----
+
+  /// Snapped drag-start corner of the current rectangle, or null.
+  Point2D? _rectDragStart;
+
+  /// Snapped (and ortho-constrained) opposite corner during the
+  /// current rectangle drag, or null.
+  Point2D? _rectDragCurrent;
+
   /// Minimum number of vertices needed to close a polygon.
   static const int _minVertices = 3;
+
+  /// Minimum rectangle side length in mm (ADR-013, mirrors
+  /// [WallDrawTool]'s wall-length minimum).
+  static const double _minRectSideMm = 100.0;
 
   @override
   String get name => 'Draw Zone';
@@ -59,8 +91,19 @@ class ZoneDrawTool extends CanvasTool {
   /// 15 screen-px / zoom (px per mm) = world-space mm threshold.
   double get _closeThresholdMm => 15.0 / callbacks.currentZoom;
 
+  /// Grid-snap [raw] unless Alt ([freePlacement]) is held, in which
+  /// case the raw world coordinate is used.
+  ///
+  /// Zones never snap to wall endpoints/interiors (unlike
+  /// [WallDrawTool]'s `_snap`), so this uses pure grid snap.
+  Point2D _snapZone(Point2D raw) => freePlacement
+      ? raw
+      : SnapService.snapToGrid(raw, callbacks.currentGridSpacingMm);
+
   @override
   void onTap(Point2D worldPoint, PointerDeviceKind deviceKind) {
+    if (rectMode) return; // rect mode uses drag, not tap
+
     // Detect double-tap by comparing successive timestamps.
     final now = DateTime.now();
     final isDoubleTap = _lastTapTime != null &&
@@ -71,11 +114,12 @@ class ZoneDrawTool extends CanvasTool {
     // Clear any previous validation error on new user action.
     _hasValidationError = false;
 
-    // Snap vertex to grid.
-    final snapped = SnapService.snapToGrid(
-      worldPoint,
-      callbacks.currentGridSpacingMm,
-    );
+    // Grid snap (Alt-aware), then ortho-constrain from the previous
+    // vertex when Shift is held.
+    var snapped = _snapZone(worldPoint);
+    if (_vertices.isNotEmpty) {
+      snapped = applyOrtho(_vertices.last, snapped);
+    }
 
     // Double-tap closes when enough committed vertices exist.
     if (isDoubleTap && _vertices.length >= _minVertices) {
@@ -110,9 +154,99 @@ class ZoneDrawTool extends CanvasTool {
     onStateChanged();
   }
 
+  // ---- Rect-mode drag (Ctrl, ADR-013) ----
+
+  @override
+  void onPointerDown(Point2D worldPoint, int buttons) {
+    if (!rectMode) return;
+    // Grid snap only — ADR-013 does NOT apply snapRectCorner.
+    _rectDragStart = _snapZone(worldPoint);
+    _rectDragCurrent = _rectDragStart;
+    onStateChanged();
+  }
+
+  @override
+  void onDragUpdate(Point2D worldPoint) {
+    if (!rectMode || _rectDragStart == null) return;
+    // Grid snap → ortho. No snapRectCorner / snapRectDimension.
+    _rectDragCurrent =
+        applyOrtho(_rectDragStart!, _snapZone(worldPoint));
+    onStateChanged();
+  }
+
+  @override
+  void onDragEnd(Point2D worldPoint) {
+    if (!rectMode) return;
+    final start = _rectDragStart;
+    if (start == null) return;
+
+    // Grid snap → ortho (ADR-013: no snapRectCorner/Dimension).
+    final end = applyOrtho(start, _snapZone(worldPoint));
+
+    final w = (end.x - start.x).abs();
+    final h = (end.y - start.y).abs();
+    if (w < _minRectSideMm || h < _minRectSideMm) {
+      callbacks.showToast(
+        'Zone rectangle too small — both sides must be ≥ 100 mm',
+      );
+      _reset();
+      return;
+    }
+
+    // Primary room = the room containing the drag-start corner
+    // (§5.3: "the room where the first vertex was placed").
+    final primaryRoom = _findRoomAt(start);
+    if (primaryRoom == null) {
+      callbacks.showToast('Draw the zone inside a room.');
+      _reset();
+      return;
+    }
+    _primaryRoom = primaryRoom;
+
+    final minX = start.x < end.x ? start.x : end.x;
+    final minY = start.y < end.y ? start.y : end.y;
+    final maxX = start.x > end.x ? start.x : end.x;
+    final maxY = start.y > end.y ? start.y : end.y;
+    final corners = <Point2D>[
+      Point2D(x: minX, y: minY),
+      Point2D(x: maxX, y: minY),
+      Point2D(x: maxX, y: maxY),
+      Point2D(x: minX, y: maxY),
+    ];
+
+    // §5.3 / ADR-006: every corner must lie inside the primary
+    // room or a door-connected adjacent room.
+    if (!corners.every(_isValidPosition)) {
+      callbacks.showToast(
+        'Zone rectangle must stay inside the room '
+        '(or a door-connected room).',
+      );
+      _reset();
+      return;
+    }
+
+    _commitZone(corners, primaryRoom);
+    _reset();
+  }
+
   @override
   void onPointerMove(Point2D worldPoint) {
-    _current = worldPoint;
+    if (rectMode) {
+      // Keep the rect ghost fresh; the active drag is driven by
+      // onDragUpdate (defensive parity with WallDrawTool).
+      if (_rectDragStart != null) {
+        _rectDragCurrent =
+            applyOrtho(_rectDragStart!, _snapZone(worldPoint));
+      }
+      _cursorOutsideValidArea = !_isValidPosition(worldPoint);
+      onStateChanged();
+      return;
+    }
+    // Polygon mode: preview the snapped (and ortho-constrained)
+    // vertex so the ghost edge matches where the click will land.
+    _current = _vertices.isEmpty
+        ? worldPoint
+        : applyOrtho(_vertices.last, _snapZone(worldPoint));
     _cursorOutsideValidArea = !_isValidPosition(worldPoint);
     onStateChanged();
   }
@@ -124,6 +258,15 @@ class ZoneDrawTool extends CanvasTool {
 
   @override
   InteractionData? getInteractionData() {
+    // Rect-mode ghost reuses the WallDrawTool rectangle painter.
+    if (rectMode &&
+        _rectDragStart != null &&
+        _rectDragCurrent != null) {
+      return RectDrawData(
+        corner1: _rectDragStart!,
+        corner2: _rectDragCurrent!,
+      );
+    }
     // Show the prohibition indicator even before any vertex is placed,
     // but don't return data when the cursor is inside a valid area and
     // no polygon has started yet (nothing useful to draw).
@@ -217,11 +360,18 @@ class ZoneDrawTool extends CanvasTool {
       return;
     }
 
-    // Build the zone with spec-required defaults.
+    _commitZone(List<Point2D>.from(_vertices), parentRoom);
+    _reset();
+  }
+
+  /// Commits a zone [polygon] for [parentRoom] with the spec-required
+  /// defaults. Shared by the polygon-close and rectangle-commit paths
+  /// (ADR-013: "both commit through the existing zone-commit path").
+  void _commitZone(List<Point2D> polygon, Room parentRoom) {
     final zone = HeatingZone(
       id: IdGenerator.newId(),
       roomId: parentRoom.id,
-      polygon: List<Point2D>.from(_vertices),
+      polygon: polygon,
       tubeSpacingMm: 150,
       tubeTypeId: callbacks.defaultTubeTypeId,
       flooringMaterialId: callbacks.defaultFlooringMaterialId,
@@ -231,7 +381,6 @@ class ZoneDrawTool extends CanvasTool {
     );
 
     callbacks.commitZone(zone);
-    _reset();
   }
 
   void _reset() {
@@ -241,6 +390,8 @@ class ZoneDrawTool extends CanvasTool {
     _cursorOutsideValidArea = false;
     _primaryRoom = null;
     _lastTapTime = null;
+    _rectDragStart = null;
+    _rectDragCurrent = null;
     onStateChanged();
   }
 }

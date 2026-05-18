@@ -541,3 +541,117 @@ require complex per-wall heuristics (fragile).
 Applies only to `SelectTool` endpoint handle drag. Mid-handle drag, wall
 selection, multi-select, and marquee select are unaffected. Wall *drawing*
 modifier keys (ADR-009 / ADR-010) are unchanged.
+
+---
+
+## ADR-013 — Heating Zone tool gains the desktop modifier vocabulary
+
+**What.**
+The Heating Zone tool (`ZoneDrawTool`), previously click-to-place polygon
+only, gains the same Shift / Ctrl / Alt desktop modifier vocabulary that
+`WallDrawTool` already exposes (UI/UX §5.3, agent-ui-ux.md §8):
+
+| Modifier | Flag            | Effect on the zone tool |
+|----------|-----------------|-------------------------|
+| **Shift** | `orthoSnap`     | Constrain the ghost edge from the previous vertex (polygon mode) or the rect drag endpoint to 0°/90°. |
+| **Ctrl**  | `rectMode`      | Drag corner-to-corner to commit a four-vertex rectangular zone in one gesture. |
+| **Alt**   | `freePlacement` | Disable grid snap for the current vertex/corner; use the raw world coordinate. |
+
+**Why.**
+Rooms are overwhelmingly rectangular, so drawing a zone vertex-by-vertex is
+tedious and error-prone where a single Ctrl-drag suffices. Keeping the
+modifier vocabulary identical to wall drawing means one mental model for the
+whole canvas. The shared behaviour is factored into a `ModifierDrawTool`
+mixin so the flag-tracking and ortho/grid-snap logic exist once, not copied
+into each tool (mirrors the wall/room rect-mode of ADR-009/010/012).
+
+Zone rectangles deliberately do **not** reuse the wall rect-mode corner/
+dimension snapping. `SnapService.snapRectCorner` and `snapRectDimension`
+exist to deduplicate shared *walls* and match adjacent *room* dimensions
+(ADR-009/010) — neither concept applies to a zone polygon, which carries no
+wall-graph ownership and no shared-edge promotion. Forcing a zone corner
+onto an unrelated room corner would silently distort the heated area.
+
+**Rules.**
+
+1. **Shared modifier tracking.** `ZoneDrawTool` mixes in `ModifierDrawTool`
+   and is fed by the existing `wallModifiersProvider` listener in
+   `FloorPlanCanvas` — the same path that already drives `WallDrawTool` and
+   `SelectTool`. No tool re-implements flag tracking or the ortho helper.
+
+2. **Shift — ortho.** With ≥ 1 committed vertex, the ghost edge from the
+   last vertex constrains to H or V via `ModifierDrawTool.applyOrtho`
+   (axis closest to the cursor wins). In rect mode the drag endpoint is
+   ortho-constrained relative to the drag-start corner. Same algorithm as
+   wall drawing.
+
+3. **Alt — free placement.** The current vertex/corner skips grid snap and
+   uses the raw world coordinate. Zones never snap to wall endpoints or
+   interiors, so the non-Alt path is pure grid snap
+   (`SnapService.snapToGrid`), never `SnapService.snap`.
+
+4. **Rect-mode snap pipeline excludes corner/dimension snap.** In rect mode
+   both the drag-start (`onPointerDown`) and drag-end (`onDragEnd`) corners
+   pass through grid snap (Alt-aware) then ortho **only**.
+   `SnapService.snapRectCorner` and `SnapService.snapRectDimension` are
+   **not** applied (unlike ADR-009 Rule 1 / ADR-010 for walls).
+
+5. **Commit path is shared.** Both the polygon close (click-near-first /
+   double-click) and the rectangle drag-end commit through one
+   `_commitZone(polygon, primaryRoom)` helper that builds the `HeatingZone`
+   with the spec defaults (tubeSpacing 150 mm, meander, border 100 mm,
+   floor heating) and calls `EditorCallbacks.commitZone`. The rectangle is
+   a 4-vertex polygon `[tl, tr, br, bl]`. Minimum side length is 100 mm
+   (mirrors `WallDrawTool`'s wall-length minimum); a smaller drag is
+   discarded with a toast.
+
+6. **Vertex-in-room validation still applies to rect corners.** §5.3 /
+   ADR-006 validation is enforced for every rectangle corner exactly as
+   for polygon vertices: the primary room is the room containing the
+   drag-start corner; all four corners must lie inside the primary room
+   **or** a door-connected adjacent room (`_isValidPosition` over
+   `_validRooms()`). A rectangle that fails validation, has no primary
+   room, or is too small is rejected with a toast and committed nothing.
+
+7. **Ctrl + corner drag reshapes an existing rectangular zone
+   (`SelectTool`).** This is the editing counterpart of Rule 5, and the
+   zone analogue of ADR-012's room reshape: with a floor zone selected,
+   Ctrl-dragging one of its vertex handles reshapes the zone as a
+   rectangle — the diagonally-opposite corner is the fixed anchor, the
+   dragged corner follows the cursor, and the two adjacent corners
+   reposition so the zone stays an axis-aligned rectangle.
+
+   - **Eligibility.** `SelectTool.rectangleZoneCorners` — the polygon
+     has exactly 4 vertices forming an axis-aligned rectangle (2 distinct
+     x, 2 distinct y within 1 mm). Non-rectangular zones fall back to
+     normal single-vertex drag when Ctrl is held.
+   - **Ctrl sampling.** `_ctrlHeld` is re-synced from the live hardware
+     key state at drag-start and held for the whole drag (mirrors
+     ADR-012 Rule 7). The corner/anchor identification reuses ADR-012's
+     `identifyRectCornersAroundDrag`.
+   - **Snap pipeline.** Pure grid snap only (Alt-aware), exactly as the
+     existing single-vertex zone drag and Rule 4 above —
+     **no** `snapRectCorner` / `snapRectDimension` / wall-endpoint snap,
+     unlike ADR-012's room reshape.
+   - **Ghost / commit.** No state mutates during the drag; a
+     `RectDrawData` ghost (the same painter as Ctrl-drawing a new zone)
+     previews from anchor to raw cursor. On release the snapped
+     rectangle is committed via a single `_MoveZoneCommand`
+     ("Resize zone") so one Ctrl+Z reverts it.
+   - **Validation.** Min 100×100 mm and the ADR-006 vertex-in-room rule
+     (`_isZonePointValid`) apply to all four new corners; failure
+     rejects with a toast and mutates nothing.
+   - **Cursor.** Hovering a corner of a rectangle-eligible selected zone
+     while Ctrl is held swaps to the rect-crosshair (same affordance as
+     ADR-012 Rule 8; `shouldUseRectCrosshair`).
+
+**Scope.**
+Applies to `ZoneDrawTool` (Rules 1–6) and `SelectTool` floor-zone vertex
+drag (Rule 7). Wall-zone placement (`WallZonePlaceTool`), polygon-only
+behaviour when no modifier is held, non-rectangular zone vertex drag, and
+the wall/room rect modes (ADR-009/010/012) are unchanged.
+
+**Verification.**
+`flutter analyze` clean; ZDT-1…ZDT-4, WDT-1…WDT-12 and the existing
+SelectTool ST / ST-RR suites pass after the `ModifierDrawTool` extraction
+and the zone-reshape addition.

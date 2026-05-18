@@ -7,6 +7,7 @@ import '../../../data/models/room.dart';
 import '../../../data/models/wall_segment.dart';
 import '../painters/interaction_data.dart';
 import 'editor_callbacks.dart';
+import 'modifier_draw_tool.dart';
 import 'room_detection.dart';
 import 'snap_service.dart';
 import 'tool_base.dart';
@@ -18,14 +19,14 @@ import 'undo_redo_service.dart';
 /// the wall. The endpoint becomes the next start (chaining).
 /// Escape cancels the current segment.
 ///
-/// Modifier key behaviour:
-/// - **Shift** (`_orthoSnap`): constrain endpoint to H or V axis
+/// Modifier key behaviour (shared [ModifierDrawTool] flags):
+/// - **Shift** ([orthoSnap]): constrain endpoint to H or V axis
 ///   from the anchor, whichever is closer to the cursor.
-/// - **Ctrl** (`_rectMode`): drag from corner A to corner B and
+/// - **Ctrl** ([rectMode]): drag from corner A to corner B and
 ///   commit four wall segments forming a closed rectangle.
-/// - **Alt** (`_freePlacement`): skip grid snap for the current
+/// - **Alt** ([freePlacement]): skip grid snap for the current
 ///   point; the raw world coordinate is used instead.
-class WallDrawTool extends CanvasTool {
+class WallDrawTool extends CanvasTool with ModifierDrawTool {
   /// Creates a [WallDrawTool].
   WallDrawTool({
     required super.callbacks,
@@ -44,17 +45,6 @@ class WallDrawTool extends CanvasTool {
 
   /// Snap type for the current cursor position.
   SnapType? _currentSnapType;
-
-  // ---- Modifier flags ----
-
-  /// Shift key: constrain ghost-line endpoint to 0° or 90°.
-  bool _orthoSnap = false;
-
-  /// Ctrl key: rectangle mode (drag four walls at once).
-  bool _rectMode = false;
-
-  /// Alt key: disable grid snap; use raw world coordinate.
-  bool _freePlacement = false;
 
   // ---- Rect-mode drag state ----
   Point2D? _dragStart;
@@ -98,30 +88,16 @@ class WallDrawTool extends CanvasTool {
   @override
   String get name => 'Draw Wall';
 
-  // ---- Modifier key tracking ----
-
-  /// Update modifier flags from a keyboard event.
-  ///
-  /// Call on both key-down and key-up so flags stay in sync.
-  void updateModifiers({
-    required bool shift,
-    required bool ctrl,
-    required bool alt,
-  }) {
-    _orthoSnap = shift;
-    _rectMode = ctrl;
-    _freePlacement = alt;
-    onStateChanged();
-  }
-
   // ---- Snap helper ----
 
   /// Snap [worldPoint] according to active modifier flags.
   ///
-  /// - Alt → raw point (no grid snap, no endpoint snap).
-  /// - Otherwise → normal [SnapService.snap].
+  /// - Alt ([freePlacement]) → raw point (no grid snap, no
+  ///   endpoint snap).
+  /// - Otherwise → normal [SnapService.snap] (endpoint / wall /
+  ///   grid snap).
   Point2D _snap(Point2D worldPoint) {
-    if (_freePlacement) return worldPoint;
+    if (freePlacement) return worldPoint;
     final result = SnapService.snap(
       worldPoint,
       callbacks.currentWalls,
@@ -131,28 +107,11 @@ class WallDrawTool extends CanvasTool {
     return result.point;
   }
 
-  /// Apply ortho constraint to [endpoint] relative to [anchor].
-  ///
-  /// If Δx ≥ Δy the endpoint is constrained to the same Y as
-  /// the anchor (horizontal). Otherwise the same X (vertical).
-  Point2D _ortho(Point2D anchor, Point2D endpoint) {
-    if (!_orthoSnap) return endpoint;
-    final dx = (endpoint.x - anchor.x).abs();
-    final dy = (endpoint.y - anchor.y).abs();
-    if (dx >= dy) {
-      // Horizontal: lock Y.
-      return Point2D(x: endpoint.x, y: anchor.y);
-    } else {
-      // Vertical: lock X.
-      return Point2D(x: anchor.x, y: endpoint.y);
-    }
-  }
-
   // ---- CanvasTool overrides ----
 
   @override
   void onPointerDown(Point2D worldPoint, int buttons) {
-    if (!_rectMode) return;
+    if (!rectMode) return;
     // Grid snap then corner snap (ADR-009 §Rule 1).
     _dragStart = SnapService.snapRectCorner(
       _snap(worldPoint),
@@ -165,9 +124,9 @@ class WallDrawTool extends CanvasTool {
 
   @override
   void onDragUpdate(Point2D worldPoint) {
-    if (!_rectMode || _dragStart == null) return;
+    if (!rectMode || _dragStart == null) return;
     // Grid snap → ortho → corner snap.
-    final orthoSnapped = _ortho(_dragStart!, _snap(worldPoint));
+    final orthoSnapped = applyOrtho(_dragStart!, _snap(worldPoint));
     _currentSnapped = SnapService.snapRectCorner(
       orthoSnapped,
       callbacks.currentWalls,
@@ -178,7 +137,7 @@ class WallDrawTool extends CanvasTool {
 
   @override
   void onDragEnd(Point2D worldPoint) {
-    if (!_rectMode) return;
+    if (!rectMode) return;
     final start = _dragStart;
     _dragStart = null;
     if (start == null) return;
@@ -188,7 +147,7 @@ class WallDrawTool extends CanvasTool {
     final end = SnapService.snapRectDimension(
       start,
       SnapService.snapRectCorner(
-        _ortho(start, _snap(worldPoint)),
+        applyOrtho(start, _snap(worldPoint)),
         callbacks.currentWalls,
         callbacks.currentGridSpacingMm,
       ),
@@ -302,9 +261,9 @@ class WallDrawTool extends CanvasTool {
     Point2D worldPoint,
     PointerDeviceKind deviceKind,
   ) {
-    if (_rectMode) return; // rect mode uses drag, not tap
+    if (rectMode) return; // rect mode uses drag, not tap
 
-    final snapped = _ortho(
+    final snapped = applyOrtho(
       _startPoint ?? worldPoint,
       _snap(worldPoint),
     );
@@ -355,11 +314,11 @@ class WallDrawTool extends CanvasTool {
 
   @override
   void onPointerMove(Point2D worldPoint) {
-    if (_rectMode) {
+    if (rectMode) {
       if (_dragStart != null) {
         // Mirror onDragUpdate: grid snap → ortho → corner snap so the
         // ghost rectangle preview matches what will be committed.
-        final orthoSnapped = _ortho(_dragStart!, _snap(worldPoint));
+        final orthoSnapped = applyOrtho(_dragStart!, _snap(worldPoint));
         _currentSnapped = SnapService.snapRectCorner(
           orthoSnapped,
           callbacks.currentWalls,
@@ -373,7 +332,7 @@ class WallDrawTool extends CanvasTool {
         callbacks.currentGridSpacingMm,
       );
       _currentSnapped = _startPoint != null
-          ? _ortho(_startPoint!, snap.point)
+          ? applyOrtho(_startPoint!, snap.point)
           : snap.point;
       _currentSnapType = snap.type;
     }
@@ -391,35 +350,18 @@ class WallDrawTool extends CanvasTool {
 
   @override
   InteractionData? getInteractionData() {
-    if (_rectMode && _dragStart != null && _currentSnapped != null) {
+    if (rectMode && _dragStart != null && _currentSnapped != null) {
       return RectDrawData(corner1: _dragStart!, corner2: _currentSnapped!);
     }
     if (_startPoint == null || _currentSnapped == null) {
       return null;
     }
 
-    // Build ortho guideline when Shift is held.
-    // The guideline extends 20 000 mm (20 m) in each direction from the
-    // anchor along the constrained axis, ensuring it spans the visible canvas
-    // at any zoom level.
-    Point2D? orthoStart;
-    Point2D? orthoEnd;
-    if (_orthoSnap) {
-      const extent = 20000.0;
-      final anchor = _startPoint!;
-      final cur = _currentSnapped!;
-      final dx = (cur.x - anchor.x).abs();
-      final dy = (cur.y - anchor.y).abs();
-      if (dx >= dy) {
-        // Horizontal axis (Y locked to anchor.y).
-        orthoStart = Point2D(x: anchor.x - extent, y: anchor.y);
-        orthoEnd = Point2D(x: anchor.x + extent, y: anchor.y);
-      } else {
-        // Vertical axis (X locked to anchor.x).
-        orthoStart = Point2D(x: anchor.x, y: anchor.y - extent);
-        orthoEnd = Point2D(x: anchor.x, y: anchor.y + extent);
-      }
-    }
+    // Build ortho guideline when Shift is held (shared helper —
+    // extends 20 m each way along the constrained axis so it spans
+    // the visible canvas at any zoom level).
+    final (orthoStart, orthoEnd) =
+        orthoGuideline(_startPoint!, _currentSnapped!);
 
     return GhostLineData(
       startPoint: _startPoint!,
