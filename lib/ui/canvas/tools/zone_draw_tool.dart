@@ -7,10 +7,12 @@ import '../../../data/models/heating_zone.dart';
 import '../../../data/models/point2d.dart';
 import '../../../data/models/room.dart';
 import '../painters/interaction_data.dart';
+import 'create_zone_command.dart';
 import 'editor_callbacks.dart';
 import 'modifier_draw_tool.dart';
 import 'snap_service.dart';
 import 'tool_base.dart';
+import 'undo_redo_service.dart';
 
 /// Tool for drawing heating zone polygons by successive clicks,
 /// or — with Ctrl held — by dragging a rectangle corner to corner.
@@ -63,7 +65,12 @@ class ZoneDrawTool extends CanvasTool with ModifierDrawTool {
   ZoneDrawTool({
     required super.callbacks,
     required super.onStateChanged,
+    required this.undoRedo,
   });
+
+  /// Undo/redo service. Every zone created by this tool is committed
+  /// through a [CreateZoneCommand] so it is revertible (ADR-014).
+  final UndoRedoService undoRedo;
 
   final List<Point2D> _vertices = [];
   Point2D? _current;
@@ -442,7 +449,15 @@ class ZoneDrawTool extends CanvasTool with ModifierDrawTool {
       zoneType: ZoneType.floorHeating,
     );
 
-    callbacks.commitZone(zone);
+    // ADR-014: route every zone-creation gesture (polygon close,
+    // Ctrl-drag rectangle, ADR-013 Ctrl+Shift+click fill-room)
+    // through the shared command so one Ctrl+Z reverts it.
+    undoRedo.execute(CreateZoneCommand(
+      zone: zone,
+      add: callbacks.commitZone,
+      remove: callbacks.removeZone,
+      label: callbacks.l10n.undo_createZone,
+    ));
   }
 
   void _reset() {

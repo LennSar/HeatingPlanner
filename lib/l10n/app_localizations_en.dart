@@ -1181,6 +1181,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get undo_deleteDistributor => 'Delete distributor';
 
   @override
+  String get undo_createZone => 'Create zone';
+
+  @override
+  String get undo_createWallZone => 'Create wall zone';
+
+  @override
   String canvas_defaultRoomName(int roomNumber) {
     return 'Room $roomNumber';
   }

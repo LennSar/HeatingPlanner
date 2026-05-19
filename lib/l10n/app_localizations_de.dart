@@ -1184,6 +1184,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get undo_deleteDistributor => 'Verteiler löschen';
 
   @override
+  String get undo_createZone => 'Zone erstellen';
+
+  @override
+  String get undo_createWallZone => 'Wandzone erstellen';
+
+  @override
   String canvas_defaultRoomName(int roomNumber) {
     return 'Raum $roomNumber';
   }

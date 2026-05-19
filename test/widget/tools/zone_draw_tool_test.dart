@@ -10,6 +10,9 @@
 //   ZDT-3  Tapping outside the active room does not add a vertex; the zone
 //           is not committed after a closure attempt.
 //   ZDT-4  Escape before closing discards all vertices (no zone added).
+//   ZDT-5  Creating a zone (polygon / rectangle / fill-room) is undoable —
+//           one Ctrl+Z removes the committed zone (ADR-014).
+//   ZDT-6  Redo after undo re-adds the identical zone (ADR-014).
 //
 // The close-threshold for the tool is 15 px / zoom. Since currentZoom = 1.0
 // the threshold is 15 mm.  All coordinates use the 100 mm grid.
@@ -24,16 +27,20 @@ import 'package:heating_planner/data/models/point2d.dart';
 import 'package:heating_planner/data/models/room.dart';
 import 'package:heating_planner/data/models/wall_segment.dart';
 import 'package:heating_planner/data/models/window_element.dart';
+import 'package:heating_planner/l10n/app_localizations.dart';
+import 'package:heating_planner/l10n/app_localizations_en.dart';
 import 'package:heating_planner/ui/canvas/tools/editor_callbacks.dart';
+import 'package:heating_planner/ui/canvas/tools/undo_redo_service.dart';
 import 'package:heating_planner/ui/canvas/tools/zone_draw_tool.dart';
 
 // ── Stub EditorCallbacks ─────────────────────────────────────────────────────
 
 class _StubCallbacks implements EditorCallbacks {
-  // Tool tests don't exercise localized labels; throw to flag any
-  // future test that needs them.
+  // Real English localizations — ADR-014 zone-creation commands read
+  // `l10n.undo_createZone` at construction time (same pattern as
+  // select_tool_test.dart).
   @override
-  Never get l10n => throw UnimplementedError();
+  final AppLocalizations l10n = AppLocalizationsEn();
 
   final List<Room> _rooms;
   final List<HeatingZone> _zones = [];
@@ -155,9 +162,11 @@ const _testRoom = Room(
 
 // ── Helper ────────────────────────────────────────────────────────────────────
 
-ZoneDrawTool _makeTool(_StubCallbacks cb) => ZoneDrawTool(
+ZoneDrawTool _makeTool(_StubCallbacks cb, [UndoRedoService? undo]) =>
+    ZoneDrawTool(
       callbacks: cb,
       onStateChanged: () {},
+      undoRedo: undo ?? UndoRedoService(),
     );
 
 /// Taps a sequence of world points and then taps the first point again to
@@ -170,6 +179,28 @@ void _tapAndClose(ZoneDrawTool tool, List<Point2D> pts) {
   // Close by tapping exactly on the first point.
   tool.onTap(pts.first, PointerDeviceKind.mouse);
 }
+
+/// The three zone-creation gestures, each committing exactly one zone
+/// inside [_testRoom] (ADR-013 / ADR-014). Used by ZDT-5 and ZDT-6 so
+/// undo/redo is verified identically for every path.
+Map<String, void Function(ZoneDrawTool)> _zoneCreators() => {
+      'polygon': (tool) => _tapAndClose(tool, const [
+            Point2D(x: 1000, y: 1000),
+            Point2D(x: 4000, y: 1000),
+            Point2D(x: 4000, y: 4000),
+          ]),
+      'rectangle': (tool) {
+        // Ctrl held → rect mode; drag corner to corner.
+        tool.updateModifiers(shift: false, ctrl: true, alt: false);
+        tool.onPointerDown(const Point2D(x: 1000, y: 1000), kPrimaryButton);
+        tool.onDragEnd(const Point2D(x: 5000, y: 4000));
+      },
+      'fill-room': (tool) {
+        // Ctrl+Shift held → fill-room on a no-drag pointer-up (ADR-013).
+        tool.updateModifiers(shift: true, ctrl: true, alt: false);
+        tool.onPointerUp(const Point2D(x: 2000, y: 2000));
+      },
+    };
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -271,4 +302,56 @@ void main() {
       expect(cb.currentZones, hasLength(1));
     },
   );
+
+  // ZDT-5 ───────────────────────────────────────────────────────────────────
+  //
+  // ADR-014: every zone-creation gesture is wrapped in a CreateZoneCommand,
+  // so a single undo() removes the committed zone — for the polygon,
+  // rectangle, and fill-room paths alike.
+
+  group('ZDT-5: zone creation is undoable (ADR-014)', () {
+    _zoneCreators().forEach((name, create) {
+      test('$name — create then undo removes the zone', () {
+        final cb = _StubCallbacks(rooms: [_testRoom]);
+        final undo = UndoRedoService();
+        final tool = _makeTool(cb, undo);
+
+        create(tool);
+        expect(cb.currentZones, hasLength(1),
+            reason: '$name path should commit exactly one zone');
+        expect(undo.canUndo, isTrue,
+            reason: '$name commit should push one undo entry');
+
+        undo.undo();
+        expect(cb.currentZones, isEmpty,
+            reason: 'undo should remove the $name zone');
+      });
+    });
+  });
+
+  // ZDT-6 ───────────────────────────────────────────────────────────────────
+  //
+  // ADR-014: redo re-adds the identical zone record (same id + polygon).
+
+  group('ZDT-6: redo re-adds the identical zone (ADR-014)', () {
+    _zoneCreators().forEach((name, create) {
+      test('$name — undo then redo restores the same zone', () {
+        final cb = _StubCallbacks(rooms: [_testRoom]);
+        final undo = UndoRedoService();
+        final tool = _makeTool(cb, undo);
+
+        create(tool);
+        final created = cb.currentZones.single;
+
+        undo.undo();
+        expect(cb.currentZones, isEmpty);
+
+        undo.redo();
+        expect(cb.currentZones, hasLength(1));
+        expect(cb.currentZones.single.id, created.id,
+            reason: 'redo should restore the identical $name zone');
+        expect(cb.currentZones.single.polygon, created.polygon);
+      });
+    });
+  });
 }

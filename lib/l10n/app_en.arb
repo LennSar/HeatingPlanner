@@ -987,6 +987,10 @@
   "@undo_deleteZone": { "description": "Undo/redo label — deleting a heating zone" },
   "undo_deleteDistributor": "Delete distributor",
   "@undo_deleteDistributor": { "description": "Undo/redo label — deleting the distributor" },
+  "undo_createZone": "Create zone",
+  "@undo_createZone": { "description": "Undo/redo label — creating a floor heating zone (polygon, rectangle, or fill-room)" },
+  "undo_createWallZone": "Create wall zone",
+  "@undo_createWallZone": { "description": "Undo/redo label — creating a wall heating zone" },
 
   "canvas_defaultRoomName": "Room {roomNumber}",
   "@canvas_defaultRoomName": {

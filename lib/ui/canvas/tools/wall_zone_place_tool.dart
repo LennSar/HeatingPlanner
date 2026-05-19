@@ -9,7 +9,9 @@ import '../../../data/models/heating_zone.dart';
 import '../../../data/models/point2d.dart';
 import '../../../data/models/wall_segment.dart';
 import '../painters/interaction_data.dart';
+import 'create_zone_command.dart';
 import 'tool_base.dart';
+import 'undo_redo_service.dart';
 
 /// Tool for placing wall heating zones by clicking on a wall segment.
 ///
@@ -30,7 +32,12 @@ class WallZonePlaceTool extends CanvasTool {
   WallZonePlaceTool({
     required super.callbacks,
     required super.onStateChanged,
+    required this.undoRedo,
   });
+
+  /// Undo/redo service. Wall zones are committed through a
+  /// [CreateZoneCommand] so creation is revertible (ADR-014).
+  final UndoRedoService undoRedo;
 
   /// World-space distance threshold for wall hit-detection (mm).
   ///
@@ -84,7 +91,13 @@ class WallZonePlaceTool extends CanvasTool {
       // heightMm left null → properties panel shows floor height default.
     );
 
-    callbacks.commitZone(zone);
+    // ADR-014: wall-zone creation is undoable via the shared command.
+    undoRedo.execute(CreateZoneCommand(
+      zone: zone,
+      add: callbacks.commitZone,
+      remove: callbacks.removeZone,
+      label: callbacks.l10n.undo_createWallZone,
+    ));
     callbacks.selectElement('zone', zone.id);
     _hoveredWall = null;
     onStateChanged();

@@ -223,10 +223,12 @@ class _FloorPlanCanvasState
     _tools[DrawingTool.drawZone] = ZoneDrawTool(
       callbacks: this,
       onStateChanged: onChanged,
+      undoRedo: undoRedo,
     );
     _tools[DrawingTool.drawWallZone] = WallZonePlaceTool(
       callbacks: this,
       onStateChanged: onChanged,
+      undoRedo: undoRedo,
     );
     _tools[DrawingTool.placeDistributor] = DistributorPlaceTool(
       callbacks: this,

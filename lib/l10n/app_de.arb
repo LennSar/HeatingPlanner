@@ -386,6 +386,8 @@
   "undo_deleteCircuit": "Heizkreis löschen",
   "undo_deleteZone": "Heizzone löschen",
   "undo_deleteDistributor": "Verteiler löschen",
+  "undo_createZone": "Zone erstellen",
+  "undo_createWallZone": "Wandzone erstellen",
 
   "canvas_defaultRoomName": "Raum {roomNumber}"
 }

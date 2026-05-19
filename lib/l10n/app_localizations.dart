@@ -2228,6 +2228,18 @@ abstract class AppLocalizations {
   /// **'Delete distributor'**
   String get undo_deleteDistributor;
 
+  /// Undo/redo label — creating a floor heating zone (polygon, rectangle, or fill-room)
+  ///
+  /// In en, this message translates to:
+  /// **'Create zone'**
+  String get undo_createZone;
+
+  /// Undo/redo label — creating a wall heating zone
+  ///
+  /// In en, this message translates to:
+  /// **'Create wall zone'**
+  String get undo_createWallZone;
+
   /// Default name for a newly detected room before the user renames it
   ///
   /// In en, this message translates to:
