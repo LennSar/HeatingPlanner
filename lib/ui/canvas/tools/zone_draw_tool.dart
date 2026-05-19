@@ -38,6 +38,16 @@ import 'tool_base.dart';
 /// - **Alt** ([freePlacement]): skip grid snap for the current
 ///   vertex / corner; the raw world coordinate is used instead.
 ///
+/// **Ctrl+Shift+click — "fill room as one zone"** (UI/UX §5.3,
+/// ADR-013 rule 4): with Ctrl **and** Shift held, a plain click
+/// with *no drag* resolves the room under the cursor and commits
+/// one heating zone whose polygon equals that room's polygon, with
+/// the spec defaults. Single room only — the ADR-006 doorway-
+/// spanning relaxation does **not** apply. If the room already has
+/// a zone it is a no-op with a transient toast; clicking outside
+/// any room is a silent no-op. A Ctrl+Shift *drag* still falls
+/// through to the ortho-constrained rect commit ([onDragEnd]).
+///
 /// Per ADR-013 the rectangle corners are **not** passed through
 /// [SnapService.snapRectCorner] / [SnapService.snapRectDimension]
 /// (those are wall/room-graph features). The §5.3 / ADR-006
@@ -226,6 +236,58 @@ class ZoneDrawTool extends CanvasTool with ModifierDrawTool {
     }
 
     _commitZone(corners, primaryRoom);
+    _reset();
+  }
+
+  /// Ctrl+Shift+click (no drag) — "fill room as one zone".
+  ///
+  /// Per UI/UX §5.3 "Fill room as one zone" and `DECISIONS.md`
+  /// ADR-013 rule 4: resolve the room under the cursor and commit
+  /// one heating zone whose polygon equals that room's polygon,
+  /// with the spec defaults. Single room only — the ADR-006
+  /// doorway-spanning relaxation does **not** apply here, so the
+  /// polygon is exactly `room.polygon` (an open ring, first != last,
+  /// the same convention zone polygons use).
+  ///
+  /// The canvas only calls [onPointerUp] when the pointer is
+  /// released *without* a drag (`_isDragging == false`), so a
+  /// Ctrl+Shift *drag* still commits via the ortho-constrained
+  /// rect path in [onDragEnd] (ADR-013 rule 2).
+  @override
+  void onPointerUp(Point2D worldPoint) {
+    // Trigger is Ctrl+Shift held (rectMode = Ctrl, orthoSnap = Shift).
+    // Any other state (plain click, Ctrl-only, polygon mode) is left
+    // to the existing onTap path — onPointerUp is a no-op there.
+    if (!(rectMode && orthoSnap)) return;
+
+    // onPointerDown set a transient rect-drag ghost when Ctrl went
+    // down; fill-room is a click, not a drag, so clear it.
+    _rectDragStart = null;
+    _rectDragCurrent = null;
+
+    // Resolve the room directly under the cursor. Raw point, no grid
+    // snap: the zone mirrors the room exactly and snapping could
+    // nudge the hit out of a small room or across a wall.
+    final room = _findRoomAt(worldPoint);
+    if (room == null) {
+      // Click outside any room: silent no-op.
+      onStateChanged();
+      return;
+    }
+
+    // One zone per room (single-room attribution via roomId,
+    // ADR-006 rule 2). If the room already has one: no-op + toast.
+    final alreadyZoned =
+        callbacks.currentZones.any((z) => z.roomId == room.id);
+    if (alreadyZoned) {
+      callbacks.showToast('Room already has a heating zone.');
+      onStateChanged();
+      return;
+    }
+
+    // Single room only: the zone polygon is exactly the room
+    // polygon. Shared commit path → one undo entry (ADR-013 rule 5).
+    _commitZone(List<Point2D>.from(room.polygon), room);
     _reset();
   }
 
