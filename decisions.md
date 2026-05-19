@@ -655,3 +655,65 @@ the wall/room rect modes (ADR-009/010/012) are unchanged.
 `flutter analyze` clean; ZDT-1…ZDT-4, WDT-1…WDT-12 and the existing
 SelectTool ST / ST-RR suites pass after the `ModifierDrawTool` extraction
 and the zone-reshape addition.
+
+---
+
+## ADR-014 — Zone creation is undoable via one shared `_CreateZoneCommand`
+
+**What.**
+Every heating-zone *creation* — floor zones from `ZoneDrawTool`
+(polygon close, Ctrl-drag rectangle, and the ADR-013 Ctrl+Shift+click
+"fill room as one zone" gesture) and wall zones from
+`WallZonePlaceTool` — is wrapped in a single `_CreateZoneCommand`
+pushed onto `UndoRedoService`. `ZoneDrawTool` and `WallZonePlaceTool`
+gain the `undoRedo` constructor dependency that
+`WallDrawTool` / `SelectTool` already have. The command's `execute`
+adds the zone via `EditorCallbacks.commitZone`; `undo` removes it via
+`EditorCallbacks.removeZone(zone.id)`; `redo` re-adds the identical
+zone object (same `id`). The command wraps the shared
+`_commitZone(polygon, parentRoom)` helper (ADR-013 rule 5), so all
+floor-zone gestures produce exactly **one** undo entry regardless of
+how the polygon was drawn.
+
+**Why.**
+Zone delete and move/reshape were already undoable
+(`_DeleteZoneCommand` / `_MoveZoneCommand` in `SelectTool`), but
+creation bypassed `UndoRedoService` — `commitZone` mutated editor
+state and persisted to the DAO without pushing a command, so Ctrl+Z
+could not revert a freshly drawn or filled zone. agent-frontend.md §7
+already requires zone drawing to be undoable; this closes the gap.
+Wrapping the single shared `_commitZone` path (not each gesture)
+guarantees the ADR-013 "one commit path" promise also means "one undo
+entry" — fill-room, polygon, and rectangle behave identically under
+undo. A freshly created zone has no circuit (`circuitId == null`), so
+`removeZone(id)` is a complete inverse; no circuit-detachment
+bookkeeping is needed at creation time.
+
+**Rule.**
+1. `ZoneDrawTool` and `WallZonePlaceTool` take an `undoRedo`
+   (`UndoRedoService`) constructor argument, wired in the
+   `FloorPlanCanvas` tool init exactly as the other tools are.
+2. The shared `_commitZone` helper and `WallZonePlaceTool`'s zone
+   commit route through `undoRedo.execute(_CreateZoneCommand(...))`.
+   No zone-creation path calls `commitZone` outside a command.
+3. `_CreateZoneCommand`: `execute` → `callbacks.commitZone(zone)`;
+   `undo` → `callbacks.removeZone(zone.id)`; the zone object is
+   captured so redo restores the identical record. Label via the
+   localized `EditorCallbacks.l10n` convention used by the other
+   commands.
+4. Exactly one command per committed zone. The ADR-013 fill-room
+   no-op cases (outside any room; room already has a zone) commit
+   nothing and push no command.
+5. `_DeleteZoneCommand` / `_MoveZoneCommand` are unchanged; this ADR
+   only adds the missing creation command and the tool dependency.
+
+**Scope.**
+`ZoneDrawTool`, `WallZonePlaceTool`, and the `FloorPlanCanvas` tool
+wiring. `SelectTool` zone delete/move/reshape and all non-zone tools
+are unaffected.
+
+**Verification.**
+`flutter analyze` clean; new ZDT-5 (create → undo removes the zone)
+and ZDT-6 (redo re-adds it) in
+`test/widget/tools/zone_draw_tool_test.dart` covering polygon,
+rectangle, and fill-room; existing ZDT-1…ZDT-4 still pass.

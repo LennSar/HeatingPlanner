@@ -543,6 +543,19 @@ class UndoRedoService extends StateNotifier<UndoRedoState> {
 
 **Stack limit:** Keep last 100 commands. Older commands are discarded.
 
+### 7.1 Zone Creation (ADR-014)
+
+Zone *creation* is undoable like every other geometry change. All
+floor-zone gestures (`ZoneDrawTool`: polygon close, Ctrl-drag
+rectangle, Ctrl+Shift+click fill-room) and wall-zone placement
+(`WallZonePlaceTool`) route their single shared commit through one
+`_CreateZoneCommand` on `UndoRedoService` — never call
+`EditorCallbacks.commitZone` directly from a creation path.
+`ZoneDrawTool` and `WallZonePlaceTool` take the `undoRedo`
+constructor dependency the other tools already have. `execute` adds
+the zone, `undo` removes it by id, `redo` re-adds the same record.
+One zone = one undo entry. See `DECISIONS.md` ADR-014.
+
 ---
 
 ## 8. Save State & AutoSave
