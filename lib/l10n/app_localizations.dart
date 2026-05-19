@@ -746,6 +746,18 @@ abstract class AppLocalizations {
   /// **'Height'**
   String get heightLabel;
 
+  /// Header for the editable rectangular-room Width/Height group (UI/UX §7.2.2)
+  ///
+  /// In en, this message translates to:
+  /// **'Dimensions'**
+  String get rectangularRoomDimensions;
+
+  /// Toast shown when a typed room Width/Height is below the 10 cm minimum (ADR-015 Rule 5)
+  ///
+  /// In en, this message translates to:
+  /// **'Room too small (min 10×10 cm)'**
+  String get roomTooSmallCm;
+
   /// Label for sill height field
   ///
   /// In en, this message translates to:

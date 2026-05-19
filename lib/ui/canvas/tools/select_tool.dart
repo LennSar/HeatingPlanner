@@ -335,7 +335,10 @@ class SelectTool extends CanvasTool {
   /// distinct corner points using exactly 2 distinct x-values and 2
   /// distinct y-values (which implies 90° interior angles for any
   /// closed cycle through those 4 corners with axis-aligned segments).
-  @visibleForTesting
+  ///
+  /// Public API: also consumed by the room properties panel as the
+  /// single source of rectangle-eligibility / corner extraction for the
+  /// ADR-015 Width/Height resize (the panel must not reimplement this).
   static List<Point2D>? rectangleCorners(List<WallSegment> walls) {
     if (walls.length != 4) return null;
     const tol = _rectTolMm;

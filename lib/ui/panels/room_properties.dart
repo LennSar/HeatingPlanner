@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -9,8 +11,11 @@ import '../../calculation/providers/project_settings_provider.dart';
 import '../../calculation/providers/u_value_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/enums.dart';
+import '../../data/models/point2d.dart';
 import '../../data/models/room.dart';
 import '../../data/models/wall_construction.dart';
+import '../../data/models/wall_segment.dart';
+import '../canvas/tools/select_tool.dart';
 import '../canvas/tools/undo_redo_service.dart';
 import '../providers/editor_state_provider.dart';
 import 'wall_construction_editor.dart';
@@ -100,18 +105,219 @@ class _RoomPropertiesState
   /// drag starts — used to build the undo command on drag end.
   Room? _roomAtSliderStart;
 
+  /// Controllers for the ADR-015 rectangular-room Width/Height
+  /// fields (centimetres). Only meaningful while the selected room
+  /// is rectangle-eligible (ADR-012 Rule 1).
+  late TextEditingController _widthController;
+  late TextEditingController _heightController;
+  late FocusNode _widthFocus;
+  late FocusNode _heightFocus;
+
+  /// Last room ID whose Width/Height controllers were synced from
+  /// the model. Reset to `null` whenever the room is not
+  /// rectangle-eligible so re-eligibility forces a fresh sync.
+  String? _lastSyncedDimRoomId;
+
+  /// Axis tolerance (mm) for corner-identity checks — mirrors
+  /// `SelectTool`'s 1 mm rectangle tolerance (ADR-012 Rule 1).
+  static const double _dimTolMm = 1.0;
+
   @override
   void initState() {
     super.initState();
     _nameController = TextEditingController();
     _acrController = TextEditingController();
+    _widthController = TextEditingController();
+    _heightController = TextEditingController();
+    _widthFocus = FocusNode()
+      ..addListener(() {
+        if (!_widthFocus.hasFocus) _onDimFocusLost(isWidth: true);
+      });
+    _heightFocus = FocusNode()
+      ..addListener(() {
+        if (!_heightFocus.hasFocus) _onDimFocusLost(isWidth: false);
+      });
   }
 
   @override
   void dispose() {
     _nameController.dispose();
     _acrController.dispose();
+    _widthController.dispose();
+    _heightController.dispose();
+    _widthFocus.dispose();
+    _heightFocus.dispose();
     super.dispose();
+  }
+
+  /// Returns the 4 corners of [roomId]'s rectangle, or `null` when
+  /// the room is not rectangle-eligible (ADR-012 Rule 1). Eligibility
+  /// and corner extraction are delegated to [SelectTool.rectangleCorners]
+  /// — the panel never reimplements this geometry (ADR-015 Rule 1).
+  List<Point2D>? _rectCorners(EditorState state, String roomId) {
+    final roomWalls =
+        state.walls.where((w) => w.roomId == roomId).toList();
+    return SelectTool.rectangleCorners(roomWalls);
+  }
+
+  /// Formats a millimetre extent as a centimetre string
+  /// (mm / 10), trimming a redundant ".0" (ADR-015 Rule 2).
+  String _formatCm(double mm) {
+    final cm = mm / 10.0;
+    final rounded = cm.roundToDouble();
+    return (cm - rounded).abs() < 1e-6
+        ? rounded.toStringAsFixed(0)
+        : cm.toStringAsFixed(1);
+  }
+
+  /// Syncs the Width/Height controllers from the model bounding box.
+  ///
+  /// Skips the field the user is currently editing (so a commit only
+  /// happens on Enter / focus loss, never per keystroke — UI/UX
+  /// §7.2.2), but always refreshes on a room change or when the value
+  /// changed externally (e.g. undo/redo) while unfocused.
+  void _syncDimControllers(
+    String roomId,
+    double widthMm,
+    double heightMm,
+  ) {
+    final roomChanged = _lastSyncedDimRoomId != roomId;
+    if (roomChanged) _lastSyncedDimRoomId = roomId;
+    final wStr = _formatCm(widthMm);
+    final hStr = _formatCm(heightMm);
+    if ((roomChanged || !_widthFocus.hasFocus) &&
+        _widthController.text != wStr) {
+      _widthController.text = wStr;
+    }
+    if ((roomChanged || !_heightFocus.hasFocus) &&
+        _heightController.text != hStr) {
+      _heightController.text = hStr;
+    }
+  }
+
+  /// Focus-loss handler — resolves the live room (the build-time
+  /// snapshot may be stale by now) and commits the edited dimension.
+  void _onDimFocusLost({required bool isWidth}) {
+    if (!mounted) return;
+    final room = ref
+        .read(editorStateProvider)
+        .rooms
+        .where((r) => r.id == widget.roomId)
+        .firstOrNull;
+    if (room == null) return;
+    _commitDimension(room: room, isWidth: isWidth);
+  }
+
+  /// Commits a Width or Height edit (ADR-015).
+  ///
+  /// Reuses the ADR-012 four-wall reshape path: each of the room's
+  /// four walls is repositioned via [EditorStateNotifier.updateWall]
+  /// (which performs ADR-011 mirror sync for shared walls), the room
+  /// polygon is updated, and the before/after snapshot is pushed as a
+  /// single "Resize room" [Command]. The top-left corner (min-x,
+  /// min-y) is the fixed anchor (ADR-015 Rule 3). The typed value is
+  /// honoured verbatim — no grid snap (ADR-015 Rule 6). A value
+  /// < 10 cm or non-numeric reverts the field and shows a toast,
+  /// mutating nothing (ADR-015 Rule 5).
+  void _commitDimension({required Room room, required bool isWidth}) {
+    final l10n = AppLocalizations.of(context)!;
+    final controller =
+        isWidth ? _widthController : _heightController;
+    final state = ref.read(editorStateProvider);
+
+    final corners = _rectCorners(state, room.id);
+    if (corners == null) return; // no longer eligible — ignore.
+
+    final minX = corners.map((c) => c.x).reduce(math.min);
+    final minY = corners.map((c) => c.y).reduce(math.min);
+    final maxX = corners.map((c) => c.x).reduce(math.max);
+    final maxY = corners.map((c) => c.y).reduce(math.max);
+    final curWidthMm = maxX - minX;
+    final curHeightMm = maxY - minY;
+    final curMm = isWidth ? curWidthMm : curHeightMm;
+
+    final parsed = double.tryParse(
+      controller.text.trim().replaceAll(',', '.'),
+    );
+
+    // ADR-015 Rule 5: reject non-numeric or < 10 cm — revert the
+    // field, toast, mutate nothing.
+    if (parsed == null || parsed < 10.0) {
+      controller.text = _formatCm(curMm);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(l10n.roomTooSmallCm),
+          duration: const Duration(seconds: 2),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    // ADR-015 Rule 2/6: cm → mm = round(cm × 10), used verbatim.
+    final newMm = (parsed * 10).roundToDouble();
+    final newWidthMm = isWidth ? newMm : curWidthMm;
+    final newHeightMm = isWidth ? curHeightMm : newMm;
+
+    // No-op when the extent is unchanged — normalize display only.
+    if ((newWidthMm - curWidthMm).abs() < _dimTolMm &&
+        (newHeightMm - curHeightMm).abs() < _dimTolMm) {
+      controller.text = _formatCm(curMm);
+      return;
+    }
+
+    // ADR-015 Rule 3: top-left (minX, minY) fixed; the edited
+    // extent moves the opposite edge.
+    final newMaxX = minX + newWidthMm;
+    final newMaxY = minY + newHeightMm;
+
+    final notifier = ref.read(editorStateProvider.notifier);
+    final oldWalls = state.walls.toList();
+    final oldRooms = state.rooms.toList();
+    final roomWalls =
+        state.walls.where((w) => w.roomId == room.id).toList();
+
+    bool near(double a, double b) => (a - b).abs() < _dimTolMm;
+    Point2D remap(Point2D p) => Point2D(
+          x: near(p.x, maxX) ? newMaxX : minX,
+          y: near(p.y, maxY) ? newMaxY : minY,
+        );
+
+    // Reuse the ADR-012 path: per-wall updateWall (ADR-011 mirror
+    // sync happens inside updateWall) — geometry/wall updates are
+    // not reimplemented here.
+    for (final wall in roomWalls) {
+      notifier.updateWall(
+        wall.copyWith(
+          startPoint: remap(wall.startPoint),
+          endPoint: remap(wall.endPoint),
+        ),
+      );
+    }
+    notifier.updateRoom(
+      room.copyWith(
+        polygon: [
+          Point2D(x: minX, y: minY),
+          Point2D(x: newMaxX, y: minY),
+          Point2D(x: newMaxX, y: newMaxY),
+          Point2D(x: minX, y: newMaxY),
+        ],
+      ),
+    );
+
+    // Snapshot the post-state and register a single undo entry so
+    // one Ctrl+Z reverts the whole resize (ADR-015 Rule 4).
+    final after = ref.read(editorStateProvider);
+    ref.read(undoRedoProvider).execute(
+          _ResizeRoomCommand(
+            replace:
+                notifier.replaceAllWallsAndRooms,
+            oldWalls: oldWalls,
+            oldRooms: oldRooms,
+            newWalls: after.walls.toList(),
+            newRooms: after.rooms.toList(),
+          ),
+        );
   }
 
   void _syncController(String name) {
@@ -223,6 +429,27 @@ class _RoomPropertiesState
         .where((w) => w.roomId == widget.roomId)
         .length;
 
+    // ADR-015: rectangle-eligibility (= ADR-012 Rule 1) gates the
+    // editable Width/Height group. Corners come straight from
+    // SelectTool.rectangleCorners — no geometry reimplemented here.
+    final rectCorners = _rectCorners(editorState, widget.roomId);
+    double? rectWidthMm;
+    double? rectHeightMm;
+    if (rectCorners != null) {
+      final xs = rectCorners.map((c) => c.x);
+      final ys = rectCorners.map((c) => c.y);
+      rectWidthMm = xs.reduce(math.max) - xs.reduce(math.min);
+      rectHeightMm = ys.reduce(math.max) - ys.reduce(math.min);
+      _syncDimControllers(
+        widget.roomId,
+        rectWidthMm,
+        rectHeightMm,
+      );
+    } else {
+      // Force a fresh sync if the room becomes eligible again.
+      _lastSyncedDimRoomId = null;
+    }
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(Spacing.md),
       child: Column(
@@ -331,6 +558,63 @@ class _RoomPropertiesState
               }
             },
           ),
+
+          // ADR-015 / UI/UX §7.2.2 — editable rectangular-room
+          // Width/Height (cm). Rendered only when rectangle-eligible.
+          if (rectWidthMm != null && rectHeightMm != null) ...[
+            const SizedBox(height: Spacing.md),
+            Text(
+              l10n.rectangularRoomDimensions,
+              style: textTheme.headlineSmall,
+            ),
+            const SizedBox(height: Spacing.sm),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: TextField(
+                    key: const Key('roomWidthField'),
+                    controller: _widthController,
+                    focusNode: _widthFocus,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: l10n.widthLabel,
+                      suffixText: 'cm',
+                      isDense: true,
+                    ),
+                    onSubmitted: (_) => _commitDimension(
+                      room: room,
+                      isWidth: true,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: Spacing.sm),
+                Expanded(
+                  child: TextField(
+                    key: const Key('roomHeightField'),
+                    controller: _heightController,
+                    focusNode: _heightFocus,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(
+                      decimal: true,
+                    ),
+                    decoration: InputDecoration(
+                      labelText: l10n.heightLabel,
+                      suffixText: 'cm',
+                      isDense: true,
+                    ),
+                    onSubmitted: (_) => _commitDimension(
+                      room: room,
+                      isWidth: false,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
 
           const Divider(height: Spacing.lg),
 
@@ -1333,4 +1617,38 @@ class _UpdateRoomCommand extends Command {
 
   @override
   void undo() => update(oldRoom);
+}
+
+/// Command: ADR-015 properties-panel room resize.
+///
+/// The four per-wall [EditorStateNotifier.updateWall] calls (with
+/// ADR-011 mirror sync) and the room-polygon update have already been
+/// applied when this command is constructed; it stores the full
+/// walls/rooms lists before and after so the entire batch — including
+/// any mirror-wall partner updates — reverts as a single Ctrl+Z.
+/// Mirrors the ADR-012 `_RectReshapeCommand` snapshot pattern.
+class _ResizeRoomCommand extends Command {
+  _ResizeRoomCommand({
+    required this.replace,
+    required this.oldWalls,
+    required this.oldRooms,
+    required this.newWalls,
+    required this.newRooms,
+  });
+
+  /// `EditorStateNotifier.replaceAllWallsAndRooms`.
+  final void Function(List<WallSegment>, List<Room>) replace;
+  final List<WallSegment> oldWalls;
+  final List<Room> oldRooms;
+  final List<WallSegment> newWalls;
+  final List<Room> newRooms;
+
+  @override
+  String get label => 'Resize room';
+
+  @override
+  void execute() => replace(newWalls, newRooms);
+
+  @override
+  void undo() => replace(oldWalls, oldRooms);
 }

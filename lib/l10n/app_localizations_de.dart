@@ -392,6 +392,12 @@ class AppLocalizationsDe extends AppLocalizations {
   String get heightLabel => 'Höhe';
 
   @override
+  String get rectangularRoomDimensions => 'Abmessungen';
+
+  @override
+  String get roomTooSmallCm => 'Raum zu klein (min. 10×10 cm)';
+
+  @override
   String get sillHeight => 'Brüstungshöhe';
 
   @override

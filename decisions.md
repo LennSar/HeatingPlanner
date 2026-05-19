@@ -717,3 +717,59 @@ are unaffected.
 and ZDT-6 (redo re-adds it) in
 `test/widget/tools/zone_draw_tool_test.dart` covering polygon,
 rectangle, and fill-room; existing ZDT-1…ZDT-4 still pass.
+
+---
+
+## ADR-015 — Properties-panel resize of a rectangular room (top-left anchored)
+
+**What.**
+A rectangle-eligible room (ADR-012 Rule 1 eligibility) shows editable
+**Width** and **Height** fields in the room properties panel
+(UI/UX §7.2.2), in **centimetres**. Editing a value resizes the room as an
+axis-aligned rectangle with the **top-left corner (min-x, min-y) as the fixed
+anchor**: changing Width moves the two right-side corners' x; changing Height
+moves the two bottom-side corners' y. The four walls are repositioned in one
+atomic update reusing the ADR-012 reshape path
+(`EditorStateNotifier.updateWall`, ADR-011 mirror sync), grouped into one
+`UndoRedoService` command ("Resize room").
+
+**Why.**
+ADR-012's corner-drag reshape anchors the corner diagonally opposite the
+grabbed one. A panel field has no grabbed corner, so a fixed, deterministic
+anchor is required. Top-left (min-x, min-y) is chosen because it is
+deterministic, matches reading order, and keeps the room's origin stable
+across successive single-dimension edits. Center-anchoring was rejected
+because it moves all four edges on every commit, making repeated edits
+visually unstable. Typed values are honoured exactly (no grid snap): grid
+snap exists to forgive imprecise pointer input, but a typed dimension is
+already precise, and snapping 451 cm → 450 cm would silently contradict the
+user.
+
+**Rule.**
+1. Eligibility = ADR-012 Rule 1 exactly (4 wall segments, all axis-aligned
+   within 1 mm, 4 distinct corners, 90° interior angles). For non-eligible
+   rooms the Dimensions group is not rendered.
+2. `Width = maxX − minX`, `Height = maxY − minY` of the room's corners
+   (mm). Displayed as cm = mm / 10; input parsed cm → mm = round(cm × 10).
+3. On commit (field submit or focus loss) the four corners become
+   `(minX, minY)`, `(minX+W, minY)`, `(minX+W, minY+H)`, `(minX, minY+H)`,
+   where the edited extent changes and the other keeps its current value.
+4. The four walls update atomically via the existing ADR-012 reshape path
+   (`EditorStateNotifier.updateWall` per wall in a single `state.copyWith`,
+   ADR-011 mirror sync for shared walls), pushed as one `UndoRedoService`
+   command labelled "Resize room" so one Ctrl+Z reverts it.
+5. Minimum 100 mm / 10 cm per dimension (ADR-012 Rule 6). A value < 10 cm or
+   non-numeric is rejected: the field reverts to the current value and a
+   transient toast "Room too small (min 10×10 cm)" is shown; nothing mutates.
+6. No grid snap on the typed value — the parsed mm extent is used verbatim
+   (contrast ADR-012 corner drag, which snaps the cursor).
+
+**Scope.**
+Properties-panel Width/Height fields only. ADR-012 corner-drag reshape,
+non-rectangular rooms, and all other panels are unchanged.
+
+**Verification.**
+`flutter analyze` clean; widget test: rectangular room shows the fields;
+editing Width resizes with top-left fixed; < 10 cm rejected with field
+revert + toast; non-rectangular room hides the group; one Ctrl+Z reverts a
+resize.

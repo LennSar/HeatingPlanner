@@ -692,6 +692,26 @@ Ceiling
 - Construction button: full width, left-aligned label, right-aligned action
 - Correction factor row: label left, value or slider right (slider width 120px)
 
+#### 7.2.2 Rectangular Room Dimensions
+
+Shown **only** when the selected room is rectangle-eligible (ADR-012 Rule 1:
+exactly 4 axis-aligned walls forming four 90° corners). Hidden entirely for
+non-rectangular rooms — "width/height" is undefined for L-shapes, consistent
+with ADR-012's rationale.
+
+| Field | Type | Editable | Validation |
+|-------|------|----------|-----------|
+| Width  | Numeric input (cm) | Yes | ≥ 10 cm |
+| Height | Numeric input (cm) | Yes | ≥ 10 cm |
+
+- Width = room bounding-box extent along x; Height = extent along y.
+- Value applies on **Enter or focus loss** (not per keystroke — a
+  geometry-reshaping field must not reshape mid-typing). No Apply button.
+- Resize is top-left-anchored, atomic across all four walls, one undo entry,
+  min 10×10 cm — see `DECISIONS.md` ADR-015.
+- Invalid/too-small input reverts the field and shows toast
+  "Room too small (min 10×10 cm)".
+
 ### 7.3 Wall Segment Selected
 
 | Field | Type | Editable |

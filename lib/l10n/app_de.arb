@@ -117,6 +117,8 @@
   "typeLabel": "Typ",
   "widthLabel": "Breite",
   "heightLabel": "Höhe",
+  "rectangularRoomDimensions": "Abmessungen",
+  "roomTooSmallCm": "Raum zu klein (min. 10×10 cm)",
   "sillHeight": "Brüstungshöhe",
   "uValueLabel": "U-Wert",
 

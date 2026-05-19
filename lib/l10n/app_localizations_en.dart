@@ -393,6 +393,12 @@ class AppLocalizationsEn extends AppLocalizations {
   String get heightLabel => 'Height';
 
   @override
+  String get rectangularRoomDimensions => 'Dimensions';
+
+  @override
+  String get roomTooSmallCm => 'Room too small (min 10×10 cm)';
+
+  @override
   String get sillHeight => 'Sill Height';
 
   @override

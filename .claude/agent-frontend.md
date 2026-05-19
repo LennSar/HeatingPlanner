@@ -379,6 +379,14 @@ Widget build(BuildContext context, WidgetRef ref) {
 }
 ```
 
+**`room_properties.dart` — rectangular room dimensions:** render the editable
+Width/Height (cm) group per UI/UX §7.2.2 only when the room is rectangle-eligible
+(ADR-012 Rule 1). The resize must **reuse the existing ADR-012 four-wall reshape
+path** (`EditorStateNotifier.updateWall` per wall in one `state.copyWith`,
+ADR-011 mirror sync, single `UndoRedoService` "Resize room" command) — do not
+reimplement corner geometry or wall updates. Top-left anchored, min 10×10 cm,
+no grid snap on the typed value. See `DECISIONS.md` ADR-015.
+
 ### 5.2 Properties Panel (Tablet)
 
 On viewport < 600dp, replace the side panel with a `DraggableScrollableSheet`:
