@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show mapEquals;
+import 'package:flutter/foundation.dart' show ValueListenable, mapEquals;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -160,13 +160,28 @@ class FloorPlanCanvas extends ConsumerStatefulWidget {
       _FloorPlanCanvasState();
 }
 
+/// Pointer-driven state consumed only by the interaction painter.
+///
+/// Kept as a record so [ValueNotifier] equality is structural — writing the
+/// same `(hoverWorldPoint, data)` pair twice does not fire listeners.
+typedef _InteractionState = ({
+  Offset? hoverWorldPoint,
+  InteractionData? data,
+});
+
+const _InteractionState _emptyInteractionState =
+    (hoverWorldPoint: null, data: null);
+
 class _FloorPlanCanvasState
     extends ConsumerState<FloorPlanCanvas>
     implements EditorCallbacks {
-  /// Current mouse position in world coordinates for the
-  /// interaction painter and status bar.
-  Offset? _hoverWorldPoint;
-
+  /// Pointer/hover state consumed by the interaction layer only.
+  ///
+  /// Mutating this notifier triggers a repaint of the interaction
+  /// [CustomPaint] (via [CustomPainter.repaint]) without rebuilding the
+  /// FloorPlanCanvas widget tree — that is what keeps hover and drag cheap.
+  final ValueNotifier<_InteractionState> _interactionState =
+      ValueNotifier(_emptyInteractionState);
 
   double _initialZoom = 1.0;
 
@@ -180,9 +195,6 @@ class _FloorPlanCanvasState
   /// Cached tool instances.
   final Map<DrawingTool, CanvasTool> _tools = {};
 
-  /// Current interaction data from the active tool.
-  InteractionData? _interactionData;
-
   /// Whether a drag is in progress.
   bool _isDragging = false;
 
@@ -190,14 +202,29 @@ class _FloorPlanCanvasState
   /// build so ref is available).
   bool _toolsInitialised = false;
 
+  @override
+  void dispose() {
+    _interactionState.dispose();
+    super.dispose();
+  }
+
+  void _setInteractionData(InteractionData? data) {
+    _interactionState.value = (
+      hoverWorldPoint: _interactionState.value.hoverWorldPoint,
+      data: data,
+    );
+  }
+
+  void _setHoverAndData(Offset? hover, InteractionData? data) {
+    _interactionState.value = (hoverWorldPoint: hover, data: data);
+  }
+
   void _ensureToolsInitialised() {
     if (_toolsInitialised) return;
     _toolsInitialised = true;
 
     void onChanged() {
-      setState(() {
-        _interactionData = _activeTool?.getInteractionData();
-      });
+      _setInteractionData(_activeTool?.getInteractionData());
     }
 
     final undoRedo = ref.read(undoRedoProvider);
@@ -899,11 +926,10 @@ class _FloorPlanCanvasState
               }
               _activeTool?.onDragUpdate(worldPoint);
 
-              setState(() {
-                _hoverWorldPoint = worldOffset;
-                _interactionData =
-                    _activeTool?.getInteractionData();
-              });
+              _setHoverAndData(
+                worldOffset,
+                _activeTool?.getInteractionData(),
+              );
             }
           },
           onPointerUp: (event) {
@@ -923,10 +949,7 @@ class _FloorPlanCanvasState
               // actions (e.g. zone body drag threshold not reached).
               _activeTool?.onPointerUp(worldPoint);
             }
-            setState(() {
-              _interactionData =
-                  _activeTool?.getInteractionData();
-            });
+            _setInteractionData(_activeTool?.getInteractionData());
           },
           child: GestureDetector(
             onScaleStart: (details) {
@@ -1011,10 +1034,7 @@ class _FloorPlanCanvasState
                     .read(toolStatusHintProvider.notifier)
                     .set(hint);
 
-                setState(() {
-                  _hoverWorldPoint = worldOffset;
-                  _interactionData = idata;
-                });
+                _setHoverAndData(worldOffset, idata);
               },
               onExit: (_) {
                 ref
@@ -1023,7 +1043,7 @@ class _FloorPlanCanvasState
                 ref
                     .read(toolStatusHintProvider.notifier)
                     .set(null);
-                setState(() => _hoverWorldPoint = null);
+                _setHoverAndData(null, _interactionState.value.data);
               },
               child: Container(
                 color: Theme.of(context)
@@ -1073,8 +1093,7 @@ class _FloorPlanCanvasState
                           size: viewSize,
                           painter: _InteractionLayerPainter(
                             transform: canvasState.transform,
-                            interactionData: _interactionData,
-                            hoverWorldPoint: _hoverWorldPoint,
+                            state: _interactionState,
                             selectionHighlightColor:
                                 colors.selectionHighlight,
                             supplyPipeColor: colors.supplyPipe,
@@ -1392,45 +1411,47 @@ class _HoverHighlightLayerPainter extends CustomPainter {
 /// Paints only the in-progress tool interaction (ghost line / polygon /
 /// rectangle, cursor hover point).
 ///
-/// This is the only layer that repaints during a pointer move, because the
-/// other two layers are behind their own [RepaintBoundary]s and reject
-/// repaints whose inputs are unchanged.
+/// Subscribes to a [ValueListenable] of pointer/hover state and forwards it
+/// to [CustomPainter.repaint] (`super(repaint: state)`). When the listenable
+/// notifies, the framework repaints this painter without rebuilding the
+/// FloorPlanCanvas widget tree — that is what keeps hover and drag cheap.
 class _InteractionLayerPainter extends CustomPainter {
-  const _InteractionLayerPainter({
+  _InteractionLayerPainter({
     required this.transform,
-    required this.interactionData,
-    required this.hoverWorldPoint,
+    required this.state,
     required this.selectionHighlightColor,
     required this.supplyPipeColor,
     required this.returnPipeColor,
-  });
+  }) : super(repaint: state);
 
   final Matrix4 transform;
-  final InteractionData? interactionData;
-  final Offset? hoverWorldPoint;
+  final ValueListenable<_InteractionState> state;
   final Color selectionHighlightColor;
   final Color supplyPipeColor;
   final Color returnPipeColor;
 
   @override
   void paint(Canvas canvas, Size size) {
+    final s = state.value;
     canvas.save();
     canvas.transform(transform.storage);
     InteractionPainter(
-      hoverPoint: hoverWorldPoint,
+      hoverPoint: s.hoverWorldPoint,
       selectionHighlightColor: selectionHighlightColor,
       supplyPipeColor: supplyPipeColor,
       returnPipeColor: returnPipeColor,
-      interactionData: interactionData,
+      interactionData: s.data,
     ).paint(canvas, size);
     canvas.restore();
   }
 
   @override
   bool shouldRepaint(_InteractionLayerPainter oldDelegate) {
+    // Pointer/hover changes flow through `repaint:` and never call
+    // shouldRepaint. This handles widget-tree rebuilds where the parent
+    // passed a new transform, listenable, or theme colour.
     return transform != oldDelegate.transform ||
-        interactionData != oldDelegate.interactionData ||
-        hoverWorldPoint != oldDelegate.hoverWorldPoint ||
+        !identical(state, oldDelegate.state) ||
         selectionHighlightColor != oldDelegate.selectionHighlightColor ||
         supplyPipeColor != oldDelegate.supplyPipeColor ||
         returnPipeColor != oldDelegate.returnPipeColor;
