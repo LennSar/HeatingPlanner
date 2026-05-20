@@ -345,6 +345,19 @@ class EditorStateNotifier extends Notifier<EditorState>
     state = state.copyWith(walls: walls, rooms: rooms);
   }
 
+  /// Replace walls, rooms, and zones in one atomic state update.
+  ///
+  /// Used by the ADR-016 "Move room" undo command so a single Ctrl+Z
+  /// reverts every wall, room, and zone change made during the move,
+  /// including regenerated/severed shared walls.
+  void replaceAllWallsRoomsZones(
+    List<WallSegment> walls,
+    List<Room> rooms,
+    List<HeatingZone> zones,
+  ) {
+    state = state.copyWith(walls: walls, rooms: rooms, zones: zones);
+  }
+
   // ---- Windows ----
 
   /// Add a window element.

@@ -195,6 +195,39 @@ abstract final class SnapService {
     return point;
   }
 
+  /// Tolerance for the room-draw edge-match used by rect-mode and the
+  /// ADR-016 room-move drop (ADR-009 §Rule 2): each endpoint of a
+  /// candidate edge must be within this distance of the corresponding
+  /// existing-wall endpoint (forward or reversed) for the edge to be
+  /// considered shared.
+  static const double edgeMatchToleranceMm = 50.0;
+
+  /// Returns the first room-assigned wall in [candidates] whose geometry
+  /// matches the edge `a → b` within [toleranceMm] on **both** endpoints
+  /// (direction-agnostic).
+  ///
+  /// Shared implementation of the room-draw shared-wall deduplication
+  /// (ADR-009 §Rule 2). Used by both `WallDrawTool` rect mode and the
+  /// ADR-016 room-move reconciliation in `SelectTool` so a single edge
+  /// matcher backs both pipelines — there is no second, parallel
+  /// "move-aware" matcher.
+  static WallSegment? matchExistingWall(
+    Point2D a,
+    Point2D b,
+    List<WallSegment> candidates, {
+    double toleranceMm = edgeMatchToleranceMm,
+  }) {
+    for (final w in candidates) {
+      if (w.roomId.isEmpty) continue;
+      final fwd = GeometryEngine.distanceMm(w.startPoint, a) <= toleranceMm &&
+          GeometryEngine.distanceMm(w.endPoint, b) <= toleranceMm;
+      final rev = GeometryEngine.distanceMm(w.startPoint, b) <= toleranceMm &&
+          GeometryEngine.distanceMm(w.endPoint, a) <= toleranceMm;
+      if (fwd || rev) return w;
+    }
+    return null;
+  }
+
   /// Snap [dragEnd] so that the new room's height and/or width matches that
   /// of an adjacent room whose shared wall is anchored at [dragStart]
   /// (ADR-010).

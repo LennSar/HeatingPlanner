@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../../../calculation/engines/geometry_engine.dart';
 import '../../../core/utils/geometry_utils.dart';
+import '../../../core/utils/id_generator.dart';
 import '../../../data/models/distributor.dart';
 import '../../../data/models/door.dart';
 import '../../../data/models/enums.dart';
@@ -214,6 +215,59 @@ class SelectTool extends CanvasTool {
   /// Live raw cursor for the rect-reshape ghost (no commit until end).
   Point2D? _zoneRectCursor;
 
+  // -- ADR-016: Room-interior drag (move entire room) --
+
+  /// True when [onPointerDown] landed inside a room interior (not on a
+  /// wall hit-band or wall handle) and the press has yet to resolve into
+  /// either a "move" (drag past threshold) or a plain "select" (release
+  /// within threshold). Mirrors the [_zonePointerOnZone] / deferred-tap
+  /// flow used for zones.
+  bool _roomPointerInside = false;
+
+  /// World-space anchor recorded when [_roomPointerInside] is armed.
+  ///
+  /// Used to: (1) gate the drag-threshold check in [onDragUpdate],
+  /// (2) compute the grid-snapped translation delta as
+  /// `snappedCursor − dragStart` (ADR-016 Rule 2).
+  Point2D? _roomMoveAnchor;
+
+  /// The room that will translate during a confirmed room-move drag.
+  ///
+  /// Captured at pointer-down so the drag uses the room snapshot from
+  /// that moment even if other providers refresh mid-gesture.
+  Room? _roomMoveRoom;
+
+  /// Snapshot of the moved room's walls at pointer-down (the pre-move
+  /// geometry that the commit translates from and that undo restores).
+  List<WallSegment> _roomMoveWallsAtStart = const [];
+
+  /// Snapshot of the moved room's zones at pointer-down (their polygons
+  /// translate with the room, per ADR-016 Rule 2).
+  List<HeatingZone> _roomMoveZonesAtStart = const [];
+
+  /// Full pre-move snapshot (all walls / rooms / zones) — used so the
+  /// "Move room" command can revert detaches, splits, promotions, and
+  /// mirror-copy insertions in a single atomic `replaceAll...` (Rule 5).
+  List<WallSegment> _roomMoveOldWalls = const [];
+  List<Room> _roomMoveOldRooms = const [];
+  List<HeatingZone> _roomMoveOldZones = const [];
+
+  /// True once the pointer has crossed [_zoneDragThresholdPx] of the
+  /// anchor — the gesture is now a confirmed room move and the ghost
+  /// preview becomes visible.
+  bool _roomMoveDragActive = false;
+
+  /// Current snapped translation in world-mm. Updated every frame
+  /// during the drag and used to render the ghost (ADR-016 Rule 2).
+  Point2D _roomMoveDelta = const Point2D(x: 0, y: 0);
+
+  /// Alt-held flag forwarded by the canvas keyboard handler.
+  ///
+  /// When true, [onDragUpdate] uses the raw cursor (no grid snap) for
+  /// the translation, mirroring the Alt = free-placement convention
+  /// the other tools follow.
+  bool _altHeld = false;
+
   // -- Deferred-tap state (zone pointer-down suppresses onTap) --
 
   /// Arguments of the tap that was suppressed because the pointer went
@@ -261,14 +315,16 @@ class SelectTool extends CanvasTool {
   // Modifier-key tracking (ADR-012 Rule 7)
   // ================================================================
 
-  /// Update the Ctrl-held flag from the canvas keyboard handler.
+  /// Update the modifier-key flags from the canvas keyboard handler.
   ///
-  /// Cmd on macOS maps to the same flag via the keyboard shortcut
-  /// layer. Call on both key-down and key-up so the flag stays in
-  /// sync (mirrors [WallDrawTool.updateModifiers]).
-  void updateModifiers({required bool ctrl}) {
-    if (_ctrlHeld == ctrl) return;
+  /// Cmd on macOS maps to the same Ctrl flag via the keyboard shortcut
+  /// layer. Call on both key-down and key-up so the flags stay in sync
+  /// (mirrors [WallDrawTool.updateModifiers]). [alt] is read by the
+  /// ADR-016 room-move drag to disable grid snap (free placement).
+  void updateModifiers({required bool ctrl, bool alt = false}) {
+    if (_ctrlHeld == ctrl && _altHeld == alt) return;
     _ctrlHeld = ctrl;
+    _altHeld = alt;
     onStateChanged();
   }
 
@@ -319,6 +375,20 @@ class SelectTool extends CanvasTool {
   /// corner of a rectangle-eligible selected zone (ADR-013).
   bool get shouldUseRectCrosshair =>
       _ctrlHeld && _hoverEndpointOnRectRoom;
+
+  /// True when the canvas should show the grab (or grabbing) hand
+  /// cursor for the room-interior move affordance (ADR-016, UI/UX
+  /// §6.2). `grab` while hovering an unhandled room interior; flips to
+  /// `grabbing` once the pointer is actively dragging the room.
+  bool _hoverOnRoomInterior = false;
+
+  /// True when the room-move drag is active (past threshold). The
+  /// canvas reads this to switch from "grab" to "grabbing".
+  bool get isMovingRoom => _roomMoveDragActive;
+
+  /// True when the cursor is hovering a room interior with no
+  /// handle / opening / zone competing for it.
+  bool get shouldUseGrabCursor => _hoverOnRoomInterior;
 
   // ================================================================
   // ADR-012 rectangle helpers
@@ -479,6 +549,15 @@ class SelectTool extends CanvasTool {
     if (_zonePointerOnZone) {
       _deferredTap = (point: worldPoint, kind: deviceKind);
       _zonePointerOnZone = false;
+      return;
+    }
+
+    // Pointer went down inside a room interior — defer the tap so
+    // drag past threshold becomes a "Move room" and release within
+    // threshold still only selects (ADR-016 Rule 1).
+    if (_roomPointerInside) {
+      _deferredTap = (point: worldPoint, kind: deviceKind);
+      _roomPointerInside = false;
       return;
     }
 
@@ -700,7 +779,10 @@ class SelectTool extends CanvasTool {
     }
 
     // Wall handle hit-test.
-    if (_selectedWall == null) return;
+    if (_selectedWall == null) {
+      _armRoomMoveIfApplicable(worldPoint);
+      return;
+    }
     // Refresh the cached _selectedWall reference from current state.
     // After an undo (or any mutation routed through
     // replaceAllWallsAndRooms), the cached instance keeps the
@@ -719,7 +801,10 @@ class SelectTool extends CanvasTool {
     _selectedWall = refreshedSelected;
 
     final handleType = _hitTestHandle(worldPoint);
-    if (handleType == null) return;
+    if (handleType == null) {
+      _armRoomMoveIfApplicable(worldPoint);
+      return;
+    }
 
     _dragHandle = handleType;
     _dragStartWall = _selectedWall;
@@ -856,6 +941,27 @@ class SelectTool extends CanvasTool {
       return;
     }
 
+    // ADR-016: room-interior drag.
+    if (_roomMoveAnchor != null) {
+      if (!_roomMoveDragActive) {
+        final thresholdMm =
+            _zoneDragThresholdPx / callbacks.currentZoom;
+        if (GeometryEngine.distanceMm(
+              worldPoint,
+              _roomMoveAnchor!,
+            ) >=
+            thresholdMm) {
+          _roomMoveDragActive = true;
+          _deferredTap = null; // discard — this is definitely a drag
+        }
+      }
+      if (_roomMoveDragActive) {
+        _roomMoveDelta = _computeRoomMoveDelta(worldPoint);
+        onStateChanged();
+      }
+      return;
+    }
+
     // Wall drag.
     if (_dragHandle == null || _dragStartWall == null) return;
 
@@ -951,6 +1057,25 @@ class SelectTool extends CanvasTool {
     if (_openingDragHandle != null) {
       _commitOpeningDrag();
       _clearOpeningDragState();
+      onStateChanged();
+      return;
+    }
+
+    // ADR-016: room-interior drag end.
+    if (_roomMoveAnchor != null) {
+      if (_roomMoveDragActive) {
+        _commitRoomMove(worldPoint);
+      } else if (_deferredTap != null) {
+        // Pointer moved but stayed under the threshold — treat as a
+        // click and let the normal cycling logic select.
+        final tap = _deferredTap!;
+        _deferredTap = null;
+        _clearRoomMoveState();
+        _doTap(tap.point, tap.kind);
+        onStateChanged();
+        return;
+      }
+      _clearRoomMoveState();
       onStateChanged();
       return;
     }
@@ -1098,7 +1223,14 @@ class SelectTool extends CanvasTool {
       }
     }
     _hoverEndpointOnRectRoom = hovering;
-    if (wasHover != hovering) onStateChanged();
+
+    // ADR-016 / UI/UX §6.2: hover over a room interior with no wall /
+    // handle / opening competing → grab-hand cursor. Skip during any
+    // active drag so the grabbing-hand stays put.
+    final wasOnRoom = _hoverOnRoomInterior;
+    final onRoom = _isRoomInteriorHit(worldPoint);
+    _hoverOnRoomInterior = onRoom;
+    if (wasHover != hovering || wasOnRoom != onRoom) onStateChanged();
   }
 
   @override
@@ -1118,10 +1250,12 @@ class SelectTool extends CanvasTool {
       final tap = _deferredTap!;
       _deferredTap = null;
       _clearZoneDragState();
+      _clearRoomMoveState();
       _doTap(tap.point, tap.kind);
       onStateChanged();
     } else {
       _clearZoneDragState();
+      _clearRoomMoveState();
     }
   }
 
@@ -1172,6 +1306,14 @@ class SelectTool extends CanvasTool {
       return;
     }
 
+    // ADR-016: room-interior drag mutates no state during onDragUpdate
+    // (the ghost is preview-only), so cancelling just drops the ghost.
+    if (_roomMoveAnchor != null) {
+      _clearRoomMoveState();
+      onStateChanged();
+      return;
+    }
+
     // Revert wall drag.
     if (_dragHandle != null) {
       // ADR-012 rect-reshape mutates no state during onDragUpdate,
@@ -1196,6 +1338,30 @@ class SelectTool extends CanvasTool {
 
   @override
   InteractionData? getInteractionData() {
+    // ADR-016: room-move ghost takes priority while a room is in flight.
+    if (_roomMoveDragActive && _roomMoveRoom != null) {
+      final dx = _roomMoveDelta.x;
+      final dy = _roomMoveDelta.y;
+      final wallLines = <(Point2D, Point2D)>[
+        for (final w in _roomMoveWallsAtStart)
+          (
+            Point2D(x: w.startPoint.x + dx, y: w.startPoint.y + dy),
+            Point2D(x: w.endPoint.x + dx, y: w.endPoint.y + dy),
+          ),
+      ];
+      final zonePolys = <List<Point2D>>[
+        for (final z in _roomMoveZonesAtStart)
+          [
+            for (final p in z.polygon)
+              Point2D(x: p.x + dx, y: p.y + dy),
+          ],
+      ];
+      return RoomMoveGhostData(
+        wallLines: wallLines,
+        zonePolygons: zonePolys,
+      );
+    }
+
     // ADR-012 rect-reshape ghost preview takes priority while
     // the drag is in progress. Uses RectDrawData so the painter
     // renders the same four-wall outline + width/height
@@ -2616,6 +2782,304 @@ class SelectTool extends CanvasTool {
   }
 
   // ================================================================
+  // ADR-016: move entire room by interior drag
+  // ================================================================
+
+  /// Returns true when [worldPoint] lies inside some room polygon and
+  /// is NOT within a wall hit-band (ADR-016 Rule 1).
+  ///
+  /// "Inside a room interior" is the trigger condition for a room-move
+  /// drag; it is also what gates the grab/grabbing cursor. The wall
+  /// hit-band exclusion delegates to [_hitTestWall], which uses the
+  /// same 100 mm half-thickness already used for wall selection — so
+  /// "near a wall" never arms a room move.
+  bool _isRoomInteriorHit(Point2D worldPoint) {
+    // Disqualify: pointer over any opening / circuit / distributor.
+    if (_hitTestWindow(worldPoint) != null) return false;
+    if (_hitTestDoor(worldPoint) != null) return false;
+    if (_hitTestCircuit(worldPoint) != null) return false;
+    final dist = callbacks.currentDistributor;
+    if (dist != null && _isPointOnDistributor(worldPoint, dist)) {
+      return false;
+    }
+    // Disqualify: pointer inside a wall hit-band.
+    if (_hitTestWall(worldPoint) != null) return false;
+    // Qualify only if some room polygon contains the point.
+    for (final r in callbacks.currentRooms) {
+      if (r.polygon.length >= 3 &&
+          GeometryUtils.containsPoint(r.polygon, worldPoint)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Smallest-area room containing [worldPoint], matching the
+  /// hit-stack room ordering used elsewhere in this tool.
+  Room? _roomContaining(Point2D worldPoint) {
+    final rooms = callbacks.currentRooms
+        .where(
+          (r) =>
+              r.polygon.length >= 3 &&
+              GeometryUtils.containsPoint(r.polygon, worldPoint),
+        )
+        .toList()
+      ..sort(
+        (a, b) => GeometryUtils.area(a.polygon)
+            .compareTo(GeometryUtils.area(b.polygon)),
+      );
+    return rooms.isEmpty ? null : rooms.first;
+  }
+
+  /// Arm the room-move gesture when [worldPoint] qualifies as a room
+  /// interior with no competing element (ADR-016 Rule 1).
+  ///
+  /// The arming snapshots the room, its walls, its zones, and the full
+  /// pre-move state so:
+  ///   - the drag's ghost can translate the snapshot every frame
+  ///     without touching live state,
+  ///   - the commit uses the original geometry as the source of truth,
+  ///   - the "Move room" undo command can revert detaches, splits, and
+  ///     mirror-copy insertions atomically (Rule 5).
+  void _armRoomMoveIfApplicable(Point2D worldPoint) {
+    if (!_isRoomInteriorHit(worldPoint)) return;
+    final room = _roomContaining(worldPoint);
+    if (room == null) return;
+
+    _roomPointerInside = true;
+    _roomMoveAnchor = worldPoint;
+    _roomMoveRoom = room;
+    _roomMoveDragActive = false;
+    _roomMoveDelta = const Point2D(x: 0, y: 0);
+    _roomMoveWallsAtStart = callbacks.currentWalls
+        .where((w) => w.roomId == room.id)
+        .toList(growable: false);
+    _roomMoveZonesAtStart = callbacks.currentZones
+        .where((z) => z.roomId == room.id)
+        .toList(growable: false);
+    _roomMoveOldWalls =
+        List<WallSegment>.unmodifiable(callbacks.currentWalls);
+    _roomMoveOldRooms =
+        List<Room>.unmodifiable(callbacks.currentRooms);
+    _roomMoveOldZones =
+        List<HeatingZone>.unmodifiable(callbacks.currentZones);
+    onStateChanged();
+  }
+
+  /// Compute the translation delta for the current cursor (ADR-016 R2).
+  ///
+  /// Default = grid-snapped vector `cursor − anchor`. With Alt held the
+  /// raw cursor wins (free placement, matching other tools' convention).
+  Point2D _computeRoomMoveDelta(Point2D cursor) {
+    final anchor = _roomMoveAnchor!;
+    if (_altHeld) {
+      return Point2D(x: cursor.x - anchor.x, y: cursor.y - anchor.y);
+    }
+    // Snap the *delta* to the grid so the rigid translation lands on
+    // grid-aligned positions regardless of where the press started.
+    final spacing = callbacks.currentGridSpacingMm;
+    final dx = ((cursor.x - anchor.x) / spacing).roundToDouble() * spacing;
+    final dy = ((cursor.y - anchor.y) / spacing).roundToDouble() * spacing;
+    return Point2D(x: dx, y: dy);
+  }
+
+  void _clearRoomMoveState() {
+    _roomPointerInside = false;
+    _roomMoveAnchor = null;
+    _roomMoveRoom = null;
+    _roomMoveWallsAtStart = const [];
+    _roomMoveZonesAtStart = const [];
+    _roomMoveOldWalls = const [];
+    _roomMoveOldRooms = const [];
+    _roomMoveOldZones = const [];
+    _roomMoveDragActive = false;
+    _roomMoveDelta = const Point2D(x: 0, y: 0);
+  }
+
+  /// Reconcile the moved room against existing rooms on drop (ADR-016
+  /// Rules 3–6).
+  ///
+  /// Pipeline (faithful reuse of the room-draw path; no shared-wall
+  /// logic is re-implemented here):
+  ///
+  ///   1. Snapshot the post-detach delta corner so any nearby existing
+  ///      corner can fold into the translation (ADR-009 Rule 1
+  ///      `snapRectCorner`). The whole-room translation stays rigid:
+  ///      one corner's snap delta is applied uniformly to every wall.
+  ///   2. Detach any shared-wall partner of the moved room. The partner
+  ///      reverts to `exterior` with `mirrorId` / `adjacentRoomId`
+  ///      cleared on both sides (Rule 3); the moved room's own copy is
+  ///      removed in step 3 anyway.
+  ///   3. Remove the moved room's walls and its Room entity so the
+  ///      room-draw pipeline (`commitWallWithSplit` +
+  ///      `addRoomFromDetection`) can re-create them at the destination.
+  ///   4. For each translated edge, either reuse a matching existing
+  ///      room wall (`SnapService.matchExistingWall`, 50 mm both
+  ///      endpoints — same matcher as `WallDrawTool` rect mode) or
+  ///      create a fresh unassigned wall and route it through
+  ///      `commitWallWithSplit` (ADR-003 host-wall split).
+  ///   5. `addRoomFromDetection` re-adds the room with its original id
+  ///      / name / temperature and the new wall ids; promote +
+  ///      ADR-001 mirror copy + ADR-011 `mirrorId` linkage happen
+  ///      inside that one call.
+  ///   6. Translate each zone polygon by the same delta.
+  ///   7. Push one "Move room" command that snapshots the full final
+  ///      state so a single Ctrl+Z reverts the move including
+  ///      regenerated / severed shared walls (Rule 5).
+  void _commitRoomMove(Point2D rawCursor) {
+    final room = _roomMoveRoom;
+    if (room == null) return;
+    var delta = _computeRoomMoveDelta(rawCursor);
+
+    // (1) ADR-009 Rule 1 corner snap on the translated corners; pick the
+    // nearest snap and fold its offset back into the whole-room delta so
+    // the translation stays rigid (no shearing).
+    if (!_altHeld) {
+      final otherWalls = callbacks.currentWalls
+          .where((w) => w.roomId != room.id)
+          .toList(growable: false);
+      double bestAdjX = 0;
+      double bestAdjY = 0;
+      double bestDist = double.infinity;
+      for (final w in _roomMoveWallsAtStart) {
+        for (final ep in [w.startPoint, w.endPoint]) {
+          final translated = Point2D(x: ep.x + delta.x, y: ep.y + delta.y);
+          final snapped = SnapService.snapRectCorner(
+            translated,
+            otherWalls,
+            callbacks.currentGridSpacingMm,
+          );
+          if (snapped == translated) continue;
+          final adjX = snapped.x - translated.x;
+          final adjY = snapped.y - translated.y;
+          final d = adjX * adjX + adjY * adjY;
+          if (d < bestDist) {
+            bestDist = d;
+            bestAdjX = adjX;
+            bestAdjY = adjY;
+          }
+        }
+      }
+      if (bestDist != double.infinity) {
+        delta = Point2D(x: delta.x + bestAdjX, y: delta.y + bestAdjY);
+      }
+    }
+
+    // Pure-rotation-no-translation: a click without drag past threshold
+    // never reaches _commitRoomMove (the deferred-tap branch handles
+    // that), but a drag that snapped back to zero is still a no-op.
+    if (delta.x == 0 && delta.y == 0) return;
+
+    // (2) Detach shared partners before we delete the moved room's walls.
+    // Each partner's mirrorId is nulled out *before* updateWall runs so
+    // ADR-011 mirror sync cannot pull the moved wall along with it.
+    final partnersToDetach = <WallSegment>[];
+    for (final w in _roomMoveWallsAtStart) {
+      final partnerId = w.mirrorId;
+      if (partnerId == null) continue;
+      final partner = callbacks.currentWalls
+          .where((p) => p.id == partnerId)
+          .firstOrNull;
+      if (partner == null) continue;
+      partnersToDetach.add(
+        partner.copyWith(
+          wallType: WallType.exterior,
+          adjacentRoomId: null,
+          mirrorId: null,
+        ),
+      );
+    }
+    for (final detached in partnersToDetach) {
+      callbacks.updateWall(detached);
+    }
+
+    // (3) Remove the moved room's walls and the Room entity, so the
+    // reconciliation can recreate them via the room-draw pipeline. The
+    // Room object itself is re-added in step (5) with the same id /
+    // name / temp / etc. — only `polygon` is translated.
+    for (final w in _roomMoveWallsAtStart) {
+      callbacks.removeWall(w.id);
+    }
+    callbacks.destroyRoom(room.id);
+
+    // (4) Recreate edges. For each pre-move wall translate its endpoints
+    // by `delta`, then either match an existing room-assigned wall
+    // (50 mm both endpoints, ADR-009 Rule 2) or insert a fresh wall via
+    // `commitWallWithSplit` (ADR-003 host split when an endpoint lands
+    // mid-wall). The collected `roomWallIds` are passed to
+    // `addRoomFromDetection` in step (5).
+    final wallIdsForRoom = <String>[];
+    for (final w in _roomMoveWallsAtStart) {
+      final a = Point2D(x: w.startPoint.x + delta.x, y: w.startPoint.y + delta.y);
+      final b = Point2D(x: w.endPoint.x + delta.x, y: w.endPoint.y + delta.y);
+      final match = SnapService.matchExistingWall(
+        a,
+        b,
+        callbacks.currentWalls,
+      );
+      if (match != null) {
+        wallIdsForRoom.add(match.id);
+        continue;
+      }
+      final fresh = WallSegment(
+        id: IdGenerator.newId(),
+        roomId: '',
+        startPoint: a,
+        endPoint: b,
+        constructionId: w.constructionId,
+      );
+      callbacks.commitWallWithSplit(fresh);
+      wallIdsForRoom.add(fresh.id);
+    }
+
+    // (5) Re-add the moved room with translated polygon via the same
+    // promote-+-mirror pipeline used by room drawing. Room identity
+    // (id, name, target temp, …) is preserved.
+    final translatedPolygon = [
+      for (final p in room.polygon)
+        Point2D(x: p.x + delta.x, y: p.y + delta.y),
+    ];
+    callbacks.addRoomFromDetection(
+      room: room.copyWith(polygon: translatedPolygon),
+      wallIds: wallIdsForRoom,
+    );
+
+    // (6) Translate the room's zones by the same delta. roomId stays
+    // unchanged so zone-to-room linkage survives the move.
+    for (final z in _roomMoveZonesAtStart) {
+      final newPoly = [
+        for (final v in z.polygon)
+          Point2D(x: v.x + delta.x, y: v.y + delta.y),
+      ];
+      callbacks.updateZone(z.copyWith(polygon: newPoly));
+    }
+
+    // (7) Snapshot the post-state and push a single undo command that
+    // atomically reverts every change in one Ctrl+Z (Rule 5).
+    final newWalls = List<WallSegment>.unmodifiable(callbacks.currentWalls);
+    final newRooms = List<Room>.unmodifiable(callbacks.currentRooms);
+    final newZones = List<HeatingZone>.unmodifiable(callbacks.currentZones);
+
+    undoRedo.execute(_MoveRoomCommand(
+      callbacks: callbacks,
+      oldWalls: _roomMoveOldWalls,
+      oldRooms: _roomMoveOldRooms,
+      oldZones: _roomMoveOldZones,
+      newWalls: newWalls,
+      newRooms: newRooms,
+      newZones: newZones,
+    ));
+
+    // Keep the moved room selected so the properties panel updates.
+    _selectedRoom = callbacks.currentRooms
+        .where((r) => r.id == room.id)
+        .firstOrNull;
+    if (_selectedRoom != null) {
+      callbacks.selectElement('room', _selectedRoom!.id);
+    }
+  }
+
+  // ================================================================
   // Misc helpers
   // ================================================================
 
@@ -3378,6 +3842,45 @@ class _RectReshapeCommand extends Command {
   @override
   void undo() =>
       callbacks.replaceAllWallsAndRooms(oldWalls, oldRooms);
+}
+
+/// Command: ADR-016 move entire room — walls + rooms + zones replaced
+/// atomically so a single Ctrl+Z reverts the whole move including
+/// regenerated / severed shared walls and translated zones.
+///
+/// Mirrors [_RectReshapeCommand] / [_RectDrawCommand] (the existing
+/// before/after snapshot pattern in this codebase); the only difference
+/// is that this command also captures zones because the moved room's
+/// `HeatingZone` polygons translated with the room.
+class _MoveRoomCommand extends Command {
+  _MoveRoomCommand({
+    required this.callbacks,
+    required this.oldWalls,
+    required this.oldRooms,
+    required this.oldZones,
+    required this.newWalls,
+    required this.newRooms,
+    required this.newZones,
+  });
+
+  final EditorCallbacks callbacks;
+  final List<WallSegment> oldWalls;
+  final List<Room> oldRooms;
+  final List<HeatingZone> oldZones;
+  final List<WallSegment> newWalls;
+  final List<Room> newRooms;
+  final List<HeatingZone> newZones;
+
+  @override
+  String get label => 'Move room';
+
+  @override
+  void execute() =>
+      callbacks.replaceAllWallsRoomsZones(newWalls, newRooms, newZones);
+
+  @override
+  void undo() =>
+      callbacks.replaceAllWallsRoomsZones(oldWalls, oldRooms, oldZones);
 }
 
 /// Command: move a zone polygon (vertex drag or body drag).

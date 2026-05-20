@@ -33,7 +33,8 @@ This file is maintained by the prompt engineer. Update it whenever the user conf
 | Draw rooms (polygon tool) | ✅ | |
 | Room persistence across restarts | ✅ | |
 | Room properties panel | ✅ | |
-| Rectangular room width/height in properties (editable) | 🔧 | ADR-015; reuses ADR-012 reshape path |
+| Rectangular room width/height in properties (editable) | ✅ | ADR-015; reuses ADR-012 reshape path |
+| Move entire room (interior drag) | 🔧 | ADR-016; reuses room-draw reconciliation path |
 
 ---
 

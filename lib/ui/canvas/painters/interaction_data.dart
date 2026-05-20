@@ -318,6 +318,30 @@ enum RoutePhase {
   returnLine,
 }
 
+/// Ghost preview shown while moving an entire room (ADR-016).
+///
+/// Produced by [SelectTool] during a room-interior drag. The
+/// painter renders each wall as a dashed outline and each
+/// heating zone as a translucent polygon at the translated
+/// position so the user sees the whole room follow the cursor.
+/// Adjacent rooms are not part of this preview — they stay put
+/// until the drop reconciles shared walls.
+@immutable
+class RoomMoveGhostData extends InteractionData {
+  /// Creates [RoomMoveGhostData].
+  const RoomMoveGhostData({
+    required this.wallLines,
+    this.zonePolygons = const [],
+  });
+
+  /// Translated wall segments as `(start, end)` point pairs (world mm).
+  final List<(Point2D, Point2D)> wallLines;
+
+  /// Translated heating-zone polygons (world mm). Each inner list is one
+  /// zone's closed polygon. Empty when the moved room has no zones.
+  final List<List<Point2D>> zonePolygons;
+}
+
 /// Ghost rectangle shown while drawing walls with Ctrl+drag.
 ///
 /// Produced by [WallDrawTool] in rect mode ([_rectMode] active).

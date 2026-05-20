@@ -308,6 +308,19 @@ Modifier flags are independent — `_orthoSnap` and `_freePlacement` may both be
 
 **Rect-mode dimension-matching snap (ADR-010):** After `snapRectCorner`, apply `SnapService.snapRectDimension(dragStart, dragEnd, walls)` to the drag-end at `onDragEnd`. This overrides individual axes when the grid-snapped drag-end coordinate is within **100 mm** of a wall endpoint that shares the corresponding axis coordinate with the snapped drag-start (same x-column → candidate y-snap; same y-row → candidate x-snap). Ensures the new room matches the height or width of the adjacent room's shared wall even when grid snap would land on the wrong line. See `DECISIONS.md ADR-010` for full rules and threshold rationale.
 
+#### SelectTool — move entire room (ADR-016)
+
+`SelectTool` gains a room-interior drag: pointer-down inside a room polygon
+(not on a wall hit-band or handle) and drag → translate the whole room (all
+its walls, its `polygon`, and its `HeatingZone` polygons) by the grid-snapped
+delta; a press without drag still only selects. On drop, **reuse the existing
+room-draw shared-wall reconciliation path** (`commitWallWithSplit` / the
+ADR-009 edge-match — promote-to-interior, ADR-001 mirror copy, ADR-003 split,
+ADR-011 `mirrorId`); do not reimplement shared-wall logic. Walls that were
+shared but no longer coincide revert to exterior with `mirrorId` cleared on
+both sides. The whole move is one `state.copyWith` and one `UndoRedoService`
+"Move room" command. See `DECISIONS.md` ADR-016.
+
 ### 4.5 Snapping Implementation
 
 Implement snapping in a `SnapService` utility class consumed by all tools.

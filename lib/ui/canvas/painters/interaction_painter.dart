@@ -183,6 +183,8 @@ class InteractionPainter extends CustomPainter {
             Offset(corner1.x, corner1.y),
             Offset(corner2.x, corner2.y),
           );
+        case RoomMoveGhostData(:final wallLines, :final zonePolygons):
+          _drawRoomMoveGhost(canvas, wallLines, zonePolygons);
         case RouteDrawData(
               :final phase,
               :final supplyPoints,
@@ -468,6 +470,56 @@ class InteractionPainter extends CustomPainter {
       '$heightMm mm',
       Offset(rect.right + 30, rect.center.dy),
     );
+  }
+
+  /// Draws the moving-room ghost (ADR-016): a dashed outline for each
+  /// translated wall plus a translucent fill for each translated zone.
+  ///
+  /// Matches the existing ghost-line styling so the user perceives the
+  /// whole room as "in flight" without committing to anything.
+  void _drawRoomMoveGhost(
+    Canvas canvas,
+    List<(Point2D, Point2D)> wallLines,
+    List<List<Point2D>> zonePolygons,
+  ) {
+    final highlight = selectionHighlightColor ?? Colors.blue;
+
+    // Zone fills, drawn first so wall outlines sit on top.
+    if (zonePolygons.isNotEmpty) {
+      final zoneFill = Paint()
+        ..color = highlight.withValues(alpha: 0.18)
+        ..style = PaintingStyle.fill;
+      final zoneStroke = Paint()
+        ..color = highlight.withValues(alpha: 0.55)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 4.0;
+      for (final poly in zonePolygons) {
+        if (poly.length < 3) continue;
+        final path = Path()..moveTo(poly.first.x, poly.first.y);
+        for (var i = 1; i < poly.length; i++) {
+          path.lineTo(poly[i].x, poly[i].y);
+        }
+        path.close();
+        canvas.drawPath(path, zoneFill);
+        canvas.drawPath(path, zoneStroke);
+      }
+    }
+
+    // Walls: dashed lines so the ghost is distinct from committed walls.
+    final ghostPaint = Paint()
+      ..color = highlight
+      ..strokeWidth = 6.0
+      ..style = PaintingStyle.stroke;
+    for (final line in wallLines) {
+      final (a, b) = line;
+      _drawDashedLine(
+        canvas,
+        Offset(a.x, a.y),
+        Offset(b.x, b.y),
+        ghostPaint,
+        30.0,
+      );
+    }
   }
 
   void _drawRectAnnotation(Canvas canvas, String text, Offset position) {

@@ -378,6 +378,24 @@ Mid-handle drag (move-entire-wall) is unaffected by modifier keys.
 - Single element (window, door, zone): immediate delete with undo support.
 - Distributor: confirmation dialog ("Delete distributor and all connected circuits?")
 
+#### 5.6.3 Move Entire Room (Interior Drag)
+
+Press inside a room's interior (not on a wall or wall handle) and drag to
+move the whole room. A press-release without drag still only selects the
+room (§5.6 table) — drag past the standard threshold to move.
+
+1. Cursor changes to the grab/grabbing hand (§6.2).
+2. A ghost of the whole room (all walls + its heating zones) follows the
+   cursor; the translation snaps to grid (Alt = free placement).
+3. Windows and doors move with their host walls automatically.
+4. Adjacent rooms stay put during the drag.
+5. On release: if the moved room's walls now coincide with another room's
+   walls, shared walls are regenerated automatically — the result is
+   identical to redrawing the room at that position. Walls that were shared
+   before the move but no longer coincide revert to exterior.
+6. Single undo entry "Move room" reverts the entire move. See
+   `DECISIONS.md` ADR-016.
+
 ### 5.7 Wall Construction Editor (Modal)
 
 ```

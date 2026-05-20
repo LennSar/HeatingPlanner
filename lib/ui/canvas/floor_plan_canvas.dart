@@ -307,6 +307,27 @@ class _FloorPlanCanvasState
         .replaceAllWallsAndRooms(walls, rooms);
   }
 
+  @override
+  void replaceAllWallsRoomsZones(
+    List<WallSegment> walls,
+    List<Room> rooms,
+    List<HeatingZone> zones,
+  ) {
+    ref
+        .read(editorStateProvider.notifier)
+        .replaceAllWallsRoomsZones(walls, rooms, zones);
+  }
+
+  @override
+  void addRoomFromDetection({
+    required Room room,
+    required List<String> wallIds,
+  }) {
+    ref
+        .read(editorStateProvider.notifier)
+        .addRoomFromDetection(room: room, wallIds: wallIds);
+  }
+
   // ---- Windows ----
 
   @override
@@ -785,7 +806,12 @@ class _FloorPlanCanvasState
       }
       final st = _tools[DrawingTool.select];
       if (st is SelectTool) {
-        st.updateModifiers(ctrl: mods.rectMode);
+        // Alt is forwarded so ADR-016 room-move can disable grid snap
+        // (free placement, consistent with the other tools).
+        st.updateModifiers(
+          ctrl: mods.rectMode,
+          alt: mods.freePlacement,
+        );
       }
     });
 
@@ -1038,8 +1064,14 @@ class _FloorPlanCanvasState
     // a rectangle-eligible room.
     if (tool == DrawingTool.select) {
       final st = _tools[DrawingTool.select];
-      if (st is SelectTool && st.shouldUseRectCrosshair) {
-        return SystemMouseCursors.precise;
+      if (st is SelectTool) {
+        if (st.shouldUseRectCrosshair) {
+          return SystemMouseCursors.precise;
+        }
+        // ADR-016 / UI/UX §6.2: grab when hovering a room interior;
+        // grabbing while the move drag is active.
+        if (st.isMovingRoom) return SystemMouseCursors.grabbing;
+        if (st.shouldUseGrabCursor) return SystemMouseCursors.grab;
       }
       return SystemMouseCursors.basic;
     }

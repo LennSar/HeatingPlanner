@@ -80,6 +80,17 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   void replaceAllWallsAndRooms(List<WallSegment> walls, List<Room> rooms) {}
   @override
+  void replaceAllWallsRoomsZones(
+    List<WallSegment> walls,
+    List<Room> rooms,
+    List<HeatingZone> zones,
+  ) {}
+  @override
+  void addRoomFromDetection({
+    required Room room,
+    required List<String> wallIds,
+  }) {}
+  @override
   void commitWindow(WindowElement window) {}
   @override
   void updateWindow(WindowElement window) {}

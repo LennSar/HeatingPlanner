@@ -52,6 +52,28 @@ abstract class EditorCallbacks {
     List<Room> rooms,
   );
 
+  /// Replace walls, rooms, and heating zones atomically (for undo/redo).
+  ///
+  /// Used by the ADR-016 "Move room" command so a single Ctrl+Z reverts
+  /// the entire move — including any shared walls regenerated on drop
+  /// and the moved room's heating zones.
+  void replaceAllWallsRoomsZones(
+    List<WallSegment> walls,
+    List<Room> rooms,
+    List<HeatingZone> zones,
+  );
+
+  /// Reconcile a room against its walls using the room-draw shared-wall
+  /// pipeline (ADR-001 mirror copy, ADR-011 mirrorId, promote-to-interior).
+  ///
+  /// Exposed for tools that re-commit a room without going through the
+  /// room-detection dialog — currently the ADR-016 move-room flow in
+  /// [SelectTool]. Wraps `EditorStateNotifier.addRoomFromDetection`.
+  void addRoomFromDetection({
+    required Room room,
+    required List<String> wallIds,
+  });
+
   // ---- Windows ----
 
   /// Commit a new window element to the editor state.

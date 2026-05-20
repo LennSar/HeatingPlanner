@@ -52,39 +52,6 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
   /// Minimum wall length in mm (prevents zero-length walls).
   static const double _minLengthMm = 100.0;
 
-  /// Endpoint-match tolerance for rect-mode shared-wall detection (mm).
-  ///
-  /// Both endpoints of a candidate edge must be within this distance of
-  /// the corresponding endpoints of an existing room wall (either
-  /// forward or reversed) for the edge to be considered a match
-  /// (ADR-009 §Rule 2).
-  static const double _edgeMatchToleranceMm = 50.0;
-
-  /// Returns the first existing room-assigned wall whose geometry
-  /// matches the edge [a]→[b] within [_edgeMatchToleranceMm] on
-  /// **both** endpoints (direction-agnostic).
-  ///
-  /// Used by rect-mode to reuse an existing shared-boundary wall
-  /// instead of inserting a duplicate segment (ADR-009 §Rules 2–3).
-  WallSegment? _findMatchingWall(
-    Point2D a,
-    Point2D b,
-    List<WallSegment> candidates,
-  ) {
-    for (final w in candidates) {
-      if (w.roomId.isEmpty) continue;
-      const tol = _edgeMatchToleranceMm;
-      final fwdMatch =
-          GeometryEngine.distanceMm(w.startPoint, a) <= tol &&
-          GeometryEngine.distanceMm(w.endPoint, b) <= tol;
-      final revMatch =
-          GeometryEngine.distanceMm(w.startPoint, b) <= tol &&
-          GeometryEngine.distanceMm(w.endPoint, a) <= tol;
-      if (fwdMatch || revMatch) return w;
-    }
-    return null;
-  }
-
   @override
   String get name => 'Draw Wall';
 
@@ -193,7 +160,7 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
     WallSegment? firstNewWall;
     WallSegment? lastEffectiveWall;
     for (final (a, b) in [(tl, tr), (tr, br), (br, bl), (bl, tl)]) {
-      final match = _findMatchingWall(a, b, oldWalls);
+      final match = SnapService.matchExistingWall(a, b, oldWalls);
       if (match != null) {
         // Reuse the existing wall; addRoomFromDetection will promote it
         // to WallType.interior and insert the ADR-001 mirror copy.

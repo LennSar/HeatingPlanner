@@ -136,6 +136,27 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   void replaceAllWallsAndRooms(List<WallSegment> walls, List<Room> rooms) {}
   @override
+  void replaceAllWallsRoomsZones(
+    List<WallSegment> walls,
+    List<Room> rooms,
+    List<HeatingZone> zones,
+  ) {
+    _walls
+      ..clear()
+      ..addAll(walls);
+    _rooms
+      ..clear()
+      ..addAll(rooms);
+    _zones
+      ..clear()
+      ..addAll(zones);
+  }
+  @override
+  void addRoomFromDetection({
+    required Room room,
+    required List<String> wallIds,
+  }) {}
+  @override
   void commitWindow(WindowElement window) {}
   @override
   void updateWindow(WindowElement window) {}
@@ -1160,6 +1181,26 @@ class _ReshapeStubCallbacks implements EditorCallbacks {
   }
 
   @override
+  void replaceAllWallsRoomsZones(
+    List<WallSegment> walls,
+    List<Room> rooms,
+    List<HeatingZone> zones,
+  ) {
+    _walls
+      ..clear()
+      ..addAll(walls);
+    _rooms
+      ..clear()
+      ..addAll(rooms);
+  }
+
+  @override
+  void addRoomFromDetection({
+    required Room room,
+    required List<String> wallIds,
+  }) {}
+
+  @override
   void showToast(String message) => _toasts.add(message);
 
   @override
@@ -1293,6 +1334,21 @@ class _ProviderBridgeCallbacks implements EditorCallbacks {
     List<Room> rooms,
   ) =>
       _notifier.replaceAllWallsAndRooms(walls, rooms);
+
+  @override
+  void replaceAllWallsRoomsZones(
+    List<WallSegment> walls,
+    List<Room> rooms,
+    List<HeatingZone> zones,
+  ) =>
+      _notifier.replaceAllWallsRoomsZones(walls, rooms, zones);
+
+  @override
+  void addRoomFromDetection({
+    required Room room,
+    required List<String> wallIds,
+  }) =>
+      _notifier.addRoomFromDetection(room: room, wallIds: wallIds);
 
   @override
   void showToast(String message) {}

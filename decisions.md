@@ -773,3 +773,76 @@ non-rectangular rooms, and all other panels are unchanged.
 editing Width resizes with top-left fixed; < 10 cm rejected with field
 revert + toast; non-rectangular room hides the group; one Ctrl+Z reverts a
 resize.
+
+---
+
+## ADR-016 — Move entire room by interior drag; shared walls regenerated on drop
+
+**What.**
+In `SelectTool`, pressing inside a room's polygon interior (not on a wall or
+a wall handle) and dragging translates the **entire room** rigidly. A press
+without drag still only selects (existing §5.6 behaviour). During the drag
+the room is treated as fully standalone: every one of its wall segments —
+including its own copies of any currently-shared/interior walls — translates
+by the grid-snapped delta; the room's `HeatingZone` polygons translate by the
+same delta; windows/doors follow their host walls automatically. Adjacent
+rooms do **not** move (ADR-011 mirror sync is bypassed for this operation).
+
+On drop (`onDragEnd`) the moved room's walls are reconciled against all other
+rooms' walls using the **existing room-draw shared-wall pipeline** — the same
+edge-match, promote-to-interior, ADR-001 mirror copy, ADR-003 host-wall split,
+and ADR-011 `mirrorId` linkage used when a room is drawn onto an existing one.
+The post-drop graph is **identical to deleting the moved room and redrawing
+it at the destination** via the normal draw + reconciliation flow.
+
+**Why.**
+The user's mental model is "pick the room up and drop it somewhere else."
+Keeping neighbours fixed during the drag (vs. dragging them along) is
+predictable and avoids cascading multi-room moves. Regenerating shared walls
+on drop — rather than trying to preserve mirror links through the move —
+reuses one already-proven code path (ADR-001/003/009/010/011) instead of a
+second, parallel "move-aware" sync, and guarantees the move can never produce
+a graph the draw flow could not. Defining correctness as "same as redraw"
+makes the behaviour testable by equivalence.
+
+**Rule.**
+1. **Trigger.** `SelectTool`: pointer-down whose world point is inside a
+   room polygon (point-in-polygon) and *not* within a wall hit-band or a
+   selected wall's handle hit radius. Drag beyond the standard click/drag
+   threshold → move; release within threshold → select only (unchanged).
+2. **During drag.** Compute `delta = snappedCursor − dragStart`
+   (grid-snapped, Alt disables snap, consistent with other tools). Translate
+   every `WallSegment` with `roomId == movedRoom`, the room's `polygon`, and
+   every `HeatingZone` with `roomId == movedRoom` by `delta`. No mirror sync:
+   partner walls of other rooms are untouched. A ghost preview shows the
+   translating room each frame.
+3. **On drop — detach.** Any wall of the moved room that was `interior`
+   with a `mirrorId`: clear `mirrorId`/`adjacentRoomId` on both it and its
+   former partner, revert both to `exterior`. The former partner's geometry
+   is unchanged (the neighbour stays put).
+4. **On drop — reconcile.** Re-commit the moved room's walls through the
+   existing shared-wall reconciliation used by room drawing: corner snap
+   (ADR-009 Rule 1, 2×grid) and dimension snap (ADR-010) on the translated
+   corners; edge-match against other rooms' walls (50 mm both endpoints,
+   ADR-009 Rule 2); promote + ADR-001 mirror copy + ADR-011 `mirrorId`
+   (ADR-009 Rule 3); host-wall split where a moved endpoint lands mid-wall
+   (ADR-003). The `Room` entity identity is preserved — room detection is
+   **not** re-run; only geometry and shared-wall links change.
+5. **Atomicity / undo.** All translations, detaches, splits, promotions,
+   mirror-copy insertions and zone moves for one drag are one
+   `state.copyWith` and one `UndoRedoService` command "Move room"; a single
+   Ctrl+Z reverts the entire move including regenerated/severed shared walls.
+6. **Equivalence (acceptance).** For any destination, the resulting wall/
+   room/zone graph must equal the graph produced by deleting the moved room
+   and drawing an identical room at that destination.
+
+**Scope.**
+`SelectTool` room-interior drag only. Wall-handle drags (§5.6.1), ADR-012/
+015 rectangle reshape, zone move/reshape, and marquee select are unchanged.
+
+**Verification.**
+`flutter analyze` clean; widget tests: standalone room moves and zones
+follow; move next to another room regenerates a shared wall equal to the
+redraw result; moving a shared room away detaches and reverts both walls to
+exterior; one Ctrl+Z reverts a move (including shared-wall regeneration);
+a click without drag still only selects.
