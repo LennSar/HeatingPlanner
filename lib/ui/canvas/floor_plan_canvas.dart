@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show mapEquals;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -1029,25 +1030,59 @@ class _FloorPlanCanvasState
                     .colorScheme
                     .surface,
                 child: ClipRect(
-                  child: CustomPaint(
-                    size: viewSize,
-                    painter: _CanvasCompositePainter(
-                      transform: canvasState.transform,
-                      gridSpacingMm: gridSpacingMm,
-                      visibleRect: visibleRect,
-                      colors: colors,
-                      onSurface: onSurface,
-                      hoverWorldPoint: _hoverWorldPoint,
-                      walls: editorState.walls,
-                      windows: editorState.windows,
-                      doors: editorState.doors,
-                      zones: editorState.zones,
-                      zoneStates: zoneStates,
-                      circuits: editorState.circuits,
-                      distributor: editorState.distributor,
-                      interactionData: _interactionData,
-                      hoveredElement: hoveredElement,
-                    ),
+                  // Three independent layers, each behind its own
+                  // RepaintBoundary so pointer-move repaints touch
+                  // only the interaction layer.
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      RepaintBoundary(
+                        child: CustomPaint(
+                          size: viewSize,
+                          painter: _StaticWorldPainter(
+                            transform: canvasState.transform,
+                            gridSpacingMm: gridSpacingMm,
+                            visibleRect: visibleRect,
+                            colors: colors,
+                            onSurface: onSurface,
+                            walls: editorState.walls,
+                            windows: editorState.windows,
+                            doors: editorState.doors,
+                            zones: editorState.zones,
+                            zoneStates: zoneStates,
+                            circuits: editorState.circuits,
+                            distributor: editorState.distributor,
+                          ),
+                        ),
+                      ),
+                      RepaintBoundary(
+                        child: CustomPaint(
+                          size: viewSize,
+                          painter: _HoverHighlightLayerPainter(
+                            transform: canvasState.transform,
+                            hoveredElement: hoveredElement,
+                            walls: editorState.walls,
+                            zones: editorState.zones,
+                            circuits: editorState.circuits,
+                            distributor: editorState.distributor,
+                          ),
+                        ),
+                      ),
+                      RepaintBoundary(
+                        child: CustomPaint(
+                          size: viewSize,
+                          painter: _InteractionLayerPainter(
+                            transform: canvasState.transform,
+                            interactionData: _interactionData,
+                            hoverWorldPoint: _hoverWorldPoint,
+                            selectionHighlightColor:
+                                colors.selectionHighlight,
+                            supplyPipeColor: colors.supplyPipe,
+                            returnPipeColor: colors.returnPipe,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -1118,10 +1153,15 @@ class _FloorPlanCanvasState
   }
 }
 
-/// Composite painter that draws all layers in order,
-/// applying the world transform internally.
-class _CanvasCompositePainter extends CustomPainter {
-  const _CanvasCompositePainter({
+/// Paints the non-interactive world layers — grid, zones, walls, openings,
+/// distributor, pipe routes, annotations — under a single transform setup.
+///
+/// Sits behind its own [RepaintBoundary] so a pointer-move that only changes
+/// hover/interaction state will not repaint this layer: [shouldRepaint]
+/// compares structural inputs (geometry lists, zone-state map, transform,
+/// theme colours) and returns false when none of them changed.
+class _StaticWorldPainter extends CustomPainter {
+  const _StaticWorldPainter({
     required this.transform,
     required this.gridSpacingMm,
     required this.visibleRect,
@@ -1134,9 +1174,6 @@ class _CanvasCompositePainter extends CustomPainter {
     required this.zoneStates,
     required this.circuits,
     this.distributor,
-    this.hoverWorldPoint,
-    this.interactionData,
-    this.hoveredElement,
   });
 
   final Matrix4 transform;
@@ -1144,7 +1181,6 @@ class _CanvasCompositePainter extends CustomPainter {
   final Rect visibleRect;
   final HeatingPlannerColors colors;
   final Color onSurface;
-  final Offset? hoverWorldPoint;
   final List<WallSegment> walls;
   final List<WindowElement> windows;
   final List<Door> doors;
@@ -1152,22 +1188,18 @@ class _CanvasCompositePainter extends CustomPainter {
   final Map<String, ZoneColorState> zoneStates;
   final List<HeatingCircuit> circuits;
   final Distributor? distributor;
-  final InteractionData? interactionData;
-  final SelectedElement? hoveredElement;
 
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
     canvas.transform(transform.storage);
 
-    // Layer 1: Grid
     GridPainter(
       gridSpacingMm: gridSpacingMm,
       visibleRect: visibleRect,
       dotColor: colors.gridDot,
     ).paint(canvas, size);
 
-    // Layer 2: Heating zones
     HeatingZonePainter(
       zoneGreen: colors.zoneGreen,
       zoneYellow: colors.zoneYellow,
@@ -1178,14 +1210,12 @@ class _CanvasCompositePainter extends CustomPainter {
       zoneStates: zoneStates,
     ).paint(canvas, size);
 
-    // Layer 3: Walls
     WallPainter(
       wallFill: colors.wallFill,
       wallStroke: colors.wallStroke,
       walls: walls,
     ).paint(canvas, size);
 
-    // Layer 4: Openings (windows + doors)
     OpeningPainter(
       windowFill: colors.windowFill,
       doorFill: colors.doorFill,
@@ -1194,7 +1224,6 @@ class _CanvasCompositePainter extends CustomPainter {
       doors: doors,
     ).paint(canvas, size);
 
-    // Layer 5: Distributor
     if (distributor != null) {
       DistributorPainter(
         distributor: distributor!,
@@ -1204,44 +1233,70 @@ class _CanvasCompositePainter extends CustomPainter {
       ).paint(canvas, size);
     }
 
-    // Layer 6: Pipe routes
     PipeRoutePainter(
       supplyPipe: colors.supplyPipe,
       returnPipe: colors.returnPipe,
       circuits: circuits,
     ).paint(canvas, size);
 
-    // Layer 6: Annotations
-    AnnotationPainter(textColor: onSurface)
-        .paint(canvas, size);
-
-    // Layer 7: Interaction (no RepaintBoundary)
-    InteractionPainter(
-      hoverPoint: hoverWorldPoint,
-      selectionHighlightColor: colors.selectionHighlight,
-      supplyPipeColor: colors.supplyPipe,
-      returnPipeColor: colors.returnPipe,
-      interactionData: interactionData,
-    ).paint(canvas, size);
-
-    // Layer 8: Hover highlight from warning-row hover (§5.8).
-    _paintHoverHighlight(canvas);
+    AnnotationPainter(textColor: onSurface).paint(canvas, size);
 
     canvas.restore();
   }
 
-  /// Draws a 2px [hoverHighlight]-coloured outline (60 % opacity) around
-  /// the element identified by [hoveredElement], matching the spec §5.8.
-  ///
-  /// Element types handled: wall, zone, circuit, distributor.
-  /// Rooms are highlighted by outlining every wall whose roomId matches.
-  void _paintHoverHighlight(Canvas canvas) {
-    final hovered = hoveredElement;
-    if (hovered == null) return;
+  @override
+  bool shouldRepaint(_StaticWorldPainter oldDelegate) {
+    return transform != oldDelegate.transform ||
+        gridSpacingMm != oldDelegate.gridSpacingMm ||
+        visibleRect != oldDelegate.visibleRect ||
+        !identical(colors, oldDelegate.colors) ||
+        onSurface != oldDelegate.onSurface ||
+        !identical(walls, oldDelegate.walls) ||
+        !identical(windows, oldDelegate.windows) ||
+        !identical(doors, oldDelegate.doors) ||
+        !identical(zones, oldDelegate.zones) ||
+        !mapEquals(zoneStates, oldDelegate.zoneStates) ||
+        !identical(circuits, oldDelegate.circuits) ||
+        distributor != oldDelegate.distributor;
+  }
+}
 
-    // The canvas is in world-coordinate space. strokeWidth must be in world mm.
-    // Target 8 screen pixels so the stroke is visible at all zoom levels.
-    final scale = transform.storage[0]; // px per mm
+/// Paints the §5.8 warning-row hover highlight only.
+///
+/// Lives behind its own [RepaintBoundary]; only repaints when the hovered
+/// element, the world transform, or the underlying geometry changes — pointer
+/// motion alone does not invalidate this layer.
+class _HoverHighlightLayerPainter extends CustomPainter {
+  const _HoverHighlightLayerPainter({
+    required this.transform,
+    required this.hoveredElement,
+    required this.walls,
+    required this.zones,
+    required this.circuits,
+    this.distributor,
+  });
+
+  final Matrix4 transform;
+  final SelectedElement? hoveredElement;
+  final List<WallSegment> walls;
+  final List<HeatingZone> zones;
+  final List<HeatingCircuit> circuits;
+  final Distributor? distributor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (hoveredElement == null) return;
+    canvas.save();
+    canvas.transform(transform.storage);
+    _paint(canvas);
+    canvas.restore();
+  }
+
+  void _paint(Canvas canvas) {
+    final hovered = hoveredElement!;
+
+    // World-space stroke width tuned to ~8 screen px regardless of zoom.
+    final scale = transform.storage[0];
     final strokeWidthMm = scale > 0.0 ? 8.0 / scale : 80.0;
 
     const fillColor = Color(0x55FF0000);
@@ -1324,8 +1379,61 @@ class _CanvasCompositePainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_CanvasCompositePainter oldDelegate) {
-    return true; // Interaction layer changes frequently.
+  bool shouldRepaint(_HoverHighlightLayerPainter oldDelegate) {
+    return transform != oldDelegate.transform ||
+        hoveredElement != oldDelegate.hoveredElement ||
+        !identical(walls, oldDelegate.walls) ||
+        !identical(zones, oldDelegate.zones) ||
+        !identical(circuits, oldDelegate.circuits) ||
+        distributor != oldDelegate.distributor;
+  }
+}
+
+/// Paints only the in-progress tool interaction (ghost line / polygon /
+/// rectangle, cursor hover point).
+///
+/// This is the only layer that repaints during a pointer move, because the
+/// other two layers are behind their own [RepaintBoundary]s and reject
+/// repaints whose inputs are unchanged.
+class _InteractionLayerPainter extends CustomPainter {
+  const _InteractionLayerPainter({
+    required this.transform,
+    required this.interactionData,
+    required this.hoverWorldPoint,
+    required this.selectionHighlightColor,
+    required this.supplyPipeColor,
+    required this.returnPipeColor,
+  });
+
+  final Matrix4 transform;
+  final InteractionData? interactionData;
+  final Offset? hoverWorldPoint;
+  final Color selectionHighlightColor;
+  final Color supplyPipeColor;
+  final Color returnPipeColor;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.transform(transform.storage);
+    InteractionPainter(
+      hoverPoint: hoverWorldPoint,
+      selectionHighlightColor: selectionHighlightColor,
+      supplyPipeColor: supplyPipeColor,
+      returnPipeColor: returnPipeColor,
+      interactionData: interactionData,
+    ).paint(canvas, size);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_InteractionLayerPainter oldDelegate) {
+    return transform != oldDelegate.transform ||
+        interactionData != oldDelegate.interactionData ||
+        hoverWorldPoint != oldDelegate.hoverWorldPoint ||
+        selectionHighlightColor != oldDelegate.selectionHighlightColor ||
+        supplyPipeColor != oldDelegate.supplyPipeColor ||
+        returnPipeColor != oldDelegate.returnPipeColor;
   }
 }
 
