@@ -206,7 +206,15 @@ At viewport width < 600dp:
 
 ### 5.1 Wall Drawing
 
-**Trigger:** User selects the Wall tool from the toolbar.
+> **ADR-017:** Cursor click positions correspond to the wall **centerline**,
+> not the inner face. Newly drawn walls inherit `thicknessMm` from the
+> project default for their `wallType` (exterior 240 mm / interior 120 mm /
+> partition 100 mm) and the default `anchorMode` (`innerFace` for exterior,
+> `centerline` for interior/partition). The visible filled-rectangle preview
+> extends ½t on each side of the cursor path so the planner sees the actual
+> wall body during draw. Dimension annotations on the live ghost show
+> centerline length; once a room closes, all room-level annotations switch
+> to inner clear values (the *Lichtmaß* used by EN 12831).
 
 **Desktop flow — single wall mode (default):**
 1. Cursor changes to crosshair.
@@ -397,6 +405,24 @@ room (§5.6 table) — drag past the standard threshold to move.
    `DECISIONS.md` ADR-016.
 
 ### 5.7 Wall Construction Editor (Modal)
+
+> **ADR-017 — thickness change cascade.** The sum of all
+> `MaterialLayer.thicknessMm` in the construction **is** the
+> `WallSegment.thicknessMm` of every wall referencing this construction.
+> Edits to layer thicknesses immediately re-derive the wall thickness and
+> re-anchor each affected wall's centerline per its `anchorMode`. When the
+> total thickness changes, a compact in-editor banner shows the delta and
+> what will move on save:
+>
+> *"Wall thickness 240 mm → 275 mm. Affects 4 walls. Anchored on inner
+> face — outer envelope grows by 35 mm."*
+>
+> The banner colour is `infoBlue` when ≥ 1 wall affected and dimensions
+> will change, `onSurfaceSecondary` (muted) otherwise. For shared walls
+> referencing this construction, the banner additionally lists each
+> affected room with the per-room inner-clear delta:
+> *"Living Room: inner width 4000 → 3982 mm; Kitchen: inner width 3000
+> → 2982 mm."*
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -735,12 +761,27 @@ with ADR-012's rationale.
 | Field | Type | Editable |
 |-------|------|----------|
 | Wall type | Dropdown: Exterior/Interior/Partition | Yes |
-| Length | Display (mm) | No (change by moving endpoints) |
+| Length (inner clear) | Display (mm) | No (change by moving endpoints; per ADR-017 this is the inner edge length, not centerline) |
+| Length (centerline) | Display (mm), small secondary text | No |
+| Thickness | Display (mm) — shows "240 mm (project default)" when `constructionId == null`, otherwise "275 mm (from construction)" | No (set via construction or settings) |
+| Anchor face | Dropdown: Centerline / Inner face / Outer face | Yes — **disabled with tooltip** when wall is shared (`mirrorId != null`); locked to Centerline per ADR-017 Rule 3 |
 | Orientation | Display (N/S/E/W) | No (auto-calculated) |
 | Construction | Button → opens construction editor | Yes |
 | U-value | Display (W/m²K) | No (calculated) |
 | Adjacent room | Display or dropdown | Yes for interior walls |
 | [Edit Construction] | Button | Opens modal (Section 5.7) |
+
+**Pinned-face glyph (ADR-017 Rule 10).** When a wall is selected the canvas
+draws a small lock/pin icon on the anchored face:
+- `anchorMode == innerFace` → glyph rendered on the inner face midpoint
+- `anchorMode == outerFace` → glyph rendered on the outer face midpoint
+- `anchorMode == centerline` → **no glyph** (centerline is the implicit
+  default; this also covers every shared wall)
+
+Glyph styling: 14 px diameter, `primaryLight` fill, `surface` stroke 1.5 px,
+rendered in screen space (not world space) so it stays a constant size
+regardless of zoom. Tooltip on hover: *"This face stays fixed when the wall
+thickness changes."*
 
 ### 7.4 Heating Zone Selected
 
@@ -813,13 +854,28 @@ Accessible from the overflow menu (⋮) on tablet, and from the app menu bar on 
 
 | Field | Control | Values | Default |
 |-------|---------|--------|---------|
-| Drawing grid size | Dropdown | 5mm / 10mm / 25mm / 50mm / 100| 100mm |
+| Drawing grid size | Dropdown | 5mm / 10mm / 25mm / 50mm / 100mm | 100mm |
+| Default exterior wall thickness | Numeric (cm) | 5–100 | 24 |
+| Default interior wall thickness | Numeric (cm) | 5–100 | 12 |
+| Default partition wall thickness | Numeric (cm) | 5–100 | 10 |
 
 **Behaviour:**
 - Changing the grid size takes effect immediately on the canvas — no Apply button.
 - The selected value is persisted in `AppPreferences` (`gridSpacingMm`) and restored on next launch.
 - The dropdown label shows the value with its unit: "100 mm", "25 mm", etc.
-- Setting is global (not per-project).
+- Grid size is global (not per-project).
+- The three wall-thickness defaults are **project settings** (persisted on
+  the `Project` row, not `AppPreferences`). Editing one cascades to every
+  `WallSegment` of the matching `wallType` that has `constructionId == null`,
+  re-anchoring each centerline per its `anchorMode`. Walls with an explicit
+  construction are unaffected (their thickness is sourced from the
+  construction's layer sum). See `DECISIONS.md ADR-017` Rule 9.
+- Inputs are in centimetres, parsed → mm = round(cm × 10), validated against
+  the model range (50–1000 mm). Invalid values revert the field and toast
+  *"Wall thickness must be 5–100 cm"*.
+- **No "dimension display" toggle.** Per EN 12831 simplified method, the app
+  always displays inner clear (Lichtmaß) dimensions; outer envelope is a
+  derived rendering quantity only. See ADR-017.
 
 ---
 

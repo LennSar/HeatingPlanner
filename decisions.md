@@ -846,3 +846,192 @@ follow; move next to another room regenerates a shared wall equal to the
 redraw result; moving a shared room away detaches and reverts both walls to
 exterior; one Ctrl+Z reverts a move (including shared-wall regeneration);
 a click without drag still only selects.
+
+---
+
+## ADR-017 — Walls carry thickness; geometry is centerline-anchored; annotations are inner clear
+
+**What.**
+`WallSegment` becomes a physical thickness-bearing element rather than a
+zero-width line. Two new fields:
+
+| Field | Type | Meaning |
+|-------|------|---------|
+| `thicknessMm` | `double` | Total wall thickness in mm. Stored on the wall (denormalized) so geometry can be re-anchored when the value changes. |
+| `anchorMode`  | `WallAnchorMode` enum (`centerline` / `innerFace` / `outerFace`) | Which face stays fixed when `thicknessMm` changes. |
+
+`startPoint` / `endPoint` are reinterpreted as the wall **centerline**.
+`Room.polygon` is the centerline polygon. The inner clear polygon (the
+*Lichtmaß* polygon used by EN 12831) and the outer envelope are **derived** by
+offsetting the centerline polygon by ±½t per edge, with the corners mitered
+along the angle bisector. Neither derived polygon is persisted.
+
+`Project` gains three thickness defaults:
+
+| Field | Default |
+|-------|---------|
+| `defaultExteriorWallThicknessMm`  | 240 |
+| `defaultInteriorWallThicknessMm`  | 120 |
+| `defaultPartitionWallThicknessMm` | 100 |
+
+A wall's `thicknessMm` source-of-truth:
+1. If `constructionId != null` → `sum(MaterialLayer.thicknessMm)` of that
+   construction. Updated whenever the construction's layers change.
+2. Else → `Project.default<WallType>WallThicknessMm` for the wall's
+   `wallType`. Updated whenever the project default changes.
+
+All canvas dimension annotations (room width/height labels, wall length
+labels, properties-panel Width/Height fields per ADR-015) show **inner clear**
+values, per EN 12831 simplified method. There is no inner/outer toggle in
+project settings — outer envelope is a derived quantity used for rendering
+the wall body and for export, never as an input dimension.
+
+**Why.**
+EN 12831 simplified method defines room area, room volume, and wall heat-loss
+area in terms of inner clear dimensions (*Lichtmaß*) — the German/Austrian
+heat-load convention. Pinning the displayed dimension to inner clear means
+the input the planner types matches the input the calculation consumes; no
+mode flag, no risk that toggling a display setting moves any wall.
+
+Centerline storage is the only representation in which an ADR-001 shared-wall
+pair can share a single, unambiguous geometric anchor that both rooms agree on.
+Storing inner-face geometry would force one of the two rooms to "own" the wall
+and would break ADR-001's symmetry guarantee.
+
+Per-wall anchor mode gives predictable thickness-change behaviour:
+- Exterior wall (one room): default `innerFace` — thickening pushes the outer
+  envelope outward; the planned room dimension is preserved (matches the
+  new-build / regulatory planning workflow).
+- Shared interior wall (two rooms, ADR-001 mirror pair): **forced to**
+  `centerline` — both adjoining rooms each lose ½Δt of inner space
+  symmetrically. `innerFace` and `outerFace` are undefined for shared walls
+  (whose "inner"?), so the dropdown is disabled for these walls.
+- Standalone partition wall (single room, interior type, no mirror): default
+  `centerline`; user may override.
+
+Storing `thicknessMm` (rather than always re-deriving it) is necessary so the
+re-anchor step has a defined Δt = new − old when construction layers or the
+project default change. It is denormalised against `constructionId` and
+maintained by the same code path that mutates either source.
+
+**Rule.**
+
+1. **Storage.** `WallSegment` adds `thicknessMm` (non-null `double`) and
+   `anchorMode` (non-null `WallAnchorMode`, default per Rule 2). Drift table
+   `wall_segments` adds `thickness_mm REAL NOT NULL DEFAULT 0` and
+   `anchor_mode INTEGER NOT NULL DEFAULT 0`. **No migration is provided** —
+   this is a dev-stage change; existing project DBs may be discarded.
+
+2. **Default `anchorMode` on creation.**
+   - `WallType.exterior` → `innerFace`
+   - `WallType.interior` → `centerline`
+   - `WallType.partition` → `centerline`
+
+3. **`anchorMode` constraint for shared walls.** Whenever
+   `WallSegment.mirrorId != null`, `anchorMode` is **forced** to `centerline`
+   on both partners. The wall properties dropdown for that field is disabled
+   on shared walls and shows the explanatory tooltip
+   *"Shared interior walls always pivot on the centerline."*
+
+4. **Derived geometry.** Two new providers:
+   - `roomInnerPolygonProvider(roomId)` — returns the inner clear polygon,
+     computed by offsetting `Room.polygon` by `−½t` per edge using each
+     wall's `thicknessMm`, with corners mitered along the angle bisector.
+   - `roomOuterPolygonProvider(roomId)` — analogous, offset `+½t`.
+
+   Both rebuild when any of the room's walls or their `thicknessMm` change.
+   Neither polygon is persisted.
+
+5. **Inner polygon is authoritative for area / volume / wall-area.**
+   - `roomAreaM2Provider(roomId)` and `roomVolumeM3Provider(roomId)` use the
+     inner polygon (replaces the current use of `Room.polygon` directly).
+   - Each wall's net heat-loss area in `roomHeatDemandProvider` uses its
+     **inner edge length** (the edge of the inner polygon that corresponds
+     to that wall) × `Floor.heightMm`, minus opening areas as before.
+   - Per-wall inner edge lengths come from a new helper
+     `GeometryEngine.roomFaceEdges(walls, side: inner|outer)` returning a
+     `Map<wallId, edgeLengthMm>`.
+
+6. **Thickness change → centerline re-anchor.** When `thicknessMm` updates
+   on a wall (cascade from construction-layer edit, construction (re)assign,
+   construction clear, or project-default change for unassigned walls of
+   that type), the wall's centerline is repositioned by `Δt = new − old`:
+
+   - `centerline` → no shift; both faces move outward by ½Δt each.
+   - `innerFace`  → centerline shifts **outward** (away from the room
+     interior) along the wall's outward normal by ½Δt; inner face stays put.
+   - `outerFace`  → centerline shifts **inward** by ½Δt; outer face stays put.
+
+   "Outward" is determined by `Room.polygon` winding order. For shared walls
+   (`anchorMode = centerline`, forced) the centerline never shifts and ADR-011
+   mirror sync keeps both copies in lockstep.
+
+7. **ADR-011 mirror sync extension.** Fields that sync between mirror partners
+   are extended to include `thicknessMm` and `anchorMode`. Both partners
+   always carry identical values for these two fields (and `anchorMode` is
+   always `centerline` for shared walls per Rule 3).
+
+8. **Shared-wall promotion: non-default config wins.** When an existing wall
+   is promoted to interior (ADR-003 wall-commit split, ADR-009 Rule 3
+   rect-mode edge match, ADR-016 room-move reconciliation), the shared
+   wall's `thicknessMm` and `constructionId` are resolved as:
+
+   a. Both sides default (each side has `constructionId == null` AND
+      `thicknessMm == projectDefault[wallType]`) → use
+      `projectDefault[interior]`, `constructionId = null`,
+      `anchorMode = centerline`.
+   b. Exactly one side non-default → adopt that side's `thicknessMm`,
+      `constructionId`, and set `anchorMode = centerline`.
+   c. Both sides non-default and equal (`constructionId` matches and
+      thicknesses match) → preserve.
+   d. Both sides non-default and different → adopt the **existing** (not the
+      newly drawn / just moved) wall's `thicknessMm` and `constructionId`,
+      and emit a `WarningSeverity.warning` validation result:
+      *"Shared wall construction conflict — adopted [name] from [room]; review."*
+
+   In all cases the shared pair is `anchorMode = centerline` (Rule 3).
+
+9. **Project default change.** When the user edits any
+   `default<WallType>WallThicknessMm` in settings, every wall with
+   `constructionId == null` AND matching `wallType` has its `thicknessMm`
+   updated and its centerline re-anchored per Rule 6. Walls with an explicit
+   `constructionId` are unaffected (their thickness is sourced from the
+   construction).
+
+10. **Visual / UX.**
+    - `WallPainter` renders each wall as a filled rectangle of
+      `thicknessMm × wallLength` along the centerline, with corners mitered
+      along the angle bisector at every junction.
+    - `AnnotationPainter` labels each wall with its **inner edge length**
+      (not centerline length).
+    - The properties-panel Width/Height fields (ADR-015) are interpreted as
+      **inner clear** dimensions; back-computing the four centerline corners
+      uses the wall thicknesses on each side.
+    - When a wall is selected, a small lock/pin glyph is drawn on the
+      anchored face (inner face for `innerFace`, outer face for `outerFace`).
+      For `centerline` (and therefore every shared wall) no glyph is drawn —
+      centerline is the implicit default.
+
+11. **No backwards compatibility.** Migration of pre-ADR-017 project data is
+    out of scope. The expectation is that development databases are
+    recreated. `.hsp` files exported before this ADR cannot be imported.
+
+**Scope.**
+Replaces the prior zero-thickness wall model. Affects `WallSegment` and
+`Project` schemas; the wall painter; annotation painter; wall draw / select
+tools; the construction editor (thickness-change cascade); the settings
+screen (defaults); heat-demand and area providers; ADR-011 mirror sync
+fields; and the shared-wall promotion paths in ADR-003 / ADR-009 / ADR-016.
+Other ADRs (004, 006, 007, 008, 012, 013, 014, 015) are unchanged in intent;
+ADR-015 input semantics remain "inner clear" — that is now the only mode.
+
+**Verification.**
+Defined per implementation prompt. Acceptance criteria include: drawing a
+4×5 m exterior-walled room shows the inner annotation as 4000×5000 mm with
+the outer envelope at 4240×5480 mm (for a 240 mm wall thickness), and
+increasing the wall thickness to 300 mm leaves the inner annotation
+unchanged while the outer envelope grows to 4300×5600 mm; assigning a
+construction to one room's exterior wall, then drawing an adjacent room
+against it, produces a shared wall that inherits that construction
+(promotion rule 8b).
+

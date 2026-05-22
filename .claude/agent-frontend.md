@@ -223,9 +223,16 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas> {
 - Cache the grid as a `ui.Picture` and only rebuild on zoom level change or grid spacing change.
 
 **Wall painter specifics:**
-- Draw each wall segment as a filled rectangle with `wallFill` colour and `wallStroke` outline.
-- Shared wall segments (between two rooms) are drawn once, not twice.
-- Show dimension text (length in mm) alongside each wall, rotated to match wall angle.
+- Draw each wall segment as a filled rectangle with `wallFill` colour and `wallStroke` outline. **Per ADR-017** the rectangle's long axis is the wall centerline (`startPoint` → `endPoint`) and its short-axis extent is `WallSegment.thicknessMm`, ½ on each side of the centerline.
+- **Corner mitering.** Where two walls share an endpoint, clip each wall body to the angle bisector through that endpoint so corners join cleanly without overdraw. `GeometryEngine.roomFaceEdges` provides the offset inner and outer edges per wall — use those four points (inner-start, outer-start, outer-end, inner-end) as the wall rectangle's corner polygon.
+- Shared wall segments (ADR-001 mirror pair) are drawn once, not twice. Skip whichever copy has the alphabetically-greater `id` so the result is deterministic.
+- **Pinned-face glyph (ADR-017 Rule 10).** Render only for the currently selected wall and only when `anchorMode != centerline`. Compute the midpoint of the anchored face (inner for `innerFace`, outer for `outerFace`), convert to screen coordinates, and draw the lock/pin icon at that point in **screen space** so it stays a fixed 14 px diameter regardless of zoom. Styling per `agent-ui-ux.md §7.3`.
+- `shouldRepaint` returns `true` when any wall's `startPoint`, `endPoint`, `thicknessMm`, `anchorMode`, or selection state changes.
+
+**Annotation painter specifics:**
+- Wall length labels show the **inner edge length** from `wallInnerEdgeLengthProvider(wallId)` — not the centerline length (ADR-017 Rule 5). The label position is the midpoint of the inner edge.
+- Room dimension labels (Width/Height for rectangle-eligible rooms per ADR-015) read from `roomInnerPolygonProvider(roomId)`.
+- The optional secondary "centerline length" sub-label specified in `agent-ui-ux.md §7.3` is shown only when the wall is selected.
 
 **Heating zone painter specifics:**
 - Fill zone polygon with semi-transparent colour determined by the priority-ordered state machine (ADR-004):
@@ -307,6 +314,41 @@ Modifier flags are independent — `_orthoSnap` and `_freePlacement` may both be
 **Rect-mode corner snap and shared-wall deduplication (ADR-009):** When `_rectMode` is active, both the drag-start and drag-end points must be passed through `SnapService.snapRectCorner` (snap radius = `2 × gridSpacingMm`) *after* normal grid snap. At `onDragEnd`, before committing wall segments, check each of the four edges for an exact-edge match against existing walls (tolerance: **50 mm** on both endpoints). For matched edges, skip the new segment, promote the existing wall to `WallType.interior` with `adjacentRoomId`, and insert the ADR-001 mirror copy. All insertions for one rect drag are grouped as a single undo batch. See `DECISIONS.md ADR-009` for the full specification.
 
 **Rect-mode dimension-matching snap (ADR-010):** After `snapRectCorner`, apply `SnapService.snapRectDimension(dragStart, dragEnd, walls)` to the drag-end at `onDragEnd`. This overrides individual axes when the grid-snapped drag-end coordinate is within **100 mm** of a wall endpoint that shares the corresponding axis coordinate with the snapped drag-start (same x-column → candidate y-snap; same y-row → candidate x-snap). Ensures the new room matches the height or width of the adjacent room's shared wall even when grid snap would land on the wrong line. See `DECISIONS.md ADR-010` for full rules and threshold rationale.
+
+#### Wall thickness re-anchor cascade (ADR-017)
+
+`EditorStateNotifier` exposes a single helper, `_recomputeWallThickness(wall)`,
+that is the only path which mutates `WallSegment.thicknessMm`. It computes
+the new thickness from the source of truth — `sum(layers.thicknessMm)` if
+`constructionId != null`, else the appropriate project default — and, if the
+new value differs from the current one, shifts the centerline endpoints per
+`anchorMode` (ADR-017 Rule 6) before writing the wall back through
+`updateWall` (which carries ADR-011 mirror sync of both `thicknessMm` and
+`anchorMode`).
+
+`_recomputeWallThickness` is invoked from:
+1. `assignConstruction(wallId, constructionId)` / `clearConstruction(wallId)`.
+2. The construction-editor "Save" path, for every wall whose
+   `constructionId` equals the edited construction.
+3. The settings-screen project-default change handler, for every wall whose
+   `constructionId == null` and `wallType` matches the changed default.
+
+All three callers wrap their batch in a single `UndoRedoService` command
+("Reassign wall construction" / "Edit construction" / "Change default wall
+thickness") so a single Ctrl+Z reverts both the source-of-truth change and
+every re-anchor it cascaded.
+
+#### Shared-wall promotion: non-default config wins (ADR-017 Rule 8)
+
+The three shared-wall promotion paths — `commitWallWithSplit` (ADR-003
+host-wall split), rect-mode edge match (ADR-009 Rule 3), and the room-move
+reconciliation (ADR-016 Rule 4) — must resolve `thicknessMm` and
+`constructionId` for the promoted shared wall per ADR-017 Rule 8 before
+writing the wall back. Treat a wall as "default" when both
+`constructionId == null` **and** `thicknessMm == projectDefault[wallType]`.
+After promotion `anchorMode` is always `WallAnchorMode.centerline` (Rule 3).
+Conflict case 8d emits a `ValidationResult` through the validation service —
+the promotion itself never blocks on the conflict.
 
 #### SelectTool — move entire room (ADR-016)
 

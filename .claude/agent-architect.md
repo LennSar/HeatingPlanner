@@ -270,6 +270,10 @@ All models use `@freezed`. All have `toJson`/`fromJson`. All `id` fields are `St
 
 enum WallType { exterior, interior, partition }
 
+/// Which face of a wall stays fixed when its thickness changes.
+/// See `DECISIONS.md` ADR-017.
+enum WallAnchorMode { centerline, innerFace, outerFace }
+
 enum CardinalDirection {
   north, northEast, east, southEast,
   south, southWest, west, northWest;
@@ -326,7 +330,15 @@ Each model below is defined in its own file under `lib/data/models/`. I am listi
 | modifiedAt | DateTime | auto-updated | auto |
 | designOutdoorTempC | double | -50 to +10 | -12.0 |
 | defaultIndoorTempC | double | 15 to 30 | 20.0 |
+| defaultExteriorWallThicknessMm | int | 50–1000 | 240 |
+| defaultInteriorWallThicknessMm | int | 50–1000 | 120 |
+| defaultPartitionWallThicknessMm | int | 50–1000 | 100 |
 | location | GeoLocation? | optional | null |
+
+> **ADR-017:** The three wall-thickness defaults are the fallback
+> `thicknessMm` for `WallSegment`s whose `constructionId` is null. Editing a
+> default cascades to every matching wall via `EditorStateNotifier`. See
+> `DECISIONS.md ADR-017` Rule 9.
 
 **Floor**
 | Field | Type | Constraint | Default |
@@ -346,14 +358,23 @@ Each model below is defined in its own file under `lib/data/models/`. I am listi
 | airChangeRate | double | 0.1-5.0 (1/h) | 0.5 |
 | polygon | List\<Point2D\> | ≥ 3 vertices, closed | required |
 
+> **ADR-017:** `polygon` is the **centerline polygon** — the polyline traced
+> by the wall centerlines, not the inner clear boundary. The inner clear
+> polygon (used for area, volume, and wall-area in heat-load calculations
+> per EN 12831) is derived from `polygon` + each wall's `thicknessMm` via
+> `roomInnerPolygonProvider(roomId)`. Outer envelope is similarly derived.
+> Neither derived polygon is persisted.
+
 **WallSegment**
 | Field | Type | Constraint | Default |
 |-------|------|-----------|---------|
 | id | String | UUID v4 | auto |
 | roomId | String | FK → Room | required |
-| startPoint | Point2D | on room polygon | required |
-| endPoint | Point2D | on room polygon | required |
+| startPoint | Point2D | wall **centerline** start (on room polygon) | required |
+| endPoint | Point2D | wall **centerline** end (on room polygon) | required |
 | wallType | WallType | enum | exterior |
+| thicknessMm | double | 50.0–1000.0 | from project default for `wallType` |
+| anchorMode | WallAnchorMode | enum | per ADR-017 Rule 2 |
 | constructionId | String? | FK → WallConstruction | null |
 | adjacentRoomId | String? | FK → Room | null |
 | mirrorId | String? | FK → WallSegment (ON DELETE SET NULL) | null |
@@ -361,7 +382,17 @@ Each model below is defined in its own file under `lib/data/models/`. I am listi
 
 > **ADR-011:** `EditorStateNotifier.updateWall` auto-synchronizes the partner
 > wall when `mirrorId` is non-null. See `DECISIONS.md ADR-011` for the full
-> sync contract (which fields sync, which do not, and cascade-delete behaviour).
+> sync contract; the sync set includes `thicknessMm` and `anchorMode` per
+> ADR-017 Rule 7.
+
+> **ADR-017:** `startPoint`/`endPoint` are the wall **centerline**, not the
+> inner face. `thicknessMm` is stored (denormalised) and updated whenever
+> the source-of-truth changes — i.e. the assigned construction's layer sum,
+> on (un)assignment of a construction, or the project default for that
+> `wallType` (when `constructionId == null`). On every `thicknessMm` change
+> the centerline is repositioned per `anchorMode` (Rule 6). For walls with
+> `mirrorId != null`, `anchorMode` is forced to `WallAnchorMode.centerline`
+> (Rule 3). See `DECISIONS.md ADR-017`.
 
 **WindowElement**
 | Field | Type | Constraint | Default |
@@ -514,6 +545,9 @@ Use `@riverpod` annotation with code generation. Every provider is defined in th
 | `roomsProvider` | StreamProvider.family | floorId | List\<Room\> | building_repository.dart |
 | `roomProvider` | StreamProvider.family | roomId | Room | building_repository.dart |
 | `wallSegmentsProvider` | StreamProvider.family | roomId | List\<WallSegment\> | building_repository.dart |
+| `roomInnerPolygonProvider` | Provider.family | roomId | List\<Point2D\> | geometry_providers.dart |
+| `roomOuterPolygonProvider` | Provider.family | roomId | List\<Point2D\> | geometry_providers.dart |
+| `wallInnerEdgeLengthProvider` | Provider.family | wallId | double (mm) | geometry_providers.dart |
 | `windowsProvider` | StreamProvider.family | wallSegmentId | List\<WindowElement\> | building_repository.dart |
 | `doorsProvider` | StreamProvider.family | wallSegmentId | List\<Door\> | building_repository.dart |
 | `constructionProvider` | StreamProvider.family | constructionId | WallConstruction | construction_repository.dart |
@@ -544,7 +578,8 @@ Use `@riverpod` annotation with code generation. Every provider is defined in th
 When data changes, providers automatically re-evaluate because they depend on upstream streams. However, ensure:
 
 - `uValueProvider(constructionId)` depends on `layersProvider(constructionId)`.
-- `roomHeatDemandProvider(roomId)` depends on: `roomProvider(roomId)`, `wallSegmentsProvider(roomId)`, every `uValueProvider` for each wall's construction, `windowsProvider` / `doorsProvider`, project's `designOutdoorTempC`.
+- `roomInnerPolygonProvider(roomId)` / `roomOuterPolygonProvider(roomId)` depend on `roomProvider(roomId).polygon` and every `WallSegment.thicknessMm` of the room's walls. See `DECISIONS.md ADR-017` Rule 4.
+- `roomHeatDemandProvider(roomId)` depends on: `roomProvider(roomId)`, `wallSegmentsProvider(roomId)`, `roomInnerPolygonProvider(roomId)` (for area, volume, and per-wall inner edge lengths — ADR-017 Rule 5), every `uValueProvider` for each wall's construction, `windowsProvider` / `doorsProvider`, project's `designOutdoorTempC`.
 - `zoneHeatOutputProvider(zoneId)` depends on: zone params, `TubeType`, `FlooringMaterial`, distributor supply/return temps.
 - `pressureLossProvider(circuitId)` depends on: `tubeLengthProvider(circuitId)`, `flowRateProvider(circuitId)`, tube inner diameter, roughness.
 - `hydraulicBalanceProvider(distributorId)` depends on: every `pressureLossProvider` for each circuit of that distributor.

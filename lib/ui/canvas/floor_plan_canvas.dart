@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart' show ValueListenable, mapEquals;
+import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,6 +18,7 @@ import '../../l10n/app_localizations.dart';
 import '../../data/models/window_element.dart';
 import '../providers/editor_state_provider.dart';
 import '../providers/selection_provider.dart';
+import '../providers/zone_color_state_provider.dart';
 import '../screens/editor_screen.dart';
 import 'canvas_controller.dart';
 import 'painters/annotation_painter.dart';
@@ -41,9 +42,6 @@ import 'tools/wall_draw_tool.dart';
 import 'tools/window_place_tool.dart';
 import 'tools/wall_zone_place_tool.dart';
 import 'tools/zone_draw_tool.dart';
-import '../../calculation/engines/geometry_engine.dart';
-import '../../calculation/providers/heat_demand_providers.dart';
-import '../../calculation/providers/heat_output_providers.dart';
 import '../../repositories/app_preferences.dart';
 
 /// Provider that signals tools to cancel (incremented on
@@ -704,84 +702,11 @@ class _FloorPlanCanvasState
     final onSurface =
         Theme.of(context).colorScheme.onSurface;
 
-    // Compute ADR-004 zone display states from calculation providers.
-    // Priority order is strict — see ADR-004 and DECISIONS.md.
-    final zoneStates = <String, ZoneColorState>{};
-    for (final zone in editorState.zones) {
-      // Priority 1: no circuit assigned → red hatched.
-      if (zone.circuitId == null) {
-        zoneStates[zone.id] = ZoneColorState.unconnected;
-        continue;
-      }
-
-      // Priority 1b: circuit route not connected to the distributor
-      // (mirrors VR-05). Catches the case where the distributor was
-      // moved but circuitId was not yet cleared, leaving the zone
-      // with a stale circuit reference whose route no longer reaches
-      // the manifold.
-      final circuit = editorState.circuits
-          .where((c) => c.id == zone.circuitId)
-          .firstOrNull;
-      final distributor = editorState.distributor;
-      final bool routeConnected = circuit != null &&
-          circuit.supplyRoutePath.isNotEmpty &&
-          distributor != null &&
-          GeometryEngine.distanceMm(
-                circuit.supplyRoutePath.first,
-                distributor.position,
-              ) <=
-              50.0;
-      if (!routeConnected) {
-        zoneStates[zone.id] = ZoneColorState.unconnected;
-        continue;
-      }
-
-      // Priority 2: room demand is NaN (incomplete data, e.g. an
-      // exterior wall has no construction) → grey.  This check MUST
-      // come before the output check so that a valid output value
-      // cannot mask missing demand data.
-      final demandW =
-          ref.watch(roomHeatDemandProvider(zone.roomId));
-      if (demandW.isNaN) {
-        zoneStates[zone.id] = ZoneColorState.noDemand;
-        continue;
-      }
-
-      // Compute specific output (W/m²) now that demand is confirmed
-      // to be a real number.  If output cannot be determined (e.g.
-      // distributor not yet configured) fall back to unconnected.
-      final specificOutput =
-          ref.watch(zoneHeatOutputProvider(zone.id));
-      if (specificOutput.isNaN) {
-        zoneStates[zone.id] = ZoneColorState.unconnected;
-        continue;
-      }
-
-      final areaM2 = zone.polygon.length >= 3
-          ? GeometryEngine.polygonAreaM2(zone.polygon)
-          : 0.0;
-      if (areaM2 <= 0) {
-        zoneStates[zone.id] = ZoneColorState.unconnected;
-        continue;
-      }
-
-      final totalOutputW = specificOutput * areaM2;
-
-      // Genuinely zero demand (e.g. interior room with equal adjacent
-      // temperatures): no heating needed, so the zone is sufficient.
-      if (demandW <= 0) {
-        zoneStates[zone.id] = ZoneColorState.sufficient;
-        continue;
-      }
-
-      // Priorities 3–5: compare output to demand.
-      final ratio = totalOutputW / demandW;
-      zoneStates[zone.id] = ratio >= 1.0
-          ? ZoneColorState.sufficient
-          : ratio >= 0.9
-              ? ZoneColorState.marginal
-              : ZoneColorState.insufficient;
-    }
+    // ADR-004 zone display states — memoised in [zoneColorStatesProvider]
+    // so the per-zone heat-demand/output watches do not run on every
+    // canvas rebuild. The provider re-runs only when its calc-graph
+    // dependencies change.
+    final zoneStates = ref.watch(zoneColorStatesProvider);
 
     // Watch selected tool to react to tool switches.
     ref.watch(selectedToolProvider);
@@ -1274,7 +1199,7 @@ class _StaticWorldPainter extends CustomPainter {
         !identical(windows, oldDelegate.windows) ||
         !identical(doors, oldDelegate.doors) ||
         !identical(zones, oldDelegate.zones) ||
-        !mapEquals(zoneStates, oldDelegate.zoneStates) ||
+        !identical(zoneStates, oldDelegate.zoneStates) ||
         !identical(circuits, oldDelegate.circuits) ||
         distributor != oldDelegate.distributor;
   }

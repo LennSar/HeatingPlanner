@@ -175,6 +175,12 @@ class ThermalEngine {
 
   /// Net wall area after subtracting openings
   /// A_net = wallLengthMm × wallHeightMm / 1e6 - Σ(opening areas)
+  ///
+  /// **ADR-017:** `wallLengthMm` is the wall's **inner edge length** along
+  /// the room's inner clear polygon (the EN 12831 *Lichtmaß* convention),
+  /// not the centerline length. Callers obtain it from
+  /// `wallInnerEdgeLengthProvider(wallId)` or
+  /// `GeometryEngine.roomFaceEdges(side: inner)`.
   static double netWallAreaM2({
     required double wallLengthMm,
     required double wallHeightMm,
@@ -485,7 +491,45 @@ class GeometryEngine {
     List<Point2D> endpoints,
     double thresholdMm,
   );
+
+  /// Offset a closed centerline polygon by half-thicknesses to produce the
+  /// inner clear or outer envelope polygon. Each edge of [centerline] has
+  /// its own offset given by [edgeOffsetsMm[i]] (the corresponding wall's
+  /// `thicknessMm / 2`). Negative offsets shift inward (toward polygon
+  /// interior); positive shifts outward. Corners are joined with a miter
+  /// computed along the angle bisector of adjacent offset edges.
+  ///
+  /// Used by `roomInnerPolygonProvider` / `roomOuterPolygonProvider` per
+  /// `DECISIONS.md` ADR-017 Rule 4. Polygon winding determines what
+  /// "inward" means; the caller passes negative offsets for the inner
+  /// polygon and positive offsets for the outer.
+  ///
+  /// Returns the offset polygon with the same number of vertices as
+  /// [centerline]. If the offset would produce a self-intersecting or
+  /// degenerate polygon (e.g. an edge collapses below zero length),
+  /// returns an empty list — callers must treat that as a validation
+  /// error rather than silently rendering garbage.
+  static List<Point2D> offsetPolygonPerEdge({
+    required List<Point2D> centerline,
+    required List<double> edgeOffsetsMm,
+  });
+
+  /// Per-wall inner or outer edge polylines for one closed room loop.
+  /// Returns a map keyed by `wallId` whose value is the offset edge as a
+  /// `(startPoint, endPoint)` pair. Each wall's offset is `thicknessMm/2`;
+  /// `side` selects inner (negative offset) or outer (positive offset).
+  ///
+  /// Used by `wallInnerEdgeLengthProvider` and by `roomHeatDemandProvider`
+  /// to obtain each wall's heat-loss area in `roomHeatDemandProvider`.
+  /// See `DECISIONS.md` ADR-017 Rule 5.
+  static Map<String, ({Point2D start, Point2D end})> roomFaceEdges({
+    required List<WallSegment> walls,
+    required List<Point2D> roomPolygon,
+    required RoomFaceSide side,
+  });
 }
+
+enum RoomFaceSide { inner, outer }
 ```
 
 ---
