@@ -1,6 +1,8 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/calculation/engines/geometry_engine.dart';
+import 'package:heating_planner/data/models/enums.dart';
 import 'package:heating_planner/data/models/point2d.dart';
+import 'package:heating_planner/data/models/wall_segment.dart';
 
 void main() {
   // Standard rectangle used by multiple tests
@@ -630,6 +632,263 @@ void main() {
         ),
         equals(0.0),
       );
+    });
+  });
+
+  // ── offsetPolygonPerEdge / roomFaceEdges tests (ADR-017) ────────────────
+
+  /// Convenience: build a [WallSegment] for the offset tests. The fields
+  /// `wallType`, `anchorMode`, `orientation`, etc. are not used by
+  /// `roomFaceEdges`, so we leave them at their freezed defaults.
+  WallSegment wall({
+    required String id,
+    required Point2D start,
+    required Point2D end,
+    required double thicknessMm,
+  }) {
+    return WallSegment(
+      id: id,
+      roomId: 'r',
+      startPoint: start,
+      endPoint: end,
+      thicknessMm: thicknessMm,
+      anchorMode: WallAnchorMode.centerline,
+    );
+  }
+
+  void expectPointCloseTo(Point2D actual, Point2D expected,
+      {double tol = 0.5}) {
+    expect(actual.x, closeTo(expected.x, tol),
+        reason: 'x of $actual vs expected $expected');
+    expect(actual.y, closeTo(expected.y, tol),
+        reason: 'y of $actual vs expected $expected');
+  }
+
+  group('GeometryEngine.offsetPolygonPerEdge', () {
+    test('GE-OFFSET-1: 5×4 m rectangle, 240 mm all walls', () {
+      // Centerline traced (0,0)→(5000,0)→(5000,4000)→(0,4000) → close.
+      // Inner offset = −120 per edge.
+      final inner = GeometryEngine.offsetPolygonPerEdge(
+        centerline: const [
+          Point2D(x: 0, y: 0),
+          Point2D(x: 5000, y: 0),
+          Point2D(x: 5000, y: 4000),
+          Point2D(x: 0, y: 4000),
+        ],
+        edgeOffsetsMm: const [-120.0, -120.0, -120.0, -120.0],
+      );
+      expect(inner, hasLength(4));
+      expectPointCloseTo(inner[0], const Point2D(x: 120, y: 120));
+      expectPointCloseTo(inner[1], const Point2D(x: 4880, y: 120));
+      expectPointCloseTo(inner[2], const Point2D(x: 4880, y: 3880));
+      expectPointCloseTo(inner[3], const Point2D(x: 120, y: 3880));
+    });
+
+    test('GE-OFFSET-2: south wall 120 mm interior, others 240 mm', () {
+      // The "south" wall on a y-down screen is the bottom edge
+      // (vertex 2 → vertex 3, at y = 4000). 120 mm wall → −60 offset;
+      // the other three edges keep −120.
+      final inner = GeometryEngine.offsetPolygonPerEdge(
+        centerline: const [
+          Point2D(x: 0, y: 0),
+          Point2D(x: 5000, y: 0),
+          Point2D(x: 5000, y: 4000),
+          Point2D(x: 0, y: 4000),
+        ],
+        edgeOffsetsMm: const [-120.0, -120.0, -60.0, -120.0],
+      );
+      expect(inner, hasLength(4));
+      expectPointCloseTo(inner[0], const Point2D(x: 120, y: 120));
+      expectPointCloseTo(inner[1], const Point2D(x: 4880, y: 120));
+      expectPointCloseTo(inner[2], const Point2D(x: 4880, y: 3940));
+      expectPointCloseTo(inner[3], const Point2D(x: 120, y: 3940));
+    });
+
+    test('GE-OFFSET-3: L-shape with miter at concave corner', () {
+      // L-shape (screen y-down): an 'L' with the notch at the bottom-
+      // right. Vertex 3 = (2000, 2000) is the concave corner.
+      // All walls 240 mm → −120 per edge.
+      final inner = GeometryEngine.offsetPolygonPerEdge(
+        centerline: const [
+          Point2D(x: 0, y: 0),
+          Point2D(x: 4000, y: 0),
+          Point2D(x: 4000, y: 2000),
+          Point2D(x: 2000, y: 2000),
+          Point2D(x: 2000, y: 4000),
+          Point2D(x: 0, y: 4000),
+        ],
+        edgeOffsetsMm: const [
+          -120.0,
+          -120.0,
+          -120.0,
+          -120.0,
+          -120.0,
+          -120.0,
+        ],
+      );
+      expect(inner, hasLength(6));
+      // Convex corners offset inward by (±120, ±120).
+      expectPointCloseTo(inner[0], const Point2D(x: 120, y: 120));
+      expectPointCloseTo(inner[1], const Point2D(x: 3880, y: 120));
+      expectPointCloseTo(inner[2], const Point2D(x: 3880, y: 1880));
+      // Concave corner at (2000, 2000): miter along the 45° angle bisector
+      // pushes outward into what used to be the interior, landing at
+      // (1880, 1880) — Δ = (−120, −120) from the original corner.
+      expectPointCloseTo(inner[3], const Point2D(x: 1880, y: 1880));
+      expectPointCloseTo(inner[4], const Point2D(x: 1880, y: 3880));
+      expectPointCloseTo(inner[5], const Point2D(x: 120, y: 3880));
+    });
+
+    test('GE-OFFSET-DEGENERATE: 200×200 with 240 mm walls returns []', () {
+      // Inner offset of 120 on each side of a 200×200 room would push
+      // every face past its opposite face → degenerate; expect [].
+      final inner = GeometryEngine.offsetPolygonPerEdge(
+        centerline: const [
+          Point2D(x: 0, y: 0),
+          Point2D(x: 200, y: 0),
+          Point2D(x: 200, y: 200),
+          Point2D(x: 0, y: 200),
+        ],
+        edgeOffsetsMm: const [-120.0, -120.0, -120.0, -120.0],
+      );
+      expect(inner, isEmpty);
+    });
+
+    test('input length mismatch returns []', () {
+      final inner = GeometryEngine.offsetPolygonPerEdge(
+        centerline: const [
+          Point2D(x: 0, y: 0),
+          Point2D(x: 1000, y: 0),
+          Point2D(x: 1000, y: 1000),
+        ],
+        edgeOffsetsMm: const [-100.0, -100.0],
+      );
+      expect(inner, isEmpty);
+    });
+
+    test('zero-offset rectangle returns the original polygon', () {
+      final out = GeometryEngine.offsetPolygonPerEdge(
+        centerline: const [
+          Point2D(x: 0, y: 0),
+          Point2D(x: 5000, y: 0),
+          Point2D(x: 5000, y: 4000),
+          Point2D(x: 0, y: 4000),
+        ],
+        edgeOffsetsMm: const [0.0, 0.0, 0.0, 0.0],
+      );
+      expect(out, hasLength(4));
+      expectPointCloseTo(out[0], const Point2D(x: 0, y: 0));
+      expectPointCloseTo(out[1], const Point2D(x: 5000, y: 0));
+      expectPointCloseTo(out[2], const Point2D(x: 5000, y: 4000));
+      expectPointCloseTo(out[3], const Point2D(x: 0, y: 4000));
+    });
+  });
+
+  group('GeometryEngine.roomFaceEdges', () {
+    test('rectangle inner edges match each wall (240 mm all walls)', () {
+      const corners = [
+        Point2D(x: 0, y: 0),
+        Point2D(x: 5000, y: 0),
+        Point2D(x: 5000, y: 4000),
+        Point2D(x: 0, y: 4000),
+      ];
+      final walls = [
+        wall(id: 'w0', start: corners[0], end: corners[1], thicknessMm: 240),
+        wall(id: 'w1', start: corners[1], end: corners[2], thicknessMm: 240),
+        wall(id: 'w2', start: corners[2], end: corners[3], thicknessMm: 240),
+        wall(id: 'w3', start: corners[3], end: corners[0], thicknessMm: 240),
+      ];
+      final edges = GeometryEngine.roomFaceEdges(
+        walls: walls,
+        roomPolygon: corners,
+        side: RoomFaceSide.inner,
+      );
+      expect(edges.keys, containsAll(['w0', 'w1', 'w2', 'w3']));
+      expectPointCloseTo(edges['w0']!.start, const Point2D(x: 120, y: 120));
+      expectPointCloseTo(edges['w0']!.end, const Point2D(x: 4880, y: 120));
+      expectPointCloseTo(edges['w2']!.start,
+          const Point2D(x: 4880, y: 3880));
+      expectPointCloseTo(edges['w2']!.end, const Point2D(x: 120, y: 3880));
+    });
+
+    test('reversed wall is matched and returned in wall direction', () {
+      // Polygon edge 0 is (0,0)→(5000,0); the wall is drawn in the
+      // opposite direction. Its returned offset edge must respect the
+      // wall's own startPoint→endPoint orientation.
+      const corners = [
+        Point2D(x: 0, y: 0),
+        Point2D(x: 5000, y: 0),
+        Point2D(x: 5000, y: 4000),
+        Point2D(x: 0, y: 4000),
+      ];
+      final walls = [
+        wall(
+          id: 'wRev',
+          start: corners[1],
+          end: corners[0],
+          thicknessMm: 240,
+        ),
+        wall(id: 'w1', start: corners[1], end: corners[2], thicknessMm: 240),
+        wall(id: 'w2', start: corners[2], end: corners[3], thicknessMm: 240),
+        wall(id: 'w3', start: corners[3], end: corners[0], thicknessMm: 240),
+      ];
+      final edges = GeometryEngine.roomFaceEdges(
+        walls: walls,
+        roomPolygon: corners,
+        side: RoomFaceSide.inner,
+      );
+      expectPointCloseTo(
+          edges['wRev']!.start, const Point2D(x: 4880, y: 120));
+      expectPointCloseTo(edges['wRev']!.end, const Point2D(x: 120, y: 120));
+    });
+
+    test('outer side offsets the polygon outward', () {
+      const corners = [
+        Point2D(x: 0, y: 0),
+        Point2D(x: 5000, y: 0),
+        Point2D(x: 5000, y: 4000),
+        Point2D(x: 0, y: 4000),
+      ];
+      final walls = [
+        wall(id: 'w0', start: corners[0], end: corners[1], thicknessMm: 240),
+        wall(id: 'w1', start: corners[1], end: corners[2], thicknessMm: 240),
+        wall(id: 'w2', start: corners[2], end: corners[3], thicknessMm: 240),
+        wall(id: 'w3', start: corners[3], end: corners[0], thicknessMm: 240),
+      ];
+      final edges = GeometryEngine.roomFaceEdges(
+        walls: walls,
+        roomPolygon: corners,
+        side: RoomFaceSide.outer,
+      );
+      // Outer envelope: corners at (−120,−120), (5120,−120), (5120,4120),
+      // (−120,4120).
+      expectPointCloseTo(
+          edges['w0']!.start, const Point2D(x: -120, y: -120));
+      expectPointCloseTo(
+          edges['w0']!.end, const Point2D(x: 5120, y: -120));
+      expectPointCloseTo(
+          edges['w2']!.start, const Point2D(x: 5120, y: 4120));
+    });
+
+    test('unmatched polygon edge returns empty map', () {
+      const corners = [
+        Point2D(x: 0, y: 0),
+        Point2D(x: 5000, y: 0),
+        Point2D(x: 5000, y: 4000),
+        Point2D(x: 0, y: 4000),
+      ];
+      // Only three walls — one polygon edge has no match.
+      final walls = [
+        wall(id: 'w0', start: corners[0], end: corners[1], thicknessMm: 240),
+        wall(id: 'w1', start: corners[1], end: corners[2], thicknessMm: 240),
+        wall(id: 'w2', start: corners[2], end: corners[3], thicknessMm: 240),
+      ];
+      final edges = GeometryEngine.roomFaceEdges(
+        walls: walls,
+        roomPolygon: corners,
+        side: RoomFaceSide.inner,
+      );
+      expect(edges, isEmpty);
     });
   });
 }

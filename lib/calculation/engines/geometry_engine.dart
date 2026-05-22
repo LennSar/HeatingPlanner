@@ -1,6 +1,15 @@
 import 'dart:math' show pi, sqrt, atan2;
 
 import '../../data/models/point2d.dart';
+import '../../data/models/wall_segment.dart';
+
+/// Which face of a room a [GeometryEngine.roomFaceEdges] call refers to.
+///
+/// `inner` — the inner clear (*Lichtmaß*) polygon edge of each wall,
+/// obtained by offsetting the centerline polygon inward by `½t` per edge.
+/// `outer` — the outer envelope edge, offset outward by `½t` per edge.
+/// See `DECISIONS.md` ADR-017 Rule 4.
+enum RoomFaceSide { inner, outer }
 
 /// Geometry calculation engine.
 ///
@@ -244,5 +253,193 @@ class GeometryEngine {
     final len2 = abx * abx + aby * aby;
     if (len2 < 1e-9) return 0.0;
     return ((p.x - a.x) * abx + (p.y - a.y) * aby) / len2;
+  }
+
+  /// Offset a closed centerline polygon by per-edge offsets to produce the
+  /// inner clear or outer envelope polygon (ADR-017 Rule 4).
+  ///
+  /// Each edge `i` of [centerline] (from vertex `i` to vertex `(i+1) % n`)
+  /// is shifted perpendicular to itself by `edgeOffsetsMm[i]`. Negative
+  /// offsets shift inward (toward the polygon interior); positive shifts
+  /// outward. Corners are joined with a miter computed along the angle
+  /// bisector of the two adjacent offset edges (intersection of the
+  /// extended offset lines).
+  ///
+  /// Returns the offset polygon with the same number of vertices as
+  /// [centerline]. Returns an empty list when:
+  /// * the inputs are malformed (length mismatch, fewer than 3 vertices,
+  ///   degenerate centerline edge);
+  /// * any adjacent pair of offset lines is parallel (no miter);
+  /// * any resulting edge has length ≤ 0 or points opposite to its
+  ///   original direction (over-collapsed offset);
+  /// * the resulting polygon self-intersects.
+  ///
+  /// Callers must treat the empty return as a validation error rather
+  /// than silently rendering garbage.
+  static List<Point2D> offsetPolygonPerEdge({
+    required List<Point2D> centerline,
+    required List<double> edgeOffsetsMm,
+  }) {
+    final n = centerline.length;
+    if (n < 3 || edgeOffsetsMm.length != n) return const [];
+
+    // Signed area determines polygon winding, which fixes the meaning of
+    // "outward normal" (a sign convention that is independent of the
+    // caller's y-axis orientation: positive shoelace = CCW in math conv.).
+    var signedArea2 = 0.0;
+    for (var i = 0; i < n; i++) {
+      final a = centerline[i];
+      final b = centerline[(i + 1) % n];
+      signedArea2 += a.x * b.y - b.x * a.y;
+    }
+    if (signedArea2.abs() < 1e-6) return const [];
+    final windingSign = signedArea2 > 0 ? 1.0 : -1.0;
+
+    // Build the offset line for every edge.
+    final offsetStarts = List<Point2D>.filled(n, const Point2D(x: 0, y: 0));
+    final offsetEnds = List<Point2D>.filled(n, const Point2D(x: 0, y: 0));
+    for (var i = 0; i < n; i++) {
+      final a = centerline[i];
+      final b = centerline[(i + 1) % n];
+      final dx = b.x - a.x;
+      final dy = b.y - a.y;
+      final len = sqrt(dx * dx + dy * dy);
+      if (len < 1e-6) return const [];
+      // Outward unit normal: for CCW polygons (windingSign = +1) the
+      // outward direction is (dy, -dx) / len; for CW polygons it flips.
+      final nx = windingSign * dy / len;
+      final ny = -windingSign * dx / len;
+      final shift = edgeOffsetsMm[i];
+      offsetStarts[i] = Point2D(x: a.x + nx * shift, y: a.y + ny * shift);
+      offsetEnds[i] = Point2D(x: b.x + nx * shift, y: b.y + ny * shift);
+    }
+
+    // Miter each corner = intersection of the previous and current offset
+    // lines (extended infinitely). Parallel lines → no miter → return [].
+    final offsetVertices = <Point2D>[];
+    for (var i = 0; i < n; i++) {
+      final prev = (i + n - 1) % n;
+      final p = _lineIntersect(
+        offsetStarts[prev],
+        offsetEnds[prev],
+        offsetStarts[i],
+        offsetEnds[i],
+      );
+      if (p == null) return const [];
+      offsetVertices.add(p);
+    }
+
+    // Validate per-edge: each offset edge must keep the original edge's
+    // direction (positive dot product) and have non-zero length. This
+    // catches over-collapsed offsets where opposite faces have swapped.
+    for (var i = 0; i < n; i++) {
+      final a = offsetVertices[i];
+      final b = offsetVertices[(i + 1) % n];
+      final newDx = b.x - a.x;
+      final newDy = b.y - a.y;
+      if (newDx.abs() < 1e-6 && newDy.abs() < 1e-6) return const [];
+      final origA = centerline[i];
+      final origB = centerline[(i + 1) % n];
+      final origDx = origB.x - origA.x;
+      final origDy = origB.y - origA.y;
+      if (newDx * origDx + newDy * origDy <= 0) return const [];
+    }
+
+    // Validate globally: no self-intersection.
+    if (!isSimplePolygon(offsetVertices)) return const [];
+
+    return offsetVertices;
+  }
+
+  /// Per-wall inner or outer edge segments for one closed room loop
+  /// (ADR-017 Rule 5).
+  ///
+  /// Each polygon edge of [roomPolygon] is matched to a [WallSegment] in
+  /// [walls] by endpoint equality (within 1 mm; matching is direction-
+  /// agnostic — a wall whose endpoints are reversed relative to the
+  /// polygon edge is still matched and its returned segment is reversed
+  /// to preserve `wall.startPoint → wall.endPoint` orientation).
+  ///
+  /// The centerline polygon is offset by each wall's `thicknessMm / 2`
+  /// (negated for [RoomFaceSide.inner], positive for [RoomFaceSide.outer])
+  /// via [offsetPolygonPerEdge]. The returned map keys are wall IDs;
+  /// values are the corresponding offset edge as a
+  /// `(start: Point2D, end: Point2D)` pair.
+  ///
+  /// Returns an empty map when [roomPolygon] has fewer than 3 vertices,
+  /// when any polygon edge has no matching wall, or when
+  /// [offsetPolygonPerEdge] reports a degenerate offset.
+  static Map<String, ({Point2D start, Point2D end})> roomFaceEdges({
+    required List<WallSegment> walls,
+    required List<Point2D> roomPolygon,
+    required RoomFaceSide side,
+  }) {
+    final n = roomPolygon.length;
+    if (n < 3 || walls.isEmpty) return const {};
+
+    final wallIds = List<String>.filled(n, '');
+    final reversed = List<bool>.filled(n, false);
+    final offsets = List<double>.filled(n, 0.0);
+    final sideSign = side == RoomFaceSide.inner ? -1.0 : 1.0;
+
+    for (var i = 0; i < n; i++) {
+      final pa = roomPolygon[i];
+      final pb = roomPolygon[(i + 1) % n];
+      WallSegment? match;
+      var rev = false;
+      for (final w in walls) {
+        if (_pointAlmostEq(w.startPoint, pa) &&
+            _pointAlmostEq(w.endPoint, pb)) {
+          match = w;
+          rev = false;
+          break;
+        }
+        if (_pointAlmostEq(w.startPoint, pb) &&
+            _pointAlmostEq(w.endPoint, pa)) {
+          match = w;
+          rev = true;
+          break;
+        }
+      }
+      if (match == null) return const {};
+      wallIds[i] = match.id;
+      reversed[i] = rev;
+      offsets[i] = match.thicknessMm / 2.0 * sideSign;
+    }
+
+    final offsetPoly = offsetPolygonPerEdge(
+      centerline: roomPolygon,
+      edgeOffsetsMm: offsets,
+    );
+    if (offsetPoly.isEmpty) return const {};
+
+    final result = <String, ({Point2D start, Point2D end})>{};
+    for (var i = 0; i < n; i++) {
+      final a = offsetPoly[i];
+      final b = offsetPoly[(i + 1) % n];
+      result[wallIds[i]] =
+          reversed[i] ? (start: b, end: a) : (start: a, end: b);
+    }
+    return result;
+  }
+
+  static Point2D? _lineIntersect(
+    Point2D a,
+    Point2D b,
+    Point2D c,
+    Point2D d,
+  ) {
+    final dx1 = b.x - a.x;
+    final dy1 = b.y - a.y;
+    final dx2 = d.x - c.x;
+    final dy2 = d.y - c.y;
+    final det = dx1 * dy2 - dy1 * dx2;
+    if (det.abs() < 1e-9) return null;
+    final t = ((c.x - a.x) * dy2 - (c.y - a.y) * dx2) / det;
+    return Point2D(x: a.x + t * dx1, y: a.y + t * dy1);
+  }
+
+  static bool _pointAlmostEq(Point2D a, Point2D b) {
+    return (a.x - b.x).abs() <= 1.0 && (a.y - b.y).abs() <= 1.0;
   }
 }
