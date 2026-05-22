@@ -82,6 +82,12 @@ class BuildingDao extends DatabaseAccessor<AppDatabase>
   Stream<List<WallSegment>> watchWallSegments(String roomId) =>
       (select(wallSegments)..where((t) => t.roomId.equals(roomId))).watch();
 
+  /// Single wall segment by [id]; emits `null` if the row does not exist.
+  Stream<WallSegment?> watchWallById(String id) =>
+      (select(wallSegments)..where((t) => t.id.equals(id)))
+          .watch()
+          .map((rows) => rows.isEmpty ? null : rows.first);
+
   /// All wall segments for any room on [floorId] — one-shot fetch.
   Future<List<WallSegment>> getWallSegmentsForFloor(String floorId) {
     final q = select(wallSegments).join(

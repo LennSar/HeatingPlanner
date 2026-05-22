@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/enums.dart';
 import '../../repositories/building_repository.dart';
+import 'geometry_providers.dart';
 import 'project_settings_provider.dart';
 import '../engines/geometry_engine.dart';
 import '../engines/thermal_engine.dart';
@@ -21,12 +22,19 @@ import 'u_value_providers.dart';
 /// ADR-002. When [WallSegment.adjacentRoomId] is null the correction
 /// factor defaults to 0.0 (safe over-estimate, per ADR-002).
 ///
+/// Per ADR-017 Rule 5, room area / volume come from
+/// [roomInnerPolygonProvider] (the EN 12831 *Lichtmaß* polygon) and
+/// per-wall net heat-loss area uses [wallInnerEdgeLengthProvider] ×
+/// floor height minus opening areas — never the raw centerline polygon
+/// or centerline segment length.
+///
 /// Returns [double.nan] when any exterior wall has no
 /// [WallSegment.constructionId] assigned — this signals incomplete
 /// data (as opposed to a genuinely zero demand) so that downstream
 /// consumers (e.g. zone colour logic) can distinguish the two cases.
 ///
 /// Depends on [roomProvider], [wallSegmentsProvider],
+/// [roomInnerPolygonProvider], [wallInnerEdgeLengthProvider],
 /// [windowsProvider], [doorsProvider], [floorProvider],
 /// [uValueProvider], and [designOutdoorTempCProvider].
 final roomHeatDemandProvider =
@@ -104,10 +112,14 @@ final roomHeatDemandProvider =
     }
 
     // Net opaque wall area after subtracting openings.
-    final wallLengthMm = GeometryEngine.segmentLengthMm(
-      wall.startPoint,
-      wall.endPoint,
-    );
+    //
+    // ADR-017 Rule 5: the wall's heat-loss length is its inner-edge
+    // length along the room's *Lichtmaß* polygon, not the centerline
+    // length. NaN means the inner polygon is degenerate — skip the wall
+    // (the room is unbuildable; downstream validation surfaces it).
+    final wallLengthMm =
+        ref.watch(wallInnerEdgeLengthProvider(wall.id));
+    if (wallLengthMm.isNaN || wallLengthMm <= 0) continue;
     final openings = <({int widthMm, int heightMm})>[];
     for (final w in windows) {
       openings.add((widthMm: w.widthMm, heightMm: w.heightMm));
@@ -157,8 +169,16 @@ final roomHeatDemandProvider =
   }
 
   // Ventilation heat loss (EN 12831 Q_V).
-  final floorAreaM2 =
-      GeometryEngine.polygonAreaM2(room.polygon);
+  //
+  // ADR-017 Rule 5: room area / volume come from the inner clear
+  // polygon — the *Lichtmaß* polygon — not the centerline polygon.
+  // An empty inner polygon means the room is degenerate; treat it as
+  // having no floor area and skip the floor/ventilation/ceiling terms
+  // (each is guarded by floorAreaM2 > 0 below).
+  final innerPolygon = ref.watch(roomInnerPolygonProvider(roomId));
+  final floorAreaM2 = innerPolygon.isEmpty
+      ? double.nan
+      : GeometryEngine.polygonAreaM2(innerPolygon);
   if (!floorAreaM2.isNaN && floorAreaM2 > 0) {
     final volumeM3 = ThermalEngine.roomVolumeM3(
       floorAreaM2: floorAreaM2,

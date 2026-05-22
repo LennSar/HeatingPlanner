@@ -74,6 +74,17 @@ final wallSegmentsProvider =
       .map((rows) => rows.map(_wallSegmentFromRow).toList());
 });
 
+/// Reactive stream of a single [WallSegment] by ID.
+///
+/// Emits `null` if the wall does not exist (e.g. after deletion).
+final wallSegmentProvider =
+    StreamProvider.family<WallSegment?, String>((ref, wallId) {
+  return ref
+      .watch(buildingDaoProvider)
+      .watchWallById(wallId)
+      .map((row) => row == null ? null : _wallSegmentFromRow(row));
+});
+
 /// Reactive stream of all [WindowElement]s on a wall segment.
 final windowsProvider =
     StreamProvider.family<List<WindowElement>, String>(
