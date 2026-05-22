@@ -15,6 +15,14 @@ class WallSegments extends Table {
   TextColumn get endPointJson => text()();
   TextColumn get wallType =>
       text().withDefault(const Constant('exterior'))();
+
+  /// Total wall thickness in mm (ADR-017).
+  RealColumn get thicknessMm => real()();
+
+  /// `WallAnchorMode.index` — which face stays fixed on thickness change
+  /// (ADR-017). 0 = centerline, 1 = innerFace, 2 = outerFace.
+  IntColumn get anchorMode => integer()();
+
   TextColumn get constructionId => text()
       .nullable()
       .references(WallConstructions, #id, onDelete: KeyAction.setNull)();

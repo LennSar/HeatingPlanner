@@ -14,6 +14,10 @@ _WallSegment _$WallSegmentFromJson(Map<String, dynamic> json) => _WallSegment(
   wallType:
       $enumDecodeNullable(_$WallTypeEnumMap, json['wallType']) ??
       WallType.exterior,
+  thicknessMm: (json['thicknessMm'] as num?)?.toDouble() ?? 0.0,
+  anchorMode:
+      $enumDecodeNullable(_$WallAnchorModeEnumMap, json['anchorMode']) ??
+      WallAnchorMode.centerline,
   constructionId: json['constructionId'] as String?,
   adjacentRoomId: json['adjacentRoomId'] as String?,
   orientation:
@@ -29,6 +33,8 @@ Map<String, dynamic> _$WallSegmentToJson(_WallSegment instance) =>
       'startPoint': instance.startPoint,
       'endPoint': instance.endPoint,
       'wallType': _$WallTypeEnumMap[instance.wallType]!,
+      'thicknessMm': instance.thicknessMm,
+      'anchorMode': _$WallAnchorModeEnumMap[instance.anchorMode]!,
       'constructionId': instance.constructionId,
       'adjacentRoomId': instance.adjacentRoomId,
       'orientation': _$CardinalDirectionEnumMap[instance.orientation]!,
@@ -39,6 +45,12 @@ const _$WallTypeEnumMap = {
   WallType.exterior: 'exterior',
   WallType.interior: 'interior',
   WallType.partition: 'partition',
+};
+
+const _$WallAnchorModeEnumMap = {
+  WallAnchorMode.centerline: 'centerline',
+  WallAnchorMode.innerFace: 'innerFace',
+  WallAnchorMode.outerFace: 'outerFace',
 };
 
 const _$CardinalDirectionEnumMap = {

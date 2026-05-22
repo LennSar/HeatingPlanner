@@ -4,6 +4,7 @@ import 'package:drift/drift.dart' show Value;
 import 'package:uuid/uuid.dart';
 
 import '../data/database/app_database.dart' as $db;
+import '../data/models/enums.dart';
 
 /// Imports a `.hsp` project snapshot into [_db], generating new UUIDs for
 /// all project-specific entities so that the imported project coexists
@@ -360,6 +361,10 @@ class HspImporter {
       orientation: Value(
         d['orientation'] as String? ?? 'north',
       ),
+      thicknessMm: (d['thicknessMm'] as num?)?.toDouble() ?? 0.0,
+      anchorMode: d['anchorMode'] is int
+          ? d['anchorMode'] as int
+          : WallAnchorMode.centerline.index,
     );
   }
 

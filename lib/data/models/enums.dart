@@ -1,6 +1,18 @@
 /// Wall thermal and structural classification.
 enum WallType { exterior, interior, partition }
 
+/// Which face of a wall stays fixed when its thickness changes (ADR-017).
+///
+/// `centerline` — the centerline does not move; both faces shift outward
+/// by `½Δt` each. Forced for shared interior walls (`mirrorId != null`).
+///
+/// `innerFace` — the inner face stays put; the centerline shifts outward
+/// along the wall's outward normal by `½Δt`. Default for exterior walls.
+///
+/// `outerFace` — the outer face stays put; the centerline shifts inward
+/// by `½Δt`.
+enum WallAnchorMode { centerline, innerFace, outerFace }
+
 /// Eight-point compass orientation, derived from wall segment geometry.
 enum CardinalDirection {
   north,

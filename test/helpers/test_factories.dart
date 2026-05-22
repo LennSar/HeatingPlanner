@@ -417,6 +417,8 @@ Future<FullTestProjectSeed> createFullTestProject(
             roomId: w.roomId,
             startPointJson: jsonEncode(w.start),
             endPointJson: jsonEncode(w.end),
+            thicknessMm: 240.0,
+            anchorMode: WallAnchorMode.centerline.index,
           ),
         );
   }

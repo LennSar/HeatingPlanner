@@ -10,6 +10,19 @@ class Projects extends Table {
   RealColumn get defaultIndoorTempC => real().withDefault(const Constant(20.0))();
   IntColumn get floorHeightMm => integer().withDefault(const Constant(2600))();
   RealColumn get unheatedSpaceTempC => real().withDefault(const Constant(10.0))();
+
+  /// Default total thickness in mm for exterior walls (ADR-017).
+  IntColumn get defaultExteriorWallThicknessMm =>
+      integer().withDefault(const Constant(240))();
+
+  /// Default total thickness in mm for interior (shared) walls (ADR-017).
+  IntColumn get defaultInteriorWallThicknessMm =>
+      integer().withDefault(const Constant(120))();
+
+  /// Default total thickness in mm for partition walls (ADR-017).
+  IntColumn get defaultPartitionWallThicknessMm =>
+      integer().withDefault(const Constant(100))();
+
   /// Serialised JSON blob for the optional GeoLocation.
   TextColumn get locationJson => text().nullable()();
 

@@ -17,10 +17,20 @@ mixin _$WallSegment {
 
 /// UUID v4 primary key.
  String get id;/// UUID of the owning [Room].
- String get roomId;/// Start vertex in millimetre coordinates.
- Point2D get startPoint;/// End vertex in millimetre coordinates.
+ String get roomId;/// Centerline start vertex in millimetre coordinates (ADR-017).
+ Point2D get startPoint;/// Centerline end vertex in millimetre coordinates (ADR-017).
  Point2D get endPoint;/// Thermal and structural classification.
- WallType get wallType;/// UUID of the associated [WallConstruction]; null if unassigned.
+ WallType get wallType;/// Total wall thickness in mm (ADR-017).
+///
+/// Constraint: 50.0–1000.0. Stored denormalized; source-of-truth is
+/// `sum(MaterialLayer.thicknessMm)` when `constructionId != null`,
+/// otherwise the matching `Project.default<WallType>WallThicknessMm`.
+ double get thicknessMm;/// Which face stays fixed when [thicknessMm] changes (ADR-017).
+///
+/// Defaults per ADR-017 Rule 2: `innerFace` for exterior walls,
+/// `centerline` for interior and partition walls. Forced to
+/// `centerline` whenever `mirrorId != null` (ADR-017 Rule 3).
+ WallAnchorMode get anchorMode;/// UUID of the associated [WallConstruction]; null if unassigned.
  String? get constructionId;/// UUID of the room on the other side; null for exterior walls.
  String? get adjacentRoomId;/// Compass orientation derived from segment angle.
  CardinalDirection get orientation;/// UUID of the mirror wall in an ADR-001 shared-wall pair.
@@ -40,16 +50,16 @@ $WallSegmentCopyWith<WallSegment> get copyWith => _$WallSegmentCopyWithImpl<Wall
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is WallSegment&&(identical(other.id, id) || other.id == id)&&(identical(other.roomId, roomId) || other.roomId == roomId)&&(identical(other.startPoint, startPoint) || other.startPoint == startPoint)&&(identical(other.endPoint, endPoint) || other.endPoint == endPoint)&&(identical(other.wallType, wallType) || other.wallType == wallType)&&(identical(other.constructionId, constructionId) || other.constructionId == constructionId)&&(identical(other.adjacentRoomId, adjacentRoomId) || other.adjacentRoomId == adjacentRoomId)&&(identical(other.orientation, orientation) || other.orientation == orientation)&&(identical(other.mirrorId, mirrorId) || other.mirrorId == mirrorId));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is WallSegment&&(identical(other.id, id) || other.id == id)&&(identical(other.roomId, roomId) || other.roomId == roomId)&&(identical(other.startPoint, startPoint) || other.startPoint == startPoint)&&(identical(other.endPoint, endPoint) || other.endPoint == endPoint)&&(identical(other.wallType, wallType) || other.wallType == wallType)&&(identical(other.thicknessMm, thicknessMm) || other.thicknessMm == thicknessMm)&&(identical(other.anchorMode, anchorMode) || other.anchorMode == anchorMode)&&(identical(other.constructionId, constructionId) || other.constructionId == constructionId)&&(identical(other.adjacentRoomId, adjacentRoomId) || other.adjacentRoomId == adjacentRoomId)&&(identical(other.orientation, orientation) || other.orientation == orientation)&&(identical(other.mirrorId, mirrorId) || other.mirrorId == mirrorId));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,roomId,startPoint,endPoint,wallType,constructionId,adjacentRoomId,orientation,mirrorId);
+int get hashCode => Object.hash(runtimeType,id,roomId,startPoint,endPoint,wallType,thicknessMm,anchorMode,constructionId,adjacentRoomId,orientation,mirrorId);
 
 @override
 String toString() {
-  return 'WallSegment(id: $id, roomId: $roomId, startPoint: $startPoint, endPoint: $endPoint, wallType: $wallType, constructionId: $constructionId, adjacentRoomId: $adjacentRoomId, orientation: $orientation, mirrorId: $mirrorId)';
+  return 'WallSegment(id: $id, roomId: $roomId, startPoint: $startPoint, endPoint: $endPoint, wallType: $wallType, thicknessMm: $thicknessMm, anchorMode: $anchorMode, constructionId: $constructionId, adjacentRoomId: $adjacentRoomId, orientation: $orientation, mirrorId: $mirrorId)';
 }
 
 
@@ -60,7 +70,7 @@ abstract mixin class $WallSegmentCopyWith<$Res>  {
   factory $WallSegmentCopyWith(WallSegment value, $Res Function(WallSegment) _then) = _$WallSegmentCopyWithImpl;
 @useResult
 $Res call({
- String id, String roomId, Point2D startPoint, Point2D endPoint, WallType wallType, String? constructionId, String? adjacentRoomId, CardinalDirection orientation, String? mirrorId
+ String id, String roomId, Point2D startPoint, Point2D endPoint, WallType wallType, double thicknessMm, WallAnchorMode anchorMode, String? constructionId, String? adjacentRoomId, CardinalDirection orientation, String? mirrorId
 });
 
 
@@ -77,14 +87,16 @@ class _$WallSegmentCopyWithImpl<$Res>
 
 /// Create a copy of WallSegment
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? roomId = null,Object? startPoint = null,Object? endPoint = null,Object? wallType = null,Object? constructionId = freezed,Object? adjacentRoomId = freezed,Object? orientation = null,Object? mirrorId = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? roomId = null,Object? startPoint = null,Object? endPoint = null,Object? wallType = null,Object? thicknessMm = null,Object? anchorMode = null,Object? constructionId = freezed,Object? adjacentRoomId = freezed,Object? orientation = null,Object? mirrorId = freezed,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,roomId: null == roomId ? _self.roomId : roomId // ignore: cast_nullable_to_non_nullable
 as String,startPoint: null == startPoint ? _self.startPoint : startPoint // ignore: cast_nullable_to_non_nullable
 as Point2D,endPoint: null == endPoint ? _self.endPoint : endPoint // ignore: cast_nullable_to_non_nullable
 as Point2D,wallType: null == wallType ? _self.wallType : wallType // ignore: cast_nullable_to_non_nullable
-as WallType,constructionId: freezed == constructionId ? _self.constructionId : constructionId // ignore: cast_nullable_to_non_nullable
+as WallType,thicknessMm: null == thicknessMm ? _self.thicknessMm : thicknessMm // ignore: cast_nullable_to_non_nullable
+as double,anchorMode: null == anchorMode ? _self.anchorMode : anchorMode // ignore: cast_nullable_to_non_nullable
+as WallAnchorMode,constructionId: freezed == constructionId ? _self.constructionId : constructionId // ignore: cast_nullable_to_non_nullable
 as String?,adjacentRoomId: freezed == adjacentRoomId ? _self.adjacentRoomId : adjacentRoomId // ignore: cast_nullable_to_non_nullable
 as String?,orientation: null == orientation ? _self.orientation : orientation // ignore: cast_nullable_to_non_nullable
 as CardinalDirection,mirrorId: freezed == mirrorId ? _self.mirrorId : mirrorId // ignore: cast_nullable_to_non_nullable
@@ -191,10 +203,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String roomId,  Point2D startPoint,  Point2D endPoint,  WallType wallType,  String? constructionId,  String? adjacentRoomId,  CardinalDirection orientation,  String? mirrorId)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String roomId,  Point2D startPoint,  Point2D endPoint,  WallType wallType,  double thicknessMm,  WallAnchorMode anchorMode,  String? constructionId,  String? adjacentRoomId,  CardinalDirection orientation,  String? mirrorId)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _WallSegment() when $default != null:
-return $default(_that.id,_that.roomId,_that.startPoint,_that.endPoint,_that.wallType,_that.constructionId,_that.adjacentRoomId,_that.orientation,_that.mirrorId);case _:
+return $default(_that.id,_that.roomId,_that.startPoint,_that.endPoint,_that.wallType,_that.thicknessMm,_that.anchorMode,_that.constructionId,_that.adjacentRoomId,_that.orientation,_that.mirrorId);case _:
   return orElse();
 
 }
@@ -212,10 +224,10 @@ return $default(_that.id,_that.roomId,_that.startPoint,_that.endPoint,_that.wall
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String roomId,  Point2D startPoint,  Point2D endPoint,  WallType wallType,  String? constructionId,  String? adjacentRoomId,  CardinalDirection orientation,  String? mirrorId)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String roomId,  Point2D startPoint,  Point2D endPoint,  WallType wallType,  double thicknessMm,  WallAnchorMode anchorMode,  String? constructionId,  String? adjacentRoomId,  CardinalDirection orientation,  String? mirrorId)  $default,) {final _that = this;
 switch (_that) {
 case _WallSegment():
-return $default(_that.id,_that.roomId,_that.startPoint,_that.endPoint,_that.wallType,_that.constructionId,_that.adjacentRoomId,_that.orientation,_that.mirrorId);case _:
+return $default(_that.id,_that.roomId,_that.startPoint,_that.endPoint,_that.wallType,_that.thicknessMm,_that.anchorMode,_that.constructionId,_that.adjacentRoomId,_that.orientation,_that.mirrorId);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -232,10 +244,10 @@ return $default(_that.id,_that.roomId,_that.startPoint,_that.endPoint,_that.wall
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String roomId,  Point2D startPoint,  Point2D endPoint,  WallType wallType,  String? constructionId,  String? adjacentRoomId,  CardinalDirection orientation,  String? mirrorId)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String roomId,  Point2D startPoint,  Point2D endPoint,  WallType wallType,  double thicknessMm,  WallAnchorMode anchorMode,  String? constructionId,  String? adjacentRoomId,  CardinalDirection orientation,  String? mirrorId)?  $default,) {final _that = this;
 switch (_that) {
 case _WallSegment() when $default != null:
-return $default(_that.id,_that.roomId,_that.startPoint,_that.endPoint,_that.wallType,_that.constructionId,_that.adjacentRoomId,_that.orientation,_that.mirrorId);case _:
+return $default(_that.id,_that.roomId,_that.startPoint,_that.endPoint,_that.wallType,_that.thicknessMm,_that.anchorMode,_that.constructionId,_that.adjacentRoomId,_that.orientation,_that.mirrorId);case _:
   return null;
 
 }
@@ -247,19 +259,31 @@ return $default(_that.id,_that.roomId,_that.startPoint,_that.endPoint,_that.wall
 @JsonSerializable()
 
 class _WallSegment implements WallSegment {
-  const _WallSegment({required this.id, required this.roomId, required this.startPoint, required this.endPoint, this.wallType = WallType.exterior, this.constructionId, this.adjacentRoomId, this.orientation = CardinalDirection.north, this.mirrorId});
+  const _WallSegment({required this.id, required this.roomId, required this.startPoint, required this.endPoint, this.wallType = WallType.exterior, this.thicknessMm = 0.0, this.anchorMode = WallAnchorMode.centerline, this.constructionId, this.adjacentRoomId, this.orientation = CardinalDirection.north, this.mirrorId});
   factory _WallSegment.fromJson(Map<String, dynamic> json) => _$WallSegmentFromJson(json);
 
 /// UUID v4 primary key.
 @override final  String id;
 /// UUID of the owning [Room].
 @override final  String roomId;
-/// Start vertex in millimetre coordinates.
+/// Centerline start vertex in millimetre coordinates (ADR-017).
 @override final  Point2D startPoint;
-/// End vertex in millimetre coordinates.
+/// Centerline end vertex in millimetre coordinates (ADR-017).
 @override final  Point2D endPoint;
 /// Thermal and structural classification.
 @override@JsonKey() final  WallType wallType;
+/// Total wall thickness in mm (ADR-017).
+///
+/// Constraint: 50.0–1000.0. Stored denormalized; source-of-truth is
+/// `sum(MaterialLayer.thicknessMm)` when `constructionId != null`,
+/// otherwise the matching `Project.default<WallType>WallThicknessMm`.
+@override@JsonKey() final  double thicknessMm;
+/// Which face stays fixed when [thicknessMm] changes (ADR-017).
+///
+/// Defaults per ADR-017 Rule 2: `innerFace` for exterior walls,
+/// `centerline` for interior and partition walls. Forced to
+/// `centerline` whenever `mirrorId != null` (ADR-017 Rule 3).
+@override@JsonKey() final  WallAnchorMode anchorMode;
 /// UUID of the associated [WallConstruction]; null if unassigned.
 @override final  String? constructionId;
 /// UUID of the room on the other side; null for exterior walls.
@@ -285,16 +309,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _WallSegment&&(identical(other.id, id) || other.id == id)&&(identical(other.roomId, roomId) || other.roomId == roomId)&&(identical(other.startPoint, startPoint) || other.startPoint == startPoint)&&(identical(other.endPoint, endPoint) || other.endPoint == endPoint)&&(identical(other.wallType, wallType) || other.wallType == wallType)&&(identical(other.constructionId, constructionId) || other.constructionId == constructionId)&&(identical(other.adjacentRoomId, adjacentRoomId) || other.adjacentRoomId == adjacentRoomId)&&(identical(other.orientation, orientation) || other.orientation == orientation)&&(identical(other.mirrorId, mirrorId) || other.mirrorId == mirrorId));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _WallSegment&&(identical(other.id, id) || other.id == id)&&(identical(other.roomId, roomId) || other.roomId == roomId)&&(identical(other.startPoint, startPoint) || other.startPoint == startPoint)&&(identical(other.endPoint, endPoint) || other.endPoint == endPoint)&&(identical(other.wallType, wallType) || other.wallType == wallType)&&(identical(other.thicknessMm, thicknessMm) || other.thicknessMm == thicknessMm)&&(identical(other.anchorMode, anchorMode) || other.anchorMode == anchorMode)&&(identical(other.constructionId, constructionId) || other.constructionId == constructionId)&&(identical(other.adjacentRoomId, adjacentRoomId) || other.adjacentRoomId == adjacentRoomId)&&(identical(other.orientation, orientation) || other.orientation == orientation)&&(identical(other.mirrorId, mirrorId) || other.mirrorId == mirrorId));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,roomId,startPoint,endPoint,wallType,constructionId,adjacentRoomId,orientation,mirrorId);
+int get hashCode => Object.hash(runtimeType,id,roomId,startPoint,endPoint,wallType,thicknessMm,anchorMode,constructionId,adjacentRoomId,orientation,mirrorId);
 
 @override
 String toString() {
-  return 'WallSegment(id: $id, roomId: $roomId, startPoint: $startPoint, endPoint: $endPoint, wallType: $wallType, constructionId: $constructionId, adjacentRoomId: $adjacentRoomId, orientation: $orientation, mirrorId: $mirrorId)';
+  return 'WallSegment(id: $id, roomId: $roomId, startPoint: $startPoint, endPoint: $endPoint, wallType: $wallType, thicknessMm: $thicknessMm, anchorMode: $anchorMode, constructionId: $constructionId, adjacentRoomId: $adjacentRoomId, orientation: $orientation, mirrorId: $mirrorId)';
 }
 
 
@@ -305,7 +329,7 @@ abstract mixin class _$WallSegmentCopyWith<$Res> implements $WallSegmentCopyWith
   factory _$WallSegmentCopyWith(_WallSegment value, $Res Function(_WallSegment) _then) = __$WallSegmentCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String roomId, Point2D startPoint, Point2D endPoint, WallType wallType, String? constructionId, String? adjacentRoomId, CardinalDirection orientation, String? mirrorId
+ String id, String roomId, Point2D startPoint, Point2D endPoint, WallType wallType, double thicknessMm, WallAnchorMode anchorMode, String? constructionId, String? adjacentRoomId, CardinalDirection orientation, String? mirrorId
 });
 
 
@@ -322,14 +346,16 @@ class __$WallSegmentCopyWithImpl<$Res>
 
 /// Create a copy of WallSegment
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? roomId = null,Object? startPoint = null,Object? endPoint = null,Object? wallType = null,Object? constructionId = freezed,Object? adjacentRoomId = freezed,Object? orientation = null,Object? mirrorId = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? roomId = null,Object? startPoint = null,Object? endPoint = null,Object? wallType = null,Object? thicknessMm = null,Object? anchorMode = null,Object? constructionId = freezed,Object? adjacentRoomId = freezed,Object? orientation = null,Object? mirrorId = freezed,}) {
   return _then(_WallSegment(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,roomId: null == roomId ? _self.roomId : roomId // ignore: cast_nullable_to_non_nullable
 as String,startPoint: null == startPoint ? _self.startPoint : startPoint // ignore: cast_nullable_to_non_nullable
 as Point2D,endPoint: null == endPoint ? _self.endPoint : endPoint // ignore: cast_nullable_to_non_nullable
 as Point2D,wallType: null == wallType ? _self.wallType : wallType // ignore: cast_nullable_to_non_nullable
-as WallType,constructionId: freezed == constructionId ? _self.constructionId : constructionId // ignore: cast_nullable_to_non_nullable
+as WallType,thicknessMm: null == thicknessMm ? _self.thicknessMm : thicknessMm // ignore: cast_nullable_to_non_nullable
+as double,anchorMode: null == anchorMode ? _self.anchorMode : anchorMode // ignore: cast_nullable_to_non_nullable
+as WallAnchorMode,constructionId: freezed == constructionId ? _self.constructionId : constructionId // ignore: cast_nullable_to_non_nullable
 as String?,adjacentRoomId: freezed == adjacentRoomId ? _self.adjacentRoomId : adjacentRoomId // ignore: cast_nullable_to_non_nullable
 as String?,orientation: null == orientation ? _self.orientation : orientation // ignore: cast_nullable_to_non_nullable
 as CardinalDirection,mirrorId: freezed == mirrorId ? _self.mirrorId : mirrorId // ignore: cast_nullable_to_non_nullable

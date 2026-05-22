@@ -65,6 +65,9 @@ Project _projectFromRow($db.Project row) {
     defaultIndoorTempC: row.defaultIndoorTempC,
     floorHeightMm: row.floorHeightMm,
     unheatedSpaceTempC: row.unheatedSpaceTempC,
+    defaultExteriorWallThicknessMm: row.defaultExteriorWallThicknessMm,
+    defaultInteriorWallThicknessMm: row.defaultInteriorWallThicknessMm,
+    defaultPartitionWallThicknessMm: row.defaultPartitionWallThicknessMm,
     location: location,
   );
 }
@@ -143,6 +146,12 @@ $db.ProjectsCompanion _projectToCompanion(Project p) {
     defaultIndoorTempC: Value(p.defaultIndoorTempC),
     floorHeightMm: Value(p.floorHeightMm),
     unheatedSpaceTempC: Value(p.unheatedSpaceTempC),
+    defaultExteriorWallThicknessMm:
+        Value(p.defaultExteriorWallThicknessMm),
+    defaultInteriorWallThicknessMm:
+        Value(p.defaultInteriorWallThicknessMm),
+    defaultPartitionWallThicknessMm:
+        Value(p.defaultPartitionWallThicknessMm),
     locationJson: Value(locationJson),
   );
 }

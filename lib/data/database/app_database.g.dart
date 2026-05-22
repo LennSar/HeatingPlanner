@@ -100,6 +100,42 @@ class $ProjectsTable extends Projects with TableInfo<$ProjectsTable, Project> {
         requiredDuringInsert: false,
         defaultValue: const Constant(10.0),
       );
+  static const VerificationMeta _defaultExteriorWallThicknessMmMeta =
+      const VerificationMeta('defaultExteriorWallThicknessMm');
+  @override
+  late final GeneratedColumn<int> defaultExteriorWallThicknessMm =
+      GeneratedColumn<int>(
+        'default_exterior_wall_thickness_mm',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(240),
+      );
+  static const VerificationMeta _defaultInteriorWallThicknessMmMeta =
+      const VerificationMeta('defaultInteriorWallThicknessMm');
+  @override
+  late final GeneratedColumn<int> defaultInteriorWallThicknessMm =
+      GeneratedColumn<int>(
+        'default_interior_wall_thickness_mm',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(120),
+      );
+  static const VerificationMeta _defaultPartitionWallThicknessMmMeta =
+      const VerificationMeta('defaultPartitionWallThicknessMm');
+  @override
+  late final GeneratedColumn<int> defaultPartitionWallThicknessMm =
+      GeneratedColumn<int>(
+        'default_partition_wall_thickness_mm',
+        aliasedName,
+        false,
+        type: DriftSqlType.int,
+        requiredDuringInsert: false,
+        defaultValue: const Constant(100),
+      );
   static const VerificationMeta _locationJsonMeta = const VerificationMeta(
     'locationJson',
   );
@@ -121,6 +157,9 @@ class $ProjectsTable extends Projects with TableInfo<$ProjectsTable, Project> {
     defaultIndoorTempC,
     floorHeightMm,
     unheatedSpaceTempC,
+    defaultExteriorWallThicknessMm,
+    defaultInteriorWallThicknessMm,
+    defaultPartitionWallThicknessMm,
     locationJson,
   ];
   @override
@@ -200,6 +239,33 @@ class $ProjectsTable extends Projects with TableInfo<$ProjectsTable, Project> {
         ),
       );
     }
+    if (data.containsKey('default_exterior_wall_thickness_mm')) {
+      context.handle(
+        _defaultExteriorWallThicknessMmMeta,
+        defaultExteriorWallThicknessMm.isAcceptableOrUnknown(
+          data['default_exterior_wall_thickness_mm']!,
+          _defaultExteriorWallThicknessMmMeta,
+        ),
+      );
+    }
+    if (data.containsKey('default_interior_wall_thickness_mm')) {
+      context.handle(
+        _defaultInteriorWallThicknessMmMeta,
+        defaultInteriorWallThicknessMm.isAcceptableOrUnknown(
+          data['default_interior_wall_thickness_mm']!,
+          _defaultInteriorWallThicknessMmMeta,
+        ),
+      );
+    }
+    if (data.containsKey('default_partition_wall_thickness_mm')) {
+      context.handle(
+        _defaultPartitionWallThicknessMmMeta,
+        defaultPartitionWallThicknessMm.isAcceptableOrUnknown(
+          data['default_partition_wall_thickness_mm']!,
+          _defaultPartitionWallThicknessMmMeta,
+        ),
+      );
+    }
     if (data.containsKey('location_json')) {
       context.handle(
         _locationJsonMeta,
@@ -250,6 +316,18 @@ class $ProjectsTable extends Projects with TableInfo<$ProjectsTable, Project> {
         DriftSqlType.double,
         data['${effectivePrefix}unheated_space_temp_c'],
       )!,
+      defaultExteriorWallThicknessMm: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}default_exterior_wall_thickness_mm'],
+      )!,
+      defaultInteriorWallThicknessMm: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}default_interior_wall_thickness_mm'],
+      )!,
+      defaultPartitionWallThicknessMm: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}default_partition_wall_thickness_mm'],
+      )!,
       locationJson: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}location_json'],
@@ -273,6 +351,15 @@ class Project extends DataClass implements Insertable<Project> {
   final int floorHeightMm;
   final double unheatedSpaceTempC;
 
+  /// Default total thickness in mm for exterior walls (ADR-017).
+  final int defaultExteriorWallThicknessMm;
+
+  /// Default total thickness in mm for interior (shared) walls (ADR-017).
+  final int defaultInteriorWallThicknessMm;
+
+  /// Default total thickness in mm for partition walls (ADR-017).
+  final int defaultPartitionWallThicknessMm;
+
   /// Serialised JSON blob for the optional GeoLocation.
   final String? locationJson;
   const Project({
@@ -284,6 +371,9 @@ class Project extends DataClass implements Insertable<Project> {
     required this.defaultIndoorTempC,
     required this.floorHeightMm,
     required this.unheatedSpaceTempC,
+    required this.defaultExteriorWallThicknessMm,
+    required this.defaultInteriorWallThicknessMm,
+    required this.defaultPartitionWallThicknessMm,
     this.locationJson,
   });
   @override
@@ -297,6 +387,15 @@ class Project extends DataClass implements Insertable<Project> {
     map['default_indoor_temp_c'] = Variable<double>(defaultIndoorTempC);
     map['floor_height_mm'] = Variable<int>(floorHeightMm);
     map['unheated_space_temp_c'] = Variable<double>(unheatedSpaceTempC);
+    map['default_exterior_wall_thickness_mm'] = Variable<int>(
+      defaultExteriorWallThicknessMm,
+    );
+    map['default_interior_wall_thickness_mm'] = Variable<int>(
+      defaultInteriorWallThicknessMm,
+    );
+    map['default_partition_wall_thickness_mm'] = Variable<int>(
+      defaultPartitionWallThicknessMm,
+    );
     if (!nullToAbsent || locationJson != null) {
       map['location_json'] = Variable<String>(locationJson);
     }
@@ -313,6 +412,9 @@ class Project extends DataClass implements Insertable<Project> {
       defaultIndoorTempC: Value(defaultIndoorTempC),
       floorHeightMm: Value(floorHeightMm),
       unheatedSpaceTempC: Value(unheatedSpaceTempC),
+      defaultExteriorWallThicknessMm: Value(defaultExteriorWallThicknessMm),
+      defaultInteriorWallThicknessMm: Value(defaultInteriorWallThicknessMm),
+      defaultPartitionWallThicknessMm: Value(defaultPartitionWallThicknessMm),
       locationJson: locationJson == null && nullToAbsent
           ? const Value.absent()
           : Value(locationJson),
@@ -339,6 +441,15 @@ class Project extends DataClass implements Insertable<Project> {
       unheatedSpaceTempC: serializer.fromJson<double>(
         json['unheatedSpaceTempC'],
       ),
+      defaultExteriorWallThicknessMm: serializer.fromJson<int>(
+        json['defaultExteriorWallThicknessMm'],
+      ),
+      defaultInteriorWallThicknessMm: serializer.fromJson<int>(
+        json['defaultInteriorWallThicknessMm'],
+      ),
+      defaultPartitionWallThicknessMm: serializer.fromJson<int>(
+        json['defaultPartitionWallThicknessMm'],
+      ),
       locationJson: serializer.fromJson<String?>(json['locationJson']),
     );
   }
@@ -354,6 +465,15 @@ class Project extends DataClass implements Insertable<Project> {
       'defaultIndoorTempC': serializer.toJson<double>(defaultIndoorTempC),
       'floorHeightMm': serializer.toJson<int>(floorHeightMm),
       'unheatedSpaceTempC': serializer.toJson<double>(unheatedSpaceTempC),
+      'defaultExteriorWallThicknessMm': serializer.toJson<int>(
+        defaultExteriorWallThicknessMm,
+      ),
+      'defaultInteriorWallThicknessMm': serializer.toJson<int>(
+        defaultInteriorWallThicknessMm,
+      ),
+      'defaultPartitionWallThicknessMm': serializer.toJson<int>(
+        defaultPartitionWallThicknessMm,
+      ),
       'locationJson': serializer.toJson<String?>(locationJson),
     };
   }
@@ -367,6 +487,9 @@ class Project extends DataClass implements Insertable<Project> {
     double? defaultIndoorTempC,
     int? floorHeightMm,
     double? unheatedSpaceTempC,
+    int? defaultExteriorWallThicknessMm,
+    int? defaultInteriorWallThicknessMm,
+    int? defaultPartitionWallThicknessMm,
     Value<String?> locationJson = const Value.absent(),
   }) => Project(
     id: id ?? this.id,
@@ -377,6 +500,12 @@ class Project extends DataClass implements Insertable<Project> {
     defaultIndoorTempC: defaultIndoorTempC ?? this.defaultIndoorTempC,
     floorHeightMm: floorHeightMm ?? this.floorHeightMm,
     unheatedSpaceTempC: unheatedSpaceTempC ?? this.unheatedSpaceTempC,
+    defaultExteriorWallThicknessMm:
+        defaultExteriorWallThicknessMm ?? this.defaultExteriorWallThicknessMm,
+    defaultInteriorWallThicknessMm:
+        defaultInteriorWallThicknessMm ?? this.defaultInteriorWallThicknessMm,
+    defaultPartitionWallThicknessMm:
+        defaultPartitionWallThicknessMm ?? this.defaultPartitionWallThicknessMm,
     locationJson: locationJson.present ? locationJson.value : this.locationJson,
   );
   Project copyWithCompanion(ProjectsCompanion data) {
@@ -399,6 +528,18 @@ class Project extends DataClass implements Insertable<Project> {
       unheatedSpaceTempC: data.unheatedSpaceTempC.present
           ? data.unheatedSpaceTempC.value
           : this.unheatedSpaceTempC,
+      defaultExteriorWallThicknessMm:
+          data.defaultExteriorWallThicknessMm.present
+          ? data.defaultExteriorWallThicknessMm.value
+          : this.defaultExteriorWallThicknessMm,
+      defaultInteriorWallThicknessMm:
+          data.defaultInteriorWallThicknessMm.present
+          ? data.defaultInteriorWallThicknessMm.value
+          : this.defaultInteriorWallThicknessMm,
+      defaultPartitionWallThicknessMm:
+          data.defaultPartitionWallThicknessMm.present
+          ? data.defaultPartitionWallThicknessMm.value
+          : this.defaultPartitionWallThicknessMm,
       locationJson: data.locationJson.present
           ? data.locationJson.value
           : this.locationJson,
@@ -416,6 +557,15 @@ class Project extends DataClass implements Insertable<Project> {
           ..write('defaultIndoorTempC: $defaultIndoorTempC, ')
           ..write('floorHeightMm: $floorHeightMm, ')
           ..write('unheatedSpaceTempC: $unheatedSpaceTempC, ')
+          ..write(
+            'defaultExteriorWallThicknessMm: $defaultExteriorWallThicknessMm, ',
+          )
+          ..write(
+            'defaultInteriorWallThicknessMm: $defaultInteriorWallThicknessMm, ',
+          )
+          ..write(
+            'defaultPartitionWallThicknessMm: $defaultPartitionWallThicknessMm, ',
+          )
           ..write('locationJson: $locationJson')
           ..write(')'))
         .toString();
@@ -431,6 +581,9 @@ class Project extends DataClass implements Insertable<Project> {
     defaultIndoorTempC,
     floorHeightMm,
     unheatedSpaceTempC,
+    defaultExteriorWallThicknessMm,
+    defaultInteriorWallThicknessMm,
+    defaultPartitionWallThicknessMm,
     locationJson,
   );
   @override
@@ -445,6 +598,12 @@ class Project extends DataClass implements Insertable<Project> {
           other.defaultIndoorTempC == this.defaultIndoorTempC &&
           other.floorHeightMm == this.floorHeightMm &&
           other.unheatedSpaceTempC == this.unheatedSpaceTempC &&
+          other.defaultExteriorWallThicknessMm ==
+              this.defaultExteriorWallThicknessMm &&
+          other.defaultInteriorWallThicknessMm ==
+              this.defaultInteriorWallThicknessMm &&
+          other.defaultPartitionWallThicknessMm ==
+              this.defaultPartitionWallThicknessMm &&
           other.locationJson == this.locationJson);
 }
 
@@ -457,6 +616,9 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
   final Value<double> defaultIndoorTempC;
   final Value<int> floorHeightMm;
   final Value<double> unheatedSpaceTempC;
+  final Value<int> defaultExteriorWallThicknessMm;
+  final Value<int> defaultInteriorWallThicknessMm;
+  final Value<int> defaultPartitionWallThicknessMm;
   final Value<String?> locationJson;
   final Value<int> rowid;
   const ProjectsCompanion({
@@ -468,6 +630,9 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     this.defaultIndoorTempC = const Value.absent(),
     this.floorHeightMm = const Value.absent(),
     this.unheatedSpaceTempC = const Value.absent(),
+    this.defaultExteriorWallThicknessMm = const Value.absent(),
+    this.defaultInteriorWallThicknessMm = const Value.absent(),
+    this.defaultPartitionWallThicknessMm = const Value.absent(),
     this.locationJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -480,6 +645,9 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     this.defaultIndoorTempC = const Value.absent(),
     this.floorHeightMm = const Value.absent(),
     this.unheatedSpaceTempC = const Value.absent(),
+    this.defaultExteriorWallThicknessMm = const Value.absent(),
+    this.defaultInteriorWallThicknessMm = const Value.absent(),
+    this.defaultPartitionWallThicknessMm = const Value.absent(),
     this.locationJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -495,6 +663,9 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     Expression<double>? defaultIndoorTempC,
     Expression<int>? floorHeightMm,
     Expression<double>? unheatedSpaceTempC,
+    Expression<int>? defaultExteriorWallThicknessMm,
+    Expression<int>? defaultInteriorWallThicknessMm,
+    Expression<int>? defaultPartitionWallThicknessMm,
     Expression<String>? locationJson,
     Expression<int>? rowid,
   }) {
@@ -510,6 +681,12 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
       if (floorHeightMm != null) 'floor_height_mm': floorHeightMm,
       if (unheatedSpaceTempC != null)
         'unheated_space_temp_c': unheatedSpaceTempC,
+      if (defaultExteriorWallThicknessMm != null)
+        'default_exterior_wall_thickness_mm': defaultExteriorWallThicknessMm,
+      if (defaultInteriorWallThicknessMm != null)
+        'default_interior_wall_thickness_mm': defaultInteriorWallThicknessMm,
+      if (defaultPartitionWallThicknessMm != null)
+        'default_partition_wall_thickness_mm': defaultPartitionWallThicknessMm,
       if (locationJson != null) 'location_json': locationJson,
       if (rowid != null) 'rowid': rowid,
     });
@@ -524,6 +701,9 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     Value<double>? defaultIndoorTempC,
     Value<int>? floorHeightMm,
     Value<double>? unheatedSpaceTempC,
+    Value<int>? defaultExteriorWallThicknessMm,
+    Value<int>? defaultInteriorWallThicknessMm,
+    Value<int>? defaultPartitionWallThicknessMm,
     Value<String?>? locationJson,
     Value<int>? rowid,
   }) {
@@ -536,6 +716,13 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
       defaultIndoorTempC: defaultIndoorTempC ?? this.defaultIndoorTempC,
       floorHeightMm: floorHeightMm ?? this.floorHeightMm,
       unheatedSpaceTempC: unheatedSpaceTempC ?? this.unheatedSpaceTempC,
+      defaultExteriorWallThicknessMm:
+          defaultExteriorWallThicknessMm ?? this.defaultExteriorWallThicknessMm,
+      defaultInteriorWallThicknessMm:
+          defaultInteriorWallThicknessMm ?? this.defaultInteriorWallThicknessMm,
+      defaultPartitionWallThicknessMm:
+          defaultPartitionWallThicknessMm ??
+          this.defaultPartitionWallThicknessMm,
       locationJson: locationJson ?? this.locationJson,
       rowid: rowid ?? this.rowid,
     );
@@ -568,6 +755,21 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     if (unheatedSpaceTempC.present) {
       map['unheated_space_temp_c'] = Variable<double>(unheatedSpaceTempC.value);
     }
+    if (defaultExteriorWallThicknessMm.present) {
+      map['default_exterior_wall_thickness_mm'] = Variable<int>(
+        defaultExteriorWallThicknessMm.value,
+      );
+    }
+    if (defaultInteriorWallThicknessMm.present) {
+      map['default_interior_wall_thickness_mm'] = Variable<int>(
+        defaultInteriorWallThicknessMm.value,
+      );
+    }
+    if (defaultPartitionWallThicknessMm.present) {
+      map['default_partition_wall_thickness_mm'] = Variable<int>(
+        defaultPartitionWallThicknessMm.value,
+      );
+    }
     if (locationJson.present) {
       map['location_json'] = Variable<String>(locationJson.value);
     }
@@ -588,6 +790,15 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
           ..write('defaultIndoorTempC: $defaultIndoorTempC, ')
           ..write('floorHeightMm: $floorHeightMm, ')
           ..write('unheatedSpaceTempC: $unheatedSpaceTempC, ')
+          ..write(
+            'defaultExteriorWallThicknessMm: $defaultExteriorWallThicknessMm, ',
+          )
+          ..write(
+            'defaultInteriorWallThicknessMm: $defaultInteriorWallThicknessMm, ',
+          )
+          ..write(
+            'defaultPartitionWallThicknessMm: $defaultPartitionWallThicknessMm, ',
+          )
           ..write('locationJson: $locationJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -2198,6 +2409,28 @@ class $WallSegmentsTable extends WallSegments
     requiredDuringInsert: false,
     defaultValue: const Constant('exterior'),
   );
+  static const VerificationMeta _thicknessMmMeta = const VerificationMeta(
+    'thicknessMm',
+  );
+  @override
+  late final GeneratedColumn<double> thicknessMm = GeneratedColumn<double>(
+    'thickness_mm',
+    aliasedName,
+    false,
+    type: DriftSqlType.double,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _anchorModeMeta = const VerificationMeta(
+    'anchorMode',
+  );
+  @override
+  late final GeneratedColumn<int> anchorMode = GeneratedColumn<int>(
+    'anchor_mode',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: true,
+  );
   static const VerificationMeta _constructionIdMeta = const VerificationMeta(
     'constructionId',
   );
@@ -2259,6 +2492,8 @@ class $WallSegmentsTable extends WallSegments
     startPointJson,
     endPointJson,
     wallType,
+    thicknessMm,
+    anchorMode,
     constructionId,
     adjacentRoomId,
     orientation,
@@ -2316,6 +2551,25 @@ class $WallSegmentsTable extends WallSegments
         _wallTypeMeta,
         wallType.isAcceptableOrUnknown(data['wall_type']!, _wallTypeMeta),
       );
+    }
+    if (data.containsKey('thickness_mm')) {
+      context.handle(
+        _thicknessMmMeta,
+        thicknessMm.isAcceptableOrUnknown(
+          data['thickness_mm']!,
+          _thicknessMmMeta,
+        ),
+      );
+    } else if (isInserting) {
+      context.missing(_thicknessMmMeta);
+    }
+    if (data.containsKey('anchor_mode')) {
+      context.handle(
+        _anchorModeMeta,
+        anchorMode.isAcceptableOrUnknown(data['anchor_mode']!, _anchorModeMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_anchorModeMeta);
     }
     if (data.containsKey('construction_id')) {
       context.handle(
@@ -2379,6 +2633,14 @@ class $WallSegmentsTable extends WallSegments
         DriftSqlType.string,
         data['${effectivePrefix}wall_type'],
       )!,
+      thicknessMm: attachedDatabase.typeMapping.read(
+        DriftSqlType.double,
+        data['${effectivePrefix}thickness_mm'],
+      )!,
+      anchorMode: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}anchor_mode'],
+      )!,
       constructionId: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}construction_id'],
@@ -2414,6 +2676,13 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
   /// JSON {x,y} for the end vertex.
   final String endPointJson;
   final String wallType;
+
+  /// Total wall thickness in mm (ADR-017).
+  final double thicknessMm;
+
+  /// `WallAnchorMode.index` — which face stays fixed on thickness change
+  /// (ADR-017). 0 = centerline, 1 = innerFace, 2 = outerFace.
+  final int anchorMode;
   final String? constructionId;
   final String? adjacentRoomId;
   final String orientation;
@@ -2429,6 +2698,8 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
     required this.startPointJson,
     required this.endPointJson,
     required this.wallType,
+    required this.thicknessMm,
+    required this.anchorMode,
     this.constructionId,
     this.adjacentRoomId,
     required this.orientation,
@@ -2442,6 +2713,8 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
     map['start_point_json'] = Variable<String>(startPointJson);
     map['end_point_json'] = Variable<String>(endPointJson);
     map['wall_type'] = Variable<String>(wallType);
+    map['thickness_mm'] = Variable<double>(thicknessMm);
+    map['anchor_mode'] = Variable<int>(anchorMode);
     if (!nullToAbsent || constructionId != null) {
       map['construction_id'] = Variable<String>(constructionId);
     }
@@ -2462,6 +2735,8 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
       startPointJson: Value(startPointJson),
       endPointJson: Value(endPointJson),
       wallType: Value(wallType),
+      thicknessMm: Value(thicknessMm),
+      anchorMode: Value(anchorMode),
       constructionId: constructionId == null && nullToAbsent
           ? const Value.absent()
           : Value(constructionId),
@@ -2486,6 +2761,8 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
       startPointJson: serializer.fromJson<String>(json['startPointJson']),
       endPointJson: serializer.fromJson<String>(json['endPointJson']),
       wallType: serializer.fromJson<String>(json['wallType']),
+      thicknessMm: serializer.fromJson<double>(json['thicknessMm']),
+      anchorMode: serializer.fromJson<int>(json['anchorMode']),
       constructionId: serializer.fromJson<String?>(json['constructionId']),
       adjacentRoomId: serializer.fromJson<String?>(json['adjacentRoomId']),
       orientation: serializer.fromJson<String>(json['orientation']),
@@ -2501,6 +2778,8 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
       'startPointJson': serializer.toJson<String>(startPointJson),
       'endPointJson': serializer.toJson<String>(endPointJson),
       'wallType': serializer.toJson<String>(wallType),
+      'thicknessMm': serializer.toJson<double>(thicknessMm),
+      'anchorMode': serializer.toJson<int>(anchorMode),
       'constructionId': serializer.toJson<String?>(constructionId),
       'adjacentRoomId': serializer.toJson<String?>(adjacentRoomId),
       'orientation': serializer.toJson<String>(orientation),
@@ -2514,6 +2793,8 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
     String? startPointJson,
     String? endPointJson,
     String? wallType,
+    double? thicknessMm,
+    int? anchorMode,
     Value<String?> constructionId = const Value.absent(),
     Value<String?> adjacentRoomId = const Value.absent(),
     String? orientation,
@@ -2524,6 +2805,8 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
     startPointJson: startPointJson ?? this.startPointJson,
     endPointJson: endPointJson ?? this.endPointJson,
     wallType: wallType ?? this.wallType,
+    thicknessMm: thicknessMm ?? this.thicknessMm,
+    anchorMode: anchorMode ?? this.anchorMode,
     constructionId: constructionId.present
         ? constructionId.value
         : this.constructionId,
@@ -2544,6 +2827,12 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
           ? data.endPointJson.value
           : this.endPointJson,
       wallType: data.wallType.present ? data.wallType.value : this.wallType,
+      thicknessMm: data.thicknessMm.present
+          ? data.thicknessMm.value
+          : this.thicknessMm,
+      anchorMode: data.anchorMode.present
+          ? data.anchorMode.value
+          : this.anchorMode,
       constructionId: data.constructionId.present
           ? data.constructionId.value
           : this.constructionId,
@@ -2565,6 +2854,8 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
           ..write('startPointJson: $startPointJson, ')
           ..write('endPointJson: $endPointJson, ')
           ..write('wallType: $wallType, ')
+          ..write('thicknessMm: $thicknessMm, ')
+          ..write('anchorMode: $anchorMode, ')
           ..write('constructionId: $constructionId, ')
           ..write('adjacentRoomId: $adjacentRoomId, ')
           ..write('orientation: $orientation, ')
@@ -2580,6 +2871,8 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
     startPointJson,
     endPointJson,
     wallType,
+    thicknessMm,
+    anchorMode,
     constructionId,
     adjacentRoomId,
     orientation,
@@ -2594,6 +2887,8 @@ class WallSegment extends DataClass implements Insertable<WallSegment> {
           other.startPointJson == this.startPointJson &&
           other.endPointJson == this.endPointJson &&
           other.wallType == this.wallType &&
+          other.thicknessMm == this.thicknessMm &&
+          other.anchorMode == this.anchorMode &&
           other.constructionId == this.constructionId &&
           other.adjacentRoomId == this.adjacentRoomId &&
           other.orientation == this.orientation &&
@@ -2606,6 +2901,8 @@ class WallSegmentsCompanion extends UpdateCompanion<WallSegment> {
   final Value<String> startPointJson;
   final Value<String> endPointJson;
   final Value<String> wallType;
+  final Value<double> thicknessMm;
+  final Value<int> anchorMode;
   final Value<String?> constructionId;
   final Value<String?> adjacentRoomId;
   final Value<String> orientation;
@@ -2617,6 +2914,8 @@ class WallSegmentsCompanion extends UpdateCompanion<WallSegment> {
     this.startPointJson = const Value.absent(),
     this.endPointJson = const Value.absent(),
     this.wallType = const Value.absent(),
+    this.thicknessMm = const Value.absent(),
+    this.anchorMode = const Value.absent(),
     this.constructionId = const Value.absent(),
     this.adjacentRoomId = const Value.absent(),
     this.orientation = const Value.absent(),
@@ -2629,6 +2928,8 @@ class WallSegmentsCompanion extends UpdateCompanion<WallSegment> {
     required String startPointJson,
     required String endPointJson,
     this.wallType = const Value.absent(),
+    required double thicknessMm,
+    required int anchorMode,
     this.constructionId = const Value.absent(),
     this.adjacentRoomId = const Value.absent(),
     this.orientation = const Value.absent(),
@@ -2637,13 +2938,17 @@ class WallSegmentsCompanion extends UpdateCompanion<WallSegment> {
   }) : id = Value(id),
        roomId = Value(roomId),
        startPointJson = Value(startPointJson),
-       endPointJson = Value(endPointJson);
+       endPointJson = Value(endPointJson),
+       thicknessMm = Value(thicknessMm),
+       anchorMode = Value(anchorMode);
   static Insertable<WallSegment> custom({
     Expression<String>? id,
     Expression<String>? roomId,
     Expression<String>? startPointJson,
     Expression<String>? endPointJson,
     Expression<String>? wallType,
+    Expression<double>? thicknessMm,
+    Expression<int>? anchorMode,
     Expression<String>? constructionId,
     Expression<String>? adjacentRoomId,
     Expression<String>? orientation,
@@ -2656,6 +2961,8 @@ class WallSegmentsCompanion extends UpdateCompanion<WallSegment> {
       if (startPointJson != null) 'start_point_json': startPointJson,
       if (endPointJson != null) 'end_point_json': endPointJson,
       if (wallType != null) 'wall_type': wallType,
+      if (thicknessMm != null) 'thickness_mm': thicknessMm,
+      if (anchorMode != null) 'anchor_mode': anchorMode,
       if (constructionId != null) 'construction_id': constructionId,
       if (adjacentRoomId != null) 'adjacent_room_id': adjacentRoomId,
       if (orientation != null) 'orientation': orientation,
@@ -2670,6 +2977,8 @@ class WallSegmentsCompanion extends UpdateCompanion<WallSegment> {
     Value<String>? startPointJson,
     Value<String>? endPointJson,
     Value<String>? wallType,
+    Value<double>? thicknessMm,
+    Value<int>? anchorMode,
     Value<String?>? constructionId,
     Value<String?>? adjacentRoomId,
     Value<String>? orientation,
@@ -2682,6 +2991,8 @@ class WallSegmentsCompanion extends UpdateCompanion<WallSegment> {
       startPointJson: startPointJson ?? this.startPointJson,
       endPointJson: endPointJson ?? this.endPointJson,
       wallType: wallType ?? this.wallType,
+      thicknessMm: thicknessMm ?? this.thicknessMm,
+      anchorMode: anchorMode ?? this.anchorMode,
       constructionId: constructionId ?? this.constructionId,
       adjacentRoomId: adjacentRoomId ?? this.adjacentRoomId,
       orientation: orientation ?? this.orientation,
@@ -2707,6 +3018,12 @@ class WallSegmentsCompanion extends UpdateCompanion<WallSegment> {
     }
     if (wallType.present) {
       map['wall_type'] = Variable<String>(wallType.value);
+    }
+    if (thicknessMm.present) {
+      map['thickness_mm'] = Variable<double>(thicknessMm.value);
+    }
+    if (anchorMode.present) {
+      map['anchor_mode'] = Variable<int>(anchorMode.value);
     }
     if (constructionId.present) {
       map['construction_id'] = Variable<String>(constructionId.value);
@@ -2734,6 +3051,8 @@ class WallSegmentsCompanion extends UpdateCompanion<WallSegment> {
           ..write('startPointJson: $startPointJson, ')
           ..write('endPointJson: $endPointJson, ')
           ..write('wallType: $wallType, ')
+          ..write('thicknessMm: $thicknessMm, ')
+          ..write('anchorMode: $anchorMode, ')
           ..write('constructionId: $constructionId, ')
           ..write('adjacentRoomId: $adjacentRoomId, ')
           ..write('orientation: $orientation, ')
@@ -8283,6 +8602,9 @@ typedef $$ProjectsTableCreateCompanionBuilder =
       Value<double> defaultIndoorTempC,
       Value<int> floorHeightMm,
       Value<double> unheatedSpaceTempC,
+      Value<int> defaultExteriorWallThicknessMm,
+      Value<int> defaultInteriorWallThicknessMm,
+      Value<int> defaultPartitionWallThicknessMm,
       Value<String?> locationJson,
       Value<int> rowid,
     });
@@ -8296,6 +8618,9 @@ typedef $$ProjectsTableUpdateCompanionBuilder =
       Value<double> defaultIndoorTempC,
       Value<int> floorHeightMm,
       Value<double> unheatedSpaceTempC,
+      Value<int> defaultExteriorWallThicknessMm,
+      Value<int> defaultInteriorWallThicknessMm,
+      Value<int> defaultPartitionWallThicknessMm,
       Value<String?> locationJson,
       Value<int> rowid,
     });
@@ -8370,6 +8695,21 @@ class $$ProjectsTableFilterComposer
 
   ColumnFilters<double> get unheatedSpaceTempC => $composableBuilder(
     column: $table.unheatedSpaceTempC,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get defaultExteriorWallThicknessMm => $composableBuilder(
+    column: $table.defaultExteriorWallThicknessMm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get defaultInteriorWallThicknessMm => $composableBuilder(
+    column: $table.defaultInteriorWallThicknessMm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get defaultPartitionWallThicknessMm => $composableBuilder(
+    column: $table.defaultPartitionWallThicknessMm,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8453,6 +8793,22 @@ class $$ProjectsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<int> get defaultExteriorWallThicknessMm => $composableBuilder(
+    column: $table.defaultExteriorWallThicknessMm,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get defaultInteriorWallThicknessMm => $composableBuilder(
+    column: $table.defaultInteriorWallThicknessMm,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get defaultPartitionWallThicknessMm =>
+      $composableBuilder(
+        column: $table.defaultPartitionWallThicknessMm,
+        builder: (column) => ColumnOrderings(column),
+      );
+
   ColumnOrderings<String> get locationJson => $composableBuilder(
     column: $table.locationJson,
     builder: (column) => ColumnOrderings(column),
@@ -8501,6 +8857,22 @@ class $$ProjectsTableAnnotationComposer
     column: $table.unheatedSpaceTempC,
     builder: (column) => column,
   );
+
+  GeneratedColumn<int> get defaultExteriorWallThicknessMm => $composableBuilder(
+    column: $table.defaultExteriorWallThicknessMm,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get defaultInteriorWallThicknessMm => $composableBuilder(
+    column: $table.defaultInteriorWallThicknessMm,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get defaultPartitionWallThicknessMm =>
+      $composableBuilder(
+        column: $table.defaultPartitionWallThicknessMm,
+        builder: (column) => column,
+      );
 
   GeneratedColumn<String> get locationJson => $composableBuilder(
     column: $table.locationJson,
@@ -8569,6 +8941,12 @@ class $$ProjectsTableTableManager
                 Value<double> defaultIndoorTempC = const Value.absent(),
                 Value<int> floorHeightMm = const Value.absent(),
                 Value<double> unheatedSpaceTempC = const Value.absent(),
+                Value<int> defaultExteriorWallThicknessMm =
+                    const Value.absent(),
+                Value<int> defaultInteriorWallThicknessMm =
+                    const Value.absent(),
+                Value<int> defaultPartitionWallThicknessMm =
+                    const Value.absent(),
                 Value<String?> locationJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProjectsCompanion(
@@ -8580,6 +8958,10 @@ class $$ProjectsTableTableManager
                 defaultIndoorTempC: defaultIndoorTempC,
                 floorHeightMm: floorHeightMm,
                 unheatedSpaceTempC: unheatedSpaceTempC,
+                defaultExteriorWallThicknessMm: defaultExteriorWallThicknessMm,
+                defaultInteriorWallThicknessMm: defaultInteriorWallThicknessMm,
+                defaultPartitionWallThicknessMm:
+                    defaultPartitionWallThicknessMm,
                 locationJson: locationJson,
                 rowid: rowid,
               ),
@@ -8593,6 +8975,12 @@ class $$ProjectsTableTableManager
                 Value<double> defaultIndoorTempC = const Value.absent(),
                 Value<int> floorHeightMm = const Value.absent(),
                 Value<double> unheatedSpaceTempC = const Value.absent(),
+                Value<int> defaultExteriorWallThicknessMm =
+                    const Value.absent(),
+                Value<int> defaultInteriorWallThicknessMm =
+                    const Value.absent(),
+                Value<int> defaultPartitionWallThicknessMm =
+                    const Value.absent(),
                 Value<String?> locationJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProjectsCompanion.insert(
@@ -8604,6 +8992,10 @@ class $$ProjectsTableTableManager
                 defaultIndoorTempC: defaultIndoorTempC,
                 floorHeightMm: floorHeightMm,
                 unheatedSpaceTempC: unheatedSpaceTempC,
+                defaultExteriorWallThicknessMm: defaultExteriorWallThicknessMm,
+                defaultInteriorWallThicknessMm: defaultInteriorWallThicknessMm,
+                defaultPartitionWallThicknessMm:
+                    defaultPartitionWallThicknessMm,
                 locationJson: locationJson,
                 rowid: rowid,
               ),
@@ -10362,6 +10754,8 @@ typedef $$WallSegmentsTableCreateCompanionBuilder =
       required String startPointJson,
       required String endPointJson,
       Value<String> wallType,
+      required double thicknessMm,
+      required int anchorMode,
       Value<String?> constructionId,
       Value<String?> adjacentRoomId,
       Value<String> orientation,
@@ -10375,6 +10769,8 @@ typedef $$WallSegmentsTableUpdateCompanionBuilder =
       Value<String> startPointJson,
       Value<String> endPointJson,
       Value<String> wallType,
+      Value<double> thicknessMm,
+      Value<int> anchorMode,
       Value<String?> constructionId,
       Value<String?> adjacentRoomId,
       Value<String> orientation,
@@ -10553,6 +10949,16 @@ class $$WallSegmentsTableFilterComposer
 
   ColumnFilters<String> get wallType => $composableBuilder(
     column: $table.wallType,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<double> get thicknessMm => $composableBuilder(
+    column: $table.thicknessMm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<int> get anchorMode => $composableBuilder(
+    column: $table.anchorMode,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10758,6 +11164,16 @@ class $$WallSegmentsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<double> get thicknessMm => $composableBuilder(
+    column: $table.thicknessMm,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<int> get anchorMode => $composableBuilder(
+    column: $table.anchorMode,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get orientation => $composableBuilder(
     column: $table.orientation,
     builder: (column) => ColumnOrderings(column),
@@ -10880,6 +11296,16 @@ class $$WallSegmentsTableAnnotationComposer
 
   GeneratedColumn<String> get wallType =>
       $composableBuilder(column: $table.wallType, builder: (column) => column);
+
+  GeneratedColumn<double> get thicknessMm => $composableBuilder(
+    column: $table.thicknessMm,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<int> get anchorMode => $composableBuilder(
+    column: $table.anchorMode,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get orientation => $composableBuilder(
     column: $table.orientation,
@@ -11096,6 +11522,8 @@ class $$WallSegmentsTableTableManager
                 Value<String> startPointJson = const Value.absent(),
                 Value<String> endPointJson = const Value.absent(),
                 Value<String> wallType = const Value.absent(),
+                Value<double> thicknessMm = const Value.absent(),
+                Value<int> anchorMode = const Value.absent(),
                 Value<String?> constructionId = const Value.absent(),
                 Value<String?> adjacentRoomId = const Value.absent(),
                 Value<String> orientation = const Value.absent(),
@@ -11107,6 +11535,8 @@ class $$WallSegmentsTableTableManager
                 startPointJson: startPointJson,
                 endPointJson: endPointJson,
                 wallType: wallType,
+                thicknessMm: thicknessMm,
+                anchorMode: anchorMode,
                 constructionId: constructionId,
                 adjacentRoomId: adjacentRoomId,
                 orientation: orientation,
@@ -11120,6 +11550,8 @@ class $$WallSegmentsTableTableManager
                 required String startPointJson,
                 required String endPointJson,
                 Value<String> wallType = const Value.absent(),
+                required double thicknessMm,
+                required int anchorMode,
                 Value<String?> constructionId = const Value.absent(),
                 Value<String?> adjacentRoomId = const Value.absent(),
                 Value<String> orientation = const Value.absent(),
@@ -11131,6 +11563,8 @@ class $$WallSegmentsTableTableManager
                 startPointJson: startPointJson,
                 endPointJson: endPointJson,
                 wallType: wallType,
+                thicknessMm: thicknessMm,
+                anchorMode: anchorMode,
                 constructionId: constructionId,
                 adjacentRoomId: adjacentRoomId,
                 orientation: orientation,

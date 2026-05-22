@@ -65,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 15;
+  int get schemaVersion => 16;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -74,133 +74,24 @@ class AppDatabase extends _$AppDatabase {
           await heatingDao.seedDefaults();
         },
         onUpgrade: (m, from, to) async {
-          if (from < 2) {
-            await m.addColumn(
-              heatingZones,
-              heatingZones.wallSegmentId,
-            );
-            await m.addColumn(heatingZones, heatingZones.heightMm);
-          }
-          if (from < 3) {
-            await m.addColumn(
-              heatingZones,
-              heatingZones.positionOnWallMm,
-            );
-            await m.addColumn(heatingZones, heatingZones.widthMm);
-          }
-          if (from < 4) {
-            await m.addColumn(
-              flooringMaterials,
-              flooringMaterials.surfaceType,
-            );
-            await heatingDao.seedSurfaceTypeMigration();
-          }
-          if (from < 5) {
-            await m.addColumn(
-              heatingZones,
-              heatingZones.customFlooringResistance,
-            );
-            await heatingDao.seedMaterialCorrectionsV5();
-          }
-          if (from < 6) {
-            await m.addColumn(
-              distributors,
-              distributors.pumpCapacityPa,
-            );
-          }
-          if (from < 7) {
-            await m.addColumn(rooms, rooms.floorConstructionId);
-            await m.addColumn(rooms, rooms.ceilingConstructionId);
-            await m.addColumn(rooms, rooms.floorBoundary);
-            await m.addColumn(rooms, rooms.ceilingBoundary);
-            // These columns were renamed in schema v8; added here via
-            // raw SQL so the Dart table class doesn't need them.
-            await m.database.customStatement(
-              'ALTER TABLE rooms ADD COLUMN '
-              'floor_unheated_correction_factor REAL',
-            );
-            await m.database.customStatement(
-              'ALTER TABLE rooms ADD COLUMN '
-              'ceiling_unheated_correction_factor REAL',
-            );
-          }
-          if (from < 8) {
-            await m.database.customStatement(
-              'ALTER TABLE rooms ADD COLUMN '
-              'floor_adjacent_temp_c REAL',
-            );
-            await m.database.customStatement(
-              'ALTER TABLE rooms ADD COLUMN '
-              'ceiling_adjacent_temp_c REAL',
-            );
-          }
-          if (from < 9) {
-            await m.database.customStatement(
-              'ALTER TABLE wall_constructions ADD COLUMN '
-              'is_preset INTEGER NOT NULL DEFAULT 0',
-            );
-          }
-          if (from < 10) {
-            await m.addColumn(projects, projects.floorHeightMm);
-            await m.addColumn(projects, projects.unheatedSpaceTempC);
-          }
-          if (from < 11) {
-            await m.database.customStatement(
-              'ALTER TABLE distributors ADD COLUMN '
-              'width_mm INTEGER NOT NULL DEFAULT 500',
-            );
-            await m.database.customStatement(
-              'ALTER TABLE distributors ADD COLUMN '
-              'rotation_deg INTEGER NOT NULL DEFAULT 0',
-            );
-          }
-          if (from < 12) {
-            await m.database.customStatement(
-              'ALTER TABLE material_layers ADD COLUMN '
-              'stud_width_mm REAL',
-            );
-            await m.database.customStatement(
-              'ALTER TABLE material_layers ADD COLUMN '
-              'stud_clear_gap_mm REAL',
-            );
-            await m.database.customStatement(
-              'ALTER TABLE material_layers ADD COLUMN '
-              'stud_lambda REAL',
-            );
-          }
-          if (from < 13) {
-            await m.database.customStatement(
-              "ALTER TABLE material_entries ADD COLUMN "
-              "subcategory TEXT NOT NULL DEFAULT ''",
-            );
-          }
-          if (from < 14) {
-            final cols = await m.database.customSelect(
-              "PRAGMA table_info(wall_segments)",
-            ).get();
-            final hasMirrorId =
-                cols.any((r) => r.read<String>('name') == 'mirror_id');
-            if (!hasMirrorId) {
+          // ADR-017 (schema v16): WallSegment gains `thicknessMm` and
+          // `anchorMode`; Project gains three default wall-thickness
+          // columns. Per ADR-017 Rule 11 this is a dev-stage change with
+          // no backwards-compatibility migration — the database is
+          // dropped and recreated from scratch. Older per-version step
+          // migrations (v2…v15) have been removed because they are
+          // unreachable behind this wipe.
+          if (from < 16) {
+            await m.database.customStatement('PRAGMA foreign_keys = OFF');
+            for (final table in allTables.toList().reversed) {
               await m.database.customStatement(
-                'ALTER TABLE wall_segments ADD COLUMN '
-                'mirror_id TEXT REFERENCES wall_segments(id) ON DELETE SET NULL',
+                'DROP TABLE IF EXISTS ${table.actualTableName}',
               );
             }
-          }
-          if (from < 15) {
-            await m.database.customStatement(
-              'ALTER TABLE material_entries ADD COLUMN name_de TEXT',
-            );
-            await m.database.customStatement(
-              'ALTER TABLE flooring_materials ADD COLUMN name_de TEXT',
-            );
-            await m.database.customStatement(
-              'ALTER TABLE tube_types ADD COLUMN name_de TEXT',
-            );
-            await m.database.customStatement(
-              'ALTER TABLE wall_constructions ADD COLUMN name_de TEXT',
-            );
-            await heatingDao.seedGermanNamesV15();
+            await m.createAll();
+            await heatingDao.seedDefaults();
+            await m.database.customStatement('PRAGMA foreign_keys = ON');
+            return;
           }
         },
       );

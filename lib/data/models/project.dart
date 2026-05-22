@@ -46,6 +46,24 @@ abstract class Project with _$Project {
     /// Default temperature of unheated adjacent spaces in °C (0–25).
     @Default(10.0) double unheatedSpaceTempC,
 
+    /// Default total thickness in mm for exterior walls (ADR-017).
+    ///
+    /// Used as the fallback `WallSegment.thicknessMm` for exterior walls
+    /// whose `constructionId` is null. Constraint: 50–1000.
+    @Default(240) int defaultExteriorWallThicknessMm,
+
+    /// Default total thickness in mm for interior (shared) walls (ADR-017).
+    ///
+    /// Used as the fallback `WallSegment.thicknessMm` for interior walls
+    /// whose `constructionId` is null. Constraint: 50–1000.
+    @Default(120) int defaultInteriorWallThicknessMm,
+
+    /// Default total thickness in mm for partition walls (ADR-017).
+    ///
+    /// Used as the fallback `WallSegment.thicknessMm` for partition walls
+    /// whose `constructionId` is null. Constraint: 50–1000.
+    @Default(100) int defaultPartitionWallThicknessMm,
+
     /// Optional geographic location used for climate data lookup.
     GeoLocation? location,
   }) = _Project;

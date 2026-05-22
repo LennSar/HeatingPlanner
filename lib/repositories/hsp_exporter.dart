@@ -150,6 +150,11 @@ class HspExporter {
       modifiedAt: row.modifiedAt,
       designOutdoorTempC: row.designOutdoorTempC,
       defaultIndoorTempC: row.defaultIndoorTempC,
+      floorHeightMm: row.floorHeightMm,
+      unheatedSpaceTempC: row.unheatedSpaceTempC,
+      defaultExteriorWallThicknessMm: row.defaultExteriorWallThicknessMm,
+      defaultInteriorWallThicknessMm: row.defaultInteriorWallThicknessMm,
+      defaultPartitionWallThicknessMm: row.defaultPartitionWallThicknessMm,
       location: location,
     ).toJson();
   }
@@ -189,9 +194,12 @@ class HspExporter {
         startPoint: _decodePoint(row.startPointJson),
         endPoint: _decodePoint(row.endPointJson),
         wallType: WallType.values.byName(row.wallType),
+        thicknessMm: row.thicknessMm,
+        anchorMode: WallAnchorMode.values[row.anchorMode],
         constructionId: row.constructionId,
         adjacentRoomId: row.adjacentRoomId,
         orientation: CardinalDirection.values.byName(row.orientation),
+        mirrorId: row.mirrorId,
       ).toJson();
 
   Map<String, dynamic> _windowJson($db.Window row) => WindowElement(
