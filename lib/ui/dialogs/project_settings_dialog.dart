@@ -176,10 +176,9 @@ class _ProjectSettingsDialogState
       controller.text =
           _mmToCmDisplay(_currentMmFor(settings, wallType));
       controller.selection = const TextSelection.collapsed(offset: -1);
+      final l10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Wall thickness must be 5–100 cm'),
-        ),
+        SnackBar(content: Text(l10n.wallThicknessInvalidToast)),
       );
       return;
     }
@@ -533,48 +532,49 @@ class _ProjectSettingsDialogState
 
                     // ── ADR-017: default wall thicknesses ─────
                     Text(
-                      'Default wall thicknesses',
+                      l10n.defaultWallThicknesses,
                       style: textTheme.headlineSmall,
                     ),
                     const SizedBox(height: Spacing.xs),
                     Text(
-                      'Used for unassigned walls (no construction). '
-                      'Editing a value re-anchors every matching wall in '
-                      'one undo step (ADR-017 Rule 9).',
+                      l10n.defaultWallThicknessesDesc,
                       style: textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: Spacing.sm),
                     Text(
-                      'Exterior',
+                      l10n.wallTypeExterior,
                       style: textTheme.bodyMedium,
                     ),
                     const SizedBox(height: Spacing.xs),
                     _WallThicknessRow(
                       controller: _extWallController,
+                      rangeHint: l10n.wallThicknessRangeCm,
                       onFieldSubmitted: (raw) =>
                           _applyWallDefault(WallType.exterior, raw),
                     ),
                     const SizedBox(height: Spacing.sm),
                     Text(
-                      'Interior (shared)',
+                      l10n.wallTypeInteriorShared,
                       style: textTheme.bodyMedium,
                     ),
                     const SizedBox(height: Spacing.xs),
                     _WallThicknessRow(
                       controller: _intWallController,
+                      rangeHint: l10n.wallThicknessRangeCm,
                       onFieldSubmitted: (raw) =>
                           _applyWallDefault(WallType.interior, raw),
                     ),
                     const SizedBox(height: Spacing.sm),
                     Text(
-                      'Partition',
+                      l10n.wallTypePartition,
                       style: textTheme.bodyMedium,
                     ),
                     const SizedBox(height: Spacing.xs),
                     _WallThicknessRow(
                       controller: _partWallController,
+                      rangeHint: l10n.wallThicknessRangeCm,
                       onFieldSubmitted: (raw) =>
                           _applyWallDefault(WallType.partition, raw),
                     ),
@@ -788,10 +788,12 @@ class _WallThicknessRow extends StatelessWidget {
   const _WallThicknessRow({
     required this.controller,
     required this.onFieldSubmitted,
+    required this.rangeHint,
   });
 
   final TextEditingController controller;
   final ValueChanged<String> onFieldSubmitted;
+  final String rangeHint;
 
   @override
   Widget build(BuildContext context) {
@@ -824,7 +826,7 @@ class _WallThicknessRow extends StatelessWidget {
         const SizedBox(width: Spacing.md),
         Expanded(
           child: Text(
-            '5–100 cm',
+            rangeHint,
             style: textTheme.bodySmall?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),

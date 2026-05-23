@@ -1196,4 +1196,26 @@ class AppLocalizationsEn extends AppLocalizations {
   String canvas_defaultRoomName(int roomNumber) {
     return 'Room $roomNumber';
   }
+
+  @override
+  String get defaultWallThicknesses => 'Default wall thicknesses';
+
+  @override
+  String get defaultWallThicknessesDesc =>
+      'Used for unassigned walls (no construction). Editing a value re-anchors every matching wall in one undo step.';
+
+  @override
+  String get wallTypeExterior => 'Exterior';
+
+  @override
+  String get wallTypeInteriorShared => 'Interior (shared)';
+
+  @override
+  String get wallTypePartition => 'Partition';
+
+  @override
+  String get wallThicknessRangeCm => '5–100 cm';
+
+  @override
+  String get wallThicknessInvalidToast => 'Wall thickness must be 5–100 cm';
 }

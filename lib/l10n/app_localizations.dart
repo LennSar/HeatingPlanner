@@ -2257,6 +2257,48 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Room {roomNumber}'**
   String canvas_defaultRoomName(int roomNumber);
+
+  /// Heading for the ADR-017 default-thickness group on the settings dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Default wall thicknesses'**
+  String get defaultWallThicknesses;
+
+  /// Subtitle describing the cascade behaviour for the wall-thickness defaults
+  ///
+  /// In en, this message translates to:
+  /// **'Used for unassigned walls (no construction). Editing a value re-anchors every matching wall in one undo step.'**
+  String get defaultWallThicknessesDesc;
+
+  /// Wall type label — exterior
+  ///
+  /// In en, this message translates to:
+  /// **'Exterior'**
+  String get wallTypeExterior;
+
+  /// Wall type label — interior (shared between two rooms)
+  ///
+  /// In en, this message translates to:
+  /// **'Interior (shared)'**
+  String get wallTypeInteriorShared;
+
+  /// Wall type label — standalone partition wall
+  ///
+  /// In en, this message translates to:
+  /// **'Partition'**
+  String get wallTypePartition;
+
+  /// Range hint next to each default wall thickness input
+  ///
+  /// In en, this message translates to:
+  /// **'5–100 cm'**
+  String get wallThicknessRangeCm;
+
+  /// Toast shown when the user enters an out-of-range default wall thickness
+  ///
+  /// In en, this message translates to:
+  /// **'Wall thickness must be 5–100 cm'**
+  String get wallThicknessInvalidToast;
 }
 
 class _AppLocalizationsDelegate

@@ -391,5 +391,13 @@
   "undo_createZone": "Zone erstellen",
   "undo_createWallZone": "Wandzone erstellen",
 
-  "canvas_defaultRoomName": "Raum {roomNumber}"
+  "canvas_defaultRoomName": "Raum {roomNumber}",
+
+  "defaultWallThicknesses": "Standard-Wanddicken",
+  "defaultWallThicknessesDesc": "Wird für Wände ohne Aufbau verwendet. Eine Änderung verankert alle passenden Wände in einem einzigen Rückgängig-Schritt neu.",
+  "wallTypeExterior": "Außenwand",
+  "wallTypeInteriorShared": "Innenwand (geteilt)",
+  "wallTypePartition": "Trennwand",
+  "wallThicknessRangeCm": "5–100 cm",
+  "wallThicknessInvalidToast": "Wanddicke muss zwischen 5 und 100 cm liegen"
 }

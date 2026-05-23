@@ -1000,5 +1000,20 @@
   "@canvas_defaultRoomName": {
     "description": "Default name for a newly detected room before the user renames it",
     "placeholders": { "roomNumber": { "type": "int" } }
-  }
+  },
+
+  "defaultWallThicknesses": "Default wall thicknesses",
+  "@defaultWallThicknesses": { "description": "Heading for the ADR-017 default-thickness group on the settings dialog" },
+  "defaultWallThicknessesDesc": "Used for unassigned walls (no construction). Editing a value re-anchors every matching wall in one undo step.",
+  "@defaultWallThicknessesDesc": { "description": "Subtitle describing the cascade behaviour for the wall-thickness defaults" },
+  "wallTypeExterior": "Exterior",
+  "@wallTypeExterior": { "description": "Wall type label — exterior" },
+  "wallTypeInteriorShared": "Interior (shared)",
+  "@wallTypeInteriorShared": { "description": "Wall type label — interior (shared between two rooms)" },
+  "wallTypePartition": "Partition",
+  "@wallTypePartition": { "description": "Wall type label — standalone partition wall" },
+  "wallThicknessRangeCm": "5–100 cm",
+  "@wallThicknessRangeCm": { "description": "Range hint next to each default wall thickness input" },
+  "wallThicknessInvalidToast": "Wall thickness must be 5–100 cm",
+  "@wallThicknessInvalidToast": { "description": "Toast shown when the user enters an out-of-range default wall thickness" }
 }

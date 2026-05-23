@@ -1199,4 +1199,27 @@ class AppLocalizationsDe extends AppLocalizations {
   String canvas_defaultRoomName(int roomNumber) {
     return 'Raum $roomNumber';
   }
+
+  @override
+  String get defaultWallThicknesses => 'Standard-Wanddicken';
+
+  @override
+  String get defaultWallThicknessesDesc =>
+      'Wird für Wände ohne Aufbau verwendet. Eine Änderung verankert alle passenden Wände in einem einzigen Rückgängig-Schritt neu.';
+
+  @override
+  String get wallTypeExterior => 'Außenwand';
+
+  @override
+  String get wallTypeInteriorShared => 'Innenwand (geteilt)';
+
+  @override
+  String get wallTypePartition => 'Trennwand';
+
+  @override
+  String get wallThicknessRangeCm => '5–100 cm';
+
+  @override
+  String get wallThicknessInvalidToast =>
+      'Wanddicke muss zwischen 5 und 100 cm liegen';
 }
