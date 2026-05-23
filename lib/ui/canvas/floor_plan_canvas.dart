@@ -711,6 +711,14 @@ class _FloorPlanCanvasState
     // Watch selected tool to react to tool switches.
     ref.watch(selectedToolProvider);
 
+    // Watch the selected element so the wall painter can render the
+    // ADR-017 Rule 10 pinned-face glyph and the annotation painter can
+    // show the centerline-length sub-label.
+    final selectedElement = ref.watch(selectedElementProvider);
+    final selectedWallId = selectedElement?.type == 'wall'
+        ? selectedElement!.id
+        : null;
+
     // Discard any in-progress drawing when the user switches tools.
     // Tool instances are cached in [_tools], so a multi-point tool
     // (zone, route, wall) would otherwise retain its uncommitted
@@ -991,12 +999,14 @@ class _FloorPlanCanvasState
                             colors: colors,
                             onSurface: onSurface,
                             walls: editorState.walls,
+                            rooms: editorState.rooms,
                             windows: editorState.windows,
                             doors: editorState.doors,
                             zones: editorState.zones,
                             zoneStates: zoneStates,
                             circuits: editorState.circuits,
                             distributor: editorState.distributor,
+                            selectedWallId: selectedWallId,
                           ),
                         ),
                       ),
@@ -1112,12 +1122,14 @@ class _StaticWorldPainter extends CustomPainter {
     required this.colors,
     required this.onSurface,
     required this.walls,
+    required this.rooms,
     required this.windows,
     required this.doors,
     required this.zones,
     required this.zoneStates,
     required this.circuits,
     this.distributor,
+    this.selectedWallId,
   });
 
   final Matrix4 transform;
@@ -1126,12 +1138,14 @@ class _StaticWorldPainter extends CustomPainter {
   final HeatingPlannerColors colors;
   final Color onSurface;
   final List<WallSegment> walls;
+  final List<Room> rooms;
   final List<WindowElement> windows;
   final List<Door> doors;
   final List<HeatingZone> zones;
   final Map<String, ZoneColorState> zoneStates;
   final List<HeatingCircuit> circuits;
   final Distributor? distributor;
+  final String? selectedWallId;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1158,6 +1172,9 @@ class _StaticWorldPainter extends CustomPainter {
       wallFill: colors.wallFill,
       wallStroke: colors.wallStroke,
       walls: walls,
+      rooms: rooms,
+      worldToScreen: transform,
+      selectedWallId: selectedWallId,
     ).paint(canvas, size);
 
     OpeningPainter(
@@ -1183,7 +1200,12 @@ class _StaticWorldPainter extends CustomPainter {
       circuits: circuits,
     ).paint(canvas, size);
 
-    AnnotationPainter(textColor: onSurface).paint(canvas, size);
+    AnnotationPainter(
+      textColor: onSurface,
+      walls: walls,
+      rooms: rooms,
+      selectedWallId: selectedWallId,
+    ).paint(canvas, size);
 
     canvas.restore();
   }
@@ -1196,12 +1218,14 @@ class _StaticWorldPainter extends CustomPainter {
         !identical(colors, oldDelegate.colors) ||
         onSurface != oldDelegate.onSurface ||
         !identical(walls, oldDelegate.walls) ||
+        !identical(rooms, oldDelegate.rooms) ||
         !identical(windows, oldDelegate.windows) ||
         !identical(doors, oldDelegate.doors) ||
         !identical(zones, oldDelegate.zones) ||
         !identical(zoneStates, oldDelegate.zoneStates) ||
         !identical(circuits, oldDelegate.circuits) ||
-        distributor != oldDelegate.distributor;
+        distributor != oldDelegate.distributor ||
+        selectedWallId != oldDelegate.selectedWallId;
   }
 }
 
