@@ -270,6 +270,24 @@ class EditorStateNotifier extends Notifier<EditorState>
     return _shiftedForThickness(wall, newThickness);
   }
 
+  /// Applies ADR-017 Rule 2 creation-time anchor defaults to [wall]:
+  /// exterior walls coming in with the freezed fallback
+  /// `WallAnchorMode.centerline` are upgraded to `innerFace` so that
+  /// changing the exterior project default later (Rule 9) preserves
+  /// the room's inner clear dimension. Walls explicitly set to a
+  /// non-centerline anchor mode upstream — and every interior /
+  /// partition wall — are returned unchanged. Used only on creation
+  /// paths ([addWall], [commitWallWithSplit]); [updateWall] honours
+  /// the caller's chosen anchorMode verbatim.
+  WallSegment _withRule2Defaults(WallSegment wall) {
+    if (wall.wallType == WallType.exterior &&
+        wall.anchorMode == WallAnchorMode.centerline &&
+        wall.mirrorId == null) {
+      return wall.copyWith(anchorMode: WallAnchorMode.innerFace);
+    }
+    return wall;
+  }
+
   /// Returns the project-default thickness in mm for [wallType] from
   /// [settings]. Used by the ADR-017 Rule 8 promotion logic to classify
   /// a wall as "default" (constructionId null AND thicknessMm matches).
@@ -288,7 +306,7 @@ class EditorStateNotifier extends Notifier<EditorState>
 
   /// Add a wall segment.
   void addWall(WallSegment wall) {
-    final w = _withOrientation(wall);
+    final w = _withOrientation(_withRule2Defaults(wall));
     state = state.copyWith(
       walls: [...state.walls, w],
     );
@@ -1007,7 +1025,7 @@ class EditorStateNotifier extends Notifier<EditorState>
       }
     }
 
-    walls.add(_withOrientation(wall));
+    walls.add(_withOrientation(_withRule2Defaults(wall)));
     state = state.copyWith(walls: walls);
 
     if (removed.isNotEmpty || addedPersisted.isNotEmpty) {

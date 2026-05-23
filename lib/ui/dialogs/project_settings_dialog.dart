@@ -4,8 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/providers/project_settings_provider.dart';
 import '../../core/theme/app_theme.dart';
+import '../../data/models/enums.dart';
+import '../../data/models/wall_segment.dart';
 import '../../l10n/app_localizations.dart';
 import '../../repositories/app_preferences.dart';
+import '../canvas/tools/undo_redo_service.dart';
 import '../providers/editor_state_provider.dart';
 
 /// Opens the project settings dialog as a modal.
@@ -45,6 +48,9 @@ class _ProjectSettingsDialogState
   late TextEditingController _indoorController;
   late TextEditingController _heightController;
   late TextEditingController _unheatedController;
+  late TextEditingController _extWallController;
+  late TextEditingController _intWallController;
+  late TextEditingController _partWallController;
 
   @override
   void initState() {
@@ -62,6 +68,15 @@ class _ProjectSettingsDialogState
     _unheatedController = TextEditingController(
       text: settings.unheatedSpaceTempC.toStringAsFixed(1),
     );
+    _extWallController = TextEditingController(
+      text: _mmToCmDisplay(settings.defaultExteriorWallThicknessMm),
+    );
+    _intWallController = TextEditingController(
+      text: _mmToCmDisplay(settings.defaultInteriorWallThicknessMm),
+    );
+    _partWallController = TextEditingController(
+      text: _mmToCmDisplay(settings.defaultPartitionWallThicknessMm),
+    );
   }
 
   @override
@@ -70,7 +85,20 @@ class _ProjectSettingsDialogState
     _indoorController.dispose();
     _heightController.dispose();
     _unheatedController.dispose();
+    _extWallController.dispose();
+    _intWallController.dispose();
+    _partWallController.dispose();
     super.dispose();
+  }
+
+  /// Render an mm thickness as a centimetres display string. Integer
+  /// values are unsuffixed ("24"), fractional ones get one decimal
+  /// ("24.5") so the user can see when a value isn't on the whole-cm
+  /// grid.
+  static String _mmToCmDisplay(int mm) {
+    final cm = mm / 10.0;
+    if (cm == cm.roundToDouble()) return cm.toStringAsFixed(0);
+    return cm.toStringAsFixed(1);
   }
 
   void _applyOutdoor(String raw) {
@@ -129,6 +157,89 @@ class _ProjectSettingsDialogState
     }
   }
 
+  /// Validates [raw] as cm in [5, 100], cascades the new default to
+  /// every unassigned wall of [wallType] via
+  /// `recomputeWallsForProjectDefault`, and pushes the whole cascade as
+  /// one [_ChangeDefaultWallThicknessCommand] so a single Ctrl+Z reverts
+  /// both the project setting and every re-anchored wall (ADR-017
+  /// Rule 9).
+  ///
+  /// Invalid input (non-numeric, out of 5–100 cm) reverts the field to
+  /// the current persisted value and shows the documented toast.
+  void _applyWallDefault(WallType wallType, String raw) {
+    final controller = _wallControllerFor(wallType);
+    final cm = double.tryParse(raw.trim());
+    final mm = cm == null ? null : (cm * 10).round();
+    if (mm == null || mm < 50 || mm > 1000) {
+      // Reset field and toast per UI/UX §9.1 wording.
+      final settings = ref.read(projectSettingsProvider);
+      controller.text =
+          _mmToCmDisplay(_currentMmFor(settings, wallType));
+      controller.selection = const TextSelection.collapsed(offset: -1);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Wall thickness must be 5–100 cm'),
+        ),
+      );
+      return;
+    }
+    final currentMm =
+        _currentMmFor(ref.read(projectSettingsProvider), wallType);
+    if (mm == currentMm) {
+      controller.text = _mmToCmDisplay(mm);
+      return;
+    }
+    final container = ProviderScope.containerOf(context, listen: false);
+    final oldWalls = List<WallSegment>.unmodifiable(
+      ref.read(editorStateProvider).walls,
+    );
+    _setDefaultFor(wallType, mm);
+    ref
+        .read(editorStateProvider.notifier)
+        .recomputeWallsForProjectDefault(wallType);
+    final newWalls = List<WallSegment>.unmodifiable(
+      ref.read(editorStateProvider).walls,
+    );
+    container.read(undoRedoProvider).execute(
+          _ChangeDefaultWallThicknessCommand(
+            container: container,
+            wallType: wallType,
+            oldMm: currentMm,
+            newMm: mm,
+            oldWalls: oldWalls,
+            newWalls: newWalls,
+          ),
+        );
+    // Normalise display (round-trip through mm so "24.0" becomes "24").
+    controller.text = _mmToCmDisplay(mm);
+  }
+
+  TextEditingController _wallControllerFor(WallType wallType) =>
+      switch (wallType) {
+        WallType.exterior => _extWallController,
+        WallType.interior => _intWallController,
+        WallType.partition => _partWallController,
+      };
+
+  static int _currentMmFor(ProjectSettings s, WallType wallType) =>
+      switch (wallType) {
+        WallType.exterior => s.defaultExteriorWallThicknessMm,
+        WallType.interior => s.defaultInteriorWallThicknessMm,
+        WallType.partition => s.defaultPartitionWallThicknessMm,
+      };
+
+  void _setDefaultFor(WallType wallType, int mm) {
+    final notifier = ref.read(projectSettingsProvider.notifier);
+    switch (wallType) {
+      case WallType.exterior:
+        notifier.setDefaultExteriorWallThicknessMm(mm);
+      case WallType.interior:
+        notifier.setDefaultInteriorWallThicknessMm(mm);
+      case WallType.partition:
+        notifier.setDefaultPartitionWallThicknessMm(mm);
+    }
+  }
+
   void _applyHeight(String raw) {
     final parsed = int.tryParse(raw);
     if (parsed == null) {
@@ -183,6 +294,24 @@ class _ProjectSettingsDialogState
     if (_unheatedController.text != unheatedText &&
         !_unheatedController.selection.isValid) {
       _unheatedController.text = unheatedText;
+    }
+    final extText =
+        _mmToCmDisplay(settings.defaultExteriorWallThicknessMm);
+    if (_extWallController.text != extText &&
+        !_extWallController.selection.isValid) {
+      _extWallController.text = extText;
+    }
+    final intText =
+        _mmToCmDisplay(settings.defaultInteriorWallThicknessMm);
+    if (_intWallController.text != intText &&
+        !_intWallController.selection.isValid) {
+      _intWallController.text = intText;
+    }
+    final partText =
+        _mmToCmDisplay(settings.defaultPartitionWallThicknessMm);
+    if (_partWallController.text != partText &&
+        !_partWallController.selection.isValid) {
+      _partWallController.text = partText;
     }
 
     final screenHeight = MediaQuery.sizeOf(context).height;
@@ -402,6 +531,58 @@ class _ProjectSettingsDialogState
                     const Divider(),
                     const SizedBox(height: Spacing.md),
 
+                    // ── ADR-017: default wall thicknesses ─────
+                    Text(
+                      'Default wall thicknesses',
+                      style: textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: Spacing.xs),
+                    Text(
+                      'Used for unassigned walls (no construction). '
+                      'Editing a value re-anchors every matching wall in '
+                      'one undo step (ADR-017 Rule 9).',
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: Spacing.sm),
+                    Text(
+                      'Exterior',
+                      style: textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: Spacing.xs),
+                    _WallThicknessRow(
+                      controller: _extWallController,
+                      onFieldSubmitted: (raw) =>
+                          _applyWallDefault(WallType.exterior, raw),
+                    ),
+                    const SizedBox(height: Spacing.sm),
+                    Text(
+                      'Interior (shared)',
+                      style: textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: Spacing.xs),
+                    _WallThicknessRow(
+                      controller: _intWallController,
+                      onFieldSubmitted: (raw) =>
+                          _applyWallDefault(WallType.interior, raw),
+                    ),
+                    const SizedBox(height: Spacing.sm),
+                    Text(
+                      'Partition',
+                      style: textTheme.bodyMedium,
+                    ),
+                    const SizedBox(height: Spacing.xs),
+                    _WallThicknessRow(
+                      controller: _partWallController,
+                      onFieldSubmitted: (raw) =>
+                          _applyWallDefault(WallType.partition, raw),
+                    ),
+
+                    const SizedBox(height: Spacing.lg),
+                    const Divider(),
+                    const SizedBox(height: Spacing.md),
+
                     // ── Drawing grid size ────────────────────
                     Text(
                       l10n.settingsDrawingGridSize,
@@ -595,6 +776,115 @@ class _TempRow extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+/// A bare numeric (cm) text field row for one of the three
+/// wall-thickness project defaults. No slider — these change rarely and
+/// a slider would spam intermediate commits. Submission goes through
+/// [_ProjectSettingsDialogState._applyWallDefault], which handles
+/// parsing, validation, cascade, and the single-step undo command.
+class _WallThicknessRow extends StatelessWidget {
+  const _WallThicknessRow({
+    required this.controller,
+    required this.onFieldSubmitted,
+  });
+
+  final TextEditingController controller;
+  final ValueChanged<String> onFieldSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        SizedBox(
+          width: 100,
+          child: TextField(
+            controller: controller,
+            keyboardType: const TextInputType.numberWithOptions(
+              decimal: true,
+            ),
+            inputFormatters: [
+              FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d*')),
+            ],
+            decoration: const InputDecoration(
+              suffixText: 'cm',
+              isDense: true,
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: Spacing.sm,
+                vertical: Spacing.sm,
+              ),
+            ),
+            style: textTheme.bodyMedium,
+            onSubmitted: onFieldSubmitted,
+          ),
+        ),
+        const SizedBox(width: Spacing.md),
+        Expanded(
+          child: Text(
+            '5–100 cm',
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// One-step undo entry for an ADR-017 Rule 9 cascade:
+/// `setDefault<WallType>WallThicknessMm` + every re-anchored
+/// unassigned wall of [wallType].
+///
+/// The command runs against a [ProviderContainer] (resolved via
+/// `ProviderScope.containerOf` at creation time) so it survives the
+/// dialog closing — the user can dismiss the settings dialog and then
+/// still Ctrl+Z to revert the entire cascade.
+class _ChangeDefaultWallThicknessCommand extends Command {
+  _ChangeDefaultWallThicknessCommand({
+    required this.container,
+    required this.wallType,
+    required this.oldMm,
+    required this.newMm,
+    required this.oldWalls,
+    required this.newWalls,
+  });
+
+  final ProviderContainer container;
+  final WallType wallType;
+  final int oldMm;
+  final int newMm;
+  final List<WallSegment> oldWalls;
+  final List<WallSegment> newWalls;
+
+  @override
+  String get label => 'Change default wall thickness';
+
+  @override
+  void execute() {
+    _writeDefault(newMm);
+    container.read(editorStateProvider.notifier).replaceAllWalls(newWalls);
+  }
+
+  @override
+  void undo() {
+    _writeDefault(oldMm);
+    container.read(editorStateProvider.notifier).replaceAllWalls(oldWalls);
+  }
+
+  void _writeDefault(int mm) {
+    final notifier = container.read(projectSettingsProvider.notifier);
+    switch (wallType) {
+      case WallType.exterior:
+        notifier.setDefaultExteriorWallThicknessMm(mm);
+      case WallType.interior:
+        notifier.setDefaultInteriorWallThicknessMm(mm);
+      case WallType.partition:
+        notifier.setDefaultPartitionWallThicknessMm(mm);
+    }
   }
 }
 
