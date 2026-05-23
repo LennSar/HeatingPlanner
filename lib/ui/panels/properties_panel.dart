@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/engines/geometry_engine.dart';
-import '../../calculation/engines/thermal_engine.dart';
 import '../../calculation/providers/heat_demand_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../l10n/app_localizations.dart';
@@ -14,7 +13,7 @@ import 'distributor_properties.dart';
 import 'heating_zone_properties.dart';
 import 'opening_properties.dart';
 import 'room_properties.dart';
-import 'wall_construction_editor.dart';
+import 'wall_properties.dart';
 
 export '../providers/selection_provider.dart'
     show
@@ -157,7 +156,7 @@ class _ElementProperties extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return switch (selection.type) {
       'room' => RoomProperties(roomId: selection.id),
-      'wall' => _WallInfo(wallId: selection.id),
+      'wall' => WallProperties(wallId: selection.id),
       'window' =>
         WindowProperties(windowId: selection.id),
       'door' => DoorProperties(doorId: selection.id),
@@ -168,118 +167,6 @@ class _ElementProperties extends ConsumerWidget {
         CircuitProperties(circuitId: selection.id),
       _ => _GenericInfo(selection: selection),
     };
-  }
-}
-
-/// Wall info panel with construction editor access.
-class _WallInfo extends ConsumerWidget {
-  const _WallInfo({required this.wallId});
-
-  final String wallId;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final textTheme = Theme.of(context).textTheme;
-    final editorState = ref.watch(editorStateProvider);
-    final wall = editorState.walls
-        .where((w) => w.id == wallId)
-        .firstOrNull;
-
-    final l10n = AppLocalizations.of(context)!;
-
-    if (wall == null) {
-      return Padding(
-        padding: const EdgeInsets.all(Spacing.md),
-        child: Text(
-          l10n.wallNotFound,
-          style: textTheme.bodyMedium,
-        ),
-      );
-    }
-
-    final lengthMm = GeometryEngine.distanceMm(
-      wall.startPoint,
-      wall.endPoint,
-    );
-
-    final construction = wall.constructionId != null
-        ? editorState.constructions
-            .where((c) => c.id == wall.constructionId)
-            .firstOrNull
-        : null;
-
-    String uValueText = '\u2014';
-    if (construction != null) {
-      final layers = editorState.materialLayers
-          .where((l) => l.constructionId == construction.id)
-          .toList()
-        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-      final u = ThermalEngine.uValue(
-        layerThicknessesMm:
-            layers.map((l) => l.thicknessMm).toList(),
-        layerLambdas:
-            layers.map((l) => l.thermalConductivity).toList(),
-        rsi: construction.rsi,
-        rse: construction.rse,
-      );
-      if (!u.isNaN) {
-        uValueText =
-            '${u.toStringAsFixed(3)} W/(m\u00B2K)';
-      }
-    }
-
-    return Padding(
-      padding: const EdgeInsets.all(Spacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(l10n.properties, style: textTheme.headlineMedium),
-          const SizedBox(height: Spacing.lg),
-          Text(l10n.wallSegment, style: textTheme.headlineSmall),
-          const SizedBox(height: Spacing.md),
-          _infoRow(
-            l10n.lengthLabel,
-            '${lengthMm.round()} mm',
-            textTheme,
-          ),
-          _infoRow(l10n.typeWallLabel, wall.wallType.name, textTheme),
-          _infoRow(
-            l10n.orientationLabel,
-            wall.orientation.name,
-            textTheme,
-          ),
-          _infoRow(l10n.uValueLabel, uValueText, textTheme),
-          if (construction != null)
-            _infoRow(
-              l10n.constructionLabel,
-              ref
-                      .watch(localizedWallConstructionsProvider)
-                      .where((lr) => lr.row.id == construction.id)
-                      .firstOrNull
-                      ?.displayName ??
-                  construction.name,
-              textTheme,
-            ),
-          const SizedBox(height: Spacing.md),
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              icon: const Icon(Icons.layers_outlined,
-                  size: 16),
-              label: Text(
-                construction == null
-                    ? l10n.addConstruction
-                    : l10n.editConstruction,
-              ),
-              onPressed: () => showWallConstructionEditor(
-                context,
-                wall,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }
 

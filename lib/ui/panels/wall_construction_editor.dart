@@ -6,6 +6,7 @@ import '../../calculation/providers/project_settings_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/id_generator.dart';
 import '../../l10n/app_localizations.dart';
+import '../../data/models/enums.dart';
 import '../../data/models/material_layer.dart';
 import '../../data/models/wall_construction.dart';
 import '../../data/models/wall_segment.dart';
@@ -1169,6 +1170,12 @@ class _WallConstructionDialogState
               ),
               const SizedBox(height: Spacing.sm),
 
+              // ---- ADR-017 thickness-change banner ----
+              _ThicknessChangeBanner(
+                construction: _construction,
+                liveLayers: _layers,
+              ),
+
               // ---- Layer stack ----
               Text(
                 l10n.layerStack,
@@ -1870,6 +1877,175 @@ class _PresetRow extends StatelessWidget {
 // ---------------------------------------------------------------
 // Material picker dialog
 // ---------------------------------------------------------------
+
+/// ADR-017 / UI/UX §5.7 — shows the live thickness delta and the walls
+/// it will affect on save.
+///
+/// Reads the current in-editor layer stack ([liveLayers]) against the
+/// persisted layers of [construction] to compute `old → new` thickness,
+/// and against `editorStateProvider` to count walls that reference this
+/// construction. When the construction is shared (any affected wall has
+/// `mirrorId != null`) per-room inner-clear deltas are listed.
+///
+/// Visual variants per the spec:
+/// * **infoBlue** when there is ≥ 1 affected wall **and** a non-zero
+///   thickness delta — the save will visibly move geometry.
+/// * **muted** (`onSurfaceVariant`) otherwise — no walls reference this
+///   construction yet, or the layer edit did not change total thickness.
+class _ThicknessChangeBanner extends ConsumerWidget {
+  const _ThicknessChangeBanner({
+    required this.construction,
+    required this.liveLayers,
+  });
+
+  final WallConstruction construction;
+  final List<MaterialLayer> liveLayers;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final textTheme = Theme.of(context).textTheme;
+    final colors = Theme.of(context).extension<HeatingPlannerColors>()!;
+    final colorScheme = Theme.of(context).colorScheme;
+    final editorState = ref.watch(editorStateProvider);
+
+    final persistedLayers = editorState.materialLayers
+        .where((l) => l.constructionId == construction.id)
+        .toList();
+    final oldT = persistedLayers.fold<double>(
+      0.0,
+      (s, l) => s + l.thicknessMm,
+    );
+    final newT = liveLayers.fold<double>(
+      0.0,
+      (s, l) => s + l.thicknessMm,
+    );
+    final deltaT = newT - oldT;
+
+    final affected = editorState.walls
+        .where((w) => w.constructionId == construction.id)
+        .toList();
+    final hasShared =
+        affected.any((w) => w.mirrorId != null);
+    final isActive = affected.isNotEmpty && deltaT.abs() >= 0.5;
+
+    final bg = isActive
+        ? colors.infoBlue.withValues(alpha: 0.12)
+        : colorScheme.surfaceContainerHighest;
+    final fg = isActive
+        ? colors.infoBlue
+        : colorScheme.onSurfaceVariant;
+
+    // Headline string per UI/UX §5.7 example wording.
+    final headline = StringBuffer()
+      ..write('Wall thickness ${oldT.round()} mm → ')
+      ..write('${newT.round()} mm. ')
+      ..write(
+        'Affects ${affected.length} '
+        '${affected.length == 1 ? 'wall' : 'walls'}.',
+      );
+    final anchorSummary = _anchorSummary(affected, deltaT);
+    if (anchorSummary != null) {
+      headline
+        ..write(' ')
+        ..write(anchorSummary);
+    }
+
+    // Per-room inner-clear deltas (only when shared walls are affected).
+    final perRoomLines = <String>[];
+    if (hasShared && deltaT.abs() >= 0.5) {
+      final byRoom = <String, double>{};
+      for (final w in affected) {
+        // Each affected wall removes deltaT / 2 from each of the rooms
+        // sharing it (centerline-anchored mirror pair, ADR-017 Rule 3).
+        // For non-shared walls the contribution depends on anchorMode
+        // and is captured in the headline summary above instead.
+        if (w.mirrorId == null) continue;
+        final partner = editorState.walls
+            .where((p) => p.id == w.mirrorId)
+            .firstOrNull;
+        for (final roomId in {
+          w.roomId,
+          if (partner != null) partner.roomId,
+        }) {
+          if (roomId.isEmpty) continue;
+          byRoom.update(
+            roomId,
+            (v) => v - deltaT / 2.0,
+            ifAbsent: () => -deltaT / 2.0,
+          );
+        }
+      }
+      for (final entry in byRoom.entries) {
+        final room = editorState.rooms
+            .where((r) => r.id == entry.key)
+            .firstOrNull;
+        if (room == null) continue;
+        final sign = entry.value >= 0 ? '+' : '−';
+        perRoomLines.add(
+          '${room.name}: inner clear $sign'
+          '${entry.value.abs().round()} mm',
+        );
+      }
+    }
+
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: Spacing.sm),
+      padding: const EdgeInsets.symmetric(
+        horizontal: Spacing.md,
+        vertical: Spacing.sm,
+      ),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            headline.toString(),
+            style: textTheme.bodyMedium?.copyWith(
+              color: fg,
+              fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+            ),
+          ),
+          for (final line in perRoomLines)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Text(
+                line,
+                style: textTheme.bodySmall?.copyWith(color: fg),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Generates the trailing "Anchored on … — outer envelope grows by X mm"
+  /// sentence per the §5.7 example. Returns null when no affected wall has
+  /// a non-centerline anchor (in which case the basic headline suffices).
+  String? _anchorSummary(List<WallSegment> walls, double deltaT) {
+    if (deltaT.abs() < 0.5) return null;
+    final hasInner =
+        walls.any((w) => w.anchorMode == WallAnchorMode.innerFace);
+    final hasOuter =
+        walls.any((w) => w.anchorMode == WallAnchorMode.outerFace);
+    if (!hasInner && !hasOuter) return null;
+    final grows = deltaT > 0;
+    final mag = deltaT.abs().round();
+    if (hasInner && !hasOuter) {
+      return 'Anchored on inner face — outer envelope '
+          '${grows ? 'grows' : 'shrinks'} by $mag mm.';
+    }
+    if (hasOuter && !hasInner) {
+      return 'Anchored on outer face — inner clear '
+          '${grows ? 'shrinks' : 'grows'} by $mag mm.';
+    }
+    return 'Mixed anchor faces — both inner clear and outer envelope '
+        'will shift by up to $mag mm.';
+  }
+}
 
 /// Shows a [MaterialPicker] inside a dialog and returns the chosen
 /// [MaterialEntry], or null if the user dismisses without selecting.
