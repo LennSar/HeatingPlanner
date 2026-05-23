@@ -1,9 +1,11 @@
 import 'dart:async' show unawaited;
+import 'dart:math' show sqrt;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/engines/geometry_engine.dart';
+import '../../calculation/providers/project_settings_provider.dart';
 import '../../repositories/app_preferences.dart';
 import '../../repositories/building_repository.dart';
 import '../../repositories/construction_repository.dart';
@@ -20,9 +22,11 @@ import '../../data/models/localized_catalog_row.dart';
 import '../../data/models/material_layer.dart';
 import '../../data/models/point2d.dart';
 import '../../data/models/room.dart';
+import '../../data/models/validation_result.dart';
 import '../../data/models/wall_construction.dart';
 import '../../data/models/wall_segment.dart';
 import '../../data/models/window_element.dart';
+import 'transient_warnings_provider.dart';
 
 /// In-memory state for the editor canvas.
 @immutable
@@ -166,6 +170,122 @@ class EditorStateNotifier extends Notifier<EditorState>
         ),
       );
 
+  // ── ADR-017: wall-thickness source-of-truth + re-anchor cascade ──────────
+
+  /// Authoritative thickness for [wall] per ADR-017:
+  /// `sum(layers.thicknessMm)` when `constructionId != null` (the layers
+  /// drive the value), otherwise the project default for [wall.wallType].
+  ///
+  /// Reads layers from [state.materialLayers] and defaults from
+  /// [projectSettingsProvider]; falls back to the current
+  /// [WallSegment.thicknessMm] if no construction layers exist yet
+  /// (an in-progress construction edit) so the wall does not collapse
+  /// to zero during the edit.
+  double _thicknessSourceOfTruth(WallSegment wall) {
+    if (wall.constructionId != null) {
+      final layers = state.materialLayers
+          .where((l) => l.constructionId == wall.constructionId)
+          .toList();
+      if (layers.isNotEmpty) {
+        return layers.fold<double>(0.0, (s, l) => s + l.thicknessMm);
+      }
+      return wall.thicknessMm;
+    }
+    final settings = ref.read(projectSettingsProvider);
+    return switch (wall.wallType) {
+      WallType.exterior =>
+        settings.defaultExteriorWallThicknessMm.toDouble(),
+      WallType.interior =>
+        settings.defaultInteriorWallThicknessMm.toDouble(),
+      WallType.partition =>
+        settings.defaultPartitionWallThicknessMm.toDouble(),
+    };
+  }
+
+  /// Returns [wall] with its centerline shifted by `½Δt` along the
+  /// room's outward normal per ADR-017 Rule 6.
+  ///
+  /// [WallAnchorMode.centerline] → no shift (the centerline is the
+  /// anchor; both faces move outward by ½Δt each). [innerFace] shifts
+  /// the centerline outward by ½Δt; [outerFace] shifts it inward by
+  /// ½Δt. Outward direction is derived from the owning [Room]'s polygon
+  /// winding (positive shoelace = math-CCW → right-hand normal is
+  /// outward, see [GeometryEngine.offsetPolygonPerEdge]). When the
+  /// room cannot be resolved or the segment is degenerate the centerline
+  /// is left untouched — the thickness still updates.
+  WallSegment _shiftedForThickness(WallSegment wall, double newThicknessMm) {
+    final delta = newThicknessMm - wall.thicknessMm;
+    if (delta.abs() < 1e-6 ||
+        wall.anchorMode == WallAnchorMode.centerline) {
+      return wall.copyWith(thicknessMm: newThicknessMm);
+    }
+    final room =
+        state.rooms.where((r) => r.id == wall.roomId).firstOrNull;
+    if (room == null || room.polygon.length < 3) {
+      return wall.copyWith(thicknessMm: newThicknessMm);
+    }
+    var signedArea2 = 0.0;
+    for (var i = 0; i < room.polygon.length; i++) {
+      final a = room.polygon[i];
+      final b = room.polygon[(i + 1) % room.polygon.length];
+      signedArea2 += a.x * b.y - b.x * a.y;
+    }
+    final windingSign = signedArea2 > 0 ? 1.0 : -1.0;
+    final dx = wall.endPoint.x - wall.startPoint.x;
+    final dy = wall.endPoint.y - wall.startPoint.y;
+    final len = sqrt(dx * dx + dy * dy);
+    if (len < 1e-6) return wall.copyWith(thicknessMm: newThicknessMm);
+    final nx = windingSign * dy / len;
+    final ny = -windingSign * dx / len;
+    // innerFace pins the inner face → centerline moves outward by ½Δt;
+    // outerFace pins the outer face → centerline moves inward by −½Δt.
+    final sign = wall.anchorMode == WallAnchorMode.innerFace ? 1.0 : -1.0;
+    final shift = sign * delta / 2.0;
+    return wall.copyWith(
+      thicknessMm: newThicknessMm,
+      startPoint: Point2D(
+        x: wall.startPoint.x + nx * shift,
+        y: wall.startPoint.y + ny * shift,
+      ),
+      endPoint: Point2D(
+        x: wall.endPoint.x + nx * shift,
+        y: wall.endPoint.y + ny * shift,
+      ),
+    );
+  }
+
+  /// Returns [wall] with `thicknessMm` recomputed from its
+  /// source-of-truth and the centerline shifted per [anchorMode]
+  /// (ADR-017 Rule 6). The **only** path that mutates
+  /// `WallSegment.thicknessMm`; every other code path must call this
+  /// before writing the wall back through [updateWall] so ADR-011
+  /// mirror sync propagates the new thickness/anchorMode to the
+  /// partner.
+  ///
+  /// Returns [wall] unchanged when the new thickness matches the
+  /// current value (avoids spurious mirror updates).
+  WallSegment _recomputeWallThickness(WallSegment wall) {
+    final newThickness = _thicknessSourceOfTruth(wall);
+    if ((newThickness - wall.thicknessMm).abs() < 1e-6) return wall;
+    return _shiftedForThickness(wall, newThickness);
+  }
+
+  /// Returns the project-default thickness in mm for [wallType] from
+  /// [settings]. Used by the ADR-017 Rule 8 promotion logic to classify
+  /// a wall as "default" (constructionId null AND thicknessMm matches).
+  static double _projectDefaultForType(
+    ProjectSettings settings,
+    WallType wallType,
+  ) =>
+      switch (wallType) {
+        WallType.exterior =>
+          settings.defaultExteriorWallThicknessMm.toDouble(),
+        WallType.interior =>
+          settings.defaultInteriorWallThicknessMm.toDouble(),
+        WallType.partition =>
+          settings.defaultPartitionWallThicknessMm.toDouble(),
+      };
+
   /// Add a wall segment.
   void addWall(WallSegment wall) {
     final w = _withOrientation(wall);
@@ -183,8 +303,10 @@ class EditorStateNotifier extends Notifier<EditorState>
   ///
   /// When [wall] has a non-null [WallSegment.mirrorId], the partner wall is
   /// located by ID and updated atomically in the same [state.copyWith] call,
-  /// syncing [constructionId], [startPoint]/[endPoint] (reversed), and
-  /// [wallType] (ADR-011 Rule 4). Both walls are persisted to the DAO.
+  /// syncing [constructionId], [startPoint]/[endPoint] (reversed),
+  /// [wallType], and per ADR-017 Rule 7 also [thicknessMm] and
+  /// [anchorMode] (ADR-011 Rule 4 extended). Both walls are persisted to
+  /// the DAO.
   void updateWall(WallSegment wall) {
     final w = _withOrientation(wall);
     final partnerId = w.mirrorId;
@@ -200,6 +322,8 @@ class EditorStateNotifier extends Notifier<EditorState>
             startPoint: w.endPoint,
             endPoint: w.startPoint,
             wallType: w.wallType,
+            thicknessMm: w.thicknessMm,
+            anchorMode: w.anchorMode,
           ),
         );
         state = state.copyWith(
@@ -231,6 +355,75 @@ class EditorStateNotifier extends Notifier<EditorState>
       final dao = ref.read(buildingDaoProvider);
       unawaited(upsertWallSegment(dao, w));
       markProjectDirty();
+    }
+  }
+
+  /// Assign [constructionId] to wall [wallId] and re-anchor its
+  /// centerline per ADR-017 Rule 6.
+  ///
+  /// Routes through [_recomputeWallThickness] so the wall's new
+  /// `thicknessMm` becomes the layer-sum of the assigned construction
+  /// and [updateWall] propagates the change to a mirror partner.
+  /// No-op if the wall is unknown.
+  void assignConstruction(String wallId, String constructionId) {
+    final wall = state.walls.where((w) => w.id == wallId).firstOrNull;
+    if (wall == null) return;
+    final withConstruction =
+        wall.copyWith(constructionId: constructionId);
+    updateWall(_recomputeWallThickness(withConstruction));
+  }
+
+  /// Detach the construction from wall [wallId] and re-anchor the
+  /// centerline so its thickness reverts to the project default for the
+  /// wall's [WallType] (ADR-017 Rule 9). Routes through [updateWall]
+  /// for mirror sync.
+  void clearConstruction(String wallId) {
+    final wall = state.walls.where((w) => w.id == wallId).firstOrNull;
+    if (wall == null) return;
+    final withoutConstruction = wall.copyWith(constructionId: null);
+    updateWall(_recomputeWallThickness(withoutConstruction));
+  }
+
+  /// Re-anchor every wall whose `constructionId` equals [constructionId]
+  /// after that construction's layers change (ADR-017 Rule 6, invoked
+  /// from the wall-construction-editor Save handler).
+  ///
+  /// Mirror partners are picked up by [updateWall]; the caller is
+  /// responsible for wrapping the whole edit in a single
+  /// `UndoRedoService` command so one Ctrl+Z reverts the source-of-truth
+  /// change and every re-anchor it cascaded.
+  void recomputeWallsForConstruction(String constructionId) {
+    final affected = state.walls
+        .where((w) => w.constructionId == constructionId)
+        .toList();
+    final visited = <String>{};
+    for (final w in affected) {
+      if (!visited.add(w.id)) continue;
+      final recomputed = _recomputeWallThickness(w);
+      if (identical(recomputed, w)) continue;
+      // Skip the partner if updateWall will sync it via ADR-011.
+      if (recomputed.mirrorId != null) visited.add(recomputed.mirrorId!);
+      updateWall(recomputed);
+    }
+  }
+
+  /// Re-anchor every unassigned wall (no `constructionId`) of
+  /// [wallType] when its project-default thickness changes (ADR-017
+  /// Rule 9). Caller wraps the cascade in a single `UndoRedoService`
+  /// command.
+  void recomputeWallsForProjectDefault(WallType wallType) {
+    final affected = state.walls
+        .where(
+          (w) => w.constructionId == null && w.wallType == wallType,
+        )
+        .toList();
+    final visited = <String>{};
+    for (final w in affected) {
+      if (!visited.add(w.id)) continue;
+      final recomputed = _recomputeWallThickness(w);
+      if (identical(recomputed, w)) continue;
+      if (recomputed.mirrorId != null) visited.add(recomputed.mirrorId!);
+      updateWall(recomputed);
     }
   }
 
@@ -779,12 +972,18 @@ class EditorStateNotifier extends Notifier<EditorState>
         if (host.roomId.isEmpty) continue;
         if (!_isStrictlyInterior(pt, host)) continue;
 
+        // ADR-003 Rule 5 + ADR-017: flanking segments inherit the host's
+        // thermal/geometric properties — including `thicknessMm` and
+        // `anchorMode` so the split halves continue to render and
+        // calculate as the same physical wall.
         final before = _withOrientation(WallSegment(
           id: IdGenerator.newId(),
           roomId: host.roomId,
           startPoint: host.startPoint,
           endPoint: pt,
           wallType: host.wallType,
+          thicknessMm: host.thicknessMm,
+          anchorMode: host.anchorMode,
           constructionId: host.constructionId,
           adjacentRoomId: host.adjacentRoomId,
         ));
@@ -794,6 +993,8 @@ class EditorStateNotifier extends Notifier<EditorState>
           startPoint: pt,
           endPoint: host.endPoint,
           wallType: host.wallType,
+          thicknessMm: host.thicknessMm,
+          anchorMode: host.anchorMode,
           constructionId: host.constructionId,
           adjacentRoomId: host.adjacentRoomId,
         ));
@@ -825,12 +1026,22 @@ class EditorStateNotifier extends Notifier<EditorState>
   /// shared walls correctly (ADR-001).
   ///
   /// All mutations are committed in a single state update.
+  ///
+  /// Per ADR-017 Rules 3 and 7–8, every shared-wall promotion forces
+  /// `anchorMode = WallAnchorMode.centerline` on both members of the
+  /// mirror pair, inherits the host wall's [thicknessMm] and
+  /// [constructionId] (case 8b — only the host is non-default at this
+  /// point; the freshly created mirror is always default), and emits a
+  /// `WarningSeverity.warning` validation result if case 8d (both sides
+  /// non-default and different) ever fires.
   void addRoomFromDetection({
     required Room room,
     required List<String> wallIds,
   }) {
     final updatedWalls = [...state.walls];
     final toPersist = <WallSegment>[];
+    final conflicts = <ValidationResult>[];
+    final settings = ref.read(projectSettingsProvider);
 
     for (int i = 0; i < wallIds.length; i++) {
       final wallId = wallIds[i];
@@ -849,10 +1060,44 @@ class EditorStateNotifier extends Notifier<EditorState>
         // Generate the mirror's ID upfront so both walls can
         // cross-reference each other (ADR-011 Rule 3).
         final newMirrorId = IdGenerator.newId();
+
+        // ADR-017 Rule 8 resolution. The neighbour-side wall is `wall`;
+        // the new-room-side wall is freshly created and therefore
+        // always default. So:
+        //  - host default + new default → case 8a → interior default
+        //    thickness, constructionId = null
+        //  - host non-default + new default → case 8b → adopt host's
+        //    thickness + constructionId.
+        // Cases 8c/8d only matter when both pre-existing walls carry a
+        // construction, which the current promotion paths cannot
+        // produce. The 8d branch is left in place defensively so future
+        // promotion paths (e.g. mid-edit splits of two assigned shared
+        // walls) emit a warning rather than silently picking a winner.
+        final hostDefault = wall.constructionId == null &&
+            (wall.thicknessMm -
+                    _projectDefaultForType(settings, wall.wallType))
+                    .abs() <
+                1e-6;
+        final double resolvedThickness;
+        final String? resolvedConstructionId;
+        if (hostDefault) {
+          // Case 8a: use the interior default — both partners default.
+          resolvedThickness =
+              settings.defaultInteriorWallThicknessMm.toDouble();
+          resolvedConstructionId = null;
+        } else {
+          // Case 8b: adopt the host wall's existing construction.
+          resolvedThickness = wall.thicknessMm;
+          resolvedConstructionId = wall.constructionId;
+        }
+
         final updated = wall.copyWith(
           wallType: WallType.interior,
           adjacentRoomId: room.id,
           mirrorId: newMirrorId,
+          thicknessMm: resolvedThickness,
+          anchorMode: WallAnchorMode.centerline,
+          constructionId: resolvedConstructionId,
         );
         updatedWalls[idx] = updated;
         toPersist.add(updated);
@@ -863,7 +1108,9 @@ class EditorStateNotifier extends Notifier<EditorState>
           startPoint: wall.endPoint,
           endPoint: wall.startPoint,
           wallType: WallType.interior,
-          constructionId: wall.constructionId,
+          thicknessMm: resolvedThickness,
+          anchorMode: WallAnchorMode.centerline,
+          constructionId: resolvedConstructionId,
           adjacentRoomId: neighbourRoomId,
           orientation: wall.orientation,
           mirrorId: updated.id,
@@ -882,6 +1129,15 @@ class EditorStateNotifier extends Notifier<EditorState>
     unawaited(upsertRoom(dao, room));
     for (final w in toPersist) {
       unawaited(upsertWallSegment(dao, w));
+    }
+    // ADR-017 Rule 8d: surface any non-blocking promotion conflicts to
+    // the validation service (no-op when [conflicts] is empty, which is
+    // the current expected case — see the Rule 8 commentary above).
+    if (conflicts.isNotEmpty) {
+      final warnings = ref.read(transientWarningsProvider.notifier);
+      for (final c in conflicts) {
+        warnings.add(c);
+      }
     }
     markProjectDirty();
   }

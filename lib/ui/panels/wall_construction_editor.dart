@@ -1043,9 +1043,15 @@ class _WallConstructionDialogState
     notifier.replaceLayersForConstruction(updated.id, _layers);
 
     if (widget.wall.constructionId != updated.id) {
-      notifier.updateWall(
-        widget.wall.copyWith(constructionId: updated.id),
-      );
+      // Route through assignConstruction so ADR-017 Rule 6 re-anchors
+      // the centerline and ADR-011 mirror sync picks up the new
+      // thicknessMm on the partner.
+      notifier.assignConstruction(widget.wall.id, updated.id);
+    } else {
+      // Same construction, but layers may have changed — re-anchor every
+      // wall that uses this construction so their thicknessMm follows
+      // the new layer sum (ADR-017 Rule 6, construction-editor cascade).
+      notifier.recomputeWallsForConstruction(updated.id);
     }
 
     Navigator.of(context).pop();

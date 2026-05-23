@@ -6,8 +6,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../repositories/project_repository.dart';
 import '../../repositories/save_state_notifier.dart';
 
-/// In-memory snapshot of the four project-level settings fields that
-/// drive heat-demand and zone-output calculations.
+/// In-memory snapshot of the project-level settings fields that drive
+/// heat-demand, zone-output, and wall-geometry calculations.
 ///
 /// Derived from the persisted [Project] via [projectSettingsProvider].
 @immutable
@@ -18,6 +18,9 @@ class ProjectSettings {
     this.defaultIndoorTempC = 20.0,
     this.floorHeightMm = 2600,
     this.unheatedSpaceTempC = 10.0,
+    this.defaultExteriorWallThicknessMm = 240,
+    this.defaultInteriorWallThicknessMm = 120,
+    this.defaultPartitionWallThicknessMm = 100,
   });
 
   /// Outdoor design temperature (°C). Valid range: −50 to +10.
@@ -36,12 +39,24 @@ class ProjectSettings {
   /// [BoundaryCondition.interior] floor/ceiling when no override is set.
   final double unheatedSpaceTempC;
 
+  /// Default total thickness in mm for exterior walls (ADR-017).
+  final int defaultExteriorWallThicknessMm;
+
+  /// Default total thickness in mm for interior (shared) walls (ADR-017).
+  final int defaultInteriorWallThicknessMm;
+
+  /// Default total thickness in mm for partition walls (ADR-017).
+  final int defaultPartitionWallThicknessMm;
+
   /// Returns a copy with updated fields.
   ProjectSettings copyWith({
     double? designOutdoorTempC,
     double? defaultIndoorTempC,
     int? floorHeightMm,
     double? unheatedSpaceTempC,
+    int? defaultExteriorWallThicknessMm,
+    int? defaultInteriorWallThicknessMm,
+    int? defaultPartitionWallThicknessMm,
   }) {
     return ProjectSettings(
       designOutdoorTempC:
@@ -51,6 +66,12 @@ class ProjectSettings {
       floorHeightMm: floorHeightMm ?? this.floorHeightMm,
       unheatedSpaceTempC:
           unheatedSpaceTempC ?? this.unheatedSpaceTempC,
+      defaultExteriorWallThicknessMm: defaultExteriorWallThicknessMm ??
+          this.defaultExteriorWallThicknessMm,
+      defaultInteriorWallThicknessMm: defaultInteriorWallThicknessMm ??
+          this.defaultInteriorWallThicknessMm,
+      defaultPartitionWallThicknessMm: defaultPartitionWallThicknessMm ??
+          this.defaultPartitionWallThicknessMm,
     );
   }
 }
@@ -83,6 +104,12 @@ class ProjectSettingsNotifier
                       floorHeightMm: project.floorHeightMm,
                       unheatedSpaceTempC:
                           project.unheatedSpaceTempC,
+                      defaultExteriorWallThicknessMm:
+                          project.defaultExteriorWallThicknessMm,
+                      defaultInteriorWallThicknessMm:
+                          project.defaultInteriorWallThicknessMm,
+                      defaultPartitionWallThicknessMm:
+                          project.defaultPartitionWallThicknessMm,
                     ),
             ) ??
         const ProjectSettings();
@@ -120,6 +147,41 @@ class ProjectSettingsNotifier
     _persist();
   }
 
+  /// Set the default exterior wall thickness in mm (clamped to 50…1000).
+  ///
+  /// Per ADR-017 Rule 9, every unassigned exterior wall (no
+  /// `constructionId`) must have its `thicknessMm` and centerline
+  /// re-anchored to follow the new value. Callers are responsible for
+  /// invoking the cascade — typically the editor-state notifier's
+  /// `recomputeWallsForProjectDefault(WallType.exterior)` — so a single
+  /// `UndoRedoService` command can revert the whole change.
+  void setDefaultExteriorWallThicknessMm(int value) {
+    state = state.copyWith(
+      defaultExteriorWallThicknessMm: value.clamp(50, 1000),
+    );
+    _persist();
+  }
+
+  /// Set the default interior (shared) wall thickness in mm (50…1000).
+  ///
+  /// See [setDefaultExteriorWallThicknessMm] for the cascade contract.
+  void setDefaultInteriorWallThicknessMm(int value) {
+    state = state.copyWith(
+      defaultInteriorWallThicknessMm: value.clamp(50, 1000),
+    );
+    _persist();
+  }
+
+  /// Set the default partition wall thickness in mm (clamped to 50…1000).
+  ///
+  /// See [setDefaultExteriorWallThicknessMm] for the cascade contract.
+  void setDefaultPartitionWallThicknessMm(int value) {
+    state = state.copyWith(
+      defaultPartitionWallThicknessMm: value.clamp(50, 1000),
+    );
+    _persist();
+  }
+
   // ── Private helpers ────────────────────────────────────────────────────────
 
   /// Writes the current [state] back to the [Project] row in SQLite.
@@ -137,6 +199,12 @@ class ProjectSettingsNotifier
       defaultIndoorTempC: state.defaultIndoorTempC,
       floorHeightMm: state.floorHeightMm,
       unheatedSpaceTempC: state.unheatedSpaceTempC,
+      defaultExteriorWallThicknessMm:
+          state.defaultExteriorWallThicknessMm,
+      defaultInteriorWallThicknessMm:
+          state.defaultInteriorWallThicknessMm,
+      defaultPartitionWallThicknessMm:
+          state.defaultPartitionWallThicknessMm,
       modifiedAt: DateTime.now(),
     );
     unawaited(

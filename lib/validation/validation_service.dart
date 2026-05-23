@@ -10,6 +10,7 @@ import '../core/constants/validation_limits.dart';
 import '../data/models/enums.dart';
 import '../data/models/validation_result.dart';
 import '../ui/providers/editor_state_provider.dart';
+import '../ui/providers/transient_warnings_provider.dart';
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
@@ -47,6 +48,10 @@ final validationResultsProvider =
     results.addAll(_unconnectedZoneResults(ref));
     results.addAll(_disconnectedCircuitResults(ref));
     results.addAll(_overlappingWallResults(ref));
+    // ADR-017 Rule 8d: shared-wall promotion conflicts emitted by
+    // EditorStateNotifier.addRoomFromDetection are picked up here so
+    // they appear alongside derived rules without blocking promotion.
+    results.addAll(ref.watch(transientWarningsProvider));
     // Sort: errors before warnings before info.
     results.sort(
       (a, b) => a.severity.index.compareTo(b.severity.index),
