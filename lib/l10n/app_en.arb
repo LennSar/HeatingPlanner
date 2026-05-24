@@ -995,6 +995,21 @@
   "@undo_createZone": { "description": "Undo/redo label — creating a floor heating zone (polygon, rectangle, or fill-room)" },
   "undo_createWallZone": "Create wall zone",
   "@undo_createWallZone": { "description": "Undo/redo label — creating a wall heating zone" },
+  "undo_splitZone": "Split zone",
+  "@undo_splitZone": { "description": "Undo/redo label — splitting a rectangular heating zone (ADR-018)" },
+
+  "zoneContextMenu_delete": "Delete",
+  "@zoneContextMenu_delete": { "description": "Zone right-click context menu — delete item (ADR-018 Rule 9)" },
+  "zoneContextMenu_splitVertically": "Split vertically",
+  "@zoneContextMenu_splitVertically": { "description": "Zone right-click context menu — split the rectangular zone with a vertical bisector (ADR-018)" },
+  "zoneContextMenu_splitHorizontally": "Split horizontally",
+  "@zoneContextMenu_splitHorizontally": { "description": "Zone right-click context menu — split the rectangular zone with a horizontal bisector (ADR-018)" },
+  "zoneContextMenu_splitDisabledTooltip": "Splitting is only available for rectangular zones.",
+  "@zoneContextMenu_splitDisabledTooltip": { "description": "Tooltip on the disabled split items when the right-clicked zone is non-rectangular (ADR-018 Rule 9)" },
+  "zone_splitNonRectangularToast": "Splitting is only available for rectangular zones.",
+  "@zone_splitNonRectangularToast": { "description": "Transient toast shown when the Zone tool double-click lands on a non-rectangular zone (ADR-018 Rule 1.1)" },
+  "zone_splitTooSmallToast": "Zone too small to split (each half must be ≥ 100 mm).",
+  "@zone_splitTooSmallToast": { "description": "Transient toast shown when a split would produce a half thinner than 100 mm (ADR-018 Rule 4)" },
 
   "canvas_defaultRoomName": "Room {roomNumber}",
   "@canvas_defaultRoomName": {

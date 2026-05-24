@@ -2252,6 +2252,48 @@ abstract class AppLocalizations {
   /// **'Create wall zone'**
   String get undo_createWallZone;
 
+  /// Undo/redo label — splitting a rectangular heating zone (ADR-018)
+  ///
+  /// In en, this message translates to:
+  /// **'Split zone'**
+  String get undo_splitZone;
+
+  /// Zone right-click context menu — delete item (ADR-018 Rule 9)
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get zoneContextMenu_delete;
+
+  /// Zone right-click context menu — split the rectangular zone with a vertical bisector (ADR-018)
+  ///
+  /// In en, this message translates to:
+  /// **'Split vertically'**
+  String get zoneContextMenu_splitVertically;
+
+  /// Zone right-click context menu — split the rectangular zone with a horizontal bisector (ADR-018)
+  ///
+  /// In en, this message translates to:
+  /// **'Split horizontally'**
+  String get zoneContextMenu_splitHorizontally;
+
+  /// Tooltip on the disabled split items when the right-clicked zone is non-rectangular (ADR-018 Rule 9)
+  ///
+  /// In en, this message translates to:
+  /// **'Splitting is only available for rectangular zones.'**
+  String get zoneContextMenu_splitDisabledTooltip;
+
+  /// Transient toast shown when the Zone tool double-click lands on a non-rectangular zone (ADR-018 Rule 1.1)
+  ///
+  /// In en, this message translates to:
+  /// **'Splitting is only available for rectangular zones.'**
+  String get zone_splitNonRectangularToast;
+
+  /// Transient toast shown when a split would produce a half thinner than 100 mm (ADR-018 Rule 4)
+  ///
+  /// In en, this message translates to:
+  /// **'Zone too small to split (each half must be ≥ 100 mm).'**
+  String get zone_splitTooSmallToast;
+
   /// Default name for a newly detected room before the user renames it
   ///
   /// In en, this message translates to:

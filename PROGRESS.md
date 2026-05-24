@@ -54,6 +54,7 @@ This file is maintained by the prompt engineer. Update it whenever the user conf
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Place heating zone | ✅ | |
+| Split rectangular heating zone in two halves | 📋 | ADR-018; Zone tool double-click (longest side) + Select tool right-click context menu; spec drafted, no prompt yet |
 | Connect zone to distributor (circuit) | ✅ | |
 | Zone color state (unconnected / noDemand / insufficient / marginal / sufficient) | ✅ | ADR-004 |
 | Zone color update after distributor move | 🔧 | Prompt generated; geometric 50 mm connectivity check |

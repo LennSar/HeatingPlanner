@@ -676,6 +676,80 @@ class _FloorPlanCanvasState
   }
 
   @override
+  void requestZoneContextMenu(ZoneContextMenuRequest request) {
+    if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
+
+    // Convert world coords back to screen coords for menu anchor.
+    final transform = ref.read(canvasControllerProvider).transform;
+    final v = transform.transform3(
+      Vector3(request.worldPoint.x, request.worldPoint.y, 0),
+    );
+    final box = context.findRenderObject() as RenderBox?;
+    if (box == null) return;
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+    final globalPos = box.localToGlobal(Offset(v.x, v.y));
+
+    final position = RelativeRect.fromRect(
+      Rect.fromPoints(globalPos, globalPos),
+      Offset.zero & overlay.size,
+    );
+
+    // Build menu items. Delete is always present. Split items only
+    // for floor zones (ADR-018 Rule 9 — hidden for wall zones).
+    final items = <PopupMenuEntry<String>>[
+      PopupMenuItem<String>(
+        value: 'delete',
+        child: Text(l10n.zoneContextMenu_delete),
+      ),
+    ];
+    if (request.showSplitItems) {
+      final disabledTooltip = l10n.zoneContextMenu_splitDisabledTooltip;
+      items.add(
+        PopupMenuItem<String>(
+          value: 'splitV',
+          enabled: request.splitEnabled,
+          child: request.splitEnabled
+              ? Text(l10n.zoneContextMenu_splitVertically)
+              : Tooltip(
+                  message: disabledTooltip,
+                  child: Text(l10n.zoneContextMenu_splitVertically),
+                ),
+        ),
+      );
+      items.add(
+        PopupMenuItem<String>(
+          value: 'splitH',
+          enabled: request.splitEnabled,
+          child: request.splitEnabled
+              ? Text(l10n.zoneContextMenu_splitHorizontally)
+              : Tooltip(
+                  message: disabledTooltip,
+                  child: Text(l10n.zoneContextMenu_splitHorizontally),
+                ),
+        ),
+      );
+    }
+
+    showMenu<String>(
+      context: context,
+      position: position,
+      items: items,
+    ).then((value) {
+      switch (value) {
+        case 'delete':
+          request.onDelete();
+        case 'splitV':
+          request.onSplitVertically();
+        case 'splitH':
+          request.onSplitHorizontally();
+      }
+    });
+  }
+
+  @override
   double get currentZoom =>
       ref.read(canvasControllerProvider).zoom;
 
@@ -918,6 +992,20 @@ class _FloorPlanCanvasState
                 worldPoint,
                 details.kind ?? PointerDeviceKind.mouse,
               );
+            },
+            // ADR-018 Rule 10: 500 ms long-press is the tablet
+            // equivalent of desktop right-click — forward to the
+            // active tool's onSecondaryTap path.
+            onLongPressStart: (details) {
+              final worldOffset = _toWorld(
+                canvasState,
+                details.localPosition,
+              );
+              final worldPoint = Point2D(
+                x: worldOffset.dx,
+                y: worldOffset.dy,
+              );
+              _activeTool?.onSecondaryTap(worldPoint);
             },
             child: MouseRegion(
               cursor: _cursorForTool(

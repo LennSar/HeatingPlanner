@@ -1035,3 +1035,190 @@ construction to one room's exterior wall, then drawing an adjacent room
 against it, produces a shared wall that inherits that construction
 (promotion rule 8b).
 
+---
+
+## ADR-018 — Splitting a rectangular heating zone in two equal halves
+
+**What.**
+A `HeatingZone` whose polygon is a 4-vertex axis-aligned rectangle (eligibility
+via `SelectTool.rectangleZoneCorners`, ADR-013 Rule 7) can be split into two
+equally-sized rectangular child zones via two entry points:
+
+1. **Zone tool (`ZoneDrawTool`) — double-click on an existing zone.** Splits
+   along the perpendicular bisector of the **longer side** of the parent
+   rectangle (ties — `W == H` within 1 mm — split vertically, i.e. bisect X).
+   Disambiguation against the existing polygon-close double-click (UI/UX §5.3
+   step 4, ADR-013 Rule 5): if the in-progress polygon buffer holds **≥ 1**
+   committed vertex, the double-click still closes the polygon; only when the
+   buffer is empty does the double-click route to the zone-under-cursor
+   actions.
+
+2. **Select tool (`SelectTool`) — right-click on an existing zone.** Opens a
+   context menu with *Delete*, *Split vertically*, *Split horizontally*. The
+   two split items render **disabled** on non-rectangular zones with the
+   tooltip *"Splitting is only available for rectangular zones."*
+
+The Zone tool double-click is also extended so that a double-click on **empty
+room interior** triggers the existing fill-room path (the same code path as
+`Ctrl+Shift+click`, ADR-014). Double-click on a non-rectangular zone shows a
+transient toast *"Splitting is only available for rectangular zones."* and
+mutates nothing.
+
+**Why.**
+Planners frequently lay out one rectangle covering a room, see it render red
+(output < demand, ADR-004), and need two zones — each with its own circuit —
+to double the available tube length and heat output. Manual re-draw of two
+half-rectangles is fiddly at the shared boundary (snap tolerances can leave a
+hairline gap or overlap) and forces re-typing every zone setting. A
+one-gesture split guarantees the two halves are mathematically equal, share
+the boundary exactly, and inherit every parent setting verbatim.
+
+Two entry points serve two distinct mental states:
+- The **double-click** path is the in-flow shortcut. "Smart default" =
+  longest-axis bisection produces children whose aspect ratio is closer to 1:1
+  than the parent's, which gives the BVF tube-routing simpler meanders.
+  Shorter-axis splitting would yield two narrow strips, rarely useful.
+- The **right-click** path is deliberative — open menu, choose direction —
+  matching the Select-tool convention of right-click context menus on existing
+  elements (cf. wall-handle right-click disconnect, UI/UX §5.6.1) and the
+  user's mental model "I'm inspecting and editing".
+
+Routing the right-click menu through Select tool (not Zone tool) reflects the
+architectural split already in place: Zone tool owns *creation* gestures
+(polygon, rect drag, fill-room); Select tool owns *mutations* on existing
+zones (move, resize per ADR-013 Rule 7, delete). The double-click in Zone
+tool is the deliberate exception — a fast "act on what I see" shortcut tied
+to the tool's purpose, with the disambiguation rule making both behaviours
+unambiguous without a modifier key.
+
+The split coordinate is **not** grid-snapped: snap would silently break the
+equal-area guarantee that defines the gesture. The user wants two halves, not
+two near-halves that happen to land on the grid.
+
+**Rule.**
+
+1. **Eligibility.** A zone is splittable iff `SelectTool.rectangleZoneCorners`
+   returns non-null on its polygon (4 vertices, axis-aligned within 1 mm, 2
+   distinct x and 2 distinct y per ADR-013 Rule 7). Wall zones
+   (`zoneType = wall`) are never splittable; the right-click menu items remain
+   hidden (not just disabled) for wall zones.
+
+2. **Split geometry.** Let the parent rectangle have inner corners
+   `tl = (minX, minY)`, `tr = (maxX, minY)`, `br = (maxX, maxY)`,
+   `bl = (minX, maxY)`, width `W = maxX − minX`, height `H = maxY − minY`,
+   midpoints `mx = (minX + maxX) / 2`, `my = (minY + maxY) / 2`.
+   - *Vertical split:* child A `[tl, (mx, minY), (mx, maxY), bl]`,
+     child B `[(mx, minY), tr, br, (mx, maxY)]`.
+   - *Horizontal split:* child A `[tl, tr, (maxX, my), (minX, my)]`,
+     child B `[(minX, my), (maxX, my), br, bl]`.
+   - No grid snap on the midpoint.
+
+3. **Direction selection.**
+   - Zone tool double-click → split the longer dimension (`W ≥ H` →
+     vertical; `H > W` → horizontal; equal within 1 mm → vertical).
+   - Select tool context menu → user picks explicitly.
+
+4. **Minimum-size guard.** The bisected dimension of each child must be
+   ≥ 100 mm (ADR-013 Rule 5). If `W / 2 < 100 mm` (vertical) or
+   `H / 2 < 100 mm` (horizontal), the split is rejected with a transient
+   toast *"Zone too small to split (each half must be ≥ 100 mm)."* Nothing
+   mutates.
+
+5. **Inherited fields.** Both children copy every settings field from the
+   parent verbatim: `tubeSpacingMm`, `tubeType`, `flooringMaterialId`,
+   `layoutPattern`, `borderMm`, `zoneType`, `roomId`. Each child receives a
+   fresh UUID `id`.
+
+6. **Circuit ownership.** If `parent.circuitId == null`, both children also
+   have `circuitId == null`. Otherwise:
+   - Look up the parent's `HeatingCircuit`. Find the *zone-end* of its
+     supply/return polyline — the polyline endpoint that lies inside the
+     parent zone polygon (point-in-polygon).
+   - The child whose polygon contains that endpoint inherits the parent's
+     `circuitId`. The circuit's recorded zone reference (`HeatingCircuit`'s
+     zone FK) is updated to that child's id.
+   - The other child has `circuitId = null` and therefore renders as
+     **unconnected** (red-hatched, ADR-004 state 1).
+   - Edge case: if neither child's point-in-polygon contains the endpoint
+     (e.g. float drift), the **first** child (child A in Rule 2 — left for
+     vertical, top for horizontal) keeps the circuit.
+
+7. **Atomic commit / undo.** All mutations for one split — remove parent
+   zone, insert both children, update circuit zone-FK — happen in a single
+   `state.copyWith(...)` and are wrapped in one `_SplitZoneCommand`. The
+   command lives alongside `_CreateZoneCommand` / `_MoveZoneCommand` /
+   `_DeleteZoneCommand` (Frontend agent §7.1).
+   - `execute`: delete parent, insert both children, reassign circuit
+     zone-FK to the inheriting child.
+   - `undo`: delete both children, re-insert the captured parent (same `id`,
+     same fields), restore circuit's zone-FK to the parent.
+   - `redo`: replay `execute` (children captured with their original ids so
+     re-insertion is identical).
+   - Both `ZoneDrawTool` and `SelectTool` push the command via their
+     existing `undoRedo` dependency (already injected per ADR-014). One
+     Ctrl+Z reverts the entire split.
+
+8. **Hover preview (Zone tool only).** When `ZoneDrawTool` is active, its
+   polygon buffer is empty, and the raw cursor world-point lies inside an
+   existing **rectangular** zone, the interaction layer draws a dashed line
+   along the perpendicular bisector of the **longer side** of that zone
+   (the line a double-click would cut along), in `selectionHighlight`
+   colour at 50 % opacity, 2 px stroke, dash 6 / gap 4 (world units scaled
+   for screen). Non-rectangular zones show no preview. The preview is
+   purely visual — it does not affect commit semantics.
+
+9. **Context menu items (Select tool).** A right-click on a heating zone
+   (any zone type) shows *Delete* (existing implicit gesture, now explicit
+   in the menu). For floor zones only, two additional items render below
+   *Delete*: *Split vertically* and *Split horizontally*. Both are
+   **disabled** when the right-clicked zone is non-rectangular, with the
+   tooltip *"Splitting is only available for rectangular zones."*
+   On macOS, `Ctrl+click` produces the same menu (standard Cocoa pattern,
+   already used by ADR-009 wall-handle disconnect).
+
+10. **Tablet equivalence.**
+    - Zone tool double-tap behaves identically to desktop double-click
+      (same disambiguation rule on the polygon buffer).
+    - Select tool long-press (500 ms per UI/UX §8) opens the same context
+      menu as desktop right-click.
+
+11. **No mutation of fill-room semantics.** The existing `Ctrl+Shift+click`
+    fill-room path (ADR-014) is unchanged. Double-click on empty room
+    interior is an **additional** entry point routing through the same
+    `_CreateZoneCommand` and the same fill-room geometry (the room's inner
+    polygon per ADR-017).
+
+**Scope.**
+`ZoneDrawTool` (Rule 1 double-click + Rule 8 hover preview + Rule 11 empty-
+room double-click), `SelectTool` (Rule 1 right-click context menu), and a
+new `_SplitZoneCommand` shared by both tools (Rule 7). Wall zones, non-
+rectangular zones, the polygon-close double-click during active drawing,
+the wall/room rect modes (ADR-009 / ADR-010 / ADR-012), and
+`_CreateZoneCommand` / `_MoveZoneCommand` / `_DeleteZoneCommand` are
+unchanged.
+
+**Verification.**
+`flutter analyze` clean. New tests:
+- `test/widget/tools/zone_draw_tool_test.dart`:
+  - ZDT-7: double-click on rectangular zone (W > H) splits vertically; the
+    two children share an exact midpoint edge; both inherit parent settings.
+  - ZDT-8: double-click on a non-rectangular zone (5+ vertices or non-axis-
+    aligned) emits the splittability toast and mutates nothing.
+  - ZDT-9: double-click on empty room interior creates a zone equivalent to
+    the existing `Ctrl+Shift+click` fill-room path (same polygon, single
+    undo entry).
+  - ZDT-10: hover preview renders dashed bisector on rectangular zones,
+    no preview on non-rectangular zones.
+- `test/widget/tools/select_tool_test.dart`:
+  - ST-S1: right-click on a rectangular zone shows enabled split items.
+  - ST-S2: right-click on a non-rectangular zone shows disabled split items
+    with the explanatory tooltip.
+  - ST-S3: *Split vertically* on a zone with a connected circuit leaves the
+    `circuitId` on whichever child contains the pipe terminus; the other
+    child renders unconnected.
+  - ST-S4: split rejected with toast when either half would be < 100 mm;
+    nothing mutates.
+  - ST-S5: Ctrl+Z after split restores the parent zone with its original
+    `circuitId` and circuit zone-FK.
+
+

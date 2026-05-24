@@ -390,6 +390,14 @@
   "undo_deleteDistributor": "Verteiler löschen",
   "undo_createZone": "Zone erstellen",
   "undo_createWallZone": "Wandzone erstellen",
+  "undo_splitZone": "Heizzone teilen",
+
+  "zoneContextMenu_delete": "Löschen",
+  "zoneContextMenu_splitVertically": "Vertikal teilen",
+  "zoneContextMenu_splitHorizontally": "Horizontal teilen",
+  "zoneContextMenu_splitDisabledTooltip": "Teilen ist nur für rechteckige Zonen verfügbar.",
+  "zone_splitNonRectangularToast": "Teilen ist nur für rechteckige Zonen verfügbar.",
+  "zone_splitTooSmallToast": "Heizzone zu klein zum Teilen (jede Hälfte muss ≥ 100 mm sein).",
 
   "canvas_defaultRoomName": "Raum {roomNumber}",
 

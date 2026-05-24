@@ -1196,6 +1196,30 @@ class AppLocalizationsDe extends AppLocalizations {
   String get undo_createWallZone => 'Wandzone erstellen';
 
   @override
+  String get undo_splitZone => 'Heizzone teilen';
+
+  @override
+  String get zoneContextMenu_delete => 'Löschen';
+
+  @override
+  String get zoneContextMenu_splitVertically => 'Vertikal teilen';
+
+  @override
+  String get zoneContextMenu_splitHorizontally => 'Horizontal teilen';
+
+  @override
+  String get zoneContextMenu_splitDisabledTooltip =>
+      'Teilen ist nur für rechteckige Zonen verfügbar.';
+
+  @override
+  String get zone_splitNonRectangularToast =>
+      'Teilen ist nur für rechteckige Zonen verfügbar.';
+
+  @override
+  String get zone_splitTooSmallToast =>
+      'Heizzone zu klein zum Teilen (jede Hälfte muss ≥ 100 mm sein).';
+
+  @override
   String canvas_defaultRoomName(int roomNumber) {
     return 'Raum $roomNumber';
   }

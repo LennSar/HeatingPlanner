@@ -1193,6 +1193,30 @@ class AppLocalizationsEn extends AppLocalizations {
   String get undo_createWallZone => 'Create wall zone';
 
   @override
+  String get undo_splitZone => 'Split zone';
+
+  @override
+  String get zoneContextMenu_delete => 'Delete';
+
+  @override
+  String get zoneContextMenu_splitVertically => 'Split vertically';
+
+  @override
+  String get zoneContextMenu_splitHorizontally => 'Split horizontally';
+
+  @override
+  String get zoneContextMenu_splitDisabledTooltip =>
+      'Splitting is only available for rectangular zones.';
+
+  @override
+  String get zone_splitNonRectangularToast =>
+      'Splitting is only available for rectangular zones.';
+
+  @override
+  String get zone_splitTooSmallToast =>
+      'Zone too small to split (each half must be ≥ 100 mm).';
+
+  @override
   String canvas_defaultRoomName(int roomNumber) {
     return 'Room $roomNumber';
   }

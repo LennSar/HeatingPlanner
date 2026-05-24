@@ -610,14 +610,34 @@ class UndoRedoService extends StateNotifier<UndoRedoState> {
 
 Zone *creation* is undoable like every other geometry change. All
 floor-zone gestures (`ZoneDrawTool`: polygon close, Ctrl-drag
-rectangle, Ctrl+Shift+click fill-room) and wall-zone placement
-(`WallZonePlaceTool`) route their single shared commit through one
-`_CreateZoneCommand` on `UndoRedoService` — never call
-`EditorCallbacks.commitZone` directly from a creation path.
-`ZoneDrawTool` and `WallZonePlaceTool` take the `undoRedo`
-constructor dependency the other tools already have. `execute` adds
-the zone, `undo` removes it by id, `redo` re-adds the same record.
-One zone = one undo entry. See `DECISIONS.md` ADR-014.
+rectangle, Ctrl+Shift+click fill-room, double-click fill-room per
+ADR-018 Rule 11) and wall-zone placement (`WallZonePlaceTool`)
+route their single shared commit through one `_CreateZoneCommand`
+on `UndoRedoService` — never call `EditorCallbacks.commitZone`
+directly from a creation path. `ZoneDrawTool` and
+`WallZonePlaceTool` take the `undoRedo` constructor dependency the
+other tools already have. `execute` adds the zone, `undo` removes
+it by id, `redo` re-adds the same record. One zone = one undo
+entry. See `DECISIONS.md` ADR-014.
+
+### 7.2 Zone Splitting (ADR-018)
+
+Splitting a rectangular zone — Zone tool double-click and Select
+tool right-click context menu — uses one `_SplitZoneCommand`
+alongside `_CreateZoneCommand` / `_MoveZoneCommand` /
+`_DeleteZoneCommand`. `execute` removes the parent zone, inserts
+the two child zones, and reassigns the parent circuit's zone-FK to
+the child containing the pipe terminus (per ADR-018 Rule 6).
+`undo` deletes the children, re-inserts the captured parent (same
+`id` and fields), and restores the circuit's zone-FK to the
+parent. `redo` replays `execute` with the same captured child ids
+so re-insertion is identical. One split = one undo entry. The
+command is dispatched by both `ZoneDrawTool` (double-click path,
+ADR-018 Rule 1.1) and `SelectTool` (context-menu path, ADR-018
+Rule 1.2); both tools already have `undoRedo` injected via
+ADR-014. See `DECISIONS.md` ADR-018 for the full rules including
+direction selection, minimum-size guard, inherited fields, hover
+preview, and tablet long-press equivalence.
 
 ---
 

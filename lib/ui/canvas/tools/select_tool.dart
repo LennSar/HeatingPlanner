@@ -19,6 +19,7 @@ import '../../../data/models/window_element.dart';
 import '../painters/interaction_data.dart';
 import 'editor_callbacks.dart';
 import 'snap_service.dart';
+import 'split_zone_command.dart';
 import 'tool_base.dart';
 import 'undo_redo_service.dart';
 
@@ -2526,6 +2527,15 @@ class SelectTool extends CanvasTool {
   // ================================================================
 
   void _handleSecondaryClick(Point2D worldPoint) {
+    // ADR-018 Rule 1.2 / Rule 9: zone right-click opens the context
+    // menu (delete + split items). Hit-test directly so the menu fires
+    // whether or not the zone is currently selected.
+    final zone = _zoneAtPoint(worldPoint);
+    if (zone != null) {
+      _openZoneContextMenu(worldPoint, zone);
+      return;
+    }
+
     if (_selectedWall == null) return;
     final handleType = _hitTestHandle(worldPoint);
     if (handleType == null) return;
@@ -2576,6 +2586,101 @@ class SelectTool extends CanvasTool {
     ));
     _selectedWall = updatedWall;
     onStateChanged();
+  }
+
+  // ================================================================
+  // ADR-018 — zone right-click context menu
+  // ================================================================
+
+  /// Returns the smallest-area zone whose polygon contains [point], or
+  /// null. Mirrors the zone hit-test in [_buildHitStack] so right-click
+  /// targets exactly the zone a left-click would have selected.
+  HeatingZone? _zoneAtPoint(Point2D point) {
+    final zones = callbacks.currentZones
+        .where(
+          (z) =>
+              z.polygon.length >= 3 &&
+              GeometryUtils.containsPoint(z.polygon, point),
+        )
+        .toList()
+      ..sort(
+        (a, b) => GeometryUtils.area(a.polygon)
+            .compareTo(GeometryUtils.area(b.polygon)),
+      );
+    return zones.isEmpty ? null : zones.first;
+  }
+
+  /// Builds a [ZoneContextMenuRequest] for [zone] and hands it to the
+  /// canvas widget. Floor zones get split items (disabled with a tooltip
+  /// when the polygon isn't rectangular); wall zones hide split items.
+  void _openZoneContextMenu(Point2D worldPoint, HeatingZone zone) {
+    final isFloor = zone.zoneType == ZoneType.floorHeating;
+    final splitEnabled = isFloor &&
+        SplitZoneCommand.isRectangularZone(zone.polygon);
+    callbacks.requestZoneContextMenu(
+      ZoneContextMenuRequest(
+        worldPoint: worldPoint,
+        showSplitItems: isFloor,
+        splitEnabled: splitEnabled,
+        onDelete: () => _deleteZoneById(zone.id),
+        onSplitVertically: () =>
+            _dispatchSplit(zone.id, SplitDirection.vertical),
+        onSplitHorizontally: () =>
+            _dispatchSplit(zone.id, SplitDirection.horizontal),
+      ),
+    );
+  }
+
+  /// Deletes the zone with [zoneId] via the existing [_DeleteZoneCommand],
+  /// reading the latest state so the captured snapshot is fresh.
+  void _deleteZoneById(String zoneId) {
+    final zone =
+        callbacks.currentZones.where((z) => z.id == zoneId).firstOrNull;
+    if (zone == null) return;
+    undoRedo.execute(_DeleteZoneCommand(
+      zone: zone,
+      remove: callbacks.removeZone,
+      add: callbacks.commitZone,
+      label: callbacks.l10n.undo_deleteZone,
+    ));
+    if (_selectedZone?.id == zoneId) {
+      _selectedZone = null;
+      callbacks.selectElement(null, null);
+    }
+    onStateChanged();
+  }
+
+  /// Dispatches a [SplitZoneCommand] for the zone with [zoneId] along
+  /// [direction], emitting the appropriate toast on rejection
+  /// (ADR-018 Rule 4 / Rule 9).
+  void _dispatchSplit(String zoneId, SplitDirection direction) {
+    final zone =
+        callbacks.currentZones.where((z) => z.id == zoneId).firstOrNull;
+    if (zone == null) return;
+    final result = SplitZoneCommand.tryBuild(
+      parent: zone,
+      direction: direction,
+      circuits: callbacks.currentCircuits,
+      label: callbacks.l10n.undo_splitZone,
+      add: callbacks.commitZone,
+      remove: callbacks.removeZone,
+      updateCircuit: callbacks.updateCircuit,
+    );
+    switch (result) {
+      case SplitBuildOk(:final command):
+        undoRedo.execute(command);
+        if (_selectedZone?.id == zoneId) {
+          _selectedZone = null;
+          callbacks.selectElement(null, null);
+        }
+        onStateChanged();
+      case SplitBuildRejectedTooSmall():
+        callbacks.showToast(callbacks.l10n.zone_splitTooSmallToast);
+      case SplitBuildRejectedNonRectangular():
+        callbacks.showToast(
+          callbacks.l10n.zone_splitNonRectangularToast,
+        );
+    }
   }
 
   // ================================================================

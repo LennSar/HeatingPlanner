@@ -274,6 +274,19 @@ At viewport width < 600dp:
 
 **Validation:** All vertices must be inside the primary room OR inside an adjacent room that shares a door-connected wall with the primary room (see ADR-006 in `DECISIONS.md`). If a vertex is outside all valid rooms, show a red warning overlay and reject that vertex. The primary room is the room where the first vertex was placed.
 
+**Modifier gestures (desktop, Zone tool active):**
+
+| Gesture | Effect |
+|---------|--------|
+| `Shift` / `Ctrl` / `Alt` during drag | Ortho / rect mode / free placement per ADR-013 |
+| `Ctrl+Shift+click` on empty room interior | **Fill room** — create a zone matching the room's inner-clear polygon (ADR-014, ADR-017) |
+| Double-click on empty room interior | **Fill room** — same code path as `Ctrl+Shift+click` (ADR-018) |
+| Double-click on an existing rectangular zone | **Split** the zone along the perpendicular bisector of its longer side (ties → vertical); see ADR-018 |
+| Double-click on an existing non-rectangular zone | Toast *"Splitting is only available for rectangular zones."*; no mutation |
+| Double-click while polygon buffer holds ≥ 1 vertex | Close the in-progress polygon (existing behaviour, step 4 above) — takes precedence over the zone/room-under-cursor actions |
+
+**Hover preview (Zone tool, polygon buffer empty):** When the cursor is over a rectangular zone, a dashed bisector line in `selectionHighlight` (2 px, 50 % opacity, dash 6 / gap 4) is drawn along the longer side — the line a double-click would cut along. Non-rectangular zones show no preview. See ADR-018 Rule 8.
+
 ### 5.4 Distributor Placement
 
 **Trigger:** User selects the Distributor tool.
@@ -313,6 +326,7 @@ At viewport width < 600dp:
 | Click on pipe route | Circuit | Select circuit, show circuit properties |
 | Double-click on wall | Wall | Open wall construction editor (modal) |
 | Double-click on room | Room | Open room name/temp editor inline |
+| Right-click on heating zone | Zone | Open context menu: *Delete*, *Split vertically*, *Split horizontally*. Split items are **disabled** on non-rectangular zones with tooltip *"Splitting is only available for rectangular zones."*; hidden entirely on wall zones. See ADR-018. |
 | Shift+click | Any | Add to selection (multi-select) |
 | Drag on empty space | — | Marquee selection |
 
@@ -833,6 +847,10 @@ thickness changes."*
 | Alt (hold, Wall tool) | Free placement — disable grid snap | Wall tool active |
 | Ctrl (hold, endpoint handle drag) | Rectangle reshape on rectangular rooms (see §5.6.1, ADR-012) | Select tool, endpoint handle drag |
 | Shift (hold, endpoint handle drag) | No effect — documented no-op (see §5.6.1) | Select tool, endpoint handle drag |
+| Ctrl+Shift+click | Fill room with one zone matching its inner polygon (see §5.3, ADR-014) | Zone tool active |
+| Double-click on empty room | Fill room — same path as Ctrl+Shift+click (see §5.3, ADR-018) | Zone tool active |
+| Double-click on existing zone | Split rectangular zone along longer side (see §5.3, ADR-018) | Zone tool active |
+| Right-click on zone | Context menu with Split vertically / Split horizontally (see §5.6, ADR-018) | Select tool active |
 | N | Window place tool | Editor (N for "wiNdow" — W is taken) |
 | D | Door place tool | Editor |
 | H | Heating zone tool | Editor |

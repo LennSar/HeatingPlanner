@@ -143,6 +143,8 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   void requestRoomDialog(List<Point2D> polygon, List<String> wallIds, {void Function(List<WallSegment>, List<Room>)? onCreated}) {}
   @override
+  void requestZoneContextMenu(ZoneContextMenuRequest request) {}
+  @override
   List<Room> get currentRooms => const [];
   @override
   List<WindowElement> get currentWindows => const [];
@@ -265,6 +267,9 @@ class _RoomAwareStubCallbacks implements EditorCallbacks {
     _rooms.add(newRoom);
     onCreated(List.unmodifiable(_walls), List.unmodifiable(_rooms));
   }
+
+  @override
+  void requestZoneContextMenu(ZoneContextMenuRequest request) {}
 
   @override
   void showToast(String message) {}

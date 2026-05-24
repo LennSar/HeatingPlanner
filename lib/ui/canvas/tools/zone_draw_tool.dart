@@ -11,6 +11,7 @@ import 'create_zone_command.dart';
 import 'editor_callbacks.dart';
 import 'modifier_draw_tool.dart';
 import 'snap_service.dart';
+import 'split_zone_command.dart';
 import 'tool_base.dart';
 import 'undo_redo_service.dart';
 
@@ -74,12 +75,28 @@ class ZoneDrawTool extends CanvasTool with ModifierDrawTool {
 
   final List<Point2D> _vertices = [];
   Point2D? _current;
+
+  /// Most recent raw (un-snapped, un-ortho'd) cursor world point. Used
+  /// for the ADR-018 Rule 8 hover preview hit-test, which must operate
+  /// on the literal pointer location.
+  Point2D? _rawCursor;
   bool _hasValidationError = false;
 
   /// True when the cursor is outside all valid placement areas.
   bool _cursorOutsideValidArea = false;
 
   DateTime? _lastTapTime;
+
+  /// World-coordinate position of the most recent tap. A "double-tap" is
+  /// only recognised when the second tap arrives both within the 300 ms
+  /// time window **and** within [_doubleTapDistanceMm] of the prior tap —
+  /// two clicks at distinctly different positions in quick succession
+  /// (e.g. polygon-vertex drawing) must not be treated as a double-tap.
+  Point2D? _lastTapPos;
+
+  /// Max separation between successive taps still treated as a
+  /// double-tap. Roughly the size of a touch target at default zoom.
+  static const double _doubleTapDistanceMm = 200.0;
 
   /// The room where the first vertex was placed (ADR-006).
   Room? _primaryRoom;
@@ -121,12 +138,20 @@ class ZoneDrawTool extends CanvasTool with ModifierDrawTool {
   void onTap(Point2D worldPoint, PointerDeviceKind deviceKind) {
     if (rectMode) return; // rect mode uses drag, not tap
 
-    // Detect double-tap by comparing successive timestamps.
+    // Detect double-tap by both time *and* position proximity. Two taps
+    // at distinctly different positions in quick succession (e.g. fast
+    // polygon-vertex drawing) are NOT a double-tap; only repeated taps
+    // at roughly the same spot are.
     final now = DateTime.now();
-    final isDoubleTap = _lastTapTime != null &&
+    final withinTime = _lastTapTime != null &&
         now.difference(_lastTapTime!) <
             const Duration(milliseconds: 300);
+    final withinDistance = _lastTapPos != null &&
+        GeometryEngine.distanceMm(worldPoint, _lastTapPos!) <=
+            _doubleTapDistanceMm;
+    final isDoubleTap = withinTime && withinDistance;
     _lastTapTime = now;
+    _lastTapPos = worldPoint;
 
     // Clear any previous validation error on new user action.
     _hasValidationError = false;
@@ -138,10 +163,31 @@ class ZoneDrawTool extends CanvasTool with ModifierDrawTool {
       snapped = applyOrtho(_vertices.last, snapped);
     }
 
-    // Double-tap closes when enough committed vertices exist.
-    if (isDoubleTap && _vertices.length >= _minVertices) {
-      _closeZone();
-      return;
+    // Double-tap routing (ADR-018 Rule 1.1 + Rule 11):
+    //
+    // - ≥ 3 committed vertices → close the polygon (unchanged).
+    // - 0 or 1 vertices → the polygon buffer was effectively empty
+    //   when this double-click started (a stray first-tap vertex
+    //   from this same double-click counts as "empty"). Roll back
+    //   that stray vertex and route to the zone-or-room actions:
+    //     • cursor over a rectangular floor zone → split.
+    //     • cursor over a non-rectangular floor zone → toast.
+    //     • cursor over an empty room interior → fill-room
+    //       (same code path as Ctrl+Shift+click, ADR-014).
+    // - exactly 2 vertices → fall through; the next tap will add a
+    //   third vertex and a subsequent double-tap can then close.
+    if (isDoubleTap) {
+      if (_vertices.length >= _minVertices) {
+        _closeZone();
+        return;
+      }
+      if (_vertices.length <= 1) {
+        _vertices.clear();
+        _primaryRoom = null;
+        _hasValidationError = false;
+        _handleEmptyBufferDoubleClick(worldPoint);
+        return;
+      }
     }
 
     // Single-click near the first vertex also closes.
@@ -300,6 +346,7 @@ class ZoneDrawTool extends CanvasTool with ModifierDrawTool {
 
   @override
   void onPointerMove(Point2D worldPoint) {
+    _rawCursor = worldPoint;
     if (rectMode) {
       // Keep the rect ghost fresh; the active drag is driven by
       // onDragUpdate (defensive parity with WallDrawTool).
@@ -336,6 +383,24 @@ class ZoneDrawTool extends CanvasTool with ModifierDrawTool {
         corner2: _rectDragCurrent!,
       );
     }
+
+    // ADR-018 Rule 8: with an empty polygon buffer and the raw cursor
+    // inside an existing rectangular floor zone, preview the bisector
+    // line a double-click would cut along.
+    if (_vertices.isEmpty && _rawCursor != null) {
+      final zone = _rectangularZoneUnder(_rawCursor!);
+      if (zone != null) {
+        final line =
+            SplitZoneCommand.bisectorForDoubleClick(zone.polygon);
+        if (line != null) {
+          return ZoneSplitPreviewData(
+            start: line.start,
+            end: line.end,
+          );
+        }
+      }
+    }
+
     // Show the prohibition indicator even before any vertex is placed,
     // but don't return data when the cursor is inside a valid area and
     // no polygon has started yet (nothing useful to draw).
@@ -463,12 +528,114 @@ class ZoneDrawTool extends CanvasTool with ModifierDrawTool {
   void _reset() {
     _vertices.clear();
     _current = null;
+    _rawCursor = null;
     _hasValidationError = false;
     _cursorOutsideValidArea = false;
     _primaryRoom = null;
     _lastTapTime = null;
+    _lastTapPos = null;
     _rectDragStart = null;
     _rectDragCurrent = null;
     onStateChanged();
+  }
+
+  // ----------------------------------------------------------------
+  // ADR-018: double-click on empty buffer
+  // ----------------------------------------------------------------
+
+  /// Returns the first floor zone whose polygon contains [point] and
+  /// is rectangle-eligible per [SplitZoneCommand.isRectangularZone],
+  /// or null. Used by both the hover preview ([getInteractionData])
+  /// and the double-click routing path.
+  HeatingZone? _rectangularZoneUnder(Point2D point) {
+    for (final z in callbacks.currentZones) {
+      if (z.zoneType != ZoneType.floorHeating) continue;
+      if (z.polygon.length < 3) continue;
+      if (!GeometryEngine.isPointInPolygon(point, z.polygon)) {
+        continue;
+      }
+      if (!SplitZoneCommand.isRectangularZone(z.polygon)) continue;
+      return z;
+    }
+    return null;
+  }
+
+  /// Returns the first floor zone whose polygon contains [point]
+  /// regardless of rectangle eligibility, or null. Used by the
+  /// double-click routing path so we can show the "non-rectangular"
+  /// toast when the user double-clicks a non-rect zone.
+  HeatingZone? _anyZoneUnder(Point2D point) {
+    for (final z in callbacks.currentZones) {
+      if (z.zoneType != ZoneType.floorHeating) continue;
+      if (z.polygon.length < 3) continue;
+      if (GeometryEngine.isPointInPolygon(point, z.polygon)) return z;
+    }
+    return null;
+  }
+
+  /// Routes a buffer-empty double-click per ADR-018 Rule 1.1 + Rule 11.
+  ///
+  /// Uses the raw [worldPoint] (no grid snap) so the hit-test matches
+  /// where the user clicked, not where a vertex would have landed.
+  void _handleEmptyBufferDoubleClick(Point2D worldPoint) {
+    // 1. Zone under cursor.
+    final zone = _anyZoneUnder(worldPoint);
+    if (zone != null) {
+      final direction =
+          SplitZoneCommand.doubleClickDirection(zone.polygon);
+      if (direction == null) {
+        // Non-rectangular zone — Rule 1.1 / Rule 9 toast, no mutation.
+        callbacks.showToast(
+          callbacks.l10n.zone_splitNonRectangularToast,
+        );
+        _reset();
+        return;
+      }
+      _dispatchSplit(zone, direction);
+      _reset();
+      return;
+    }
+
+    // 2. Empty room interior under cursor → fill-room (Rule 11).
+    final room = _findRoomAt(worldPoint);
+    if (room == null) {
+      // Outside any room and any zone — silent no-op.
+      _reset();
+      return;
+    }
+    final alreadyZoned =
+        callbacks.currentZones.any((z) => z.roomId == room.id);
+    if (alreadyZoned) {
+      callbacks.showToast('Room already has a heating zone.');
+      _reset();
+      return;
+    }
+    _commitZone(List<Point2D>.from(room.polygon), room);
+    _reset();
+  }
+
+  /// Dispatches a [SplitZoneCommand] for [zone] in [direction],
+  /// emitting the appropriate toast on rejection (ADR-018 Rule 4).
+  /// Shared with [SelectTool]'s right-click handler.
+  void _dispatchSplit(HeatingZone zone, SplitDirection direction) {
+    final result = SplitZoneCommand.tryBuild(
+      parent: zone,
+      direction: direction,
+      circuits: callbacks.currentCircuits,
+      label: callbacks.l10n.undo_splitZone,
+      add: callbacks.commitZone,
+      remove: callbacks.removeZone,
+      updateCircuit: callbacks.updateCircuit,
+    );
+    switch (result) {
+      case SplitBuildOk(:final command):
+        undoRedo.execute(command);
+      case SplitBuildRejectedTooSmall():
+        callbacks.showToast(callbacks.l10n.zone_splitTooSmallToast);
+      case SplitBuildRejectedNonRectangular():
+        callbacks.showToast(
+          callbacks.l10n.zone_splitNonRectangularToast,
+        );
+    }
   }
 }

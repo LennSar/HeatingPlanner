@@ -202,6 +202,9 @@ class _ProviderCallbacks implements EditorCallbacks {
   }) {}
 
   @override
+  void requestZoneContextMenu(ZoneContextMenuRequest request) {}
+
+  @override
   void showToast(String message) {}
 
   @override

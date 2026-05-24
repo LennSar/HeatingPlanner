@@ -128,6 +128,12 @@ class InteractionPainter extends CustomPainter {
           if (handles.isNotEmpty) {
             _drawWallHandles(canvas, handles, activeHandleIndex);
           }
+        case ZoneSplitPreviewData(:final start, :final end):
+          _drawZoneSplitPreview(
+            canvas,
+            Offset(start.x, start.y),
+            Offset(end.x, end.y),
+          );
         case WallZoneSelectionData(
               :final wallStart,
               :final wallEnd,
@@ -300,6 +306,24 @@ class InteractionPainter extends CustomPainter {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 5.0,
     );
+  }
+
+  /// Draws the ADR-018 Rule 8 hover preview: a dashed bisector line
+  /// in the `selectionHighlight` colour at 50 % opacity, showing where
+  /// a Zone tool double-click would split the underlying rectangular
+  /// zone. The stroke width and dash pattern are world-space — the
+  /// parent transform scales them along with the rest of the canvas.
+  void _drawZoneSplitPreview(Canvas canvas, Offset start, Offset end) {
+    final color = (selectionHighlightColor ?? Colors.blue)
+        .withValues(alpha: 0.5);
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = 20.0 // ~2 px at the default 0.1×–1× zoom range
+      ..style = PaintingStyle.stroke;
+    // Dash pattern: short on / off, world-space (Rule 8: dash 6 / gap 4
+    // scaled for screen — we use 60 / 40 world mm which reads as
+    // comparable at typical zoom levels).
+    _drawDashedLine(canvas, start, end, paint, 60.0);
   }
 
   /// Draws a red prohibition circle (⊘) at [point] to signal that

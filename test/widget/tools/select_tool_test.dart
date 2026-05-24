@@ -110,13 +110,27 @@ class _StubCallbacks implements EditorCallbacks {
   }
 
   @override
-  void showToast(String message) {}
+  void showToast(String message) => _toasts.add(message);
   @override
   void replaceAllWalls(List<WallSegment> walls) {
     _walls
       ..clear()
       ..addAll(walls);
   }
+
+  /// Last context-menu request received via [requestZoneContextMenu].
+  /// ADR-018 ST-S1 / ST-S2 / ST-S3 / ST-S4 / ST-S5 inspect this to verify
+  /// menu state and to drive the user-selected callbacks.
+  ZoneContextMenuRequest? lastContextMenuRequest;
+
+  @override
+  void requestZoneContextMenu(ZoneContextMenuRequest request) {
+    lastContextMenuRequest = request;
+  }
+
+  // Toast collector (ADR-018 ST-S4 verifies the too-small toast fires).
+  final List<String> _toasts = [];
+  List<String> get toasts => List.unmodifiable(_toasts);
 
   // ---- Unused stubs ----
   @override
@@ -188,7 +202,10 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   void commitCircuit(HeatingCircuit circuit) => _circuits.add(circuit);
   @override
-  void updateCircuit(HeatingCircuit circuit) {}
+  void updateCircuit(HeatingCircuit circuit) {
+    final i = _circuits.indexWhere((c) => c.id == circuit.id);
+    if (i >= 0) _circuits[i] = circuit;
+  }
   @override
   void clearAllCircuits() => _circuits.clear();
   @override
@@ -967,6 +984,255 @@ void main() {
     });
   });
 
+  // ────────────────────────────────────────────────────────────────────────────
+  // ADR-018 — Split zone via right-click context menu
+  // ────────────────────────────────────────────────────────────────────────────
+
+  group('ADR-018 SelectTool zone context menu', () {
+    // 8 m × 6 m parent room so the zones below sit comfortably inside.
+    const roomPolygon = [
+      Point2D(x: 0, y: 0),
+      Point2D(x: 8000, y: 0),
+      Point2D(x: 8000, y: 6000),
+      Point2D(x: 0, y: 6000),
+    ];
+    const parentRoom = Room(
+      id: 'room-1',
+      floorId: 'floor-1',
+      name: 'Test Room',
+      targetTempC: 20.0,
+      polygon: roomPolygon,
+    );
+
+    // ST-S1 ────────────────────────────────────────────────────────────────
+
+    test(
+      'ST-S1: right-click on a rectangular zone shows enabled split items',
+      () {
+        // Rectangular zone 4000 × 2000.
+        const rectZone = HeatingZone(
+          id: 'zone-rect',
+          roomId: 'room-1',
+          polygon: [
+            Point2D(x: 1000, y: 1000),
+            Point2D(x: 5000, y: 1000),
+            Point2D(x: 5000, y: 3000),
+            Point2D(x: 1000, y: 3000),
+          ],
+          tubeTypeId: 'tube-1',
+          flooringMaterialId: 'mat-1',
+        );
+        final cb = _StubCallbacks(
+          rooms: const [parentRoom],
+          zones: [rectZone],
+        );
+        final tool = _makeTool(cb);
+
+        tool.onSecondaryTap(const Point2D(x: 3000, y: 2000));
+
+        final req = cb.lastContextMenuRequest;
+        expect(req, isNotNull,
+            reason: 'right-click on a zone must request the menu');
+        expect(req!.showSplitItems, isTrue,
+            reason: 'floor zones expose the split items');
+        expect(req.splitEnabled, isTrue,
+            reason: 'rectangular zones enable the split items');
+      },
+    );
+
+    // ST-S2 ────────────────────────────────────────────────────────────────
+
+    test(
+      'ST-S2: right-click on a non-rectangular zone shows disabled split items',
+      () {
+        // 5-vertex pentagon — non-rect.
+        const pentagonZone = HeatingZone(
+          id: 'zone-penta',
+          roomId: 'room-1',
+          polygon: [
+            Point2D(x: 1000, y: 1000),
+            Point2D(x: 4000, y: 1000),
+            Point2D(x: 5000, y: 2000),
+            Point2D(x: 4000, y: 3000),
+            Point2D(x: 1000, y: 3000),
+          ],
+          tubeTypeId: 'tube-1',
+          flooringMaterialId: 'mat-1',
+        );
+        final cb = _StubCallbacks(
+          rooms: const [parentRoom],
+          zones: [pentagonZone],
+        );
+        final tool = _makeTool(cb);
+
+        tool.onSecondaryTap(const Point2D(x: 2500, y: 2000));
+
+        final req = cb.lastContextMenuRequest;
+        expect(req, isNotNull);
+        expect(req!.showSplitItems, isTrue,
+            reason: 'floor zones still expose the items, just disabled');
+        expect(req.splitEnabled, isFalse,
+            reason: 'non-rectangular zones disable the split items');
+      },
+    );
+
+    // ST-S3 ────────────────────────────────────────────────────────────────
+
+    test(
+      'ST-S3: split vertically on a zone with a connected circuit assigns the '
+      'circuitId to whichever child contains the pipe terminus',
+      () {
+        // 4000 × 2000 rectangle with a connected circuit whose supply
+        // ends at (4500, 2000) — inside the RIGHT half (child B).
+        const rectZone = HeatingZone(
+          id: 'zone-rect',
+          roomId: 'room-1',
+          polygon: [
+            Point2D(x: 1000, y: 1000),
+            Point2D(x: 5000, y: 1000),
+            Point2D(x: 5000, y: 3000),
+            Point2D(x: 1000, y: 3000),
+          ],
+          tubeTypeId: 'tube-1',
+          flooringMaterialId: 'mat-1',
+          circuitId: 'circuit-1',
+        );
+        const circuit = HeatingCircuit(
+          id: 'circuit-1',
+          distributorId: 'dist-1',
+          heatingZoneId: 'zone-rect',
+          supplyRoutePath: [
+            Point2D(x: 0, y: 2000),
+            Point2D(x: 4500, y: 2000),
+          ],
+        );
+        final cb = _StubCallbacks(
+          rooms: const [parentRoom],
+          zones: [rectZone],
+          circuits: const [circuit],
+        );
+        final tool = _makeTool(cb);
+
+        tool.onSecondaryTap(const Point2D(x: 3000, y: 2000));
+        final req = cb.lastContextMenuRequest!;
+
+        // Invoke the menu item directly.
+        req.onSplitVertically();
+
+        // Parent removed, two children present.
+        expect(cb.currentZones, hasLength(2));
+        // Right half (x ∈ [3000, 5000]) should carry the circuit.
+        final right = cb.currentZones.firstWhere(
+          (z) => z.polygon.any((p) => p.x == 5000),
+        );
+        final left = cb.currentZones.firstWhere((z) => z.id != right.id);
+        expect(right.circuitId, 'circuit-1',
+            reason: 'child containing the pipe terminus inherits the circuit');
+        expect(left.circuitId, isNull,
+            reason: 'the other child renders as unconnected');
+
+        // Circuit's zone-FK now points at the inheriting child.
+        expect(cb.currentCircuits.single.heatingZoneId, right.id);
+      },
+    );
+
+    // ST-S4 ────────────────────────────────────────────────────────────────
+
+    test(
+      'ST-S4: split rejected with toast when either half would be < 100 mm',
+      () {
+        // 150 mm × 1000 mm rectangle — vertical split would give 75 mm
+        // halves, below the 100 mm minimum.
+        const tinyZone = HeatingZone(
+          id: 'zone-tiny',
+          roomId: 'room-1',
+          polygon: [
+            Point2D(x: 1000, y: 1000),
+            Point2D(x: 1150, y: 1000),
+            Point2D(x: 1150, y: 2000),
+            Point2D(x: 1000, y: 2000),
+          ],
+          tubeTypeId: 'tube-1',
+          flooringMaterialId: 'mat-1',
+        );
+        final cb = _StubCallbacks(
+          rooms: const [parentRoom],
+          zones: [tinyZone],
+        );
+        final tool = _makeTool(cb);
+
+        tool.onSecondaryTap(const Point2D(x: 1050, y: 1500));
+        cb.lastContextMenuRequest!.onSplitVertically();
+
+        // Zone list unchanged.
+        expect(cb.currentZones, hasLength(1));
+        expect(cb.currentZones.single.id, tinyZone.id);
+        // Toast fired.
+        expect(cb.toasts, contains(cb.l10n.zone_splitTooSmallToast));
+      },
+    );
+
+    // ST-S5 ────────────────────────────────────────────────────────────────
+
+    test(
+      'ST-S5: Ctrl+Z after split restores the parent zone with its original '
+      'circuitId and the circuit zone-FK',
+      () {
+        const rectZone = HeatingZone(
+          id: 'zone-rect',
+          roomId: 'room-1',
+          polygon: [
+            Point2D(x: 1000, y: 1000),
+            Point2D(x: 5000, y: 1000),
+            Point2D(x: 5000, y: 3000),
+            Point2D(x: 1000, y: 3000),
+          ],
+          tubeTypeId: 'tube-1',
+          flooringMaterialId: 'mat-1',
+          circuitId: 'circuit-1',
+        );
+        const circuit = HeatingCircuit(
+          id: 'circuit-1',
+          distributorId: 'dist-1',
+          heatingZoneId: 'zone-rect',
+          supplyRoutePath: [
+            Point2D(x: 0, y: 2000),
+            Point2D(x: 4500, y: 2000),
+          ],
+        );
+        final cb = _StubCallbacks(
+          rooms: const [parentRoom],
+          zones: [rectZone],
+          circuits: const [circuit],
+        );
+        final undoRedo = UndoRedoService();
+        final tool = SelectTool(
+          callbacks: cb,
+          onStateChanged: () {},
+          undoRedo: undoRedo,
+        );
+
+        tool.onSecondaryTap(const Point2D(x: 3000, y: 2000));
+        cb.lastContextMenuRequest!.onSplitVertically();
+
+        // Sanity: split happened.
+        expect(cb.currentZones, hasLength(2));
+        expect(cb.currentCircuits.single.heatingZoneId, isNot('zone-rect'));
+
+        // Undo.
+        expect(undoRedo.canUndo, isTrue);
+        undoRedo.undo();
+
+        expect(cb.currentZones, hasLength(1));
+        expect(cb.currentZones.single.id, 'zone-rect');
+        expect(cb.currentZones.single.circuitId, 'circuit-1',
+            reason: 'parent restored with its original circuitId');
+        expect(cb.currentCircuits.single.heatingZoneId, 'zone-rect',
+            reason: 'circuit zone-FK restored to the parent');
+      },
+    );
+  });
+
   // ── Mirror-sync test (real EditorStateNotifier) ───────────────────────────
 
   group('ADR-012 shared-wall mirror sync (real provider)', () {
@@ -1285,6 +1551,8 @@ class _ReshapeStubCallbacks implements EditorCallbacks {
     void Function(List<WallSegment>, List<Room>)? onCreated,
   }) {}
   @override
+  void requestZoneContextMenu(ZoneContextMenuRequest request) {}
+  @override
   List<WindowElement> get currentWindows => const [];
   @override
   List<Door> get currentDoors => const [];
@@ -1424,6 +1692,8 @@ class _ProviderBridgeCallbacks implements EditorCallbacks {
     List<String> wallIds, {
     void Function(List<WallSegment>, List<Room>)? onCreated,
   }) {}
+  @override
+  void requestZoneContextMenu(ZoneContextMenuRequest request) {}
   @override
   List<WindowElement> get currentWindows => const [];
   @override

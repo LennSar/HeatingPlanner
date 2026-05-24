@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import '../../../data/models/distributor.dart';
 import '../../../data/models/door.dart';
 import '../../../data/models/heating_circuit.dart';
@@ -7,6 +9,51 @@ import '../../../data/models/room.dart';
 import '../../../data/models/wall_segment.dart';
 import '../../../data/models/window_element.dart';
 import '../../../l10n/app_localizations.dart';
+
+/// Request envelope for [EditorCallbacks.requestZoneContextMenu]
+/// (ADR-018 Rule 1.2 / Rule 9).
+///
+/// Tools build this and hand it to the canvas widget; the canvas owns
+/// the Flutter `showMenu` call and invokes the callbacks the user
+/// selects. Split items are hidden for wall zones ([showSplitItems] is
+/// false) and disabled with a tooltip on non-rectangular floor zones
+/// ([splitEnabled] is false).
+@immutable
+class ZoneContextMenuRequest {
+  /// Creates a [ZoneContextMenuRequest].
+  const ZoneContextMenuRequest({
+    required this.worldPoint,
+    required this.onDelete,
+    required this.onSplitVertically,
+    required this.onSplitHorizontally,
+    required this.showSplitItems,
+    required this.splitEnabled,
+  });
+
+  /// World-coordinate position where the gesture originated. The canvas
+  /// converts this to a screen position to anchor the menu.
+  final Point2D worldPoint;
+
+  /// Invoked when the user picks *Delete*.
+  final void Function() onDelete;
+
+  /// Invoked when the user picks *Split vertically* (rectangular floor
+  /// zones only — ignored when [splitEnabled] is false).
+  final void Function() onSplitVertically;
+
+  /// Invoked when the user picks *Split horizontally* (rectangular floor
+  /// zones only — ignored when [splitEnabled] is false).
+  final void Function() onSplitHorizontally;
+
+  /// True for floor zones; false for wall zones (ADR-018 Rule 9 —
+  /// wall-zone right-click hides the split items entirely).
+  final bool showSplitItems;
+
+  /// True when the right-clicked zone is rectangle-eligible per
+  /// `SelectTool.rectangleZoneCorners` (ADR-013 Rule 7). When false,
+  /// the split items render disabled with the explanatory tooltip.
+  final bool splitEnabled;
+}
 
 /// Callback interface that canvas tools use to mutate
 /// editor state. Implemented by the canvas widget which
@@ -195,6 +242,18 @@ abstract class EditorCallbacks {
 
   /// Show a transient toast message.
   void showToast(String message);
+
+  /// Open the heating-zone right-click context menu at [worldPoint]
+  /// (ADR-018 Rule 1.2 / Rule 9).
+  ///
+  /// The canvas widget is responsible for converting [worldPoint] to a
+  /// screen position and rendering the menu (typically via `showMenu`).
+  /// Item callbacks fire when the user picks an item; the menu closes
+  /// automatically with no callback when the user dismisses it.
+  ///
+  /// Tools (currently [SelectTool]) dispatch this for both the desktop
+  /// secondary-click path and the tablet 500 ms long-press path.
+  void requestZoneContextMenu(ZoneContextMenuRequest request);
 
   // ---- Read-only access ----
 

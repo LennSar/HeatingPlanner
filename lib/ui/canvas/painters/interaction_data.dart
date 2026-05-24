@@ -206,6 +206,30 @@ class ZoneDrawData extends InteractionData {
   final bool cursorOutsideValidArea;
 }
 
+/// Hover preview of the perpendicular bisector that a Zone tool
+/// double-click would cut along (ADR-018 Rule 8).
+///
+/// Emitted by [ZoneDrawTool] while the in-progress polygon buffer
+/// is empty *and* the raw cursor lies inside an existing rectangular
+/// floor zone. [InteractionPainter] renders [start] → [end] as a
+/// dashed line in `selectionHighlight` at 50 % opacity. Non-
+/// rectangular zones produce no preview; the preview disappears as
+/// soon as the first polygon vertex is committed.
+@immutable
+class ZoneSplitPreviewData extends InteractionData {
+  /// Creates [ZoneSplitPreviewData].
+  const ZoneSplitPreviewData({
+    required this.start,
+    required this.end,
+  });
+
+  /// Start of the bisector line in world mm.
+  final Point2D start;
+
+  /// End of the bisector line in world mm.
+  final Point2D end;
+}
+
 /// Highlight data for a selected heating zone.
 ///
 /// Produced by [SelectTool] when a heating zone is selected.
