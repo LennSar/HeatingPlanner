@@ -609,7 +609,10 @@ class _ProjectSettingsDialogState
                     const Divider(),
                     const SizedBox(height: Spacing.md),
 
-                    // ── ADR-017: default wall thicknesses ─────
+                    // ── ADR-017 / ADR-020: default wall thickness +
+                    // material per wall type, interleaved so each
+                    // thickness sits next to its matching material
+                    // dropdown.
                     Text(
                       l10n.defaultWallThicknesses,
                       style: textTheme.headlineSmall,
@@ -621,7 +624,16 @@ class _ProjectSettingsDialogState
                         color: colorScheme.onSurfaceVariant,
                       ),
                     ),
+                    const SizedBox(height: Spacing.xs),
+                    Text(
+                      l10n.defaultWallMaterialsDesc,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
                     const SizedBox(height: Spacing.sm),
+
+                    // Exterior
                     Text(
                       l10n.wallTypeExterior,
                       style: textTheme.bodyMedium,
@@ -633,7 +645,16 @@ class _ProjectSettingsDialogState
                       onFieldSubmitted: (raw) =>
                           _applyWallDefault(WallType.exterior, raw),
                     ),
-                    const SizedBox(height: Spacing.sm),
+                    const SizedBox(height: Spacing.xs),
+                    _MaterialDefaultRow(
+                      label: l10n.defaultExteriorMaterial,
+                      value: settings.defaultExteriorMaterialId,
+                      onChanged: (v) =>
+                          _applyMaterialDefault(WallType.exterior, v),
+                    ),
+                    const SizedBox(height: Spacing.md),
+
+                    // Interior (shared)
                     Text(
                       l10n.wallTypeInteriorShared,
                       style: textTheme.bodyMedium,
@@ -645,7 +666,16 @@ class _ProjectSettingsDialogState
                       onFieldSubmitted: (raw) =>
                           _applyWallDefault(WallType.interior, raw),
                     ),
-                    const SizedBox(height: Spacing.sm),
+                    const SizedBox(height: Spacing.xs),
+                    _MaterialDefaultRow(
+                      label: l10n.defaultInteriorMaterial,
+                      value: settings.defaultInteriorMaterialId,
+                      onChanged: (v) =>
+                          _applyMaterialDefault(WallType.interior, v),
+                    ),
+                    const SizedBox(height: Spacing.md),
+
+                    // Partition
                     Text(
                       l10n.wallTypePartition,
                       style: textTheme.bodyMedium,
@@ -657,38 +687,7 @@ class _ProjectSettingsDialogState
                       onFieldSubmitted: (raw) =>
                           _applyWallDefault(WallType.partition, raw),
                     ),
-
-                    const SizedBox(height: Spacing.lg),
-                    const Divider(),
-                    const SizedBox(height: Spacing.md),
-
-                    // ── ADR-020: default wall materials ───────
-                    Text(
-                      l10n.defaultWallMaterials,
-                      style: textTheme.headlineSmall,
-                    ),
                     const SizedBox(height: Spacing.xs),
-                    Text(
-                      l10n.defaultWallMaterialsDesc,
-                      style: textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: Spacing.sm),
-                    _MaterialDefaultRow(
-                      label: l10n.defaultExteriorMaterial,
-                      value: settings.defaultExteriorMaterialId,
-                      onChanged: (v) =>
-                          _applyMaterialDefault(WallType.exterior, v),
-                    ),
-                    const SizedBox(height: Spacing.sm),
-                    _MaterialDefaultRow(
-                      label: l10n.defaultInteriorMaterial,
-                      value: settings.defaultInteriorMaterialId,
-                      onChanged: (v) =>
-                          _applyMaterialDefault(WallType.interior, v),
-                    ),
-                    const SizedBox(height: Spacing.sm),
                     _MaterialDefaultRow(
                       label: l10n.defaultPartitionMaterial,
                       value: settings.defaultPartitionMaterialId,
