@@ -65,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 16;
+  int get schemaVersion => 17;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -74,14 +74,13 @@ class AppDatabase extends _$AppDatabase {
           await heatingDao.seedDefaults();
         },
         onUpgrade: (m, from, to) async {
-          // ADR-017 (schema v16): WallSegment gains `thicknessMm` and
-          // `anchorMode`; Project gains three default wall-thickness
-          // columns. Per ADR-017 Rule 11 this is a dev-stage change with
-          // no backwards-compatibility migration — the database is
-          // dropped and recreated from scratch. Older per-version step
-          // migrations (v2…v15) have been removed because they are
-          // unreachable behind this wipe.
-          if (from < 16) {
+          // ADR-017 (v16) introduced the dev-stage drop-and-recreate
+          // strategy; ADR-020 (v17) adds three material-default columns
+          // on `projects` and an `is_auto_default` flag on
+          // `wall_constructions`. Same dev-stage convention — wipe and
+          // recreate. Project files (.hsp) re-import normally after
+          // re-seeding because the new columns have safe defaults.
+          if (from < 17) {
             await m.database.customStatement('PRAGMA foreign_keys = OFF');
             for (final table in allTables.toList().reversed) {
               await m.database.customStatement(

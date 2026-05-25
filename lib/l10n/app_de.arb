@@ -407,5 +407,12 @@
   "wallTypeInteriorShared": "Innenwand (geteilt)",
   "wallTypePartition": "Trennwand",
   "wallThicknessRangeCm": "5–100 cm",
-  "wallThicknessInvalidToast": "Wanddicke muss zwischen 5 und 100 cm liegen"
+  "wallThicknessInvalidToast": "Wanddicke muss zwischen 5 und 100 cm liegen",
+
+  "defaultWallMaterials": "Standardmaterialien für Wände",
+  "defaultWallMaterialsDesc": "Änderungen hier aktualisieren Wände, die du noch nicht individuell angepasst hast.",
+  "defaultExteriorMaterial": "Außenwand-Standardmaterial",
+  "defaultInteriorMaterial": "Innenwand-Standardmaterial",
+  "defaultPartitionMaterial": "Trennwand-Standardmaterial",
+  "layerStackRequiresOneLayer": "Ein Aufbau muss mindestens eine Schicht enthalten."
 }

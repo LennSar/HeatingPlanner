@@ -82,6 +82,16 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   void destroyRoom(String roomId) {}
   @override
+  void destroyRoomCascade(String roomId) {}
+  @override
+  void replaceAllForRoomCascade(
+    List<WallSegment> walls,
+    List<Room> rooms,
+    List<HeatingZone> zones,
+    List<WindowElement> windows,
+    List<Door> doors,
+  ) {}
+  @override
   void restoreRoom(Room room, List<String> wallIds) {}
   @override
   void updateRoom(Room room) {}
@@ -99,6 +109,7 @@ class _StubCallbacks implements EditorCallbacks {
   void addRoomFromDetection({
     required Room room,
     required List<String> wallIds,
+    Map<String, WallSegment>? movedSideProperties,
   }) {}
   @override
   void commitWindow(WindowElement window) {}

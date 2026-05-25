@@ -1030,5 +1030,18 @@
   "wallThicknessRangeCm": "5–100 cm",
   "@wallThicknessRangeCm": { "description": "Range hint next to each default wall thickness input" },
   "wallThicknessInvalidToast": "Wall thickness must be 5–100 cm",
-  "@wallThicknessInvalidToast": { "description": "Toast shown when the user enters an out-of-range default wall thickness" }
+  "@wallThicknessInvalidToast": { "description": "Toast shown when the user enters an out-of-range default wall thickness" },
+
+  "defaultWallMaterials": "Default wall materials",
+  "@defaultWallMaterials": { "description": "ADR-020 heading for the three default-material dropdowns on the project settings dialog" },
+  "defaultWallMaterialsDesc": "Changes here update walls you have not customised individually.",
+  "@defaultWallMaterialsDesc": { "description": "Subtitle on the project settings explaining the ADR-020 auto-default cascade behaviour" },
+  "defaultExteriorMaterial": "Default exterior material",
+  "@defaultExteriorMaterial": { "description": "Label for the exterior material dropdown in project settings" },
+  "defaultInteriorMaterial": "Default interior material",
+  "@defaultInteriorMaterial": { "description": "Label for the interior material dropdown in project settings" },
+  "defaultPartitionMaterial": "Default partition material",
+  "@defaultPartitionMaterial": { "description": "Label for the partition material dropdown in project settings" },
+  "layerStackRequiresOneLayer": "A construction must have at least one layer.",
+  "@layerStackRequiresOneLayer": { "description": "Toast shown when the user tries to remove the final layer from a construction (ADR-020 Rule 5)" }
 }

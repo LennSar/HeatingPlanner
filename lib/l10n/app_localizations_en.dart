@@ -1242,4 +1242,24 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get wallThicknessInvalidToast => 'Wall thickness must be 5–100 cm';
+
+  @override
+  String get defaultWallMaterials => 'Default wall materials';
+
+  @override
+  String get defaultWallMaterialsDesc =>
+      'Changes here update walls you have not customised individually.';
+
+  @override
+  String get defaultExteriorMaterial => 'Default exterior material';
+
+  @override
+  String get defaultInteriorMaterial => 'Default interior material';
+
+  @override
+  String get defaultPartitionMaterial => 'Default partition material';
+
+  @override
+  String get layerStackRequiresOneLayer =>
+      'A construction must have at least one layer.';
 }

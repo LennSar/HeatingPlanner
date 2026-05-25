@@ -2716,14 +2716,38 @@ class SelectTool extends CanvasTool {
 
   void _deleteSelectedRoom() {
     final room = _selectedRoom!;
-    final wallIds = callbacks.currentWalls
-        .where((w) => w.roomId == room.id)
-        .map((w) => w.id)
-        .toList();
+
+    // ADR-019: snapshot pre-delete tuple (walls + rooms + zones +
+    // windows + doors) so one Ctrl+Z restores the whole cascade,
+    // including any reverted mirror partners.
+    final oldWalls = List<WallSegment>.unmodifiable(callbacks.currentWalls);
+    final oldRooms = List<Room>.unmodifiable(callbacks.currentRooms);
+    final oldZones = List<HeatingZone>.unmodifiable(callbacks.currentZones);
+    final oldWindows =
+        List<WindowElement>.unmodifiable(callbacks.currentWindows);
+    final oldDoors = List<Door>.unmodifiable(callbacks.currentDoors);
+
+    callbacks.destroyRoomCascade(room.id);
+
+    final newWalls = List<WallSegment>.unmodifiable(callbacks.currentWalls);
+    final newRooms = List<Room>.unmodifiable(callbacks.currentRooms);
+    final newZones = List<HeatingZone>.unmodifiable(callbacks.currentZones);
+    final newWindows =
+        List<WindowElement>.unmodifiable(callbacks.currentWindows);
+    final newDoors = List<Door>.unmodifiable(callbacks.currentDoors);
+
     undoRedo.execute(_DeleteRoomCommand(
       callbacks: callbacks,
-      room: room,
-      wallIds: wallIds,
+      oldWalls: oldWalls,
+      oldRooms: oldRooms,
+      oldZones: oldZones,
+      oldWindows: oldWindows,
+      oldDoors: oldDoors,
+      newWalls: newWalls,
+      newRooms: newRooms,
+      newZones: newZones,
+      newWindows: newWindows,
+      newDoors: newDoors,
       label: callbacks.l10n.undo_deleteRoom,
     ));
     _selectedRoom = null;
@@ -3113,7 +3137,21 @@ class SelectTool extends CanvasTool {
     // `commitWallWithSplit` (ADR-003 host split when an endpoint lands
     // mid-wall). The collected `roomWallIds` are passed to
     // `addRoomFromDetection` in step (5).
+    //
+    // ADR-017: when the fresh path is taken, the original wall's
+    // [wallType], [thicknessMm], [anchorMode], and [constructionId] are
+    // carried over so the recreated wall is the same physical wall the
+    // user configured pre-move. Previously-shared walls (`mirrorId !=
+    // null`) revert to [WallType.exterior] per ADR-016 Rule 3; the
+    // forced-centerline anchor of the shared pair is reset so
+    // `commitWallWithSplit`'s Rule 2 default upgrade kicks in.
+    //
+    // For matched edges (shared-wall promotion), the moved-side wall's
+    // pre-move properties are threaded through to `addRoomFromDetection`
+    // via `movedSideProperties` so its Rule 8 resolver can see both
+    // sides of the merge (ADR-017 Rule 8 cases a–d).
     final wallIdsForRoom = <String>[];
+    final movedSideProps = <String, WallSegment>{};
     for (final w in _roomMoveWallsAtStart) {
       final a = Point2D(x: w.startPoint.x + delta.x, y: w.startPoint.y + delta.y);
       final b = Point2D(x: w.endPoint.x + delta.x, y: w.endPoint.y + delta.y);
@@ -3124,13 +3162,18 @@ class SelectTool extends CanvasTool {
       );
       if (match != null) {
         wallIdsForRoom.add(match.id);
+        movedSideProps[match.id] = w;
         continue;
       }
+      final wasShared = w.mirrorId != null;
       final fresh = WallSegment(
         id: IdGenerator.newId(),
         roomId: '',
         startPoint: a,
         endPoint: b,
+        wallType: wasShared ? WallType.exterior : w.wallType,
+        thicknessMm: w.thicknessMm,
+        anchorMode: wasShared ? WallAnchorMode.centerline : w.anchorMode,
         constructionId: w.constructionId,
       );
       callbacks.commitWallWithSplit(fresh);
@@ -3147,6 +3190,7 @@ class SelectTool extends CanvasTool {
     callbacks.addRoomFromDetection(
       room: room.copyWith(polygon: translatedPolygon),
       wallIds: wallIdsForRoom,
+      movedSideProperties: movedSideProps,
     );
 
     // (6) Translate the room's zones by the same delta. roomId stays
@@ -3675,27 +3719,63 @@ class _DeleteWallCommand extends Command {
   }
 }
 
-/// Command: delete a room (walls preserved, roomId cleared).
+/// Command: ADR-019 cascade delete of a room.
+///
+/// Snapshots the full pre- and post-delete tuples (walls + rooms +
+/// zones + windows + doors) so one Ctrl+Z restores the room, every
+/// cascaded child, and every reverted mirror partner in a single
+/// atomic state update. Mirrors the `_MoveRoomCommand` /
+/// `_RectDrawCommand` snapshot pattern — DAO writes are issued during
+/// the initial `destroyRoomCascade` call and are not re-applied on
+/// undo (the in-memory state is authoritative).
 class _DeleteRoomCommand extends Command {
   _DeleteRoomCommand({
     required this.callbacks,
-    required this.room,
-    required this.wallIds,
+    required this.oldWalls,
+    required this.oldRooms,
+    required this.oldZones,
+    required this.oldWindows,
+    required this.oldDoors,
+    required this.newWalls,
+    required this.newRooms,
+    required this.newZones,
+    required this.newWindows,
+    required this.newDoors,
     required this.label,
   });
 
   final EditorCallbacks callbacks;
-  final Room room;
-  final List<String> wallIds;
+  final List<WallSegment> oldWalls;
+  final List<Room> oldRooms;
+  final List<HeatingZone> oldZones;
+  final List<WindowElement> oldWindows;
+  final List<Door> oldDoors;
+  final List<WallSegment> newWalls;
+  final List<Room> newRooms;
+  final List<HeatingZone> newZones;
+  final List<WindowElement> newWindows;
+  final List<Door> newDoors;
 
   @override
   final String label;
 
   @override
-  void execute() => callbacks.destroyRoom(room.id);
+  void execute() => callbacks.replaceAllForRoomCascade(
+        newWalls,
+        newRooms,
+        newZones,
+        newWindows,
+        newDoors,
+      );
 
   @override
-  void undo() => callbacks.restoreRoom(room, wallIds);
+  void undo() => callbacks.replaceAllForRoomCascade(
+        oldWalls,
+        oldRooms,
+        oldZones,
+        oldWindows,
+        oldDoors,
+      );
 }
 
 /// Command: move or resize a window element.

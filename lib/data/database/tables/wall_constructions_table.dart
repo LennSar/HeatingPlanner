@@ -12,6 +12,12 @@ class WallConstructions extends Table {
   IntColumn get isPreset =>
       integer().withDefault(const Constant(0))();
 
+  /// ADR-020 Rule 2: 1 = auto-default (created by wall-creation paths,
+  /// single project-default layer), 0 = explicitly edited. Mutually
+  /// exclusive with [isPreset].
+  IntColumn get isAutoDefault =>
+      integer().withDefault(const Constant(0))();
+
   @override
   Set<Column> get primaryKey => {id};
 }

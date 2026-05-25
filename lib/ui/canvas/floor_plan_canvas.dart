@@ -305,6 +305,28 @@ class _FloorPlanCanvasState
   }
 
   @override
+  void destroyRoomCascade(String roomId) {
+    ref.read(editorStateProvider.notifier).destroyRoomCascade(roomId);
+  }
+
+  @override
+  void replaceAllForRoomCascade(
+    List<WallSegment> walls,
+    List<Room> rooms,
+    List<HeatingZone> zones,
+    List<WindowElement> windows,
+    List<Door> doors,
+  ) {
+    ref.read(editorStateProvider.notifier).replaceAllForRoomCascade(
+          walls,
+          rooms,
+          zones,
+          windows,
+          doors,
+        );
+  }
+
+  @override
   void restoreRoom(Room room, List<String> wallIds) {
     final notifier = ref.read(editorStateProvider.notifier);
     notifier.addRoom(room);
@@ -348,10 +370,13 @@ class _FloorPlanCanvasState
   void addRoomFromDetection({
     required Room room,
     required List<String> wallIds,
+    Map<String, WallSegment>? movedSideProperties,
   }) {
-    ref
-        .read(editorStateProvider.notifier)
-        .addRoomFromDetection(room: room, wallIds: wallIds);
+    ref.read(editorStateProvider.notifier).addRoomFromDetection(
+          room: room,
+          wallIds: wallIds,
+          movedSideProperties: movedSideProperties,
+        );
   }
 
   // ---- Windows ----

@@ -26,7 +26,12 @@ mixin _$WallConstruction {
 /// "Load preset" picker inside the construction editor.
 /// Loading a preset always deep-copies all layers so edits
 /// never mutate the saved preset.
- bool get isPreset;
+ bool get isPreset;/// ADR-020 Rule 2: true when this construction was auto-created by
+/// a wall-creation path with the project default material + thickness
+/// for the wall's [WallType]. Flips to false on the first mutation
+/// through the construction editor (ADR-020 Rule 4) and is mutually
+/// exclusive with [isPreset].
+ bool get isAutoDefault;
 /// Create a copy of WallConstruction
 /// with the given fields replaced by the non-null parameter values.
 @JsonKey(includeFromJson: false, includeToJson: false)
@@ -39,16 +44,16 @@ $WallConstructionCopyWith<WallConstruction> get copyWith => _$WallConstructionCo
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is WallConstruction&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.nameDe, nameDe) || other.nameDe == nameDe)&&(identical(other.rsi, rsi) || other.rsi == rsi)&&(identical(other.rse, rse) || other.rse == rse)&&(identical(other.isPreset, isPreset) || other.isPreset == isPreset));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is WallConstruction&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.nameDe, nameDe) || other.nameDe == nameDe)&&(identical(other.rsi, rsi) || other.rsi == rsi)&&(identical(other.rse, rse) || other.rse == rse)&&(identical(other.isPreset, isPreset) || other.isPreset == isPreset)&&(identical(other.isAutoDefault, isAutoDefault) || other.isAutoDefault == isAutoDefault));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,nameDe,rsi,rse,isPreset);
+int get hashCode => Object.hash(runtimeType,id,name,nameDe,rsi,rse,isPreset,isAutoDefault);
 
 @override
 String toString() {
-  return 'WallConstruction(id: $id, name: $name, nameDe: $nameDe, rsi: $rsi, rse: $rse, isPreset: $isPreset)';
+  return 'WallConstruction(id: $id, name: $name, nameDe: $nameDe, rsi: $rsi, rse: $rse, isPreset: $isPreset, isAutoDefault: $isAutoDefault)';
 }
 
 
@@ -59,7 +64,7 @@ abstract mixin class $WallConstructionCopyWith<$Res>  {
   factory $WallConstructionCopyWith(WallConstruction value, $Res Function(WallConstruction) _then) = _$WallConstructionCopyWithImpl;
 @useResult
 $Res call({
- String id, String name, String? nameDe, double rsi, double rse, bool isPreset
+ String id, String name, String? nameDe, double rsi, double rse, bool isPreset, bool isAutoDefault
 });
 
 
@@ -76,7 +81,7 @@ class _$WallConstructionCopyWithImpl<$Res>
 
 /// Create a copy of WallConstruction
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? nameDe = freezed,Object? rsi = null,Object? rse = null,Object? isPreset = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? nameDe = freezed,Object? rsi = null,Object? rse = null,Object? isPreset = null,Object? isAutoDefault = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -84,6 +89,7 @@ as String,nameDe: freezed == nameDe ? _self.nameDe : nameDe // ignore: cast_null
 as String?,rsi: null == rsi ? _self.rsi : rsi // ignore: cast_nullable_to_non_nullable
 as double,rse: null == rse ? _self.rse : rse // ignore: cast_nullable_to_non_nullable
 as double,isPreset: null == isPreset ? _self.isPreset : isPreset // ignore: cast_nullable_to_non_nullable
+as bool,isAutoDefault: null == isAutoDefault ? _self.isAutoDefault : isAutoDefault // ignore: cast_nullable_to_non_nullable
 as bool,
   ));
 }
@@ -169,10 +175,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  String? nameDe,  double rsi,  double rse,  bool isPreset)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  String? nameDe,  double rsi,  double rse,  bool isPreset,  bool isAutoDefault)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _WallConstruction() when $default != null:
-return $default(_that.id,_that.name,_that.nameDe,_that.rsi,_that.rse,_that.isPreset);case _:
+return $default(_that.id,_that.name,_that.nameDe,_that.rsi,_that.rse,_that.isPreset,_that.isAutoDefault);case _:
   return orElse();
 
 }
@@ -190,10 +196,10 @@ return $default(_that.id,_that.name,_that.nameDe,_that.rsi,_that.rse,_that.isPre
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  String? nameDe,  double rsi,  double rse,  bool isPreset)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  String? nameDe,  double rsi,  double rse,  bool isPreset,  bool isAutoDefault)  $default,) {final _that = this;
 switch (_that) {
 case _WallConstruction():
-return $default(_that.id,_that.name,_that.nameDe,_that.rsi,_that.rse,_that.isPreset);case _:
+return $default(_that.id,_that.name,_that.nameDe,_that.rsi,_that.rse,_that.isPreset,_that.isAutoDefault);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -210,10 +216,10 @@ return $default(_that.id,_that.name,_that.nameDe,_that.rsi,_that.rse,_that.isPre
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  String? nameDe,  double rsi,  double rse,  bool isPreset)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  String? nameDe,  double rsi,  double rse,  bool isPreset,  bool isAutoDefault)?  $default,) {final _that = this;
 switch (_that) {
 case _WallConstruction() when $default != null:
-return $default(_that.id,_that.name,_that.nameDe,_that.rsi,_that.rse,_that.isPreset);case _:
+return $default(_that.id,_that.name,_that.nameDe,_that.rsi,_that.rse,_that.isPreset,_that.isAutoDefault);case _:
   return null;
 
 }
@@ -225,7 +231,7 @@ return $default(_that.id,_that.name,_that.nameDe,_that.rsi,_that.rse,_that.isPre
 @JsonSerializable()
 
 class _WallConstruction implements WallConstruction {
-  const _WallConstruction({required this.id, required this.name, this.nameDe, this.rsi = 0.13, this.rse = 0.04, this.isPreset = false});
+  const _WallConstruction({required this.id, required this.name, this.nameDe, this.rsi = 0.13, this.rse = 0.04, this.isPreset = false, this.isAutoDefault = false});
   factory _WallConstruction.fromJson(Map<String, dynamic> json) => _$WallConstructionFromJson(json);
 
 /// UUID v4 primary key.
@@ -245,6 +251,12 @@ class _WallConstruction implements WallConstruction {
 /// Loading a preset always deep-copies all layers so edits
 /// never mutate the saved preset.
 @override@JsonKey() final  bool isPreset;
+/// ADR-020 Rule 2: true when this construction was auto-created by
+/// a wall-creation path with the project default material + thickness
+/// for the wall's [WallType]. Flips to false on the first mutation
+/// through the construction editor (ADR-020 Rule 4) and is mutually
+/// exclusive with [isPreset].
+@override@JsonKey() final  bool isAutoDefault;
 
 /// Create a copy of WallConstruction
 /// with the given fields replaced by the non-null parameter values.
@@ -259,16 +271,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _WallConstruction&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.nameDe, nameDe) || other.nameDe == nameDe)&&(identical(other.rsi, rsi) || other.rsi == rsi)&&(identical(other.rse, rse) || other.rse == rse)&&(identical(other.isPreset, isPreset) || other.isPreset == isPreset));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _WallConstruction&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.nameDe, nameDe) || other.nameDe == nameDe)&&(identical(other.rsi, rsi) || other.rsi == rsi)&&(identical(other.rse, rse) || other.rse == rse)&&(identical(other.isPreset, isPreset) || other.isPreset == isPreset)&&(identical(other.isAutoDefault, isAutoDefault) || other.isAutoDefault == isAutoDefault));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,nameDe,rsi,rse,isPreset);
+int get hashCode => Object.hash(runtimeType,id,name,nameDe,rsi,rse,isPreset,isAutoDefault);
 
 @override
 String toString() {
-  return 'WallConstruction(id: $id, name: $name, nameDe: $nameDe, rsi: $rsi, rse: $rse, isPreset: $isPreset)';
+  return 'WallConstruction(id: $id, name: $name, nameDe: $nameDe, rsi: $rsi, rse: $rse, isPreset: $isPreset, isAutoDefault: $isAutoDefault)';
 }
 
 
@@ -279,7 +291,7 @@ abstract mixin class _$WallConstructionCopyWith<$Res> implements $WallConstructi
   factory _$WallConstructionCopyWith(_WallConstruction value, $Res Function(_WallConstruction) _then) = __$WallConstructionCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String name, String? nameDe, double rsi, double rse, bool isPreset
+ String id, String name, String? nameDe, double rsi, double rse, bool isPreset, bool isAutoDefault
 });
 
 
@@ -296,7 +308,7 @@ class __$WallConstructionCopyWithImpl<$Res>
 
 /// Create a copy of WallConstruction
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? nameDe = freezed,Object? rsi = null,Object? rse = null,Object? isPreset = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? nameDe = freezed,Object? rsi = null,Object? rse = null,Object? isPreset = null,Object? isAutoDefault = null,}) {
   return _then(_WallConstruction(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -304,6 +316,7 @@ as String,nameDe: freezed == nameDe ? _self.nameDe : nameDe // ignore: cast_null
 as String?,rsi: null == rsi ? _self.rsi : rsi // ignore: cast_nullable_to_non_nullable
 as double,rse: null == rse ? _self.rse : rse // ignore: cast_nullable_to_non_nullable
 as double,isPreset: null == isPreset ? _self.isPreset : isPreset // ignore: cast_nullable_to_non_nullable
+as bool,isAutoDefault: null == isAutoDefault ? _self.isAutoDefault : isAutoDefault // ignore: cast_nullable_to_non_nullable
 as bool,
   ));
 }

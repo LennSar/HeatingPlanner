@@ -68,6 +68,9 @@ Project _projectFromRow($db.Project row) {
     defaultExteriorWallThicknessMm: row.defaultExteriorWallThicknessMm,
     defaultInteriorWallThicknessMm: row.defaultInteriorWallThicknessMm,
     defaultPartitionWallThicknessMm: row.defaultPartitionWallThicknessMm,
+    defaultExteriorMaterialId: row.defaultExteriorMaterialId,
+    defaultInteriorMaterialId: row.defaultInteriorMaterialId,
+    defaultPartitionMaterialId: row.defaultPartitionMaterialId,
     location: location,
   );
 }
@@ -152,6 +155,9 @@ $db.ProjectsCompanion _projectToCompanion(Project p) {
         Value(p.defaultInteriorWallThicknessMm),
     defaultPartitionWallThicknessMm:
         Value(p.defaultPartitionWallThicknessMm),
+    defaultExteriorMaterialId: Value(p.defaultExteriorMaterialId),
+    defaultInteriorMaterialId: Value(p.defaultInteriorMaterialId),
+    defaultPartitionMaterialId: Value(p.defaultPartitionMaterialId),
     locationJson: Value(locationJson),
   );
 }

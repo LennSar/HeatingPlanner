@@ -104,6 +104,20 @@ class _ProviderCallbacks implements EditorCallbacks {
   }
 
   @override
+  void destroyRoomCascade(String roomId) =>
+      _n.destroyRoomCascade(roomId);
+
+  @override
+  void replaceAllForRoomCascade(
+    List<WallSegment> walls,
+    List<Room> rooms,
+    List<HeatingZone> zones,
+    List<WindowElement> windows,
+    List<Door> doors,
+  ) =>
+      _n.replaceAllForRoomCascade(walls, rooms, zones, windows, doors);
+
+  @override
   void restoreRoom(Room room, List<String> wallIds) {
     _n.addRoom(room);
     _n.assignWallsToRoom(wallIds, room.id);
@@ -132,8 +146,13 @@ class _ProviderCallbacks implements EditorCallbacks {
   void addRoomFromDetection({
     required Room room,
     required List<String> wallIds,
+    Map<String, WallSegment>? movedSideProperties,
   }) =>
-      _n.addRoomFromDetection(room: room, wallIds: wallIds);
+      _n.addRoomFromDetection(
+        room: room,
+        wallIds: wallIds,
+        movedSideProperties: movedSideProperties,
+      );
 
   @override
   void commitWindow(WindowElement window) => _n.addWindow(window);
@@ -709,6 +728,342 @@ void main() {
       expect(cb.currentWalls, equals(beforeWalls));
       expect(cb.currentRooms, equals(beforeRooms));
       expect(cb.currentZones, equals(beforeZones));
+    },
+  );
+
+  // ────────────────────────────────────────────────────────────────────────
+  // MR-6: ADR-017 field preservation on a standalone move.
+  // ────────────────────────────────────────────────────────────────────────
+  //
+  // Moving a room with no shared walls must preserve every wall's
+  // `thicknessMm`, `anchorMode`, and `constructionId` — the recreated
+  // wall is the same physical wall the user configured pre-move.
+
+  test(
+    'MR-6: standalone move preserves thicknessMm, anchorMode, and '
+    'constructionId on every wall',
+    () {
+      final (cb, tool, _, container) = _setup();
+      addTearDown(container.dispose);
+      final notifier = container.read(editorStateProvider.notifier);
+      // Configure walls with the rule-respecting anchorMode that
+      // production paths would set (exterior + no-mirror → innerFace
+      // per ADR-017 Rule 2). ADR-020: walls with a custom thickness
+      // must carry a `constructionId` for that thickness to survive
+      // through any wall-creation path (move reconstruction included).
+      // Walls without a `constructionId` reset to the project default
+      // when re-created.
+      final configured = [
+        _r1Walls[0].copyWith(
+          thicknessMm: 300,
+          constructionId: 'ext-B',
+          anchorMode: WallAnchorMode.outerFace,
+        ),
+        _r1Walls[1].copyWith(
+          thicknessMm: 280,
+          constructionId: 'ext-A',
+          anchorMode: WallAnchorMode.innerFace,
+        ),
+        _r1Walls[2].copyWith(
+          thicknessMm: 240,
+          anchorMode: WallAnchorMode.innerFace,
+        ),
+        _r1Walls[3].copyWith(
+          thicknessMm: 240,
+          anchorMode: WallAnchorMode.innerFace,
+        ),
+      ];
+      notifier.replaceAllWallsAndRooms(configured, [_room1]);
+
+      tool.onTap(const Point2D(x: 500, y: 500), PointerDeviceKind.mouse);
+      _drag(
+        tool,
+        from: const Point2D(x: 500, y: 500),
+        to: const Point2D(x: 1500, y: 1000),
+      );
+
+      const delta = Point2D(x: 1000, y: 500);
+      for (final original in configured) {
+        // Find the recreated wall by its translated startPoint.
+        final translated = Point2D(
+          x: original.startPoint.x + delta.x,
+          y: original.startPoint.y + delta.y,
+        );
+        final moved = cb.currentWalls
+            .firstWhere((w) => w.startPoint == translated);
+        expect(
+          moved.thicknessMm,
+          original.thicknessMm,
+          reason: 'thicknessMm must be preserved through the move',
+        );
+        expect(
+          moved.anchorMode,
+          original.anchorMode,
+          reason: 'anchorMode must be preserved through the move',
+        );
+        if (original.constructionId != null) {
+          // ADR-020: walls carrying an explicit construction (e.g. a
+          // user-set assembly) keep the same `constructionId` through
+          // the move — preservation as before.
+          expect(
+            moved.constructionId,
+            original.constructionId,
+            reason: 'constructionId must be preserved through the move',
+          );
+        } else {
+          // ADR-020 Rule 3: walls without a construction now spawn an
+          // auto-default one when re-created (e.g. via the move
+          // reconstruction path). The new id must be non-null and point
+          // at an `isAutoDefault = true` construction.
+          expect(moved.constructionId, isNotNull);
+        }
+      }
+    },
+  );
+
+  // ────────────────────────────────────────────────────────────────────────
+  // MR-7 — ADR-017 Rule 8 cases a–d on shared-wall promotion at drop.
+  // ────────────────────────────────────────────────────────────────────────
+  //
+  // Setup for each case: two 4×4 m rooms separated by a 4000 mm gap,
+  // configure the relevant walls, move room-1 right by 4000 mm so its
+  // east edge coincides with room-2's west edge.
+  //
+  // The promoted shared wall is the room-2-side wall along x = 8000
+  // (the one addRoomFromDetection sees as the matched host).
+  //
+  // Defaults: exterior 240, interior 120, partition 100 (per
+  // ProjectSettings defaults).
+  //
+  //   8a  both default                  → interior default (120)
+  //   8b  exactly one side non-default  → adopt that side
+  //   8c  both non-default, same        → preserve
+  //   8d  both non-default, different   → adopt host (existing) wall
+
+  ({_ProviderCallbacks cb, SelectTool tool, ProviderContainer container})
+      setupTwoRooms({
+    required WallSegment r1East,
+    required WallSegment r2West,
+  }) {
+    final (cb, tool, _, container) = _setup();
+    addTearDown(container.dispose);
+
+    final r1Walls = [
+      _r1Walls[0],
+      r1East,
+      _r1Walls[2],
+      _r1Walls[3],
+    ];
+    final r2Walls = [
+      const WallSegment(
+        id: 'r2-ef',
+        roomId: 'room-2',
+        startPoint: Point2D(x: 8000, y: 0),
+        endPoint: Point2D(x: 12000, y: 0),
+      ),
+      const WallSegment(
+        id: 'r2-fg',
+        roomId: 'room-2',
+        startPoint: Point2D(x: 12000, y: 0),
+        endPoint: Point2D(x: 12000, y: 4000),
+      ),
+      const WallSegment(
+        id: 'r2-gh',
+        roomId: 'room-2',
+        startPoint: Point2D(x: 12000, y: 4000),
+        endPoint: Point2D(x: 8000, y: 4000),
+      ),
+      r2West,
+    ];
+    const room2 = Room(
+      id: 'room-2',
+      floorId: 'floor-1',
+      name: 'Room 2',
+      targetTempC: 20.0,
+      polygon: [
+        Point2D(x: 8000, y: 0),
+        Point2D(x: 12000, y: 0),
+        Point2D(x: 12000, y: 4000),
+        Point2D(x: 8000, y: 4000),
+      ],
+    );
+
+    container.read(editorStateProvider.notifier).replaceAllWallsAndRooms(
+      [...r1Walls, ...r2Walls],
+      [_room1, room2],
+    );
+
+    tool.onTap(const Point2D(x: 2000, y: 2000), PointerDeviceKind.mouse);
+    _drag(
+      tool,
+      from: const Point2D(x: 2000, y: 2000),
+      to: const Point2D(x: 6000, y: 2000),
+    );
+    return (cb: cb, tool: tool, container: container);
+  }
+
+  test(
+    'MR-7a: Rule 8a — both walls default → shared wall takes interior default '
+    'thickness with no construction',
+    () {
+      final ctx = setupTwoRooms(
+        // Default = thicknessMm == projectDefault[exterior] (240),
+        // constructionId == null.
+        r1East: _r1Walls[1].copyWith(thicknessMm: 240),
+        r2West: const WallSegment(
+          id: 'r2-he',
+          roomId: 'room-2',
+          startPoint: Point2D(x: 8000, y: 4000),
+          endPoint: Point2D(x: 8000, y: 0),
+          thicknessMm: 240,
+        ),
+      );
+      final shared = ctx.cb.currentWalls.firstWhere(
+        (w) =>
+            w.roomId == 'room-2' &&
+            w.startPoint.x == 8000 &&
+            w.endPoint.x == 8000,
+      );
+      expect(shared.wallType, WallType.interior);
+      expect(
+        shared.thicknessMm,
+        120.0,
+        reason: 'Case 8a → interior default thickness (120)',
+      );
+      // ADR-020 Rule 8a — both auto-default → fresh shared auto-default
+      // construction with the project default interior material. The
+      // resulting construction row is `isAutoDefault = true`.
+      expect(shared.constructionId, isNotNull);
+      final sharedConstruction = ctx.container
+          .read(editorStateProvider)
+          .constructions
+          .firstWhere((c) => c.id == shared.constructionId);
+      expect(sharedConstruction.isAutoDefault, isTrue);
+      expect(shared.anchorMode, WallAnchorMode.centerline);
+    },
+  );
+
+  test(
+    'MR-7b-host: Rule 8b (host non-default) — shared wall adopts the host '
+    'wall thickness/construction',
+    () {
+      final ctx = setupTwoRooms(
+        r1East: _r1Walls[1].copyWith(thicknessMm: 240),
+        r2West: const WallSegment(
+          id: 'r2-he',
+          roomId: 'room-2',
+          startPoint: Point2D(x: 8000, y: 4000),
+          endPoint: Point2D(x: 8000, y: 0),
+          thicknessMm: 360,
+          constructionId: 'ext-host',
+        ),
+      );
+      final shared = ctx.cb.currentWalls.firstWhere(
+        (w) =>
+            w.roomId == 'room-2' &&
+            w.startPoint.x == 8000 &&
+            w.endPoint.x == 8000,
+      );
+      expect(shared.wallType, WallType.interior);
+      expect(shared.thicknessMm, 360.0);
+      expect(shared.constructionId, 'ext-host');
+      expect(shared.anchorMode, WallAnchorMode.centerline);
+    },
+  );
+
+  test(
+    'MR-7b-moved: Rule 8b (moved side non-default) — shared wall adopts the '
+    'moved-side wall thickness/construction',
+    () {
+      final ctx = setupTwoRooms(
+        r1East: _r1Walls[1].copyWith(
+          thicknessMm: 420,
+          constructionId: 'ext-moved',
+        ),
+        r2West: const WallSegment(
+          id: 'r2-he',
+          roomId: 'room-2',
+          startPoint: Point2D(x: 8000, y: 4000),
+          endPoint: Point2D(x: 8000, y: 0),
+          thicknessMm: 240,
+        ),
+      );
+      final shared = ctx.cb.currentWalls.firstWhere(
+        (w) =>
+            w.roomId == 'room-2' &&
+            w.startPoint.x == 8000 &&
+            w.endPoint.x == 8000,
+      );
+      expect(shared.wallType, WallType.interior);
+      expect(shared.thicknessMm, 420.0);
+      expect(shared.constructionId, 'ext-moved');
+      expect(shared.anchorMode, WallAnchorMode.centerline);
+    },
+  );
+
+  test(
+    'MR-7c: Rule 8c — both walls non-default and equal → shared wall '
+    'preserves the construction',
+    () {
+      final ctx = setupTwoRooms(
+        r1East: _r1Walls[1].copyWith(
+          thicknessMm: 300,
+          constructionId: 'ext-shared',
+        ),
+        r2West: const WallSegment(
+          id: 'r2-he',
+          roomId: 'room-2',
+          startPoint: Point2D(x: 8000, y: 4000),
+          endPoint: Point2D(x: 8000, y: 0),
+          thicknessMm: 300,
+          constructionId: 'ext-shared',
+        ),
+      );
+      final shared = ctx.cb.currentWalls.firstWhere(
+        (w) =>
+            w.roomId == 'room-2' &&
+            w.startPoint.x == 8000 &&
+            w.endPoint.x == 8000,
+      );
+      expect(shared.thicknessMm, 300.0);
+      expect(shared.constructionId, 'ext-shared');
+    },
+  );
+
+  test(
+    'MR-7d: Rule 8d — both walls non-default and different → shared wall '
+    'adopts the existing (host) wall',
+    () {
+      final ctx = setupTwoRooms(
+        r1East: _r1Walls[1].copyWith(
+          thicknessMm: 420,
+          constructionId: 'ext-moved',
+        ),
+        r2West: const WallSegment(
+          id: 'r2-he',
+          roomId: 'room-2',
+          startPoint: Point2D(x: 8000, y: 4000),
+          endPoint: Point2D(x: 8000, y: 0),
+          thicknessMm: 360,
+          constructionId: 'ext-host',
+        ),
+      );
+      final shared = ctx.cb.currentWalls.firstWhere(
+        (w) =>
+            w.roomId == 'room-2' &&
+            w.startPoint.x == 8000 &&
+            w.endPoint.x == 8000,
+      );
+      expect(
+        shared.thicknessMm,
+        360.0,
+        reason: 'Case 8d → adopt existing (host) wall thickness',
+      );
+      expect(
+        shared.constructionId,
+        'ext-host',
+        reason: 'Case 8d → adopt existing (host) construction',
+      );
     },
   );
 

@@ -304,7 +304,20 @@ mixin _$Project {
 ///
 /// Used as the fallback `WallSegment.thicknessMm` for partition walls
 /// whose `constructionId` is null. Constraint: 50–1000.
- int get defaultPartitionWallThicknessMm;/// Optional geographic location used for climate data lookup.
+ int get defaultPartitionWallThicknessMm;/// Default material catalog entry ID used for the single auto-default
+/// layer of every freshly drawn exterior wall (ADR-020 Rule 1).
+///
+/// Initial value points at the "Vertical coring brick" entry
+/// (`mat-016`) in `assets/materials.json`. Editing this field in the
+/// project settings cascades to every wall whose construction has
+/// `isAutoDefault = true` per ADR-020 Rule 6.
+ String get defaultExteriorMaterialId;/// Default material catalog entry ID for new interior (shared) walls.
+///
+/// See [defaultExteriorMaterialId] for cascade semantics.
+ String get defaultInteriorMaterialId;/// Default material catalog entry ID for new partition walls.
+///
+/// See [defaultExteriorMaterialId] for cascade semantics.
+ String get defaultPartitionMaterialId;/// Optional geographic location used for climate data lookup.
  GeoLocation? get location;
 /// Create a copy of Project
 /// with the given fields replaced by the non-null parameter values.
@@ -318,16 +331,16 @@ $ProjectCopyWith<Project> get copyWith => _$ProjectCopyWithImpl<Project>(this as
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is Project&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.modifiedAt, modifiedAt) || other.modifiedAt == modifiedAt)&&(identical(other.designOutdoorTempC, designOutdoorTempC) || other.designOutdoorTempC == designOutdoorTempC)&&(identical(other.defaultIndoorTempC, defaultIndoorTempC) || other.defaultIndoorTempC == defaultIndoorTempC)&&(identical(other.floorHeightMm, floorHeightMm) || other.floorHeightMm == floorHeightMm)&&(identical(other.unheatedSpaceTempC, unheatedSpaceTempC) || other.unheatedSpaceTempC == unheatedSpaceTempC)&&(identical(other.defaultExteriorWallThicknessMm, defaultExteriorWallThicknessMm) || other.defaultExteriorWallThicknessMm == defaultExteriorWallThicknessMm)&&(identical(other.defaultInteriorWallThicknessMm, defaultInteriorWallThicknessMm) || other.defaultInteriorWallThicknessMm == defaultInteriorWallThicknessMm)&&(identical(other.defaultPartitionWallThicknessMm, defaultPartitionWallThicknessMm) || other.defaultPartitionWallThicknessMm == defaultPartitionWallThicknessMm)&&(identical(other.location, location) || other.location == location));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is Project&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.modifiedAt, modifiedAt) || other.modifiedAt == modifiedAt)&&(identical(other.designOutdoorTempC, designOutdoorTempC) || other.designOutdoorTempC == designOutdoorTempC)&&(identical(other.defaultIndoorTempC, defaultIndoorTempC) || other.defaultIndoorTempC == defaultIndoorTempC)&&(identical(other.floorHeightMm, floorHeightMm) || other.floorHeightMm == floorHeightMm)&&(identical(other.unheatedSpaceTempC, unheatedSpaceTempC) || other.unheatedSpaceTempC == unheatedSpaceTempC)&&(identical(other.defaultExteriorWallThicknessMm, defaultExteriorWallThicknessMm) || other.defaultExteriorWallThicknessMm == defaultExteriorWallThicknessMm)&&(identical(other.defaultInteriorWallThicknessMm, defaultInteriorWallThicknessMm) || other.defaultInteriorWallThicknessMm == defaultInteriorWallThicknessMm)&&(identical(other.defaultPartitionWallThicknessMm, defaultPartitionWallThicknessMm) || other.defaultPartitionWallThicknessMm == defaultPartitionWallThicknessMm)&&(identical(other.defaultExteriorMaterialId, defaultExteriorMaterialId) || other.defaultExteriorMaterialId == defaultExteriorMaterialId)&&(identical(other.defaultInteriorMaterialId, defaultInteriorMaterialId) || other.defaultInteriorMaterialId == defaultInteriorMaterialId)&&(identical(other.defaultPartitionMaterialId, defaultPartitionMaterialId) || other.defaultPartitionMaterialId == defaultPartitionMaterialId)&&(identical(other.location, location) || other.location == location));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,createdAt,modifiedAt,designOutdoorTempC,defaultIndoorTempC,floorHeightMm,unheatedSpaceTempC,defaultExteriorWallThicknessMm,defaultInteriorWallThicknessMm,defaultPartitionWallThicknessMm,location);
+int get hashCode => Object.hash(runtimeType,id,name,createdAt,modifiedAt,designOutdoorTempC,defaultIndoorTempC,floorHeightMm,unheatedSpaceTempC,defaultExteriorWallThicknessMm,defaultInteriorWallThicknessMm,defaultPartitionWallThicknessMm,defaultExteriorMaterialId,defaultInteriorMaterialId,defaultPartitionMaterialId,location);
 
 @override
 String toString() {
-  return 'Project(id: $id, name: $name, createdAt: $createdAt, modifiedAt: $modifiedAt, designOutdoorTempC: $designOutdoorTempC, defaultIndoorTempC: $defaultIndoorTempC, floorHeightMm: $floorHeightMm, unheatedSpaceTempC: $unheatedSpaceTempC, defaultExteriorWallThicknessMm: $defaultExteriorWallThicknessMm, defaultInteriorWallThicknessMm: $defaultInteriorWallThicknessMm, defaultPartitionWallThicknessMm: $defaultPartitionWallThicknessMm, location: $location)';
+  return 'Project(id: $id, name: $name, createdAt: $createdAt, modifiedAt: $modifiedAt, designOutdoorTempC: $designOutdoorTempC, defaultIndoorTempC: $defaultIndoorTempC, floorHeightMm: $floorHeightMm, unheatedSpaceTempC: $unheatedSpaceTempC, defaultExteriorWallThicknessMm: $defaultExteriorWallThicknessMm, defaultInteriorWallThicknessMm: $defaultInteriorWallThicknessMm, defaultPartitionWallThicknessMm: $defaultPartitionWallThicknessMm, defaultExteriorMaterialId: $defaultExteriorMaterialId, defaultInteriorMaterialId: $defaultInteriorMaterialId, defaultPartitionMaterialId: $defaultPartitionMaterialId, location: $location)';
 }
 
 
@@ -338,7 +351,7 @@ abstract mixin class $ProjectCopyWith<$Res>  {
   factory $ProjectCopyWith(Project value, $Res Function(Project) _then) = _$ProjectCopyWithImpl;
 @useResult
 $Res call({
- String id, String name, DateTime createdAt, DateTime modifiedAt, double designOutdoorTempC, double defaultIndoorTempC, int floorHeightMm, double unheatedSpaceTempC, int defaultExteriorWallThicknessMm, int defaultInteriorWallThicknessMm, int defaultPartitionWallThicknessMm, GeoLocation? location
+ String id, String name, DateTime createdAt, DateTime modifiedAt, double designOutdoorTempC, double defaultIndoorTempC, int floorHeightMm, double unheatedSpaceTempC, int defaultExteriorWallThicknessMm, int defaultInteriorWallThicknessMm, int defaultPartitionWallThicknessMm, String defaultExteriorMaterialId, String defaultInteriorMaterialId, String defaultPartitionMaterialId, GeoLocation? location
 });
 
 
@@ -355,7 +368,7 @@ class _$ProjectCopyWithImpl<$Res>
 
 /// Create a copy of Project
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? createdAt = null,Object? modifiedAt = null,Object? designOutdoorTempC = null,Object? defaultIndoorTempC = null,Object? floorHeightMm = null,Object? unheatedSpaceTempC = null,Object? defaultExteriorWallThicknessMm = null,Object? defaultInteriorWallThicknessMm = null,Object? defaultPartitionWallThicknessMm = null,Object? location = freezed,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? createdAt = null,Object? modifiedAt = null,Object? designOutdoorTempC = null,Object? defaultIndoorTempC = null,Object? floorHeightMm = null,Object? unheatedSpaceTempC = null,Object? defaultExteriorWallThicknessMm = null,Object? defaultInteriorWallThicknessMm = null,Object? defaultPartitionWallThicknessMm = null,Object? defaultExteriorMaterialId = null,Object? defaultInteriorMaterialId = null,Object? defaultPartitionMaterialId = null,Object? location = freezed,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -368,7 +381,10 @@ as int,unheatedSpaceTempC: null == unheatedSpaceTempC ? _self.unheatedSpaceTempC
 as double,defaultExteriorWallThicknessMm: null == defaultExteriorWallThicknessMm ? _self.defaultExteriorWallThicknessMm : defaultExteriorWallThicknessMm // ignore: cast_nullable_to_non_nullable
 as int,defaultInteriorWallThicknessMm: null == defaultInteriorWallThicknessMm ? _self.defaultInteriorWallThicknessMm : defaultInteriorWallThicknessMm // ignore: cast_nullable_to_non_nullable
 as int,defaultPartitionWallThicknessMm: null == defaultPartitionWallThicknessMm ? _self.defaultPartitionWallThicknessMm : defaultPartitionWallThicknessMm // ignore: cast_nullable_to_non_nullable
-as int,location: freezed == location ? _self.location : location // ignore: cast_nullable_to_non_nullable
+as int,defaultExteriorMaterialId: null == defaultExteriorMaterialId ? _self.defaultExteriorMaterialId : defaultExteriorMaterialId // ignore: cast_nullable_to_non_nullable
+as String,defaultInteriorMaterialId: null == defaultInteriorMaterialId ? _self.defaultInteriorMaterialId : defaultInteriorMaterialId // ignore: cast_nullable_to_non_nullable
+as String,defaultPartitionMaterialId: null == defaultPartitionMaterialId ? _self.defaultPartitionMaterialId : defaultPartitionMaterialId // ignore: cast_nullable_to_non_nullable
+as String,location: freezed == location ? _self.location : location // ignore: cast_nullable_to_non_nullable
 as GeoLocation?,
   ));
 }
@@ -466,10 +482,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  DateTime createdAt,  DateTime modifiedAt,  double designOutdoorTempC,  double defaultIndoorTempC,  int floorHeightMm,  double unheatedSpaceTempC,  int defaultExteriorWallThicknessMm,  int defaultInteriorWallThicknessMm,  int defaultPartitionWallThicknessMm,  GeoLocation? location)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  DateTime createdAt,  DateTime modifiedAt,  double designOutdoorTempC,  double defaultIndoorTempC,  int floorHeightMm,  double unheatedSpaceTempC,  int defaultExteriorWallThicknessMm,  int defaultInteriorWallThicknessMm,  int defaultPartitionWallThicknessMm,  String defaultExteriorMaterialId,  String defaultInteriorMaterialId,  String defaultPartitionMaterialId,  GeoLocation? location)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _Project() when $default != null:
-return $default(_that.id,_that.name,_that.createdAt,_that.modifiedAt,_that.designOutdoorTempC,_that.defaultIndoorTempC,_that.floorHeightMm,_that.unheatedSpaceTempC,_that.defaultExteriorWallThicknessMm,_that.defaultInteriorWallThicknessMm,_that.defaultPartitionWallThicknessMm,_that.location);case _:
+return $default(_that.id,_that.name,_that.createdAt,_that.modifiedAt,_that.designOutdoorTempC,_that.defaultIndoorTempC,_that.floorHeightMm,_that.unheatedSpaceTempC,_that.defaultExteriorWallThicknessMm,_that.defaultInteriorWallThicknessMm,_that.defaultPartitionWallThicknessMm,_that.defaultExteriorMaterialId,_that.defaultInteriorMaterialId,_that.defaultPartitionMaterialId,_that.location);case _:
   return orElse();
 
 }
@@ -487,10 +503,10 @@ return $default(_that.id,_that.name,_that.createdAt,_that.modifiedAt,_that.desig
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  DateTime createdAt,  DateTime modifiedAt,  double designOutdoorTempC,  double defaultIndoorTempC,  int floorHeightMm,  double unheatedSpaceTempC,  int defaultExteriorWallThicknessMm,  int defaultInteriorWallThicknessMm,  int defaultPartitionWallThicknessMm,  GeoLocation? location)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  DateTime createdAt,  DateTime modifiedAt,  double designOutdoorTempC,  double defaultIndoorTempC,  int floorHeightMm,  double unheatedSpaceTempC,  int defaultExteriorWallThicknessMm,  int defaultInteriorWallThicknessMm,  int defaultPartitionWallThicknessMm,  String defaultExteriorMaterialId,  String defaultInteriorMaterialId,  String defaultPartitionMaterialId,  GeoLocation? location)  $default,) {final _that = this;
 switch (_that) {
 case _Project():
-return $default(_that.id,_that.name,_that.createdAt,_that.modifiedAt,_that.designOutdoorTempC,_that.defaultIndoorTempC,_that.floorHeightMm,_that.unheatedSpaceTempC,_that.defaultExteriorWallThicknessMm,_that.defaultInteriorWallThicknessMm,_that.defaultPartitionWallThicknessMm,_that.location);case _:
+return $default(_that.id,_that.name,_that.createdAt,_that.modifiedAt,_that.designOutdoorTempC,_that.defaultIndoorTempC,_that.floorHeightMm,_that.unheatedSpaceTempC,_that.defaultExteriorWallThicknessMm,_that.defaultInteriorWallThicknessMm,_that.defaultPartitionWallThicknessMm,_that.defaultExteriorMaterialId,_that.defaultInteriorMaterialId,_that.defaultPartitionMaterialId,_that.location);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -507,10 +523,10 @@ return $default(_that.id,_that.name,_that.createdAt,_that.modifiedAt,_that.desig
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  DateTime createdAt,  DateTime modifiedAt,  double designOutdoorTempC,  double defaultIndoorTempC,  int floorHeightMm,  double unheatedSpaceTempC,  int defaultExteriorWallThicknessMm,  int defaultInteriorWallThicknessMm,  int defaultPartitionWallThicknessMm,  GeoLocation? location)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  DateTime createdAt,  DateTime modifiedAt,  double designOutdoorTempC,  double defaultIndoorTempC,  int floorHeightMm,  double unheatedSpaceTempC,  int defaultExteriorWallThicknessMm,  int defaultInteriorWallThicknessMm,  int defaultPartitionWallThicknessMm,  String defaultExteriorMaterialId,  String defaultInteriorMaterialId,  String defaultPartitionMaterialId,  GeoLocation? location)?  $default,) {final _that = this;
 switch (_that) {
 case _Project() when $default != null:
-return $default(_that.id,_that.name,_that.createdAt,_that.modifiedAt,_that.designOutdoorTempC,_that.defaultIndoorTempC,_that.floorHeightMm,_that.unheatedSpaceTempC,_that.defaultExteriorWallThicknessMm,_that.defaultInteriorWallThicknessMm,_that.defaultPartitionWallThicknessMm,_that.location);case _:
+return $default(_that.id,_that.name,_that.createdAt,_that.modifiedAt,_that.designOutdoorTempC,_that.defaultIndoorTempC,_that.floorHeightMm,_that.unheatedSpaceTempC,_that.defaultExteriorWallThicknessMm,_that.defaultInteriorWallThicknessMm,_that.defaultPartitionWallThicknessMm,_that.defaultExteriorMaterialId,_that.defaultInteriorMaterialId,_that.defaultPartitionMaterialId,_that.location);case _:
   return null;
 
 }
@@ -522,7 +538,7 @@ return $default(_that.id,_that.name,_that.createdAt,_that.modifiedAt,_that.desig
 @JsonSerializable()
 
 class _Project implements Project {
-  const _Project({required this.id, required this.name, required this.createdAt, required this.modifiedAt, this.designOutdoorTempC = -12.0, this.defaultIndoorTempC = 20.0, this.floorHeightMm = 2600, this.unheatedSpaceTempC = 10.0, this.defaultExteriorWallThicknessMm = 240, this.defaultInteriorWallThicknessMm = 120, this.defaultPartitionWallThicknessMm = 100, this.location});
+  const _Project({required this.id, required this.name, required this.createdAt, required this.modifiedAt, this.designOutdoorTempC = -12.0, this.defaultIndoorTempC = 20.0, this.floorHeightMm = 2600, this.unheatedSpaceTempC = 10.0, this.defaultExteriorWallThicknessMm = 240, this.defaultInteriorWallThicknessMm = 120, this.defaultPartitionWallThicknessMm = 100, this.defaultExteriorMaterialId = 'mat-016', this.defaultInteriorMaterialId = 'mat-016', this.defaultPartitionMaterialId = 'mat-016', this.location});
   factory _Project.fromJson(Map<String, dynamic> json) => _$ProjectFromJson(json);
 
 /// UUID v4 primary key.
@@ -556,6 +572,22 @@ class _Project implements Project {
 /// Used as the fallback `WallSegment.thicknessMm` for partition walls
 /// whose `constructionId` is null. Constraint: 50–1000.
 @override@JsonKey() final  int defaultPartitionWallThicknessMm;
+/// Default material catalog entry ID used for the single auto-default
+/// layer of every freshly drawn exterior wall (ADR-020 Rule 1).
+///
+/// Initial value points at the "Vertical coring brick" entry
+/// (`mat-016`) in `assets/materials.json`. Editing this field in the
+/// project settings cascades to every wall whose construction has
+/// `isAutoDefault = true` per ADR-020 Rule 6.
+@override@JsonKey() final  String defaultExteriorMaterialId;
+/// Default material catalog entry ID for new interior (shared) walls.
+///
+/// See [defaultExteriorMaterialId] for cascade semantics.
+@override@JsonKey() final  String defaultInteriorMaterialId;
+/// Default material catalog entry ID for new partition walls.
+///
+/// See [defaultExteriorMaterialId] for cascade semantics.
+@override@JsonKey() final  String defaultPartitionMaterialId;
 /// Optional geographic location used for climate data lookup.
 @override final  GeoLocation? location;
 
@@ -572,16 +604,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Project&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.modifiedAt, modifiedAt) || other.modifiedAt == modifiedAt)&&(identical(other.designOutdoorTempC, designOutdoorTempC) || other.designOutdoorTempC == designOutdoorTempC)&&(identical(other.defaultIndoorTempC, defaultIndoorTempC) || other.defaultIndoorTempC == defaultIndoorTempC)&&(identical(other.floorHeightMm, floorHeightMm) || other.floorHeightMm == floorHeightMm)&&(identical(other.unheatedSpaceTempC, unheatedSpaceTempC) || other.unheatedSpaceTempC == unheatedSpaceTempC)&&(identical(other.defaultExteriorWallThicknessMm, defaultExteriorWallThicknessMm) || other.defaultExteriorWallThicknessMm == defaultExteriorWallThicknessMm)&&(identical(other.defaultInteriorWallThicknessMm, defaultInteriorWallThicknessMm) || other.defaultInteriorWallThicknessMm == defaultInteriorWallThicknessMm)&&(identical(other.defaultPartitionWallThicknessMm, defaultPartitionWallThicknessMm) || other.defaultPartitionWallThicknessMm == defaultPartitionWallThicknessMm)&&(identical(other.location, location) || other.location == location));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _Project&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.createdAt, createdAt) || other.createdAt == createdAt)&&(identical(other.modifiedAt, modifiedAt) || other.modifiedAt == modifiedAt)&&(identical(other.designOutdoorTempC, designOutdoorTempC) || other.designOutdoorTempC == designOutdoorTempC)&&(identical(other.defaultIndoorTempC, defaultIndoorTempC) || other.defaultIndoorTempC == defaultIndoorTempC)&&(identical(other.floorHeightMm, floorHeightMm) || other.floorHeightMm == floorHeightMm)&&(identical(other.unheatedSpaceTempC, unheatedSpaceTempC) || other.unheatedSpaceTempC == unheatedSpaceTempC)&&(identical(other.defaultExteriorWallThicknessMm, defaultExteriorWallThicknessMm) || other.defaultExteriorWallThicknessMm == defaultExteriorWallThicknessMm)&&(identical(other.defaultInteriorWallThicknessMm, defaultInteriorWallThicknessMm) || other.defaultInteriorWallThicknessMm == defaultInteriorWallThicknessMm)&&(identical(other.defaultPartitionWallThicknessMm, defaultPartitionWallThicknessMm) || other.defaultPartitionWallThicknessMm == defaultPartitionWallThicknessMm)&&(identical(other.defaultExteriorMaterialId, defaultExteriorMaterialId) || other.defaultExteriorMaterialId == defaultExteriorMaterialId)&&(identical(other.defaultInteriorMaterialId, defaultInteriorMaterialId) || other.defaultInteriorMaterialId == defaultInteriorMaterialId)&&(identical(other.defaultPartitionMaterialId, defaultPartitionMaterialId) || other.defaultPartitionMaterialId == defaultPartitionMaterialId)&&(identical(other.location, location) || other.location == location));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,createdAt,modifiedAt,designOutdoorTempC,defaultIndoorTempC,floorHeightMm,unheatedSpaceTempC,defaultExteriorWallThicknessMm,defaultInteriorWallThicknessMm,defaultPartitionWallThicknessMm,location);
+int get hashCode => Object.hash(runtimeType,id,name,createdAt,modifiedAt,designOutdoorTempC,defaultIndoorTempC,floorHeightMm,unheatedSpaceTempC,defaultExteriorWallThicknessMm,defaultInteriorWallThicknessMm,defaultPartitionWallThicknessMm,defaultExteriorMaterialId,defaultInteriorMaterialId,defaultPartitionMaterialId,location);
 
 @override
 String toString() {
-  return 'Project(id: $id, name: $name, createdAt: $createdAt, modifiedAt: $modifiedAt, designOutdoorTempC: $designOutdoorTempC, defaultIndoorTempC: $defaultIndoorTempC, floorHeightMm: $floorHeightMm, unheatedSpaceTempC: $unheatedSpaceTempC, defaultExteriorWallThicknessMm: $defaultExteriorWallThicknessMm, defaultInteriorWallThicknessMm: $defaultInteriorWallThicknessMm, defaultPartitionWallThicknessMm: $defaultPartitionWallThicknessMm, location: $location)';
+  return 'Project(id: $id, name: $name, createdAt: $createdAt, modifiedAt: $modifiedAt, designOutdoorTempC: $designOutdoorTempC, defaultIndoorTempC: $defaultIndoorTempC, floorHeightMm: $floorHeightMm, unheatedSpaceTempC: $unheatedSpaceTempC, defaultExteriorWallThicknessMm: $defaultExteriorWallThicknessMm, defaultInteriorWallThicknessMm: $defaultInteriorWallThicknessMm, defaultPartitionWallThicknessMm: $defaultPartitionWallThicknessMm, defaultExteriorMaterialId: $defaultExteriorMaterialId, defaultInteriorMaterialId: $defaultInteriorMaterialId, defaultPartitionMaterialId: $defaultPartitionMaterialId, location: $location)';
 }
 
 
@@ -592,7 +624,7 @@ abstract mixin class _$ProjectCopyWith<$Res> implements $ProjectCopyWith<$Res> {
   factory _$ProjectCopyWith(_Project value, $Res Function(_Project) _then) = __$ProjectCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String name, DateTime createdAt, DateTime modifiedAt, double designOutdoorTempC, double defaultIndoorTempC, int floorHeightMm, double unheatedSpaceTempC, int defaultExteriorWallThicknessMm, int defaultInteriorWallThicknessMm, int defaultPartitionWallThicknessMm, GeoLocation? location
+ String id, String name, DateTime createdAt, DateTime modifiedAt, double designOutdoorTempC, double defaultIndoorTempC, int floorHeightMm, double unheatedSpaceTempC, int defaultExteriorWallThicknessMm, int defaultInteriorWallThicknessMm, int defaultPartitionWallThicknessMm, String defaultExteriorMaterialId, String defaultInteriorMaterialId, String defaultPartitionMaterialId, GeoLocation? location
 });
 
 
@@ -609,7 +641,7 @@ class __$ProjectCopyWithImpl<$Res>
 
 /// Create a copy of Project
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? createdAt = null,Object? modifiedAt = null,Object? designOutdoorTempC = null,Object? defaultIndoorTempC = null,Object? floorHeightMm = null,Object? unheatedSpaceTempC = null,Object? defaultExteriorWallThicknessMm = null,Object? defaultInteriorWallThicknessMm = null,Object? defaultPartitionWallThicknessMm = null,Object? location = freezed,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? createdAt = null,Object? modifiedAt = null,Object? designOutdoorTempC = null,Object? defaultIndoorTempC = null,Object? floorHeightMm = null,Object? unheatedSpaceTempC = null,Object? defaultExteriorWallThicknessMm = null,Object? defaultInteriorWallThicknessMm = null,Object? defaultPartitionWallThicknessMm = null,Object? defaultExteriorMaterialId = null,Object? defaultInteriorMaterialId = null,Object? defaultPartitionMaterialId = null,Object? location = freezed,}) {
   return _then(_Project(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
@@ -622,7 +654,10 @@ as int,unheatedSpaceTempC: null == unheatedSpaceTempC ? _self.unheatedSpaceTempC
 as double,defaultExteriorWallThicknessMm: null == defaultExteriorWallThicknessMm ? _self.defaultExteriorWallThicknessMm : defaultExteriorWallThicknessMm // ignore: cast_nullable_to_non_nullable
 as int,defaultInteriorWallThicknessMm: null == defaultInteriorWallThicknessMm ? _self.defaultInteriorWallThicknessMm : defaultInteriorWallThicknessMm // ignore: cast_nullable_to_non_nullable
 as int,defaultPartitionWallThicknessMm: null == defaultPartitionWallThicknessMm ? _self.defaultPartitionWallThicknessMm : defaultPartitionWallThicknessMm // ignore: cast_nullable_to_non_nullable
-as int,location: freezed == location ? _self.location : location // ignore: cast_nullable_to_non_nullable
+as int,defaultExteriorMaterialId: null == defaultExteriorMaterialId ? _self.defaultExteriorMaterialId : defaultExteriorMaterialId // ignore: cast_nullable_to_non_nullable
+as String,defaultInteriorMaterialId: null == defaultInteriorMaterialId ? _self.defaultInteriorMaterialId : defaultInteriorMaterialId // ignore: cast_nullable_to_non_nullable
+as String,defaultPartitionMaterialId: null == defaultPartitionMaterialId ? _self.defaultPartitionMaterialId : defaultPartitionMaterialId // ignore: cast_nullable_to_non_nullable
+as String,location: freezed == location ? _self.location : location // ignore: cast_nullable_to_non_nullable
 as GeoLocation?,
   ));
 }

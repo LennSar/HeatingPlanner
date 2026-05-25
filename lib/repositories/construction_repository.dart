@@ -78,6 +78,7 @@ WallConstruction _constructionFromRow($db.WallConstruction row) {
     rsi: row.rsi,
     rse: row.rse,
     isPreset: row.isPreset == 1,
+    isAutoDefault: row.isAutoDefault == 1,
   );
 }
 
@@ -109,6 +110,7 @@ $db.WallConstructionsCompanion _constructionToCompanion(
     rsi: Value(construction.rsi),
     rse: Value(construction.rse),
     isPreset: Value(construction.isPreset ? 1 : 0),
+    isAutoDefault: Value(construction.isAutoDefault ? 1 : 0),
   );
 }
 

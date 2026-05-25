@@ -33,6 +33,13 @@ abstract class WallConstruction with _$WallConstruction {
     /// Loading a preset always deep-copies all layers so edits
     /// never mutate the saved preset.
     @Default(false) bool isPreset,
+
+    /// ADR-020 Rule 2: true when this construction was auto-created by
+    /// a wall-creation path with the project default material + thickness
+    /// for the wall's [WallType]. Flips to false on the first mutation
+    /// through the construction editor (ADR-020 Rule 4) and is mutually
+    /// exclusive with [isPreset].
+    @Default(false) bool isAutoDefault,
   }) = _WallConstruction;
 
   factory WallConstruction.fromJson(Map<String, dynamic> json) =>

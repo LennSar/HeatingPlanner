@@ -5,11 +5,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../calculation/providers/project_settings_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/enums.dart';
+import '../../data/models/material_layer.dart';
+import '../../data/models/wall_construction.dart';
 import '../../data/models/wall_segment.dart';
 import '../../l10n/app_localizations.dart';
 import '../../repositories/app_preferences.dart';
+import '../../repositories/material_repository.dart';
 import '../canvas/tools/undo_redo_service.dart';
 import '../providers/editor_state_provider.dart';
+import 'material_picker_dialog.dart';
 
 /// Opens the project settings dialog as a modal.
 ///
@@ -158,11 +162,11 @@ class _ProjectSettingsDialogState
   }
 
   /// Validates [raw] as cm in [5, 100], cascades the new default to
-  /// every unassigned wall of [wallType] via
-  /// `recomputeWallsForProjectDefault`, and pushes the whole cascade as
-  /// one [_ChangeDefaultWallThicknessCommand] so a single Ctrl+Z reverts
-  /// both the project setting and every re-anchored wall (ADR-017
-  /// Rule 9).
+  /// every wall of [wallType] whose construction has `isAutoDefault`
+  /// (ADR-020 Rule 7, reinterprets ADR-017 Rule 9), and pushes the
+  /// whole cascade as one [_ChangeDefaultWallThicknessCommand] so a
+  /// single Ctrl+Z reverts the project setting AND every cascaded
+  /// construction-layer thickness, wall re-anchor, and mirror sync.
   ///
   /// Invalid input (non-numeric, out of 5–100 cm) reverts the field to
   /// the current persisted value and shows the documented toast.
@@ -189,16 +193,27 @@ class _ProjectSettingsDialogState
       return;
     }
     final container = ProviderScope.containerOf(context, listen: false);
-    final oldWalls = List<WallSegment>.unmodifiable(
-      ref.read(editorStateProvider).walls,
-    );
+    final pre = container.read(editorStateProvider);
+    final oldWalls = List<WallSegment>.unmodifiable(pre.walls);
+    final oldConstructions =
+        List<WallConstruction>.unmodifiable(pre.constructions);
+    final oldLayers =
+        List<MaterialLayer>.unmodifiable(pre.materialLayers);
     _setDefaultFor(wallType, mm);
-    ref
-        .read(editorStateProvider.notifier)
-        .recomputeWallsForProjectDefault(wallType);
-    final newWalls = List<WallSegment>.unmodifiable(
-      ref.read(editorStateProvider).walls,
-    );
+    final notifier = ref.read(editorStateProvider.notifier);
+    // ADR-020 Rule 7: cascade through every auto-default construction
+    // for walls of [wallType] — updates its single layer thickness and
+    // re-anchors per ADR-017 Rule 6. Rule 9's safety-net for
+    // `constructionId == null` walls runs immediately after, for the
+    // legacy path that may still exist.
+    notifier.recomputeAutoDefaultThicknessForWallType(wallType);
+    notifier.recomputeWallsForProjectDefault(wallType);
+    final post = container.read(editorStateProvider);
+    final newWalls = List<WallSegment>.unmodifiable(post.walls);
+    final newConstructions =
+        List<WallConstruction>.unmodifiable(post.constructions);
+    final newLayers =
+        List<MaterialLayer>.unmodifiable(post.materialLayers);
     container.read(undoRedoProvider).execute(
           _ChangeDefaultWallThicknessCommand(
             container: container,
@@ -207,10 +222,74 @@ class _ProjectSettingsDialogState
             newMm: mm,
             oldWalls: oldWalls,
             newWalls: newWalls,
+            oldConstructions: oldConstructions,
+            newConstructions: newConstructions,
+            oldLayers: oldLayers,
+            newLayers: newLayers,
           ),
         );
     // Normalise display (round-trip through mm so "24.0" becomes "24").
     controller.text = _mmToCmDisplay(mm);
+  }
+
+  /// ADR-020 Rule 6: change the project default material for [wallType]
+  /// and cascade through every auto-default construction owned by a
+  /// wall of [wallType]. One [_ChangeDefaultMaterialCommand] is pushed
+  /// onto the undo stack so a single Ctrl+Z reverts the field write
+  /// and the per-layer material change.
+  void _applyMaterialDefault(WallType wallType, String materialId) {
+    final settings = ref.read(projectSettingsProvider);
+    final currentId = _currentMaterialIdFor(settings, wallType);
+    if (currentId == materialId) return;
+    final container = ProviderScope.containerOf(context, listen: false);
+    final pre = container.read(editorStateProvider);
+    final oldConstructions =
+        List<WallConstruction>.unmodifiable(pre.constructions);
+    final oldLayers =
+        List<MaterialLayer>.unmodifiable(pre.materialLayers);
+    _setMaterialDefaultFor(wallType, materialId);
+    ref
+        .read(editorStateProvider.notifier)
+        .recomputeAutoDefaultMaterialsForWallType(wallType);
+    final post = container.read(editorStateProvider);
+    final newConstructions =
+        List<WallConstruction>.unmodifiable(post.constructions);
+    final newLayers =
+        List<MaterialLayer>.unmodifiable(post.materialLayers);
+    container.read(undoRedoProvider).execute(
+          _ChangeDefaultMaterialCommand(
+            container: container,
+            wallType: wallType,
+            oldMaterialId: currentId,
+            newMaterialId: materialId,
+            oldConstructions: oldConstructions,
+            newConstructions: newConstructions,
+            oldLayers: oldLayers,
+            newLayers: newLayers,
+          ),
+        );
+  }
+
+  static String _currentMaterialIdFor(
+    ProjectSettings s,
+    WallType wallType,
+  ) =>
+      switch (wallType) {
+        WallType.exterior => s.defaultExteriorMaterialId,
+        WallType.interior => s.defaultInteriorMaterialId,
+        WallType.partition => s.defaultPartitionMaterialId,
+      };
+
+  void _setMaterialDefaultFor(WallType wallType, String materialId) {
+    final notifier = ref.read(projectSettingsProvider.notifier);
+    switch (wallType) {
+      case WallType.exterior:
+        notifier.setDefaultExteriorMaterialId(materialId);
+      case WallType.interior:
+        notifier.setDefaultInteriorMaterialId(materialId);
+      case WallType.partition:
+        notifier.setDefaultPartitionMaterialId(materialId);
+    }
   }
 
   TextEditingController _wallControllerFor(WallType wallType) =>
@@ -583,6 +662,44 @@ class _ProjectSettingsDialogState
                     const Divider(),
                     const SizedBox(height: Spacing.md),
 
+                    // ── ADR-020: default wall materials ───────
+                    Text(
+                      l10n.defaultWallMaterials,
+                      style: textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: Spacing.xs),
+                    Text(
+                      l10n.defaultWallMaterialsDesc,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: Spacing.sm),
+                    _MaterialDefaultRow(
+                      label: l10n.defaultExteriorMaterial,
+                      value: settings.defaultExteriorMaterialId,
+                      onChanged: (v) =>
+                          _applyMaterialDefault(WallType.exterior, v),
+                    ),
+                    const SizedBox(height: Spacing.sm),
+                    _MaterialDefaultRow(
+                      label: l10n.defaultInteriorMaterial,
+                      value: settings.defaultInteriorMaterialId,
+                      onChanged: (v) =>
+                          _applyMaterialDefault(WallType.interior, v),
+                    ),
+                    const SizedBox(height: Spacing.sm),
+                    _MaterialDefaultRow(
+                      label: l10n.defaultPartitionMaterial,
+                      value: settings.defaultPartitionMaterialId,
+                      onChanged: (v) =>
+                          _applyMaterialDefault(WallType.partition, v),
+                    ),
+
+                    const SizedBox(height: Spacing.lg),
+                    const Divider(),
+                    const SizedBox(height: Spacing.md),
+
                     // ── Drawing grid size ────────────────────
                     Text(
                       l10n.settingsDrawingGridSize,
@@ -671,6 +788,7 @@ class _LanguageRow extends ConsumerWidget {
         );
 
     return DropdownButton<String>(
+      key: const ValueKey('languageDropdown'),
       value: current,
       items: [
         DropdownMenuItem(
@@ -837,9 +955,10 @@ class _WallThicknessRow extends StatelessWidget {
   }
 }
 
-/// One-step undo entry for an ADR-017 Rule 9 cascade:
-/// `setDefault<WallType>WallThicknessMm` + every re-anchored
-/// unassigned wall of [wallType].
+/// One-step undo entry for an ADR-020 Rule 7 cascade:
+/// `setDefault<WallType>WallThicknessMm` + every cascaded
+/// auto-default construction-layer thickness + every re-anchored
+/// wall of [wallType].
 ///
 /// The command runs against a [ProviderContainer] (resolved via
 /// `ProviderScope.containerOf` at creation time) so it survives the
@@ -853,6 +972,10 @@ class _ChangeDefaultWallThicknessCommand extends Command {
     required this.newMm,
     required this.oldWalls,
     required this.newWalls,
+    required this.oldConstructions,
+    required this.newConstructions,
+    required this.oldLayers,
+    required this.newLayers,
   });
 
   final ProviderContainer container;
@@ -861,20 +984,36 @@ class _ChangeDefaultWallThicknessCommand extends Command {
   final int newMm;
   final List<WallSegment> oldWalls;
   final List<WallSegment> newWalls;
+  final List<WallConstruction> oldConstructions;
+  final List<WallConstruction> newConstructions;
+  final List<MaterialLayer> oldLayers;
+  final List<MaterialLayer> newLayers;
 
   @override
-  String get label => 'Change default wall thickness';
+  String get label => 'Update project defaults';
 
   @override
   void execute() {
     _writeDefault(newMm);
-    container.read(editorStateProvider.notifier).replaceAllWalls(newWalls);
+    container
+        .read(editorStateProvider.notifier)
+        .replaceAllWallsConstructionsLayers(
+          newWalls,
+          newConstructions,
+          newLayers,
+        );
   }
 
   @override
   void undo() {
     _writeDefault(oldMm);
-    container.read(editorStateProvider.notifier).replaceAllWalls(oldWalls);
+    container
+        .read(editorStateProvider.notifier)
+        .replaceAllWallsConstructionsLayers(
+          oldWalls,
+          oldConstructions,
+          oldLayers,
+        );
   }
 
   void _writeDefault(int mm) {
@@ -887,6 +1026,130 @@ class _ChangeDefaultWallThicknessCommand extends Command {
       case WallType.partition:
         notifier.setDefaultPartitionWallThicknessMm(mm);
     }
+  }
+}
+
+/// ADR-020 Rule 6 — undo entry for `setDefault<WallType>MaterialId` +
+/// every cascaded auto-default construction layer material change.
+class _ChangeDefaultMaterialCommand extends Command {
+  _ChangeDefaultMaterialCommand({
+    required this.container,
+    required this.wallType,
+    required this.oldMaterialId,
+    required this.newMaterialId,
+    required this.oldConstructions,
+    required this.newConstructions,
+    required this.oldLayers,
+    required this.newLayers,
+  });
+
+  final ProviderContainer container;
+  final WallType wallType;
+  final String oldMaterialId;
+  final String newMaterialId;
+  final List<WallConstruction> oldConstructions;
+  final List<WallConstruction> newConstructions;
+  final List<MaterialLayer> oldLayers;
+  final List<MaterialLayer> newLayers;
+
+  @override
+  String get label => 'Update project defaults';
+
+  @override
+  void execute() {
+    _writeDefault(newMaterialId);
+    final n = container.read(editorStateProvider.notifier);
+    // Walls themselves are unchanged by a material-only cascade — only
+    // the construction layer rows shift. Reuse the same restore helper
+    // by passing the current walls list verbatim.
+    n.replaceAllWallsConstructionsLayers(
+      container.read(editorStateProvider).walls,
+      newConstructions,
+      newLayers,
+    );
+  }
+
+  @override
+  void undo() {
+    _writeDefault(oldMaterialId);
+    final n = container.read(editorStateProvider.notifier);
+    n.replaceAllWallsConstructionsLayers(
+      container.read(editorStateProvider).walls,
+      oldConstructions,
+      oldLayers,
+    );
+  }
+
+  void _writeDefault(String id) {
+    final notifier = container.read(projectSettingsProvider.notifier);
+    switch (wallType) {
+      case WallType.exterior:
+        notifier.setDefaultExteriorMaterialId(id);
+      case WallType.interior:
+        notifier.setDefaultInteriorMaterialId(id);
+      case WallType.partition:
+        notifier.setDefaultPartitionMaterialId(id);
+    }
+  }
+}
+
+/// ADR-020 Rule 9 row — labelled button that opens the same searchable,
+/// grouped material picker the wall construction editor uses for its
+/// per-layer material lookup. The button label shows the locale-resolved
+/// display name of the currently selected material.
+///
+/// Using the shared [showMaterialPickerDialog] (Category → Subcategory
+/// → Entry tree, with search) keeps the project-settings UX consistent
+/// with the per-layer picker instead of dumping every catalog entry
+/// into one flat dropdown.
+class _MaterialDefaultRow extends ConsumerWidget {
+  const _MaterialDefaultRow({
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final String label;
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final textTheme = Theme.of(context).textTheme;
+    final entries = ref.watch(localizedMaterialEntriesProvider);
+    final current =
+        entries.where((e) => e.row.id == value).firstOrNull;
+    final displayName = current?.displayName ?? value;
+    return Row(
+      children: [
+        SizedBox(
+          width: 140,
+          child: Text(label, style: textTheme.bodyMedium),
+        ),
+        Expanded(
+          child: OutlinedButton(
+            onPressed: () async {
+              final picked = await showMaterialPickerDialog(context);
+              if (picked != null && picked.id != value) {
+                onChanged(picked.id);
+              }
+            },
+            style: OutlinedButton.styleFrom(
+              alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.symmetric(
+                horizontal: Spacing.sm,
+                vertical: Spacing.sm,
+              ),
+            ),
+            child: Text(
+              displayName,
+              style: textTheme.bodyMedium,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ),
+      ],
+    );
   }
 }
 

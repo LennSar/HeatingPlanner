@@ -17,21 +17,31 @@
 //
 // SnapService.gridSpacingMm == 100 mm.
 
+import 'package:drift/drift.dart' show driftRuntimeOptions;
+import 'package:drift/native.dart';
 import 'package:flutter/gestures.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+// Drift generates data classes that collide with our freezed models.
+import 'package:heating_planner/data/database/app_database.dart'
+    hide Distributor, Door, HeatingCircuit, HeatingZone, Room, WallSegment;
 import 'package:heating_planner/calculation/engines/geometry_engine.dart';
 import 'package:heating_planner/data/models/distributor.dart';
 import 'package:heating_planner/data/models/door.dart';
+import 'package:heating_planner/data/models/enums.dart';
 import 'package:heating_planner/data/models/heating_circuit.dart';
 import 'package:heating_planner/data/models/heating_zone.dart';
 import 'package:heating_planner/data/models/point2d.dart';
 import 'package:heating_planner/data/models/room.dart';
 import 'package:heating_planner/data/models/wall_segment.dart';
 import 'package:heating_planner/data/models/window_element.dart';
+import 'package:heating_planner/l10n/app_localizations.dart';
+import 'package:heating_planner/l10n/app_localizations_en.dart';
 import 'package:heating_planner/ui/canvas/tools/editor_callbacks.dart';
 import 'package:heating_planner/ui/canvas/tools/snap_service.dart';
 import 'package:heating_planner/ui/canvas/tools/undo_redo_service.dart';
 import 'package:heating_planner/ui/canvas/tools/wall_draw_tool.dart';
+import 'package:heating_planner/ui/providers/editor_state_provider.dart';
 
 // ── Stub EditorCallbacks ─────────────────────────────────────────────────────
 
@@ -71,6 +81,16 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   void destroyRoom(String roomId) {}
   @override
+  void destroyRoomCascade(String roomId) {}
+  @override
+  void replaceAllForRoomCascade(
+    List<WallSegment> walls,
+    List<Room> rooms,
+    List<HeatingZone> zones,
+    List<WindowElement> windows,
+    List<Door> doors,
+  ) {}
+  @override
   void restoreRoom(Room room, List<String> wallIds) {}
   @override
   void updateRoom(Room room) {}
@@ -86,6 +106,7 @@ class _StubCallbacks implements EditorCallbacks {
   void addRoomFromDetection({
     required Room room,
     required List<String> wallIds,
+    Map<String, WallSegment>? movedSideProperties,
   }) {}
   @override
   void commitWindow(WindowElement window) {}
@@ -237,6 +258,7 @@ class _RoomAwareStubCallbacks implements EditorCallbacks {
   void addRoomFromDetection({
     required Room room,
     required List<String> wallIds,
+    Map<String, WallSegment>? movedSideProperties,
   }) {}
 
   @override
@@ -281,6 +303,16 @@ class _RoomAwareStubCallbacks implements EditorCallbacks {
   void removeWall(String wallId) {}
   @override
   void destroyRoom(String roomId) {}
+  @override
+  void destroyRoomCascade(String roomId) {}
+  @override
+  void replaceAllForRoomCascade(
+    List<WallSegment> walls,
+    List<Room> rooms,
+    List<HeatingZone> zones,
+    List<WindowElement> windows,
+    List<Door> doors,
+  ) {}
   @override
   void restoreRoom(Room room, List<String> wallIds) {}
   @override
@@ -360,9 +392,195 @@ double _polySpan(List<Point2D> pts, double Function(Point2D) axis) {
   return hi - lo;
 }
 
+// ── Provider-backed callbacks adapter (WDT-13 / WDT-14) ──────────────────────
+//
+// Routes every wall-creation call to a real EditorStateNotifier so the
+// ADR-017 Rule 1 (thickness defaults) and Rule 2 (anchorMode defaults)
+// applied inside `addWall` / `commitWallWithSplit` execute exactly as in
+// production. Without this adapter the stub-based callbacks above never
+// touch the notifier and Rule 1/2 are bypassed.
+
+class _ProviderWallDrawCallbacks implements EditorCallbacks {
+  _ProviderWallDrawCallbacks(this._container);
+
+  final ProviderContainer _container;
+
+  EditorStateNotifier get _n =>
+      _container.read(editorStateProvider.notifier);
+
+  @override
+  final AppLocalizations l10n = AppLocalizationsEn();
+
+  @override
+  List<WallSegment> get currentWalls =>
+      _container.read(editorStateProvider).walls;
+  @override
+  List<Room> get currentRooms =>
+      _container.read(editorStateProvider).rooms;
+  @override
+  List<HeatingZone> get currentZones =>
+      _container.read(editorStateProvider).zones;
+  @override
+  List<WindowElement> get currentWindows =>
+      _container.read(editorStateProvider).windows;
+  @override
+  List<Door> get currentDoors =>
+      _container.read(editorStateProvider).doors;
+  @override
+  List<HeatingCircuit> get currentCircuits =>
+      _container.read(editorStateProvider).circuits;
+  @override
+  Distributor? get currentDistributor =>
+      _container.read(editorStateProvider).distributor;
+
+  @override
+  void commitWall(WallSegment wall) => _n.addWall(wall);
+  @override
+  void commitWallWithSplit(WallSegment wall) => _n.commitWallWithSplit(wall);
+  @override
+  void updateWall(WallSegment wall) => _n.updateWall(wall);
+  @override
+  void removeWall(String wallId) => _n.removeWall(wallId);
+
+  @override
+  void destroyRoom(String roomId) {
+    _n.clearRoomIdOnWalls(roomId);
+    _n.removeRoom(roomId);
+  }
+
+  @override
+  void destroyRoomCascade(String roomId) =>
+      _n.destroyRoomCascade(roomId);
+
+  @override
+  void replaceAllForRoomCascade(
+    List<WallSegment> walls,
+    List<Room> rooms,
+    List<HeatingZone> zones,
+    List<WindowElement> windows,
+    List<Door> doors,
+  ) =>
+      _n.replaceAllForRoomCascade(walls, rooms, zones, windows, doors);
+
+  @override
+  void restoreRoom(Room room, List<String> wallIds) {
+    _n.addRoom(room);
+    _n.assignWallsToRoom(wallIds, room.id);
+  }
+
+  @override
+  void updateRoom(Room room) => _n.updateRoom(room);
+
+  @override
+  void replaceAllWalls(List<WallSegment> walls) =>
+      _n.replaceAllWalls(walls);
+  @override
+  void replaceAllWallsAndRooms(
+    List<WallSegment> walls,
+    List<Room> rooms,
+  ) =>
+      _n.replaceAllWallsAndRooms(walls, rooms);
+  @override
+  void replaceAllWallsRoomsZones(
+    List<WallSegment> walls,
+    List<Room> rooms,
+    List<HeatingZone> zones,
+  ) =>
+      _n.replaceAllWallsRoomsZones(walls, rooms, zones);
+  @override
+  void addRoomFromDetection({
+    required Room room,
+    required List<String> wallIds,
+    Map<String, WallSegment>? movedSideProperties,
+  }) =>
+      _n.addRoomFromDetection(
+        room: room,
+        wallIds: wallIds,
+        movedSideProperties: movedSideProperties,
+      );
+
+  @override
+  void commitWindow(WindowElement window) => _n.addWindow(window);
+  @override
+  void updateWindow(WindowElement window) => _n.updateWindow(window);
+  @override
+  void removeWindow(String windowId) => _n.removeWindow(windowId);
+
+  @override
+  void commitDoor(Door door) => _n.addDoor(door);
+  @override
+  void updateDoor(Door door) => _n.updateDoor(door);
+  @override
+  void removeDoor(String doorId) => _n.removeDoor(doorId);
+
+  @override
+  void commitDistributor(Distributor d) => _n.setDistributor(d);
+  @override
+  void updateDistributor(Distributor d) => _n.updateDistributor(d);
+  @override
+  void removeDistributor() => _n.clearDistributor();
+  @override
+  void requestDistributorReplaceDialog({
+    required void Function() onMove,
+    required void Function() onReplace,
+  }) {}
+  @override
+  void requestDistributorDeleteDialog({
+    required void Function() onConfirmed,
+  }) {}
+
+  @override
+  void commitCircuit(HeatingCircuit circuit) => _n.addCircuit(circuit);
+  @override
+  void updateCircuit(HeatingCircuit circuit) => _n.updateCircuit(circuit);
+  @override
+  void removeCircuit(String circuitId) => _n.removeCircuit(circuitId);
+  @override
+  void clearAllCircuits() => _n.clearAllCircuits();
+
+  @override
+  void commitZone(HeatingZone zone) => _n.addZone(zone);
+  @override
+  void updateZone(HeatingZone zone) => _n.updateZone(zone);
+  @override
+  void removeZone(String zoneId) => _n.removeZone(zoneId);
+
+  @override
+  String get currentFloorId => 'floor-1';
+  @override
+  String get defaultTubeTypeId => 'tube-1';
+  @override
+  String get defaultFlooringMaterialId => 'mat-1';
+
+  @override
+  void selectElement(String? type, String? id) {}
+
+  @override
+  void requestRoomDialog(
+    List<Point2D> polygon,
+    List<String> wallIds, {
+    void Function(List<WallSegment>, List<Room>)? onCreated,
+  }) {}
+
+  @override
+  void requestZoneContextMenu(ZoneContextMenuRequest request) {}
+
+  @override
+  void showToast(String message) {}
+
+  @override
+  double get currentZoom => 1.0;
+  @override
+  double get currentGridSpacingMm => 100.0;
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 void main() {
+  setUpAll(() {
+    driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
+  });
+  TestWidgetsFlutterBinding.ensureInitialized();
   // WDT-1 ────────────────────────────────────────────────────────────────────
 
   test(
@@ -804,6 +1022,150 @@ void main() {
   // dimension-matching snap feature (to be implemented in SnapService /
   // WallDrawTool.onDragEnd). Per agent-test.md §3: tests are written against
   // the specification, not the current implementation.
+
+  // WDT-13 / WDT-14 ────────────────────────────────────────────────────────
+  //
+  // ADR-017 Rule 1: a newly drawn room's walls all carry the matching
+  // project default `thicknessMm` for their `wallType`, and `anchorMode`
+  // per Rule 2.
+  //
+  // These cases drive WallDrawTool through a provider-backed
+  // EditorCallbacks so the real EditorStateNotifier's wall-creation path
+  // runs (where Rule 1 / Rule 2 defaults are applied). The stub-based
+  // tests above intentionally bypass the notifier so they remain unit
+  // tests of WallDrawTool's gesture logic.
+
+  test(
+    'WDT-13: single wall drawn click-click carries default exterior '
+    'thickness (240 mm) and anchorMode = innerFace',
+    () {
+      final container = ProviderContainer(overrides: [
+        appDatabaseProvider.overrideWith((ref) {
+          final db = AppDatabase.forTesting(NativeDatabase.memory());
+          ref.onDispose(db.close);
+          return db;
+        }),
+      ]);
+      addTearDown(container.dispose);
+      final cb = _ProviderWallDrawCallbacks(container);
+      final tool = WallDrawTool(
+        callbacks: cb,
+        onStateChanged: () {},
+        undoRedo: UndoRedoService(),
+      );
+
+      tool.onTap(const Point2D(x: 0, y: 0), PointerDeviceKind.mouse);
+      tool.onTap(const Point2D(x: 5000, y: 0), PointerDeviceKind.mouse);
+
+      expect(cb.currentWalls, hasLength(1));
+      final wall = cb.currentWalls.single;
+      // Rule 1: default exterior thickness from ProjectSettings (240 mm).
+      expect(wall.thicknessMm, 240.0);
+      // Rule 2: exterior + no mirror → innerFace.
+      expect(wall.anchorMode, WallAnchorMode.innerFace);
+    },
+  );
+
+  test(
+    'WDT-14: Ctrl+drag rectangle commits 4 walls, all carrying default '
+    'exterior thickness and innerFace anchor per ADR-017 Rules 1 & 2',
+    () {
+      final container = ProviderContainer(overrides: [
+        appDatabaseProvider.overrideWith((ref) {
+          final db = AppDatabase.forTesting(NativeDatabase.memory());
+          ref.onDispose(db.close);
+          return db;
+        }),
+      ]);
+      addTearDown(container.dispose);
+      final cb = _ProviderWallDrawCallbacks(container);
+      final tool = WallDrawTool(
+        callbacks: cb,
+        onStateChanged: () {},
+        undoRedo: UndoRedoService(),
+      );
+
+      tool.updateModifiers(shift: false, ctrl: true, alt: false);
+      tool.onPointerDown(const Point2D(x: 0, y: 0), 1);
+      tool.onDragEnd(const Point2D(x: 4000, y: 3000));
+
+      expect(cb.currentWalls, hasLength(4));
+      for (final w in cb.currentWalls) {
+        expect(
+          w.thicknessMm,
+          240.0,
+          reason: 'every freshly drawn wall must inherit the project '
+              "exterior default thickness, not the freezed fallback of 0",
+        );
+        expect(
+          w.anchorMode,
+          WallAnchorMode.innerFace,
+          reason: 'ADR-017 Rule 2: exterior + no mirror → innerFace',
+        );
+      }
+    },
+  );
+
+  // WDT-15 ───────────────────────────────────────────────────────────────────
+  //
+  // ADR-020 Rule 3: every WallDrawTool-committed wall must carry a non-null
+  // `constructionId` pointing at a fresh single-layer auto-default
+  // construction (project default material + thickness for its `wallType`).
+  // The Ctrl+drag rectangle path exercises commitWallWithSplit four times,
+  // so we expect four auto-default constructions, each with exactly one
+  // layer using the default exterior material id and thickness.
+
+  test(
+    'WDT-15: Ctrl+drag rectangle gives every wall an auto-default '
+    'construction (ADR-020 Rule 3)',
+    () {
+      final container = ProviderContainer(overrides: [
+        appDatabaseProvider.overrideWith((ref) {
+          final db = AppDatabase.forTesting(NativeDatabase.memory());
+          ref.onDispose(db.close);
+          return db;
+        }),
+      ]);
+      addTearDown(container.dispose);
+      final cb = _ProviderWallDrawCallbacks(container);
+      final tool = WallDrawTool(
+        callbacks: cb,
+        onStateChanged: () {},
+        undoRedo: UndoRedoService(),
+      );
+
+      tool.updateModifiers(shift: false, ctrl: true, alt: false);
+      tool.onPointerDown(const Point2D(x: 0, y: 0), 1);
+      tool.onDragEnd(const Point2D(x: 4000, y: 3000));
+
+      final state = container.read(editorStateProvider);
+      expect(state.walls, hasLength(4));
+      for (final w in state.walls) {
+        expect(
+          w.constructionId,
+          isNotNull,
+          reason:
+              'ADR-020 Rule 3: every freshly drawn wall must carry a '
+              'construction id',
+        );
+        final c = state.constructions
+            .where((c) => c.id == w.constructionId)
+            .single;
+        expect(c.isAutoDefault, isTrue);
+        expect(c.isPreset, isFalse);
+        final layers = state.materialLayers
+            .where((l) => l.constructionId == c.id)
+            .toList();
+        expect(
+          layers,
+          hasLength(1),
+          reason: 'auto-default construction must have exactly one layer',
+        );
+        expect(layers.single.materialId, 'mat-016');
+        expect(layers.single.thicknessMm, 240.0);
+      }
+    },
+  );
 
   test(
     'WDT-12: drag-end within 100 mm of shared-wall height snaps y to match '

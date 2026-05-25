@@ -64,6 +64,25 @@ abstract class Project with _$Project {
     /// whose `constructionId` is null. Constraint: 50–1000.
     @Default(100) int defaultPartitionWallThicknessMm,
 
+    /// Default material catalog entry ID used for the single auto-default
+    /// layer of every freshly drawn exterior wall (ADR-020 Rule 1).
+    ///
+    /// Initial value points at the "Vertical coring brick" entry
+    /// (`mat-016`) in `assets/materials.json`. Editing this field in the
+    /// project settings cascades to every wall whose construction has
+    /// `isAutoDefault = true` per ADR-020 Rule 6.
+    @Default('mat-016') String defaultExteriorMaterialId,
+
+    /// Default material catalog entry ID for new interior (shared) walls.
+    ///
+    /// See [defaultExteriorMaterialId] for cascade semantics.
+    @Default('mat-016') String defaultInteriorMaterialId,
+
+    /// Default material catalog entry ID for new partition walls.
+    ///
+    /// See [defaultExteriorMaterialId] for cascade semantics.
+    @Default('mat-016') String defaultPartitionMaterialId,
+
     /// Optional geographic location used for climate data lookup.
     GeoLocation? location,
   }) = _Project;

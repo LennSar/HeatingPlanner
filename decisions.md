@@ -1221,4 +1221,286 @@ unchanged.
   - ST-S5: Ctrl+Z after split restores the parent zone with its original
     `circuitId` and circuit zone-FK.
 
+---
+
+## ADR-019 — Deleting a room cascades to its walls, zones, openings; mirror partners revert to exterior
+
+**What.**
+Deleting a `Room` (Select-tool Delete on a selected room, or Ctrl/⌘+Delete /
+Backspace when a room is selected) removes the room entity *and* every
+child element keyed by `roomId`: all of its `WallSegment`s, all of its
+`HeatingZone`s, and every `WindowElement` / `Door` hosted on those walls.
+For each removed wall whose `mirrorId != null`, the surviving partner is
+reverted in place: `wallType` becomes `exterior`, `mirrorId` /
+`adjacentRoomId` are cleared, `anchorMode` is set to `innerFace`
+(ADR-017 Rule 2 default for exterior walls), while `thicknessMm` and
+`constructionId` are preserved verbatim (the partner's physical wall is
+unchanged — only its sharing relationship is severed).
+
+The whole cascade — child removal, partner revert, room removal — is one
+atomic `state.copyWith` and one `UndoRedoService` "Delete room" command;
+a single Ctrl+Z restores the room, every deleted child, and every
+mirror link to its pre-delete state.
+
+**Why.**
+Until ADR-019 the delete path called `clearRoomIdOnWalls` and left walls
+in memory with an empty `roomId`. These orphans rendered nowhere (the
+wall painter only mitres room-assigned walls into corners) yet still
+participated in snap candidates, room-detection BFS, and validation,
+which led to drifting state and confusing repeats of "Restore room"
+attempts. Cascading the delete matches the intuitive mental model
+("delete the room, take its walls with it") and gives the snapshot-
+based undo a clean inverse: replace the post-delete state with the
+pre-delete state and DAO writes follow.
+
+Partner revert is required because ADR-017 Rule 3 forces shared walls
+to `centerline`. Once the partner is alone it is conceptually a fresh
+exterior wall and must follow Rule 2 (`innerFace`); leaving it at
+`centerline` would mean the next thickness change would push the
+neighbour's inner clear dimension inward, contradicting the planning-
+workflow promise that the planner's typed dimension is what's kept.
+The partner's `thicknessMm` and `constructionId` are preserved because
+those are physical properties — the wall is the same wall, just no
+longer shared.
+
+**Rule.**
+
+1. **Cascade scope.** On `destroyRoom(roomId)`:
+   - Every wall with `roomId == roomId` is removed.
+   - Every zone with `roomId == roomId` is removed.
+   - Every window / door whose `wallSegmentId` references a removed
+     wall is removed.
+   - The room entity itself is removed.
+
+2. **Mirror revert.** For each removed wall with `mirrorId != null`,
+   locate the partner by id in the remaining walls (the partner's
+   `roomId` is the neighbour and therefore not in the delete set) and
+   update it in-place to:
+   - `wallType = WallType.exterior`
+   - `mirrorId = null`
+   - `adjacentRoomId = null`
+   - `anchorMode = WallAnchorMode.innerFace`
+   - `thicknessMm` and `constructionId` unchanged.
+
+3. **Atomicity.** All of the above happens in a single `state.copyWith`
+   so the wall painter, room detection, and validation only ever see the
+   pre- or post-delete graph — never an intermediate state with the
+   room gone but its walls still present.
+
+4. **Undo.** The delete command snapshots the pre-delete (walls, rooms,
+   zones, windows, doors) and post-delete tuples; `execute` replaces with
+   the post-delete tuple, `undo` replaces with the pre-delete tuple. A
+   single Ctrl+Z restores the room and every cascaded child, with
+   mirror links intact on both partners. DAO writes follow the same
+   eventual-sync pattern as `_MoveRoomCommand` (ADR-016 Rule 5).
+
+5. **Heating circuits.** Circuits referencing a removed zone via
+   `zoneId` are left with a dangling reference; this is the existing
+   behaviour and is out of scope for ADR-019. Validation already flags
+   unconnected circuits via `ADR-004`'s zone-state machine. A future
+   ADR may extend the cascade to also remove orphan circuits.
+
+**Scope.**
+Affects `EditorStateNotifier.destroyRoom`-equivalent path,
+`EditorCallbacks.destroyRoom` / `restoreRoom`, and
+`SelectTool._DeleteRoomCommand`. Wall deletion (ADR-001 mirror-pair
+deletion) and zone / opening deletion in isolation are unchanged.
+
+**Verification.**
+`flutter analyze` clean; new widget tests:
+- `test/widget/tools/delete_room_test.dart`:
+  - DR-1: deleting a standalone room removes the room, all its walls,
+    and all its zones; nothing else changes.
+  - DR-2: deleting a room with a shared wall removes the deleted
+    room's wall, leaves the neighbour's partner as a standalone
+    `exterior` wall with cleared `mirrorId` / `adjacentRoomId`,
+    `anchorMode = innerFace`, and unchanged `thicknessMm` /
+    `constructionId`.
+  - DR-3: a single Ctrl+Z after either case restores the room, every
+    deleted child, and the mirror link on both partners.
+
+
+## ADR-020 — Project default wall material; every new wall carries a single-layer auto-default construction
+
+**What.**
+`Project` gains three new material-id fields:
+
+| Field | Default |
+|-------|---------|
+| `defaultExteriorMaterialId`   | `mat-016` (Vertical coring brick) |
+| `defaultInteriorMaterialId`   | `mat-016` |
+| `defaultPartitionMaterialId`  | `mat-016` |
+
+`WallConstruction` gains a boolean `isAutoDefault` (default `false`),
+orthogonal to the existing `isPreset` flag but mutually exclusive
+(`isAutoDefault = true` implies `isPreset = false`).
+
+Every code path that creates a `WallSegment` — room-draw polygon tool,
+rect-mode, ADR-003 host-wall split, ADR-009 Rule 3 promotion, ADR-016
+reconciliation re-creation — also spawns a fresh `WallConstruction`
+with `isAutoDefault = true, isPreset = false` and exactly one
+`MaterialLayer` whose `materialId` equals the project default for the
+wall's `wallType` and whose `thicknessMm` equals the matching project
+default. The wall's `constructionId` is linked to that new
+construction; the wall's `thicknessMm` equals the layer sum (ADR-017
+Rule 1 case 1). Rule 1 case 2 (the bare-thickness project-default
+fallback) remains as a safety net for any wall that might still have
+`constructionId == null`.
+
+The wall construction editor flips `isAutoDefault` to `false` on any
+layer-affecting mutation (add layer, remove layer, change material,
+change thickness). The "Load preset" path replaces
+`WallSegment.constructionId` with a fresh non-auto-default copy of the
+preset; the orphaned auto-default construction is deleted in the same
+save transaction. A no-op edit (open then close without changes)
+leaves the flag alone. The editor enforces a minimum of one layer per
+construction.
+
+Project Settings exposes three new material dropdowns next to the
+existing thickness fields. Changing any default cascades to every
+auto-default construction layer of the corresponding `wallType` and is
+recorded as a single `UndoRedoService` "Update project defaults"
+command.
+
+**Why.**
+Before ADR-020 the wall properties panel's construction section was
+empty for un-assigned walls. Walls already adopted the project default
+*thickness* (ADR-017 Rule 1 case 2), so the inner-clear annotation and
+heat-demand calculations were correct, but the construction-editor
+field was visually empty, which was inconsistent with the rest of the
+panel. Auto-spawning a construction at draw time gives every wall a
+real layer stack with sensible material defaults, matching the user
+mental model of "a wall always has a build-up." Marking these
+constructions with `isAutoDefault = true` lets us cascade Project
+Settings changes without disturbing user-customised assemblies, and
+gives the editor a clear signal for the "this construction was never
+edited" UI state.
+
+The single source-of-truth for material lookups is the catalog stream
+(`materialEntriesProvider`); the auto-default construction's layer
+copies thermal conductivity / density / specific heat from the catalog
+at spawn time so U-value calculations are consistent with the
+non-auto-default path.
+
+**Rule.**
+
+1. **Project model — three new material fields.** Add
+   `defaultExteriorMaterialId`, `defaultInteriorMaterialId`,
+   `defaultPartitionMaterialId` to the `Project` freezed model and to
+   the `projects` Drift table. All three initial defaults are
+   `mat-016` (Vertical coring brick).
+
+2. **Construction model — `isAutoDefault` flag.** Add
+   `isAutoDefault: bool` (default `false`) to the `WallConstruction`
+   freezed model and to the `wall_constructions` Drift table.
+   Orthogonal to `isPreset`; `isAutoDefault = true` implies
+   `isPreset = false`.
+
+3. **Wall creation always generates a construction.** Every code path
+   that creates a `WallSegment` also creates a fresh `WallConstruction`
+   with `isAutoDefault = true, isPreset = false` and one
+   `MaterialLayer` whose `materialId = project.default<WallType>MaterialId`
+   and `thicknessMm = project.default<WallType>WallThicknessMm`. The
+   wall's `constructionId` is linked to that new construction; its
+   `thicknessMm` equals the layer sum. Rule 1 case 2 stays as a
+   safety net only.
+
+4. **Edit clears auto-default.** Any mutation through the construction
+   editor that changes the construction's contents sets
+   `isAutoDefault = false` on save. A no-op edit (open + close without
+   changes) leaves the flag alone. Loading a preset replaces
+   `WallSegment.constructionId` with a fresh non-auto-default instance
+   copied from the preset; the orphaned auto-default construction is
+   deleted in the same transaction.
+
+5. **Construction editor must require at least one layer.** Removing
+   the last layer is disallowed; the UI surfaces a localised toast
+   instead.
+
+6. **Project default material change → cascade.** When the user changes
+   any `default<WallType>MaterialId` in Project Settings, every
+   `WallSegment` whose `wallType` matches AND whose construction has
+   `isAutoDefault = true` has its single layer's `materialId` (and
+   thermal conductivity / density / specific heat copied from the new
+   `MaterialEntry`) updated. Walls with `isAutoDefault = false` are
+   untouched.
+
+7. **Project default thickness change → cascade (reinterprets ADR-017
+   Rule 9).** Same predicate: walls of matching `wallType` whose
+   construction has `isAutoDefault = true` get their single layer
+   `thicknessMm` updated and the wall is re-anchored per ADR-017
+   Rule 6. ADR-017 Rule 9 is effectively replaced by this rule — its
+   safety-net behaviour is retained for any `constructionId == null`
+   wall that might still exist.
+
+8. **Shared-wall promotion (ADR-017 Rule 8) — auto-default
+   propagation.** Cases a–d unchanged in outcome. The surviving shared
+   wall's `isAutoDefault` follows whichever side was adopted:
+    - 8a → `true` (both sides auto-default; mirror copies share a
+      single new auto-default construction; the prior auto-default
+      constructions are orphaned and deleted in the same transaction);
+    - 8b/c → adopted side's `isAutoDefault` value;
+    - 8d → existing wall's `isAutoDefault` value.
+
+   ADR-001 mirror partners share `constructionId` (single construction
+   row) per existing behaviour. A wall with `constructionId == null`
+   is treated as auto-default for the purposes of this rule (legacy
+   safety-net path).
+
+9. **UI — Project Settings screen.** Add three dropdowns ("Default
+   exterior material", "Default interior material", "Default partition
+   material") next to the existing default-thickness fields, populated
+   from `materialEntriesProvider`. Each material change commits via
+   `_ChangeDefaultMaterialCommand`; each thickness change commits via
+   the existing `_ChangeDefaultWallThicknessCommand` (now extended to
+   snapshot constructions / layers too). Both commands are labelled
+   "Update project defaults" in the undo stack.
+
+10. **UI — wall properties panel.** Every wall now carries a real
+    construction, so the placeholder "(project default)" suffix on the
+    thickness display is removed. The "Add construction" / "Edit
+    construction" button label conditional is kept only as a safety
+    net for the legacy `constructionId == null` branch.
+
+11. **L10n.** Add German + English strings for the three new dropdown
+    labels (`defaultExteriorMaterial`, `defaultInteriorMaterial`,
+    `defaultPartitionMaterial`), the section heading
+    (`defaultWallMaterials`), the descriptive tooltip
+    (`defaultWallMaterialsDesc`: *"Changes here update walls you have
+    not customised individually"*), and the Rule 5 toast
+    (`layerStackRequiresOneLayer`: *"A construction must have at
+    least one layer."*).
+
+**Scope.**
+Affects `Project` and `WallConstruction` schemas; the project settings
+dialog; the wall construction editor; the wall properties panel;
+`EditorStateNotifier`'s wall-creation paths
+(`addWall`, `commitWallWithSplit`, `addRoomFromDetection`); and the
+shared-wall promotion logic. Does not change ADR-001 (shared walls
+remain two `WallSegment`s sharing a single `WallConstruction`),
+ADR-016, or ADR-017 semantics. The in-flight `isPreset` work is
+orthogonal and is preserved.
+
+**Verification.**
+Defined per implementation prompt. Acceptance criteria include:
+- Drawing a 4×5 m room shows four walls, each with a non-null
+  `constructionId` pointing at a single-layer auto-default
+  construction whose `materialId` and `thicknessMm` match the project
+  defaults for `WallType.exterior`.
+- Changing `defaultExteriorMaterialId` in Project Settings updates
+  only the auto-default exterior walls' single-layer material;
+  user-edited (`isAutoDefault == false`) walls and walls of other
+  `wallType`s remain untouched. Ctrl+Z reverts both the project field
+  and the cascaded layer rows in one step.
+- Changing `defaultExteriorWallThicknessMm` updates the auto-default
+  exterior layers' thickness and re-anchors the owning walls per
+  ADR-017 Rule 6.
+- Editing any layer in the construction editor flips
+  `isAutoDefault` to `false` on save.
+- Loading a preset over an auto-default construction yields a fresh
+  non-auto-default copy on the wall and orphan-deletes the original
+  auto-default row.
+- Shared-wall promotion under Rule 8a yields a wall with
+  `isAutoDefault = true`; Rule 8b yields a wall whose `isAutoDefault`
+  matches the adopted side.
 

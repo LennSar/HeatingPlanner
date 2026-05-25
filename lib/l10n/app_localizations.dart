@@ -2341,6 +2341,42 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Wall thickness must be 5–100 cm'**
   String get wallThicknessInvalidToast;
+
+  /// ADR-020 heading for the three default-material dropdowns on the project settings dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Default wall materials'**
+  String get defaultWallMaterials;
+
+  /// Subtitle on the project settings explaining the ADR-020 auto-default cascade behaviour
+  ///
+  /// In en, this message translates to:
+  /// **'Changes here update walls you have not customised individually.'**
+  String get defaultWallMaterialsDesc;
+
+  /// Label for the exterior material dropdown in project settings
+  ///
+  /// In en, this message translates to:
+  /// **'Default exterior material'**
+  String get defaultExteriorMaterial;
+
+  /// Label for the interior material dropdown in project settings
+  ///
+  /// In en, this message translates to:
+  /// **'Default interior material'**
+  String get defaultInteriorMaterial;
+
+  /// Label for the partition material dropdown in project settings
+  ///
+  /// In en, this message translates to:
+  /// **'Default partition material'**
+  String get defaultPartitionMaterial;
+
+  /// Toast shown when the user tries to remove the final layer from a construction (ADR-020 Rule 5)
+  ///
+  /// In en, this message translates to:
+  /// **'A construction must have at least one layer.'**
+  String get layerStackRequiresOneLayer;
 }
 
 class _AppLocalizationsDelegate

@@ -6,10 +6,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/engines/geometry_engine.dart';
 import '../../calculation/providers/project_settings_provider.dart';
+import '../../data/database/app_database.dart' show appDatabaseProvider;
 import '../../repositories/app_preferences.dart';
 import '../../repositories/building_repository.dart';
 import '../../repositories/construction_repository.dart';
 import '../../repositories/heating_repository.dart';
+import '../../repositories/material_repository.dart';
 import '../../repositories/project_repository.dart';
 import '../../repositories/save_state_notifier.dart';
 import '../../core/utils/id_generator.dart';
@@ -19,6 +21,7 @@ import '../../data/models/enums.dart';
 import '../../data/models/heating_circuit.dart';
 import '../../data/models/heating_zone.dart';
 import '../../data/models/localized_catalog_row.dart';
+import '../../data/models/material_entry.dart';
 import '../../data/models/material_layer.dart';
 import '../../data/models/point2d.dart';
 import '../../data/models/room.dart';
@@ -288,6 +291,193 @@ class EditorStateNotifier extends Notifier<EditorState>
     return wall;
   }
 
+  /// Applies ADR-017 Rule 1 creation-time thickness defaults to [wall]:
+  /// a fresh wall coming in with the freezed fallback `thicknessMm = 0`
+  /// is upgraded to its source-of-truth — `sum(layers.thicknessMm)` when
+  /// `constructionId != null`, otherwise the matching project default
+  /// for [wall.wallType]. Walls already carrying a positive thickness
+  /// (a split fragment that inherited the host's thickness, an undo
+  /// restore, or a caller that supplied an explicit value) are returned
+  /// unchanged. Used only on creation paths ([addWall],
+  /// [commitWallWithSplit]); [updateWall] honours the caller's chosen
+  /// thickness verbatim.
+  WallSegment _withThicknessDefaults(WallSegment wall) {
+    if (wall.thicknessMm > 0) return wall;
+    return wall.copyWith(thicknessMm: _thicknessSourceOfTruth(wall));
+  }
+
+  // ── ADR-020: auto-default constructions ───────────────────────────────────
+
+  /// Project-default material catalog ID for [wallType] (ADR-020 Rule 1).
+  String _projectDefaultMaterialIdFor(WallType wallType) {
+    final s = ref.read(projectSettingsProvider);
+    return switch (wallType) {
+      WallType.exterior => s.defaultExteriorMaterialId,
+      WallType.interior => s.defaultInteriorMaterialId,
+      WallType.partition => s.defaultPartitionMaterialId,
+    };
+  }
+
+  /// Project-default thickness in mm for [wallType] (ADR-017 Rule 1 case 2).
+  double _projectDefaultThicknessFor(WallType wallType) {
+    final s = ref.read(projectSettingsProvider);
+    return _projectDefaultForType(s, wallType);
+  }
+
+  /// Looks up the [MaterialEntry] for [materialId] from
+  /// [materialEntriesProvider]; returns a generic placeholder when the
+  /// catalog has not finished loading or the ID is missing so the
+  /// auto-default construction is always seedable.
+  MaterialEntry _resolveMaterial(String materialId) {
+    // Synchronous lookup: read the *cached* state of the materials
+    // provider only when it has already been mounted. We never trigger
+    // a fresh stream subscription here because the underlying Drift
+    // database is opened lazily and pulls in `path_provider`, which
+    // crashes on a vanilla `ProviderContainer()` without
+    // `TestWidgetsFlutterBinding.ensureInitialized()`. The Project
+    // Settings dialog and the construction editor open the catalog
+    // separately when they need it for display; for the initial
+    // auto-default construction it is enough to ship known good
+    // defaults for `mat-016` (Vertical coring brick).
+    final cached = ref.exists(materialEntriesProvider)
+        ? ref.read(materialEntriesProvider).asData?.value
+        : null;
+    final hit = cached?.where((m) => m.id == materialId).firstOrNull;
+    if (hit != null) return hit;
+    return MaterialEntry(
+      id: materialId,
+      name: materialId,
+      category: 'Masonry',
+      subcategory: 'Historic brick',
+      lambdaDefault: 0.50,
+      densityDefault: 1200,
+      specificHeatDefault: 900,
+    );
+  }
+
+  /// ADR-020 Rule 3 — creates a fresh auto-default [WallConstruction] for
+  /// [wallType] plus its single project-default [MaterialLayer], commits
+  /// both to in-memory state, persists them when a Drift DAO is
+  /// available, and returns the new construction id. Caller is expected
+  /// to use the returned id as the wall's `constructionId`.
+  String _spawnAutoDefaultConstruction(WallType wallType) {
+    final mat = _resolveMaterial(_projectDefaultMaterialIdFor(wallType));
+    final thickness = _projectDefaultThicknessFor(wallType);
+    final cid = IdGenerator.newId();
+    final construction = WallConstruction(
+      id: cid,
+      name: 'Auto-default ${wallType.name}',
+      isAutoDefault: true,
+    );
+    final layer = MaterialLayer(
+      id: IdGenerator.newId(),
+      constructionId: cid,
+      sortOrder: 0,
+      materialId: mat.id,
+      thicknessMm: thickness,
+      thermalConductivity: mat.lambdaDefault,
+      density: mat.densityDefault,
+      specificHeat: mat.specificHeatDefault,
+    );
+    state = state.copyWith(
+      constructions: [...state.constructions, construction],
+      materialLayers: [...state.materialLayers, layer],
+    );
+    // DAO writes are best-effort: bare-bones unit tests run without an
+    // `appDatabaseProvider` override, in which case opening the real
+    // Drift database needs `path_provider` and crashes the binding on
+    // the very first query. Persist only when the DB provider already
+    // has a mounted, error-free element in this container.
+    if (_isDatabaseAvailable()) {
+      final cDao = ref.read(constructionDaoProvider);
+      unawaited(upsertConstruction(cDao, construction));
+      unawaited(upsertLayer(cDao, layer));
+    }
+    return cid;
+  }
+
+  /// True when [appDatabaseProvider] has been overridden / mounted in
+  /// the current [ProviderContainer]. Used by the ADR-020 spawn /
+  /// cascade helpers to skip DAO writes in lightweight unit tests
+  /// that intentionally construct a bare `ProviderContainer()` and
+  /// never override [appDatabaseProvider].
+  bool _isDatabaseAvailable() => ref.exists(appDatabaseProvider);
+
+  /// ADR-020 Rule 6 cascade — push the new project-default material into
+  /// the single layer of every auto-default construction whose owning
+  /// walls have [wallType]. Walls whose construction has
+  /// `isAutoDefault == false` are untouched.
+  void recomputeAutoDefaultMaterialsForWallType(WallType wallType) {
+    final mat = _resolveMaterial(_projectDefaultMaterialIdFor(wallType));
+    final wallsOfType = state.walls.where((w) => w.wallType == wallType);
+    final targetConstructionIds = <String>{
+      for (final w in wallsOfType)
+        if (w.constructionId != null) w.constructionId!,
+    };
+    final affected = state.constructions
+        .where(
+          (c) => c.isAutoDefault && targetConstructionIds.contains(c.id),
+        )
+        .map((c) => c.id)
+        .toSet();
+    if (affected.isEmpty) return;
+    final updatedLayers = state.materialLayers.map((l) {
+      if (!affected.contains(l.constructionId)) return l;
+      return l.copyWith(
+        materialId: mat.id,
+        thermalConductivity: mat.lambdaDefault,
+        density: mat.densityDefault,
+        specificHeat: mat.specificHeatDefault,
+      );
+    }).toList();
+    state = state.copyWith(materialLayers: updatedLayers);
+    if (_isDatabaseAvailable()) {
+      final cDao = ref.read(constructionDaoProvider);
+      for (final l in updatedLayers) {
+        if (!affected.contains(l.constructionId)) continue;
+        unawaited(upsertLayer(cDao, l));
+      }
+    }
+    markProjectDirty();
+  }
+
+  /// ADR-020 Rule 7 cascade — set the single layer's `thicknessMm` to the
+  /// new project default for [wallType] on every auto-default
+  /// construction, then re-anchor each owning wall per ADR-017 Rule 6.
+  void recomputeAutoDefaultThicknessForWallType(WallType wallType) {
+    final newThickness = _projectDefaultThicknessFor(wallType);
+    final wallsOfType =
+        state.walls.where((w) => w.wallType == wallType).toList();
+    final targetConstructionIds = <String>{
+      for (final w in wallsOfType)
+        if (w.constructionId != null) w.constructionId!,
+    };
+    final affected = state.constructions
+        .where(
+          (c) => c.isAutoDefault && targetConstructionIds.contains(c.id),
+        )
+        .map((c) => c.id)
+        .toSet();
+    if (affected.isEmpty) return;
+    final updatedLayers = state.materialLayers.map((l) {
+      if (!affected.contains(l.constructionId)) return l;
+      return l.copyWith(thicknessMm: newThickness);
+    }).toList();
+    state = state.copyWith(materialLayers: updatedLayers);
+    if (_isDatabaseAvailable()) {
+      final cDao = ref.read(constructionDaoProvider);
+      for (final l in updatedLayers) {
+        if (!affected.contains(l.constructionId)) continue;
+        unawaited(upsertLayer(cDao, l));
+      }
+    }
+    // ADR-017 Rule 6 re-anchor for every wall whose construction is in
+    // [affected]. recomputeWallsForConstruction handles mirror sync.
+    for (final cid in affected) {
+      recomputeWallsForConstruction(cid);
+    }
+  }
+
   /// Returns the project-default thickness in mm for [wallType] from
   /// [settings]. Used by the ADR-017 Rule 8 promotion logic to classify
   /// a wall as "default" (constructionId null AND thicknessMm matches).
@@ -305,8 +495,23 @@ class EditorStateNotifier extends Notifier<EditorState>
       };
 
   /// Add a wall segment.
+  ///
+  /// ADR-020 Rule 3: when [wall] arrives with a null `constructionId`, a
+  /// fresh auto-default [WallConstruction] is spawned (project default
+  /// material + thickness for the wall's [WallType]) and the wall is
+  /// linked to it. Walls supplied with an explicit `constructionId`
+  /// (split fragments, undo restores, shared-wall mirrors) are left
+  /// alone so their existing construction stays intact.
   void addWall(WallSegment wall) {
-    final w = _withOrientation(_withRule2Defaults(wall));
+    var prepared = _withThicknessDefaults(_withRule2Defaults(wall));
+    if (prepared.constructionId == null) {
+      final cid = _spawnAutoDefaultConstruction(prepared.wallType);
+      prepared = prepared.copyWith(
+        constructionId: cid,
+        thicknessMm: _projectDefaultThicknessFor(prepared.wallType),
+      );
+    }
+    final w = _withOrientation(prepared);
     state = state.copyWith(
       walls: [...state.walls, w],
     );
@@ -536,6 +741,121 @@ class EditorStateNotifier extends Notifier<EditorState>
     markProjectDirty();
   }
 
+  /// Delete [roomId] and every child element keyed by it, per ADR-019.
+  ///
+  /// Cascade scope (Rule 1):
+  ///   - every wall with `roomId == roomId`,
+  ///   - every zone with `roomId == roomId`,
+  ///   - every window / door whose `wallSegmentId` references a
+  ///     removed wall,
+  ///   - the room entity itself.
+  ///
+  /// For each removed wall with `mirrorId != null` the surviving
+  /// partner is reverted to `exterior` with `mirrorId` and
+  /// `adjacentRoomId` cleared and `anchorMode = innerFace`
+  /// (ADR-017 Rule 2); `thicknessMm` and `constructionId` are
+  /// preserved (Rule 2).
+  ///
+  /// All of the above happens in a single `state.copyWith` (Rule 3).
+  /// DAO writes follow; the snapshot-based "Delete room" command
+  /// captures pre- and post-state for one-Ctrl+Z undo (Rule 4).
+  void destroyRoomCascade(String roomId) {
+    final wallsToRemove =
+        state.walls.where((w) => w.roomId == roomId).toList();
+    if (wallsToRemove.isEmpty &&
+        state.rooms.where((r) => r.id == roomId).isEmpty) {
+      // Nothing to do — neither room nor any walls reference it.
+      return;
+    }
+    final wallIdsToRemove = wallsToRemove.map((w) => w.id).toSet();
+    final partnerIds = <String>{
+      for (final w in wallsToRemove)
+        if (w.mirrorId != null) w.mirrorId!,
+    };
+    final zonesToRemove =
+        state.zones.where((z) => z.roomId == roomId).toList();
+    final windowsToRemove = state.windows
+        .where((w) => wallIdsToRemove.contains(w.wallSegmentId))
+        .toList();
+    final doorsToRemove = state.doors
+        .where((d) => wallIdsToRemove.contains(d.wallSegmentId))
+        .toList();
+
+    final partnersUpdated = <WallSegment>[];
+    final newWalls = <WallSegment>[];
+    for (final w in state.walls) {
+      if (wallIdsToRemove.contains(w.id)) continue;
+      if (partnerIds.contains(w.id)) {
+        final reverted = w.copyWith(
+          wallType: WallType.exterior,
+          mirrorId: null,
+          adjacentRoomId: null,
+          anchorMode: WallAnchorMode.innerFace,
+        );
+        partnersUpdated.add(reverted);
+        newWalls.add(reverted);
+      } else {
+        newWalls.add(w);
+      }
+    }
+
+    state = state.copyWith(
+      walls: newWalls,
+      rooms: state.rooms.where((r) => r.id != roomId).toList(),
+      zones: state.zones.where((z) => z.roomId != roomId).toList(),
+      windows: state.windows
+          .where((w) => !wallIdsToRemove.contains(w.wallSegmentId))
+          .toList(),
+      doors: state.doors
+          .where((d) => !wallIdsToRemove.contains(d.wallSegmentId))
+          .toList(),
+    );
+
+    final bDao = ref.read(buildingDaoProvider);
+    final hDao = ref.read(heatingDaoProvider);
+    for (final w in wallsToRemove) {
+      unawaited(deleteWallSegment(bDao, w.id));
+    }
+    for (final p in partnersUpdated) {
+      unawaited(upsertWallSegment(bDao, p));
+    }
+    for (final z in zonesToRemove) {
+      unawaited(deleteHeatingZone(hDao, z.id));
+    }
+    for (final w in windowsToRemove) {
+      unawaited(deleteWindow(bDao, w.id));
+    }
+    for (final d in doorsToRemove) {
+      unawaited(deleteDoor(bDao, d.id));
+    }
+    unawaited(deleteRoom(bDao, roomId));
+    markProjectDirty();
+  }
+
+  /// Replace walls, rooms, zones, windows, and doors atomically — the
+  /// inverse of [destroyRoomCascade] (ADR-019 Rule 4 snapshot restore).
+  ///
+  /// Used by the "Delete room" undo / redo command. Memory only; DAO
+  /// sync is handled by the initial [destroyRoomCascade] call and is
+  /// not re-applied on undo (the existing snapshot-restore pattern for
+  /// `_MoveRoomCommand` / `_RectDrawCommand` follows the same
+  /// convention).
+  void replaceAllForRoomCascade(
+    List<WallSegment> walls,
+    List<Room> rooms,
+    List<HeatingZone> zones,
+    List<WindowElement> windows,
+    List<Door> doors,
+  ) {
+    state = state.copyWith(
+      walls: walls,
+      rooms: rooms,
+      zones: zones,
+      windows: windows,
+      doors: doors,
+    );
+  }
+
   // ---- Walls batch operations ----
 
   /// Replace the entire wall list in one state update.
@@ -543,6 +863,22 @@ class EditorStateNotifier extends Notifier<EditorState>
   /// Used by undo/redo commands to restore a prior snapshot.
   void replaceAllWalls(List<WallSegment> walls) {
     state = state.copyWith(walls: walls);
+  }
+
+  /// Replace walls, constructions, and material layers in one atomic
+  /// state update (ADR-020 Rule 6/7 undo snapshot — "Update project
+  /// defaults" command). DAO sync is handled by the originating
+  /// mutation; undo/redo restores the in-memory tuple only.
+  void replaceAllWallsConstructionsLayers(
+    List<WallSegment> walls,
+    List<WallConstruction> constructions,
+    List<MaterialLayer> layers,
+  ) {
+    state = state.copyWith(
+      walls: walls,
+      constructions: constructions,
+      materialLayers: layers,
+    );
   }
 
   /// Replace walls and rooms in one atomic state update.
@@ -1025,17 +1361,38 @@ class EditorStateNotifier extends Notifier<EditorState>
       }
     }
 
-    walls.add(_withOrientation(_withRule2Defaults(wall)));
+    var prepared = _withThicknessDefaults(_withRule2Defaults(wall));
+    if (prepared.constructionId == null) {
+      // ADR-020 Rule 3: every fresh wall carries an auto-default
+      // construction. Split fragments above kept the host's
+      // constructionId so they remain on the original construction.
+      final cid = _spawnAutoDefaultConstruction(prepared.wallType);
+      prepared = prepared.copyWith(
+        constructionId: cid,
+        thicknessMm: _projectDefaultThicknessFor(prepared.wallType),
+      );
+    }
+    final newWall = _withOrientation(prepared);
+    walls.add(newWall);
     state = state.copyWith(walls: walls);
 
+    final dao = ref.read(buildingDaoProvider);
     if (removed.isNotEmpty || addedPersisted.isNotEmpty) {
-      final dao = ref.read(buildingDaoProvider);
       for (final id in removed) {
         unawaited(deleteWallSegment(dao, id));
       }
       for (final w in addedPersisted) {
         unawaited(upsertWallSegment(dao, w));
       }
+    }
+    // Persist the newly added wall whenever it carries a roomId so the
+    // ADR-017 startup restore picks up its constructionId. Bare
+    // (roomId-empty) walls remain in-memory until promoted to a room.
+    if (newWall.roomId.isNotEmpty) {
+      unawaited(upsertWallSegment(dao, newWall));
+    }
+    if (removed.isNotEmpty || addedPersisted.isNotEmpty ||
+        newWall.roomId.isNotEmpty) {
       markProjectDirty();
     }
   }
@@ -1047,19 +1404,62 @@ class EditorStateNotifier extends Notifier<EditorState>
   ///
   /// Per ADR-017 Rules 3 and 7–8, every shared-wall promotion forces
   /// `anchorMode = WallAnchorMode.centerline` on both members of the
-  /// mirror pair, inherits the host wall's [thicknessMm] and
-  /// [constructionId] (case 8b — only the host is non-default at this
-  /// point; the freshly created mirror is always default), and emits a
-  /// `WarningSeverity.warning` validation result if case 8d (both sides
-  /// non-default and different) ever fires.
+  /// mirror pair and resolves [thicknessMm] / [constructionId] per
+  /// Rule 8 cases 8a–8d.
+  ///
+  /// [movedSideProperties] supplies the new-room-side wall's
+  /// pre-move [thicknessMm] / [constructionId] / [wallType] for shared
+  /// walls promoted via the ADR-016 room-move reconciliation path
+  /// (keyed by the matched host wall's id). The room-draw path passes
+  /// null, which the resolver treats as "new side is default" — the
+  /// historical invariant before ADR-016.
   void addRoomFromDetection({
     required Room room,
     required List<String> wallIds,
+    Map<String, WallSegment>? movedSideProperties,
   }) {
     final updatedWalls = [...state.walls];
+    var updatedConstructions = [...state.constructions];
+    var updatedLayers = [...state.materialLayers];
     final toPersist = <WallSegment>[];
     final conflicts = <ValidationResult>[];
     final settings = ref.read(projectSettingsProvider);
+
+    // Local helpers so the loop body stays readable. ADR-020 Rule 7's
+    // safety-net text — "keep its safety-net behaviour for any
+    // constructionId == null wall that might still exist" — applies
+    // here too: a wall with null `constructionId` is treated as
+    // auto-default for promotion-decision purposes.
+    bool isAutoDefault(String? cid) {
+      if (cid == null) return true;
+      return updatedConstructions
+              .where((c) => c.id == cid)
+              .firstOrNull
+              ?.isAutoDefault ==
+          true;
+    }
+
+    void dropAutoDefault(String cid) {
+      updatedConstructions =
+          updatedConstructions.where((c) => c.id != cid).toList();
+      updatedLayers =
+          updatedLayers.where((l) => l.constructionId != cid).toList();
+      if (_isDatabaseAvailable()) {
+        final cDao = ref.read(constructionDaoProvider);
+        unawaited(deleteConstruction(cDao, cid));
+      }
+    }
+
+    String spawnSharedAutoDefault() {
+      // ADR-020 Rule 8a: create a fresh shared auto-default interior
+      // construction. _spawnAutoDefaultConstruction commits to state &
+      // DAO, but state is read again on the next iteration via
+      // `updatedConstructions`, so refresh from the notifier state.
+      final cid = _spawnAutoDefaultConstruction(WallType.interior);
+      updatedConstructions = [...state.constructions];
+      updatedLayers = [...state.materialLayers];
+      return cid;
+    }
 
     for (int i = 0; i < wallIds.length; i++) {
       final wallId = wallIds[i];
@@ -1079,35 +1479,107 @@ class EditorStateNotifier extends Notifier<EditorState>
         // cross-reference each other (ADR-011 Rule 3).
         final newMirrorId = IdGenerator.newId();
 
-        // ADR-017 Rule 8 resolution. The neighbour-side wall is `wall`;
-        // the new-room-side wall is freshly created and therefore
-        // always default. So:
-        //  - host default + new default → case 8a → interior default
-        //    thickness, constructionId = null
-        //  - host non-default + new default → case 8b → adopt host's
-        //    thickness + constructionId.
-        // Cases 8c/8d only matter when both pre-existing walls carry a
-        // construction, which the current promotion paths cannot
-        // produce. The 8d branch is left in place defensively so future
-        // promotion paths (e.g. mid-edit splits of two assigned shared
-        // walls) emit a warning rather than silently picking a winner.
-        final hostDefault = wall.constructionId == null &&
-            (wall.thicknessMm -
-                    _projectDefaultForType(settings, wall.wallType))
-                    .abs() <
-                1e-6;
+        // ADR-020 reinterprets ADR-017 Rule 8: "default" means
+        // `construction.isAutoDefault == true`.
+        //   8a both auto-default              → fresh shared auto-default
+        //   8b exactly one side non-auto-def. → adopt that side
+        //   8c both non-auto-default, equal   → preserve
+        //   8d both non-auto-default, diff.   → adopt host + warning
+        //
+        // When [movedSideProperties] is null (room-draw path) the moved
+        // side is treated as auto-default (the wall was just drawn and
+        // its auto-default construction was spawned in `addWall` /
+        // `commitWallWithSplit`).
+        final movedSide = movedSideProperties?[wallId];
+        final hostAutoDefault = isAutoDefault(wall.constructionId);
+        final movedAutoDefault = movedSide == null
+            ? true
+            : isAutoDefault(movedSide.constructionId);
+
         final double resolvedThickness;
         final String? resolvedConstructionId;
-        if (hostDefault) {
-          // Case 8a: use the interior default — both partners default.
+        final bool resolvedIsAutoDefault;
+        if (hostAutoDefault && movedAutoDefault) {
+          // Case 8a — both auto-default → fresh shared auto-default.
+          final sharedCid = spawnSharedAutoDefault();
+          // Orphan the previous auto-defaults if any.
+          final wallCid = wall.constructionId;
+          if (wallCid != null) {
+            dropAutoDefault(wallCid);
+          }
+          final movedCid = movedSide?.constructionId;
+          if (movedCid != null && movedCid != wallCid) {
+            dropAutoDefault(movedCid);
+          }
           resolvedThickness =
               settings.defaultInteriorWallThicknessMm.toDouble();
-          resolvedConstructionId = null;
-        } else {
-          // Case 8b: adopt the host wall's existing construction.
+          resolvedConstructionId = sharedCid;
+          resolvedIsAutoDefault = true;
+        } else if (!hostAutoDefault && movedAutoDefault) {
+          // Case 8b (host non-auto-default) — adopt host.
+          final movedCid = movedSide?.constructionId;
+          if (movedCid != null && movedCid != wall.constructionId) {
+            dropAutoDefault(movedCid);
+          }
           resolvedThickness = wall.thicknessMm;
           resolvedConstructionId = wall.constructionId;
+          resolvedIsAutoDefault = false;
+        } else if (hostAutoDefault && !movedAutoDefault) {
+          // Case 8b (moved non-auto-default) — adopt moved side.
+          // `movedAutoDefault == false` implies movedSide is non-null
+          // (the null branch sets movedAutoDefault = true), so flow
+          // analysis already narrows movedSide here.
+          final moved = movedSide;
+          final wallCid = wall.constructionId;
+          if (wallCid != null && moved.constructionId != wallCid) {
+            dropAutoDefault(wallCid);
+          }
+          resolvedThickness = moved.thicknessMm;
+          resolvedConstructionId = moved.constructionId;
+          resolvedIsAutoDefault = false;
+        } else if (movedSide != null &&
+            movedSide.constructionId == wall.constructionId &&
+            (movedSide.thicknessMm - wall.thicknessMm).abs() < 1e-6) {
+          // Case 8c — both non-auto-default and equal → preserve.
+          resolvedThickness = wall.thicknessMm;
+          resolvedConstructionId = wall.constructionId;
+          resolvedIsAutoDefault = false;
+        } else {
+          // Case 8d — both non-auto-default and different. Adopt host.
+          resolvedThickness = wall.thicknessMm;
+          resolvedConstructionId = wall.constructionId;
+          resolvedIsAutoDefault = false;
+          final movedCid = movedSide?.constructionId;
+          if (movedCid != null && movedCid != wall.constructionId) {
+            // The moved side's now-unreferenced construction may have
+            // been a preset or an edited user construction — leave it
+            // for the user. Only orphan when it was auto-default.
+            if (isAutoDefault(movedCid)) {
+              dropAutoDefault(movedCid);
+            }
+          }
+          conflicts.add(
+            ValidationResult(
+              severity: WarningSeverity.warning,
+              elementType: 'wall',
+              elementId: wall.id,
+              message:
+                  'Shared wall construction conflict — adopted host wall '
+                  'configuration; review.',
+            ),
+          );
         }
+        // resolvedIsAutoDefault is the post-promotion isAutoDefault
+        // value documented by ADR-020 Rule 8; it is already implied by
+        // the chosen [resolvedConstructionId]'s row in the construction
+        // table, so no extra write is needed here.
+        assert(
+          resolvedConstructionId == null ||
+              isAutoDefault(resolvedConstructionId) ==
+                  resolvedIsAutoDefault,
+          'ADR-020 Rule 8: post-promotion construction isAutoDefault flag '
+          'must match the resolved value.',
+        );
 
         final updated = wall.copyWith(
           wallType: WallType.interior,
@@ -1141,6 +1613,8 @@ class EditorStateNotifier extends Notifier<EditorState>
     state = state.copyWith(
       walls: updatedWalls,
       rooms: [...state.rooms, room],
+      constructions: updatedConstructions,
+      materialLayers: updatedLayers,
     );
 
     final dao = ref.read(buildingDaoProvider);

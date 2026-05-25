@@ -14,6 +14,7 @@ _WallConstruction _$WallConstructionFromJson(Map<String, dynamic> json) =>
       rsi: (json['rsi'] as num?)?.toDouble() ?? 0.13,
       rse: (json['rse'] as num?)?.toDouble() ?? 0.04,
       isPreset: json['isPreset'] as bool? ?? false,
+      isAutoDefault: json['isAutoDefault'] as bool? ?? false,
     );
 
 Map<String, dynamic> _$WallConstructionToJson(_WallConstruction instance) =>
@@ -24,4 +25,5 @@ Map<String, dynamic> _$WallConstructionToJson(_WallConstruction instance) =>
       'rsi': instance.rsi,
       'rse': instance.rse,
       'isPreset': instance.isPreset,
+      'isAutoDefault': instance.isAutoDefault,
     };

@@ -23,6 +23,20 @@ class Projects extends Table {
   IntColumn get defaultPartitionWallThicknessMm =>
       integer().withDefault(const Constant(100))();
 
+  /// ADR-020 Rule 1: default material catalog ID for the single
+  /// auto-default layer of every new exterior wall's construction.
+  /// Initial value points at the `Vertical coring brick` entry.
+  TextColumn get defaultExteriorMaterialId =>
+      text().withDefault(const Constant('mat-016'))();
+
+  /// ADR-020 Rule 1: default material catalog ID for new interior walls.
+  TextColumn get defaultInteriorMaterialId =>
+      text().withDefault(const Constant('mat-016'))();
+
+  /// ADR-020 Rule 1: default material catalog ID for new partition walls.
+  TextColumn get defaultPartitionMaterialId =>
+      text().withDefault(const Constant('mat-016'))();
+
   /// Serialised JSON blob for the optional GeoLocation.
   TextColumn get locationJson => text().nullable()();
 

@@ -10,10 +10,9 @@ import '../../data/models/enums.dart';
 import '../../data/models/material_layer.dart';
 import '../../data/models/wall_construction.dart';
 import '../../data/models/wall_segment.dart';
+import '../dialogs/material_picker_dialog.dart';
 import '../providers/editor_state_provider.dart';
-import '../../data/models/material_entry.dart';
 import '../../repositories/material_repository.dart';
-import '../widgets/material_picker.dart';
 
 // ---------------------------------------------------------------
 // Public entry point
@@ -247,7 +246,7 @@ class _SlabConstructionDialogState
   }
 
   Future<void> _pickMaterial(int index) async {
-    final mat = await _showMaterialPickerDialog(context);
+    final mat = await showMaterialPickerDialog(context);
     if (mat == null || !mounted) return;
     _updateLayer(
       index,
@@ -669,6 +668,19 @@ class _WallConstructionDialogState
   bool _isNewConstruction = false;
   bool _defaultNameApplied = false;
 
+  /// ADR-020 Rule 4: set when the user has made any layer-affecting
+  /// mutation (add, remove, reorder, change material, change thickness,
+  /// or load preset). On save we flip [WallConstruction.isAutoDefault]
+  /// to false so the cascade in Rule 6/7 no longer touches this row.
+  bool _hasLayerMutation = false;
+
+  /// ADR-020 Rule 4: when a preset is loaded over an auto-default
+  /// construction, the previously assigned construction becomes an
+  /// orphan and must be deleted in the same save transaction. Holds
+  /// the orphan id so [_save] can clean it up after `assignConstruction`
+  /// has rerouted the wall to the new construction.
+  String? _orphanedAutoDefaultId;
+
   @override
   void initState() {
     super.initState();
@@ -801,6 +813,7 @@ class _WallConstructionDialogState
       return;
     }
     setState(() {
+      _hasLayerMutation = true;
       _layers = [
         ..._layers,
         MaterialLayer(
@@ -818,7 +831,18 @@ class _WallConstructionDialogState
   }
 
   void _removeLayer(int index) {
+    // ADR-020 Rule 5: removing the last layer is disallowed (the
+    // construction would have `sum(layers) = 0` and the owning wall
+    // would collapse to zero thickness). Surface a toast and bail.
+    if (_layers.length <= 1) {
+      final l10n = AppLocalizations.of(context)!;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.layerStackRequiresOneLayer)),
+      );
+      return;
+    }
     setState(() {
+      _hasLayerMutation = true;
       final list = List<MaterialLayer>.from(_layers)..removeAt(index);
       _layers = list
           .asMap()
@@ -830,6 +854,7 @@ class _WallConstructionDialogState
 
   void _onReorder(int oldIndex, int newIndex) {
     setState(() {
+      _hasLayerMutation = true;
       if (newIndex > oldIndex) newIndex--;
       final list = List<MaterialLayer>.from(_layers);
       list.insert(newIndex, list.removeAt(oldIndex));
@@ -843,6 +868,7 @@ class _WallConstructionDialogState
 
   void _updateLayer(int index, MaterialLayer updated) {
     setState(() {
+      _hasLayerMutation = true;
       final list = List<MaterialLayer>.from(_layers);
       list[index] = updated.copyWith(sortOrder: index);
       _layers = list;
@@ -850,7 +876,7 @@ class _WallConstructionDialogState
   }
 
   Future<void> _pickMaterialForLayer(int index) async {
-    final mat = await _showMaterialPickerDialog(context);
+    final mat = await showMaterialPickerDialog(context);
     if (mat == null || !mounted) return;
     _updateLayer(
       index,
@@ -996,11 +1022,26 @@ class _WallConstructionDialogState
         .toList()
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
 
-    final newId = _construction.id;
+    // ADR-020 Rule 4: loading a preset replaces the wall's
+    // `constructionId` with a fresh non-auto-default instance copied
+    // from the preset; the orphaned auto-default construction (if any)
+    // is deleted on save. Assign a *new* UUID so the loaded preset
+    // does not stomp the in-place row.
+    final priorConstruction = ref
+        .read(editorStateProvider)
+        .constructions
+        .where((c) => c.id == _construction.id)
+        .firstOrNull;
+    if (priorConstruction != null && priorConstruction.isAutoDefault) {
+      _orphanedAutoDefaultId = priorConstruction.id;
+    }
+    final newId = IdGenerator.newId();
     setState(() {
+      _hasLayerMutation = true;
       _construction = selected.copyWith(
         id: newId,
         isPreset: false,
+        isAutoDefault: false,
       );
       _layers = srcLayers
           .asMap()
@@ -1025,10 +1066,16 @@ class _WallConstructionDialogState
 
     final rsi = double.tryParse(_rsiCtrl.text) ?? 0.13;
     final rse = double.tryParse(_rseCtrl.text) ?? 0.04;
+    // ADR-020 Rule 4: any layer-affecting mutation flips
+    // `isAutoDefault` to false. The no-op edit case (open & close
+    // without changes) leaves the flag alone.
+    final clearedAutoDefault =
+        _hasLayerMutation ? false : _construction.isAutoDefault;
     final updated = _construction.copyWith(
       name: name,
       rsi: rsi,
       rse: rse,
+      isAutoDefault: clearedAutoDefault,
     );
 
     final notifier = ref.read(editorStateProvider.notifier);
@@ -1053,6 +1100,21 @@ class _WallConstructionDialogState
       // wall that uses this construction so their thicknessMm follows
       // the new layer sum (ADR-017 Rule 6, construction-editor cascade).
       notifier.recomputeWallsForConstruction(updated.id);
+    }
+
+    // ADR-020 Rule 4: orphaned auto-default cleanup. After
+    // `assignConstruction` rerouted the wall to the new construction,
+    // the previously assigned auto-default has zero references and
+    // can be safely deleted.
+    final orphan = _orphanedAutoDefaultId;
+    if (orphan != null && orphan != updated.id) {
+      final stillReferenced = ref
+          .read(editorStateProvider)
+          .walls
+          .any((w) => w.constructionId == orphan);
+      if (!stillReferenced) {
+        notifier.removeConstruction(orphan);
+      }
     }
 
     Navigator.of(context).pop();
@@ -2047,26 +2109,4 @@ class _ThicknessChangeBanner extends ConsumerWidget {
   }
 }
 
-/// Shows a [MaterialPicker] inside a dialog and returns the chosen
-/// [MaterialEntry], or null if the user dismisses without selecting.
-Future<MaterialEntry?> _showMaterialPickerDialog(BuildContext context) {
-  return showDialog<MaterialEntry>(
-    context: context,
-    builder: (ctx) => Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: SizedBox(
-        width: 400,
-        height: 560,
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: MaterialPicker(
-            onSelected: (m) => Navigator.of(ctx).pop(m),
-          ),
-        ),
-      ),
-    ),
-  );
-}
 

@@ -104,11 +104,9 @@ class WallProperties extends ConsumerWidget {
       }
     }
 
-    final thicknessSuffix = wall.constructionId == null
-        ? '(project default)'
-        : '(from construction)';
-    final thicknessText =
-        '${wall.thicknessMm.round()} mm $thicknessSuffix';
+    // ADR-020 Rule 10: every wall carries a real construction, so the
+    // placeholder "(project default)" suffix is gone.
+    final thicknessText = '${wall.thicknessMm.round()} mm';
 
     final isShared = wall.mirrorId != null;
 
@@ -169,6 +167,9 @@ class WallProperties extends ConsumerWidget {
             width: double.infinity,
             child: OutlinedButton.icon(
               icon: const Icon(Icons.layers_outlined, size: 16),
+              // ADR-020 Rule 10: every wall now carries a construction;
+              // the legacy "Add construction" label only fires on the
+              // safety-net path when a legacy wall lost its row.
               label: Text(
                 construction == null
                     ? l10n.addConstruction

@@ -29,9 +29,11 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/core/theme/app_theme.dart';
 import 'package:heating_planner/data/database/app_database.dart'
     as $db;
+import 'package:heating_planner/data/models/material_entry.dart';
 import 'package:heating_planner/data/models/project.dart';
 import 'package:heating_planner/l10n/app_localizations.dart';
 import 'package:heating_planner/repositories/app_preferences.dart';
+import 'package:heating_planner/repositories/material_repository.dart';
 import 'package:heating_planner/repositories/project_repository.dart';
 import 'package:heating_planner/ui/dialogs/project_settings_dialog.dart';
 import 'package:heating_planner/ui/screens/project_list_screen.dart';
@@ -72,10 +74,13 @@ Future<void> _selectLanguage(
   String optionText,
 ) async {
   // The Project Settings dialog's language dropdown is the
-  // only DropdownButton<String> in the tree. The dialog is
-  // taller than the test viewport, so scroll its
-  // SingleChildScrollView to bring the dropdown into view.
-  final dropdown = find.byType(DropdownButton<String>);
+  // DropdownButton tagged with the ValueKey('languageDropdown')
+  // exposed by the language-row widget (ADR-020 added three
+  // material-default DropdownButton<String>s above it, so the bare
+  // type-match would now find four matches). The dialog is taller
+  // than the test viewport, so scroll its SingleChildScrollView to
+  // bring the dropdown into view.
+  final dropdown = find.byKey(const ValueKey('languageDropdown'));
   final scrollable = find
       .descendant(
         of: find.byType(ProjectSettingsDialog),
@@ -117,6 +122,25 @@ void main() {
                 .overrideWithValue(db),
             projectsProvider.overrideWith(
               (ref) => Stream.value(<Project>[]),
+            ),
+            // ADR-020: the project settings dialog now opens
+            // material-default dropdowns that subscribe to
+            // [materialEntriesProvider]. Override with a synchronous
+            // single-value stream so Drift doesn't keep a watch open
+            // and produce a "Timer still pending" assertion when the
+            // test tree is torn down.
+            materialEntriesProvider.overrideWith(
+              (ref) => Stream.value(<MaterialEntry>[
+                const MaterialEntry(
+                  id: 'mat-016',
+                  name: 'Vertical coring brick',
+                  category: 'Masonry',
+                  subcategory: 'Historic brick',
+                  lambdaDefault: 0.50,
+                  densityDefault: 1200,
+                  specificHeatDefault: 900,
+                ),
+              ]),
             ),
           ],
           child: const _TestApp(),

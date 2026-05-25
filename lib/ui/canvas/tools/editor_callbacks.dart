@@ -82,7 +82,30 @@ abstract class EditorCallbacks {
   // ---- Rooms ----
 
   /// Remove a room by ID and clear roomId on its walls.
+  ///
+  /// Non-cascading legacy path used by `_DeleteWallCommand` and the
+  /// ADR-016 room-move flow. For ADR-019 room deletion use
+  /// [destroyRoomCascade] instead.
   void destroyRoom(String roomId);
+
+  /// ADR-019 cascade delete: removes [roomId], every wall keyed by
+  /// it, every zone keyed by it, and every window / door hosted on
+  /// those walls. For each removed wall with `mirrorId != null`, the
+  /// surviving partner reverts to `exterior` with cleared
+  /// `mirrorId` / `adjacentRoomId` and `anchorMode = innerFace`
+  /// (thickness and construction preserved). All in one atomic
+  /// state update.
+  void destroyRoomCascade(String roomId);
+
+  /// Snapshot-restore the editor state to a pre-/post-cascade tuple
+  /// (ADR-019 Rule 4). Used by the "Delete room" undo / redo command.
+  void replaceAllForRoomCascade(
+    List<WallSegment> walls,
+    List<Room> rooms,
+    List<HeatingZone> zones,
+    List<WindowElement> windows,
+    List<Door> doors,
+  );
 
   /// Add a room back and reassign its walls (for undo).
   void restoreRoom(Room room, List<String> wallIds);
@@ -116,9 +139,16 @@ abstract class EditorCallbacks {
   /// Exposed for tools that re-commit a room without going through the
   /// room-detection dialog — currently the ADR-016 move-room flow in
   /// [SelectTool]. Wraps `EditorStateNotifier.addRoomFromDetection`.
+  ///
+  /// [movedSideProperties], when non-null, supplies the new-room-side
+  /// wall's pre-move thickness/construction/wallType for each shared
+  /// wall promoted via room-move reconciliation, keyed by the matched
+  /// host wall's id. The room-draw path passes null (moved side is
+  /// implicitly default), which preserves the historical Rule 8 path.
   void addRoomFromDetection({
     required Room room,
     required List<String> wallIds,
+    Map<String, WallSegment>? movedSideProperties,
   });
 
   // ---- Windows ----

@@ -34,6 +34,12 @@ _Project _$ProjectFromJson(Map<String, dynamic> json) => _Project(
       (json['defaultInteriorWallThicknessMm'] as num?)?.toInt() ?? 120,
   defaultPartitionWallThicknessMm:
       (json['defaultPartitionWallThicknessMm'] as num?)?.toInt() ?? 100,
+  defaultExteriorMaterialId:
+      json['defaultExteriorMaterialId'] as String? ?? 'mat-016',
+  defaultInteriorMaterialId:
+      json['defaultInteriorMaterialId'] as String? ?? 'mat-016',
+  defaultPartitionMaterialId:
+      json['defaultPartitionMaterialId'] as String? ?? 'mat-016',
   location: json['location'] == null
       ? null
       : GeoLocation.fromJson(json['location'] as Map<String, dynamic>),
@@ -51,5 +57,8 @@ Map<String, dynamic> _$ProjectToJson(_Project instance) => <String, dynamic>{
   'defaultExteriorWallThicknessMm': instance.defaultExteriorWallThicknessMm,
   'defaultInteriorWallThicknessMm': instance.defaultInteriorWallThicknessMm,
   'defaultPartitionWallThicknessMm': instance.defaultPartitionWallThicknessMm,
+  'defaultExteriorMaterialId': instance.defaultExteriorMaterialId,
+  'defaultInteriorMaterialId': instance.defaultInteriorMaterialId,
+  'defaultPartitionMaterialId': instance.defaultPartitionMaterialId,
   'location': instance.location,
 };

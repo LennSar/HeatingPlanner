@@ -21,6 +21,9 @@ class ProjectSettings {
     this.defaultExteriorWallThicknessMm = 240,
     this.defaultInteriorWallThicknessMm = 120,
     this.defaultPartitionWallThicknessMm = 100,
+    this.defaultExteriorMaterialId = 'mat-016',
+    this.defaultInteriorMaterialId = 'mat-016',
+    this.defaultPartitionMaterialId = 'mat-016',
   });
 
   /// Outdoor design temperature (°C). Valid range: −50 to +10.
@@ -48,6 +51,16 @@ class ProjectSettings {
   /// Default total thickness in mm for partition walls (ADR-017).
   final int defaultPartitionWallThicknessMm;
 
+  /// ADR-020 Rule 1 — material catalog ID assigned to the single
+  /// auto-default layer of every new exterior wall.
+  final String defaultExteriorMaterialId;
+
+  /// ADR-020 Rule 1 — material catalog ID for new interior walls.
+  final String defaultInteriorMaterialId;
+
+  /// ADR-020 Rule 1 — material catalog ID for new partition walls.
+  final String defaultPartitionMaterialId;
+
   /// Returns a copy with updated fields.
   ProjectSettings copyWith({
     double? designOutdoorTempC,
@@ -57,6 +70,9 @@ class ProjectSettings {
     int? defaultExteriorWallThicknessMm,
     int? defaultInteriorWallThicknessMm,
     int? defaultPartitionWallThicknessMm,
+    String? defaultExteriorMaterialId,
+    String? defaultInteriorMaterialId,
+    String? defaultPartitionMaterialId,
   }) {
     return ProjectSettings(
       designOutdoorTempC:
@@ -72,6 +88,12 @@ class ProjectSettings {
           this.defaultInteriorWallThicknessMm,
       defaultPartitionWallThicknessMm: defaultPartitionWallThicknessMm ??
           this.defaultPartitionWallThicknessMm,
+      defaultExteriorMaterialId:
+          defaultExteriorMaterialId ?? this.defaultExteriorMaterialId,
+      defaultInteriorMaterialId:
+          defaultInteriorMaterialId ?? this.defaultInteriorMaterialId,
+      defaultPartitionMaterialId:
+          defaultPartitionMaterialId ?? this.defaultPartitionMaterialId,
     );
   }
 }
@@ -110,6 +132,12 @@ class ProjectSettingsNotifier
                           project.defaultInteriorWallThicknessMm,
                       defaultPartitionWallThicknessMm:
                           project.defaultPartitionWallThicknessMm,
+                      defaultExteriorMaterialId:
+                          project.defaultExteriorMaterialId,
+                      defaultInteriorMaterialId:
+                          project.defaultInteriorMaterialId,
+                      defaultPartitionMaterialId:
+                          project.defaultPartitionMaterialId,
                     ),
             ) ??
         const ProjectSettings();
@@ -182,6 +210,30 @@ class ProjectSettingsNotifier
     _persist();
   }
 
+  /// ADR-020 Rule 6 — set the default exterior wall material catalog ID.
+  ///
+  /// Callers (the Project Settings dialog) are responsible for invoking
+  /// `EditorStateNotifier.recomputeAutoDefaultMaterialsForWallType` so the
+  /// single layer of every auto-default exterior-wall construction picks
+  /// up the new material. The whole change is bundled into one
+  /// `UndoRedoService` "Update project defaults" command at the call site.
+  void setDefaultExteriorMaterialId(String value) {
+    state = state.copyWith(defaultExteriorMaterialId: value);
+    _persist();
+  }
+
+  /// ADR-020 Rule 6 — see [setDefaultExteriorMaterialId].
+  void setDefaultInteriorMaterialId(String value) {
+    state = state.copyWith(defaultInteriorMaterialId: value);
+    _persist();
+  }
+
+  /// ADR-020 Rule 6 — see [setDefaultExteriorMaterialId].
+  void setDefaultPartitionMaterialId(String value) {
+    state = state.copyWith(defaultPartitionMaterialId: value);
+    _persist();
+  }
+
   // ── Private helpers ────────────────────────────────────────────────────────
 
   /// Writes the current [state] back to the [Project] row in SQLite.
@@ -205,6 +257,9 @@ class ProjectSettingsNotifier
           state.defaultInteriorWallThicknessMm,
       defaultPartitionWallThicknessMm:
           state.defaultPartitionWallThicknessMm,
+      defaultExteriorMaterialId: state.defaultExteriorMaterialId,
+      defaultInteriorMaterialId: state.defaultInteriorMaterialId,
+      defaultPartitionMaterialId: state.defaultPartitionMaterialId,
       modifiedAt: DateTime.now(),
     );
     unawaited(

@@ -350,10 +350,16 @@ void main() {
 
       expect(find.text('Solid brick'), findsOneWidget);
 
-      await tester.tap(find.byIcon(Icons.delete_outline));
+      // ADR-020 Rule 5: removing the *last* layer is disallowed.
+      // Add a second layer first so we can exercise the delete path.
+      await tester.tap(find.text('Add Layer'));
+      await tester.pump();
+      expect(find.text('Solid brick'), findsNWidgets(2));
+
+      await tester.tap(find.byIcon(Icons.delete_outline).first);
       await tester.pump();
 
-      expect(find.text('Solid brick'), findsNothing);
+      expect(find.text('Solid brick'), findsOneWidget);
       await _tearDownDialog(tester);
     },
   );
@@ -505,6 +511,234 @@ void main() {
 
       // A layer row must appear.
       expect(find.text('Solid brick'), findsOneWidget);
+      await _tearDownDialog(tester);
+    },
+  );
+
+  // ADR-020-WCE-A ────────────────────────────────────────────────────────────
+  //
+  // Rule 4: any layer-affecting mutation through the construction editor
+  // flips the construction's `isAutoDefault` flag to `false` on save.
+  // We pre-seed an `isAutoDefault: true` construction, open the editor,
+  // add a layer (mutation), and then read state via the provider.
+
+  testWidgets(
+    'ADR-020-WCE-A: mutating layers flips isAutoDefault to false on save',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      const autoCid = 'auto-1';
+      const autoConstruction = WallConstruction(
+        id: autoCid,
+        name: 'Auto-default exterior',
+        isAutoDefault: true,
+      );
+      const autoLayer = MaterialLayer(
+        id: 'auto-layer-1',
+        constructionId: autoCid,
+        sortOrder: 0,
+        materialId: 'mat-001',
+        thicknessMm: 240,
+        thermalConductivity: 0.77,
+        density: 1800,
+        specificHeat: 900,
+      );
+      const autoWall = WallSegment(
+        id: 'wall-auto',
+        roomId: 'room-1',
+        startPoint: Point2D(x: 0, y: 0),
+        endPoint: Point2D(x: 5000, y: 0),
+        wallType: WallType.exterior,
+        orientation: CardinalDirection.south,
+        thicknessMm: 240,
+        anchorMode: WallAnchorMode.innerFace,
+        constructionId: autoCid,
+      );
+
+      // Build a custom trigger so we can read the post-save state via
+      // a captured ProviderContainer.
+      const initialState = EditorState(
+        walls: [autoWall],
+        constructions: [autoConstruction],
+        materialLayers: [autoLayer],
+      );
+      ProviderContainer? captured;
+      Widget app = ProviderScope(
+        overrides: [
+          editorStateProvider.overrideWith(
+            () => _StubEditorNotifier(initialState),
+          ),
+          materialEntriesProvider.overrideWith(
+            (ref) => Stream.value(const [_testMaterial]),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: const [Locale('en')],
+          home: Scaffold(
+            body: Consumer(
+              builder: (ctx, ref, _) {
+                captured = ProviderScope.containerOf(ctx, listen: false);
+                return ElevatedButton(
+                  onPressed: () =>
+                      showWallConstructionEditor(ctx, autoWall),
+                  child: const Text('Open'),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(app);
+      await _openDialog(tester);
+
+      // Mutation: add a second layer.
+      await tester.tap(find.text('Add Layer'));
+      await tester.pumpAndSettle();
+
+      // Save: tap the FilledButton with the localized "Save" label.
+      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await tester.pumpAndSettle();
+
+      final post = captured!.read(editorStateProvider);
+      final saved = post.constructions
+          .firstWhere((c) => c.id == autoCid);
+      expect(
+        saved.isAutoDefault,
+        isFalse,
+        reason: 'ADR-020 Rule 4: any layer mutation must clear isAutoDefault',
+      );
+      await _tearDownDialog(tester);
+    },
+  );
+
+  // ADR-020-WCE-B ────────────────────────────────────────────────────────────
+  //
+  // Rule 4 — load-preset cleanup. When a preset is loaded over an
+  // auto-default construction, the resulting wall.constructionId points
+  // at a fresh non-auto-default copy and the original auto-default row
+  // is deleted (orphaned).
+
+  testWidgets(
+    'ADR-020-WCE-B: loading a preset over an auto-default construction '
+    'orphan-deletes the old row on save',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 900));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      const autoCid = 'auto-2';
+      const presetCid = 'preset-1';
+      const autoConstruction = WallConstruction(
+        id: autoCid,
+        name: 'Auto-default exterior',
+        isAutoDefault: true,
+      );
+      const presetConstruction = WallConstruction(
+        id: presetCid,
+        name: 'Brick + EPS 16 cm',
+        isPreset: true,
+      );
+      const autoLayer = MaterialLayer(
+        id: 'auto-layer-2',
+        constructionId: autoCid,
+        sortOrder: 0,
+        materialId: 'mat-001',
+        thicknessMm: 240,
+        thermalConductivity: 0.77,
+        density: 1800,
+        specificHeat: 900,
+      );
+      const presetLayer = MaterialLayer(
+        id: 'preset-layer-1',
+        constructionId: presetCid,
+        sortOrder: 0,
+        materialId: 'mat-001',
+        thicknessMm: 380,
+        thermalConductivity: 0.77,
+        density: 1800,
+        specificHeat: 900,
+      );
+      const autoWall = WallSegment(
+        id: 'wall-auto-2',
+        roomId: 'room-1',
+        startPoint: Point2D(x: 0, y: 0),
+        endPoint: Point2D(x: 5000, y: 0),
+        wallType: WallType.exterior,
+        orientation: CardinalDirection.south,
+        thicknessMm: 240,
+        anchorMode: WallAnchorMode.innerFace,
+        constructionId: autoCid,
+      );
+
+      const initialState = EditorState(
+        walls: [autoWall],
+        constructions: [autoConstruction, presetConstruction],
+        materialLayers: [autoLayer, presetLayer],
+      );
+      ProviderContainer? captured;
+      Widget app = ProviderScope(
+        overrides: [
+          editorStateProvider.overrideWith(
+            () => _StubEditorNotifier(initialState),
+          ),
+          materialEntriesProvider.overrideWith(
+            (ref) => Stream.value(const [_testMaterial]),
+          ),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: const [Locale('en')],
+          home: Scaffold(
+            body: Consumer(
+              builder: (ctx, ref, _) {
+                captured = ProviderScope.containerOf(ctx, listen: false);
+                return ElevatedButton(
+                  onPressed: () =>
+                      showWallConstructionEditor(ctx, autoWall),
+                  child: const Text('Open'),
+                );
+              },
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(app);
+      await _openDialog(tester);
+
+      // Tap "Load" then pick the preset.
+      await tester.tap(find.text('Load'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Brick + EPS 16 cm'));
+      await tester.pumpAndSettle();
+
+      // Save.
+      await tester.tap(find.widgetWithText(FilledButton, 'Save'));
+      await tester.pumpAndSettle();
+
+      final post = captured!.read(editorStateProvider);
+      // The orphaned auto-default row must be gone.
+      expect(
+        post.constructions.where((c) => c.id == autoCid),
+        isEmpty,
+        reason: 'ADR-020 Rule 4: load-preset must delete the orphaned '
+            'auto-default construction',
+      );
+      // The wall must point at a fresh non-auto-default copy with
+      // non-auto-default flag and a brand-new id (≠ presetCid, ≠ autoCid).
+      final wall =
+          post.walls.firstWhere((w) => w.id == 'wall-auto-2');
+      expect(wall.constructionId, isNot(autoCid));
+      expect(wall.constructionId, isNot(presetCid));
+      expect(wall.constructionId, isNotNull);
+      final fresh =
+          post.constructions.firstWhere((c) => c.id == wall.constructionId);
+      expect(fresh.isAutoDefault, isFalse);
+      expect(fresh.isPreset, isFalse);
       await _tearDownDialog(tester);
     },
   );

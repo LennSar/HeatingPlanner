@@ -1246,4 +1246,24 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get wallThicknessInvalidToast =>
       'Wanddicke muss zwischen 5 und 100 cm liegen';
+
+  @override
+  String get defaultWallMaterials => 'Standardmaterialien für Wände';
+
+  @override
+  String get defaultWallMaterialsDesc =>
+      'Änderungen hier aktualisieren Wände, die du noch nicht individuell angepasst hast.';
+
+  @override
+  String get defaultExteriorMaterial => 'Außenwand-Standardmaterial';
+
+  @override
+  String get defaultInteriorMaterial => 'Innenwand-Standardmaterial';
+
+  @override
+  String get defaultPartitionMaterial => 'Trennwand-Standardmaterial';
+
+  @override
+  String get layerStackRequiresOneLayer =>
+      'Ein Aufbau muss mindestens eine Schicht enthalten.';
 }

@@ -136,6 +136,42 @@ class $ProjectsTable extends Projects with TableInfo<$ProjectsTable, Project> {
         requiredDuringInsert: false,
         defaultValue: const Constant(100),
       );
+  static const VerificationMeta _defaultExteriorMaterialIdMeta =
+      const VerificationMeta('defaultExteriorMaterialId');
+  @override
+  late final GeneratedColumn<String> defaultExteriorMaterialId =
+      GeneratedColumn<String>(
+        'default_exterior_material_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('mat-016'),
+      );
+  static const VerificationMeta _defaultInteriorMaterialIdMeta =
+      const VerificationMeta('defaultInteriorMaterialId');
+  @override
+  late final GeneratedColumn<String> defaultInteriorMaterialId =
+      GeneratedColumn<String>(
+        'default_interior_material_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('mat-016'),
+      );
+  static const VerificationMeta _defaultPartitionMaterialIdMeta =
+      const VerificationMeta('defaultPartitionMaterialId');
+  @override
+  late final GeneratedColumn<String> defaultPartitionMaterialId =
+      GeneratedColumn<String>(
+        'default_partition_material_id',
+        aliasedName,
+        false,
+        type: DriftSqlType.string,
+        requiredDuringInsert: false,
+        defaultValue: const Constant('mat-016'),
+      );
   static const VerificationMeta _locationJsonMeta = const VerificationMeta(
     'locationJson',
   );
@@ -160,6 +196,9 @@ class $ProjectsTable extends Projects with TableInfo<$ProjectsTable, Project> {
     defaultExteriorWallThicknessMm,
     defaultInteriorWallThicknessMm,
     defaultPartitionWallThicknessMm,
+    defaultExteriorMaterialId,
+    defaultInteriorMaterialId,
+    defaultPartitionMaterialId,
     locationJson,
   ];
   @override
@@ -266,6 +305,33 @@ class $ProjectsTable extends Projects with TableInfo<$ProjectsTable, Project> {
         ),
       );
     }
+    if (data.containsKey('default_exterior_material_id')) {
+      context.handle(
+        _defaultExteriorMaterialIdMeta,
+        defaultExteriorMaterialId.isAcceptableOrUnknown(
+          data['default_exterior_material_id']!,
+          _defaultExteriorMaterialIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('default_interior_material_id')) {
+      context.handle(
+        _defaultInteriorMaterialIdMeta,
+        defaultInteriorMaterialId.isAcceptableOrUnknown(
+          data['default_interior_material_id']!,
+          _defaultInteriorMaterialIdMeta,
+        ),
+      );
+    }
+    if (data.containsKey('default_partition_material_id')) {
+      context.handle(
+        _defaultPartitionMaterialIdMeta,
+        defaultPartitionMaterialId.isAcceptableOrUnknown(
+          data['default_partition_material_id']!,
+          _defaultPartitionMaterialIdMeta,
+        ),
+      );
+    }
     if (data.containsKey('location_json')) {
       context.handle(
         _locationJsonMeta,
@@ -328,6 +394,18 @@ class $ProjectsTable extends Projects with TableInfo<$ProjectsTable, Project> {
         DriftSqlType.int,
         data['${effectivePrefix}default_partition_wall_thickness_mm'],
       )!,
+      defaultExteriorMaterialId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}default_exterior_material_id'],
+      )!,
+      defaultInteriorMaterialId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}default_interior_material_id'],
+      )!,
+      defaultPartitionMaterialId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}default_partition_material_id'],
+      )!,
       locationJson: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}location_json'],
@@ -360,6 +438,17 @@ class Project extends DataClass implements Insertable<Project> {
   /// Default total thickness in mm for partition walls (ADR-017).
   final int defaultPartitionWallThicknessMm;
 
+  /// ADR-020 Rule 1: default material catalog ID for the single
+  /// auto-default layer of every new exterior wall's construction.
+  /// Initial value points at the `Vertical coring brick` entry.
+  final String defaultExteriorMaterialId;
+
+  /// ADR-020 Rule 1: default material catalog ID for new interior walls.
+  final String defaultInteriorMaterialId;
+
+  /// ADR-020 Rule 1: default material catalog ID for new partition walls.
+  final String defaultPartitionMaterialId;
+
   /// Serialised JSON blob for the optional GeoLocation.
   final String? locationJson;
   const Project({
@@ -374,6 +463,9 @@ class Project extends DataClass implements Insertable<Project> {
     required this.defaultExteriorWallThicknessMm,
     required this.defaultInteriorWallThicknessMm,
     required this.defaultPartitionWallThicknessMm,
+    required this.defaultExteriorMaterialId,
+    required this.defaultInteriorMaterialId,
+    required this.defaultPartitionMaterialId,
     this.locationJson,
   });
   @override
@@ -396,6 +488,15 @@ class Project extends DataClass implements Insertable<Project> {
     map['default_partition_wall_thickness_mm'] = Variable<int>(
       defaultPartitionWallThicknessMm,
     );
+    map['default_exterior_material_id'] = Variable<String>(
+      defaultExteriorMaterialId,
+    );
+    map['default_interior_material_id'] = Variable<String>(
+      defaultInteriorMaterialId,
+    );
+    map['default_partition_material_id'] = Variable<String>(
+      defaultPartitionMaterialId,
+    );
     if (!nullToAbsent || locationJson != null) {
       map['location_json'] = Variable<String>(locationJson);
     }
@@ -415,6 +516,9 @@ class Project extends DataClass implements Insertable<Project> {
       defaultExteriorWallThicknessMm: Value(defaultExteriorWallThicknessMm),
       defaultInteriorWallThicknessMm: Value(defaultInteriorWallThicknessMm),
       defaultPartitionWallThicknessMm: Value(defaultPartitionWallThicknessMm),
+      defaultExteriorMaterialId: Value(defaultExteriorMaterialId),
+      defaultInteriorMaterialId: Value(defaultInteriorMaterialId),
+      defaultPartitionMaterialId: Value(defaultPartitionMaterialId),
       locationJson: locationJson == null && nullToAbsent
           ? const Value.absent()
           : Value(locationJson),
@@ -450,6 +554,15 @@ class Project extends DataClass implements Insertable<Project> {
       defaultPartitionWallThicknessMm: serializer.fromJson<int>(
         json['defaultPartitionWallThicknessMm'],
       ),
+      defaultExteriorMaterialId: serializer.fromJson<String>(
+        json['defaultExteriorMaterialId'],
+      ),
+      defaultInteriorMaterialId: serializer.fromJson<String>(
+        json['defaultInteriorMaterialId'],
+      ),
+      defaultPartitionMaterialId: serializer.fromJson<String>(
+        json['defaultPartitionMaterialId'],
+      ),
       locationJson: serializer.fromJson<String?>(json['locationJson']),
     );
   }
@@ -474,6 +587,15 @@ class Project extends DataClass implements Insertable<Project> {
       'defaultPartitionWallThicknessMm': serializer.toJson<int>(
         defaultPartitionWallThicknessMm,
       ),
+      'defaultExteriorMaterialId': serializer.toJson<String>(
+        defaultExteriorMaterialId,
+      ),
+      'defaultInteriorMaterialId': serializer.toJson<String>(
+        defaultInteriorMaterialId,
+      ),
+      'defaultPartitionMaterialId': serializer.toJson<String>(
+        defaultPartitionMaterialId,
+      ),
       'locationJson': serializer.toJson<String?>(locationJson),
     };
   }
@@ -490,6 +612,9 @@ class Project extends DataClass implements Insertable<Project> {
     int? defaultExteriorWallThicknessMm,
     int? defaultInteriorWallThicknessMm,
     int? defaultPartitionWallThicknessMm,
+    String? defaultExteriorMaterialId,
+    String? defaultInteriorMaterialId,
+    String? defaultPartitionMaterialId,
     Value<String?> locationJson = const Value.absent(),
   }) => Project(
     id: id ?? this.id,
@@ -506,6 +631,12 @@ class Project extends DataClass implements Insertable<Project> {
         defaultInteriorWallThicknessMm ?? this.defaultInteriorWallThicknessMm,
     defaultPartitionWallThicknessMm:
         defaultPartitionWallThicknessMm ?? this.defaultPartitionWallThicknessMm,
+    defaultExteriorMaterialId:
+        defaultExteriorMaterialId ?? this.defaultExteriorMaterialId,
+    defaultInteriorMaterialId:
+        defaultInteriorMaterialId ?? this.defaultInteriorMaterialId,
+    defaultPartitionMaterialId:
+        defaultPartitionMaterialId ?? this.defaultPartitionMaterialId,
     locationJson: locationJson.present ? locationJson.value : this.locationJson,
   );
   Project copyWithCompanion(ProjectsCompanion data) {
@@ -540,6 +671,15 @@ class Project extends DataClass implements Insertable<Project> {
           data.defaultPartitionWallThicknessMm.present
           ? data.defaultPartitionWallThicknessMm.value
           : this.defaultPartitionWallThicknessMm,
+      defaultExteriorMaterialId: data.defaultExteriorMaterialId.present
+          ? data.defaultExteriorMaterialId.value
+          : this.defaultExteriorMaterialId,
+      defaultInteriorMaterialId: data.defaultInteriorMaterialId.present
+          ? data.defaultInteriorMaterialId.value
+          : this.defaultInteriorMaterialId,
+      defaultPartitionMaterialId: data.defaultPartitionMaterialId.present
+          ? data.defaultPartitionMaterialId.value
+          : this.defaultPartitionMaterialId,
       locationJson: data.locationJson.present
           ? data.locationJson.value
           : this.locationJson,
@@ -566,6 +706,9 @@ class Project extends DataClass implements Insertable<Project> {
           ..write(
             'defaultPartitionWallThicknessMm: $defaultPartitionWallThicknessMm, ',
           )
+          ..write('defaultExteriorMaterialId: $defaultExteriorMaterialId, ')
+          ..write('defaultInteriorMaterialId: $defaultInteriorMaterialId, ')
+          ..write('defaultPartitionMaterialId: $defaultPartitionMaterialId, ')
           ..write('locationJson: $locationJson')
           ..write(')'))
         .toString();
@@ -584,6 +727,9 @@ class Project extends DataClass implements Insertable<Project> {
     defaultExteriorWallThicknessMm,
     defaultInteriorWallThicknessMm,
     defaultPartitionWallThicknessMm,
+    defaultExteriorMaterialId,
+    defaultInteriorMaterialId,
+    defaultPartitionMaterialId,
     locationJson,
   );
   @override
@@ -604,6 +750,9 @@ class Project extends DataClass implements Insertable<Project> {
               this.defaultInteriorWallThicknessMm &&
           other.defaultPartitionWallThicknessMm ==
               this.defaultPartitionWallThicknessMm &&
+          other.defaultExteriorMaterialId == this.defaultExteriorMaterialId &&
+          other.defaultInteriorMaterialId == this.defaultInteriorMaterialId &&
+          other.defaultPartitionMaterialId == this.defaultPartitionMaterialId &&
           other.locationJson == this.locationJson);
 }
 
@@ -619,6 +768,9 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
   final Value<int> defaultExteriorWallThicknessMm;
   final Value<int> defaultInteriorWallThicknessMm;
   final Value<int> defaultPartitionWallThicknessMm;
+  final Value<String> defaultExteriorMaterialId;
+  final Value<String> defaultInteriorMaterialId;
+  final Value<String> defaultPartitionMaterialId;
   final Value<String?> locationJson;
   final Value<int> rowid;
   const ProjectsCompanion({
@@ -633,6 +785,9 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     this.defaultExteriorWallThicknessMm = const Value.absent(),
     this.defaultInteriorWallThicknessMm = const Value.absent(),
     this.defaultPartitionWallThicknessMm = const Value.absent(),
+    this.defaultExteriorMaterialId = const Value.absent(),
+    this.defaultInteriorMaterialId = const Value.absent(),
+    this.defaultPartitionMaterialId = const Value.absent(),
     this.locationJson = const Value.absent(),
     this.rowid = const Value.absent(),
   });
@@ -648,6 +803,9 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     this.defaultExteriorWallThicknessMm = const Value.absent(),
     this.defaultInteriorWallThicknessMm = const Value.absent(),
     this.defaultPartitionWallThicknessMm = const Value.absent(),
+    this.defaultExteriorMaterialId = const Value.absent(),
+    this.defaultInteriorMaterialId = const Value.absent(),
+    this.defaultPartitionMaterialId = const Value.absent(),
     this.locationJson = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
@@ -666,6 +824,9 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     Expression<int>? defaultExteriorWallThicknessMm,
     Expression<int>? defaultInteriorWallThicknessMm,
     Expression<int>? defaultPartitionWallThicknessMm,
+    Expression<String>? defaultExteriorMaterialId,
+    Expression<String>? defaultInteriorMaterialId,
+    Expression<String>? defaultPartitionMaterialId,
     Expression<String>? locationJson,
     Expression<int>? rowid,
   }) {
@@ -687,6 +848,12 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
         'default_interior_wall_thickness_mm': defaultInteriorWallThicknessMm,
       if (defaultPartitionWallThicknessMm != null)
         'default_partition_wall_thickness_mm': defaultPartitionWallThicknessMm,
+      if (defaultExteriorMaterialId != null)
+        'default_exterior_material_id': defaultExteriorMaterialId,
+      if (defaultInteriorMaterialId != null)
+        'default_interior_material_id': defaultInteriorMaterialId,
+      if (defaultPartitionMaterialId != null)
+        'default_partition_material_id': defaultPartitionMaterialId,
       if (locationJson != null) 'location_json': locationJson,
       if (rowid != null) 'rowid': rowid,
     });
@@ -704,6 +871,9 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
     Value<int>? defaultExteriorWallThicknessMm,
     Value<int>? defaultInteriorWallThicknessMm,
     Value<int>? defaultPartitionWallThicknessMm,
+    Value<String>? defaultExteriorMaterialId,
+    Value<String>? defaultInteriorMaterialId,
+    Value<String>? defaultPartitionMaterialId,
     Value<String?>? locationJson,
     Value<int>? rowid,
   }) {
@@ -723,6 +893,12 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
       defaultPartitionWallThicknessMm:
           defaultPartitionWallThicknessMm ??
           this.defaultPartitionWallThicknessMm,
+      defaultExteriorMaterialId:
+          defaultExteriorMaterialId ?? this.defaultExteriorMaterialId,
+      defaultInteriorMaterialId:
+          defaultInteriorMaterialId ?? this.defaultInteriorMaterialId,
+      defaultPartitionMaterialId:
+          defaultPartitionMaterialId ?? this.defaultPartitionMaterialId,
       locationJson: locationJson ?? this.locationJson,
       rowid: rowid ?? this.rowid,
     );
@@ -770,6 +946,21 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
         defaultPartitionWallThicknessMm.value,
       );
     }
+    if (defaultExteriorMaterialId.present) {
+      map['default_exterior_material_id'] = Variable<String>(
+        defaultExteriorMaterialId.value,
+      );
+    }
+    if (defaultInteriorMaterialId.present) {
+      map['default_interior_material_id'] = Variable<String>(
+        defaultInteriorMaterialId.value,
+      );
+    }
+    if (defaultPartitionMaterialId.present) {
+      map['default_partition_material_id'] = Variable<String>(
+        defaultPartitionMaterialId.value,
+      );
+    }
     if (locationJson.present) {
       map['location_json'] = Variable<String>(locationJson.value);
     }
@@ -799,6 +990,9 @@ class ProjectsCompanion extends UpdateCompanion<Project> {
           ..write(
             'defaultPartitionWallThicknessMm: $defaultPartitionWallThicknessMm, ',
           )
+          ..write('defaultExteriorMaterialId: $defaultExteriorMaterialId, ')
+          ..write('defaultInteriorMaterialId: $defaultInteriorMaterialId, ')
+          ..write('defaultPartitionMaterialId: $defaultPartitionMaterialId, ')
           ..write('locationJson: $locationJson, ')
           ..write('rowid: $rowid')
           ..write(')'))
@@ -2021,8 +2215,28 @@ class $WallConstructionsTable extends WallConstructions
     requiredDuringInsert: false,
     defaultValue: const Constant(0),
   );
+  static const VerificationMeta _isAutoDefaultMeta = const VerificationMeta(
+    'isAutoDefault',
+  );
   @override
-  List<GeneratedColumn> get $columns => [id, name, nameDe, rsi, rse, isPreset];
+  late final GeneratedColumn<int> isAutoDefault = GeneratedColumn<int>(
+    'is_auto_default',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  @override
+  List<GeneratedColumn> get $columns => [
+    id,
+    name,
+    nameDe,
+    rsi,
+    rse,
+    isPreset,
+    isAutoDefault,
+  ];
   @override
   String get aliasedName => _alias ?? actualTableName;
   @override
@@ -2072,6 +2286,15 @@ class $WallConstructionsTable extends WallConstructions
         isPreset.isAcceptableOrUnknown(data['is_preset']!, _isPresetMeta),
       );
     }
+    if (data.containsKey('is_auto_default')) {
+      context.handle(
+        _isAutoDefaultMeta,
+        isAutoDefault.isAcceptableOrUnknown(
+          data['is_auto_default']!,
+          _isAutoDefaultMeta,
+        ),
+      );
+    }
     return context;
   }
 
@@ -2105,6 +2328,10 @@ class $WallConstructionsTable extends WallConstructions
         DriftSqlType.int,
         data['${effectivePrefix}is_preset'],
       )!,
+      isAutoDefault: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}is_auto_default'],
+      )!,
     );
   }
 
@@ -2124,6 +2351,11 @@ class WallConstruction extends DataClass
 
   /// 1 = preset, 0 = regular construction.
   final int isPreset;
+
+  /// ADR-020 Rule 2: 1 = auto-default (created by wall-creation paths,
+  /// single project-default layer), 0 = explicitly edited. Mutually
+  /// exclusive with [isPreset].
+  final int isAutoDefault;
   const WallConstruction({
     required this.id,
     required this.name,
@@ -2131,6 +2363,7 @@ class WallConstruction extends DataClass
     required this.rsi,
     required this.rse,
     required this.isPreset,
+    required this.isAutoDefault,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -2143,6 +2376,7 @@ class WallConstruction extends DataClass
     map['rsi'] = Variable<double>(rsi);
     map['rse'] = Variable<double>(rse);
     map['is_preset'] = Variable<int>(isPreset);
+    map['is_auto_default'] = Variable<int>(isAutoDefault);
     return map;
   }
 
@@ -2156,6 +2390,7 @@ class WallConstruction extends DataClass
       rsi: Value(rsi),
       rse: Value(rse),
       isPreset: Value(isPreset),
+      isAutoDefault: Value(isAutoDefault),
     );
   }
 
@@ -2171,6 +2406,7 @@ class WallConstruction extends DataClass
       rsi: serializer.fromJson<double>(json['rsi']),
       rse: serializer.fromJson<double>(json['rse']),
       isPreset: serializer.fromJson<int>(json['isPreset']),
+      isAutoDefault: serializer.fromJson<int>(json['isAutoDefault']),
     );
   }
   @override
@@ -2183,6 +2419,7 @@ class WallConstruction extends DataClass
       'rsi': serializer.toJson<double>(rsi),
       'rse': serializer.toJson<double>(rse),
       'isPreset': serializer.toJson<int>(isPreset),
+      'isAutoDefault': serializer.toJson<int>(isAutoDefault),
     };
   }
 
@@ -2193,6 +2430,7 @@ class WallConstruction extends DataClass
     double? rsi,
     double? rse,
     int? isPreset,
+    int? isAutoDefault,
   }) => WallConstruction(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -2200,6 +2438,7 @@ class WallConstruction extends DataClass
     rsi: rsi ?? this.rsi,
     rse: rse ?? this.rse,
     isPreset: isPreset ?? this.isPreset,
+    isAutoDefault: isAutoDefault ?? this.isAutoDefault,
   );
   WallConstruction copyWithCompanion(WallConstructionsCompanion data) {
     return WallConstruction(
@@ -2209,6 +2448,9 @@ class WallConstruction extends DataClass
       rsi: data.rsi.present ? data.rsi.value : this.rsi,
       rse: data.rse.present ? data.rse.value : this.rse,
       isPreset: data.isPreset.present ? data.isPreset.value : this.isPreset,
+      isAutoDefault: data.isAutoDefault.present
+          ? data.isAutoDefault.value
+          : this.isAutoDefault,
     );
   }
 
@@ -2220,13 +2462,15 @@ class WallConstruction extends DataClass
           ..write('nameDe: $nameDe, ')
           ..write('rsi: $rsi, ')
           ..write('rse: $rse, ')
-          ..write('isPreset: $isPreset')
+          ..write('isPreset: $isPreset, ')
+          ..write('isAutoDefault: $isAutoDefault')
           ..write(')'))
         .toString();
   }
 
   @override
-  int get hashCode => Object.hash(id, name, nameDe, rsi, rse, isPreset);
+  int get hashCode =>
+      Object.hash(id, name, nameDe, rsi, rse, isPreset, isAutoDefault);
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
@@ -2236,7 +2480,8 @@ class WallConstruction extends DataClass
           other.nameDe == this.nameDe &&
           other.rsi == this.rsi &&
           other.rse == this.rse &&
-          other.isPreset == this.isPreset);
+          other.isPreset == this.isPreset &&
+          other.isAutoDefault == this.isAutoDefault);
 }
 
 class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
@@ -2246,6 +2491,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
   final Value<double> rsi;
   final Value<double> rse;
   final Value<int> isPreset;
+  final Value<int> isAutoDefault;
   final Value<int> rowid;
   const WallConstructionsCompanion({
     this.id = const Value.absent(),
@@ -2254,6 +2500,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
     this.rsi = const Value.absent(),
     this.rse = const Value.absent(),
     this.isPreset = const Value.absent(),
+    this.isAutoDefault = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   WallConstructionsCompanion.insert({
@@ -2263,6 +2510,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
     this.rsi = const Value.absent(),
     this.rse = const Value.absent(),
     this.isPreset = const Value.absent(),
+    this.isAutoDefault = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        name = Value(name);
@@ -2273,6 +2521,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
     Expression<double>? rsi,
     Expression<double>? rse,
     Expression<int>? isPreset,
+    Expression<int>? isAutoDefault,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -2282,6 +2531,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
       if (rsi != null) 'rsi': rsi,
       if (rse != null) 'rse': rse,
       if (isPreset != null) 'is_preset': isPreset,
+      if (isAutoDefault != null) 'is_auto_default': isAutoDefault,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -2293,6 +2543,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
     Value<double>? rsi,
     Value<double>? rse,
     Value<int>? isPreset,
+    Value<int>? isAutoDefault,
     Value<int>? rowid,
   }) {
     return WallConstructionsCompanion(
@@ -2302,6 +2553,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
       rsi: rsi ?? this.rsi,
       rse: rse ?? this.rse,
       isPreset: isPreset ?? this.isPreset,
+      isAutoDefault: isAutoDefault ?? this.isAutoDefault,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -2327,6 +2579,9 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
     if (isPreset.present) {
       map['is_preset'] = Variable<int>(isPreset.value);
     }
+    if (isAutoDefault.present) {
+      map['is_auto_default'] = Variable<int>(isAutoDefault.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -2342,6 +2597,7 @@ class WallConstructionsCompanion extends UpdateCompanion<WallConstruction> {
           ..write('rsi: $rsi, ')
           ..write('rse: $rse, ')
           ..write('isPreset: $isPreset, ')
+          ..write('isAutoDefault: $isAutoDefault, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -8605,6 +8861,9 @@ typedef $$ProjectsTableCreateCompanionBuilder =
       Value<int> defaultExteriorWallThicknessMm,
       Value<int> defaultInteriorWallThicknessMm,
       Value<int> defaultPartitionWallThicknessMm,
+      Value<String> defaultExteriorMaterialId,
+      Value<String> defaultInteriorMaterialId,
+      Value<String> defaultPartitionMaterialId,
       Value<String?> locationJson,
       Value<int> rowid,
     });
@@ -8621,6 +8880,9 @@ typedef $$ProjectsTableUpdateCompanionBuilder =
       Value<int> defaultExteriorWallThicknessMm,
       Value<int> defaultInteriorWallThicknessMm,
       Value<int> defaultPartitionWallThicknessMm,
+      Value<String> defaultExteriorMaterialId,
+      Value<String> defaultInteriorMaterialId,
+      Value<String> defaultPartitionMaterialId,
       Value<String?> locationJson,
       Value<int> rowid,
     });
@@ -8710,6 +8972,21 @@ class $$ProjectsTableFilterComposer
 
   ColumnFilters<int> get defaultPartitionWallThicknessMm => $composableBuilder(
     column: $table.defaultPartitionWallThicknessMm,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get defaultExteriorMaterialId => $composableBuilder(
+    column: $table.defaultExteriorMaterialId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get defaultInteriorMaterialId => $composableBuilder(
+    column: $table.defaultInteriorMaterialId,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get defaultPartitionMaterialId => $composableBuilder(
+    column: $table.defaultPartitionMaterialId,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -8809,6 +9086,21 @@ class $$ProjectsTableOrderingComposer
         builder: (column) => ColumnOrderings(column),
       );
 
+  ColumnOrderings<String> get defaultExteriorMaterialId => $composableBuilder(
+    column: $table.defaultExteriorMaterialId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get defaultInteriorMaterialId => $composableBuilder(
+    column: $table.defaultInteriorMaterialId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get defaultPartitionMaterialId => $composableBuilder(
+    column: $table.defaultPartitionMaterialId,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get locationJson => $composableBuilder(
     column: $table.locationJson,
     builder: (column) => ColumnOrderings(column),
@@ -8873,6 +9165,21 @@ class $$ProjectsTableAnnotationComposer
         column: $table.defaultPartitionWallThicknessMm,
         builder: (column) => column,
       );
+
+  GeneratedColumn<String> get defaultExteriorMaterialId => $composableBuilder(
+    column: $table.defaultExteriorMaterialId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get defaultInteriorMaterialId => $composableBuilder(
+    column: $table.defaultInteriorMaterialId,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get defaultPartitionMaterialId => $composableBuilder(
+    column: $table.defaultPartitionMaterialId,
+    builder: (column) => column,
+  );
 
   GeneratedColumn<String> get locationJson => $composableBuilder(
     column: $table.locationJson,
@@ -8947,6 +9254,9 @@ class $$ProjectsTableTableManager
                     const Value.absent(),
                 Value<int> defaultPartitionWallThicknessMm =
                     const Value.absent(),
+                Value<String> defaultExteriorMaterialId = const Value.absent(),
+                Value<String> defaultInteriorMaterialId = const Value.absent(),
+                Value<String> defaultPartitionMaterialId = const Value.absent(),
                 Value<String?> locationJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProjectsCompanion(
@@ -8962,6 +9272,9 @@ class $$ProjectsTableTableManager
                 defaultInteriorWallThicknessMm: defaultInteriorWallThicknessMm,
                 defaultPartitionWallThicknessMm:
                     defaultPartitionWallThicknessMm,
+                defaultExteriorMaterialId: defaultExteriorMaterialId,
+                defaultInteriorMaterialId: defaultInteriorMaterialId,
+                defaultPartitionMaterialId: defaultPartitionMaterialId,
                 locationJson: locationJson,
                 rowid: rowid,
               ),
@@ -8981,6 +9294,9 @@ class $$ProjectsTableTableManager
                     const Value.absent(),
                 Value<int> defaultPartitionWallThicknessMm =
                     const Value.absent(),
+                Value<String> defaultExteriorMaterialId = const Value.absent(),
+                Value<String> defaultInteriorMaterialId = const Value.absent(),
+                Value<String> defaultPartitionMaterialId = const Value.absent(),
                 Value<String?> locationJson = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => ProjectsCompanion.insert(
@@ -8996,6 +9312,9 @@ class $$ProjectsTableTableManager
                 defaultInteriorWallThicknessMm: defaultInteriorWallThicknessMm,
                 defaultPartitionWallThicknessMm:
                     defaultPartitionWallThicknessMm,
+                defaultExteriorMaterialId: defaultExteriorMaterialId,
+                defaultInteriorMaterialId: defaultInteriorMaterialId,
+                defaultPartitionMaterialId: defaultPartitionMaterialId,
                 locationJson: locationJson,
                 rowid: rowid,
               ),
@@ -10317,6 +10636,7 @@ typedef $$WallConstructionsTableCreateCompanionBuilder =
       Value<double> rsi,
       Value<double> rse,
       Value<int> isPreset,
+      Value<int> isAutoDefault,
       Value<int> rowid,
     });
 typedef $$WallConstructionsTableUpdateCompanionBuilder =
@@ -10327,6 +10647,7 @@ typedef $$WallConstructionsTableUpdateCompanionBuilder =
       Value<double> rsi,
       Value<double> rse,
       Value<int> isPreset,
+      Value<int> isAutoDefault,
       Value<int> rowid,
     });
 
@@ -10425,6 +10746,11 @@ class $$WallConstructionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<int> get isAutoDefault => $composableBuilder(
+    column: $table.isAutoDefault,
+    builder: (column) => ColumnFilters(column),
+  );
+
   Expression<bool> wallSegmentsRefs(
     Expression<bool> Function($$WallSegmentsTableFilterComposer f) f,
   ) {
@@ -10514,6 +10840,11 @@ class $$WallConstructionsTableOrderingComposer
     column: $table.isPreset,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get isAutoDefault => $composableBuilder(
+    column: $table.isAutoDefault,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$WallConstructionsTableAnnotationComposer
@@ -10542,6 +10873,11 @@ class $$WallConstructionsTableAnnotationComposer
 
   GeneratedColumn<int> get isPreset =>
       $composableBuilder(column: $table.isPreset, builder: (column) => column);
+
+  GeneratedColumn<int> get isAutoDefault => $composableBuilder(
+    column: $table.isAutoDefault,
+    builder: (column) => column,
+  );
 
   Expression<T> wallSegmentsRefs<T extends Object>(
     Expression<T> Function($$WallSegmentsTableAnnotationComposer a) f,
@@ -10636,6 +10972,7 @@ class $$WallConstructionsTableTableManager
                 Value<double> rsi = const Value.absent(),
                 Value<double> rse = const Value.absent(),
                 Value<int> isPreset = const Value.absent(),
+                Value<int> isAutoDefault = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => WallConstructionsCompanion(
                 id: id,
@@ -10644,6 +10981,7 @@ class $$WallConstructionsTableTableManager
                 rsi: rsi,
                 rse: rse,
                 isPreset: isPreset,
+                isAutoDefault: isAutoDefault,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -10654,6 +10992,7 @@ class $$WallConstructionsTableTableManager
                 Value<double> rsi = const Value.absent(),
                 Value<double> rse = const Value.absent(),
                 Value<int> isPreset = const Value.absent(),
+                Value<int> isAutoDefault = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => WallConstructionsCompanion.insert(
                 id: id,
@@ -10662,6 +11001,7 @@ class $$WallConstructionsTableTableManager
                 rsi: rsi,
                 rse: rse,
                 isPreset: isPreset,
+                isAutoDefault: isAutoDefault,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
