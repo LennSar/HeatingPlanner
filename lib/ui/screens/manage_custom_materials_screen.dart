@@ -54,15 +54,15 @@ class _ManageCustomMaterialsScreenState
     await pickAndConfigureCustomMaterialLibrary(ref);
   }
 
-  Future<void> _onClear() async {
+  Future<void> _onResetToDefault() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Unlink custom material library?'),
+        title: const Text('Switch back to the default library file?'),
         content: const Text(
-          'The file on disk will not be deleted, but your custom '
-          'materials will disappear from the app until you pick the '
-          'file again.',
+          'Your custom materials from the current file will no longer '
+          'appear unless you Browse back to it. The current file on '
+          'disk is not modified.',
         ),
         actions: [
           TextButton(
@@ -71,7 +71,7 @@ class _ManageCustomMaterialsScreenState
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Unlink'),
+            child: const Text('Reset to default'),
           ),
         ],
       ),
@@ -178,7 +178,7 @@ class _ManageCustomMaterialsScreenState
 
   @override
   Widget build(BuildContext context) {
-    final path = ref.watch(customMaterialLibraryPathProvider);
+    final storedPath = ref.watch(customMaterialLibraryPathProvider);
     final customs =
         ref.watch(customMaterialsProvider).asData?.value ?? const [];
     final filtered = _filter(customs, _query);
@@ -189,17 +189,19 @@ class _ManageCustomMaterialsScreenState
       appBar: AppBar(
         title: const Text('Custom Materials'),
         actions: [
+          // ADR-021 Rule 14: a default library always exists, so Add is
+          // always enabled.
           if (!isCompact)
             TextButton.icon(
               key: const Key('custom-materials-add'),
-              onPressed: path == null ? null : _onAdd,
+              onPressed: _onAdd,
               icon: const Icon(Icons.add),
               label: const Text('Add'),
             )
           else
             IconButton(
               key: const Key('custom-materials-add'),
-              onPressed: path == null ? null : _onAdd,
+              onPressed: _onAdd,
               icon: const Icon(Icons.add),
             ),
         ],
@@ -210,11 +212,12 @@ class _ManageCustomMaterialsScreenState
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             _LibraryHeader(
-              path: path,
+              storedPath: storedPath,
               compact: isCompact,
               onBrowse: _onBrowse,
-              onClear: path == null ? null : _onClear,
-              onReload: path == null ? null : _onReload,
+              onResetToDefault:
+                  storedPath == null ? null : _onResetToDefault,
+              onReload: _onReload,
             ),
             const SizedBox(height: Spacing.md),
             TextField(
@@ -229,9 +232,7 @@ class _ManageCustomMaterialsScreenState
             const SizedBox(height: Spacing.md),
             Expanded(
               child: customs.isEmpty
-                  ? _EmptyState(
-                      onAdd: path == null ? null : _onAdd,
-                    )
+                  ? _EmptyState(onAdd: _onAdd)
                   : _GroupedList(
                       grouped: grouped,
                       compact: isCompact,
@@ -282,38 +283,46 @@ class _ManageCustomMaterialsScreenState
 
 // ── Library path header ─────────────────────────────────────────────────────
 
-class _LibraryHeader extends StatelessWidget {
+class _LibraryHeader extends ConsumerWidget {
   const _LibraryHeader({
-    required this.path,
+    required this.storedPath,
     required this.compact,
     required this.onBrowse,
-    required this.onClear,
+    required this.onResetToDefault,
     required this.onReload,
   });
 
-  final String? path;
+  /// `null` ⇒ Rule 14 default is in effect; the "Reset to default"
+  /// affordance is hidden.
+  final String? storedPath;
   final bool compact;
   final VoidCallback onBrowse;
-  final VoidCallback? onClear;
-  final VoidCallback? onReload;
+  final VoidCallback? onResetToDefault;
+  final VoidCallback onReload;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final resolved =
+        ref.watch(resolvedLibraryPathProvider).asData?.value ?? '';
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
         Expanded(
-          child: Text(
-            path ?? 'No library configured',
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: path == null
-                  ? theme.colorScheme.onSurfaceVariant
-                  : null,
+          child: Tooltip(
+            message: resolved,
+            child: Text(
+              resolved,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium,
             ),
           ),
         ),
+        if (storedPath == null) ...[
+          const SizedBox(width: Spacing.sm),
+          const _DefaultChip(),
+        ],
         const SizedBox(width: Spacing.sm),
         if (compact)
           PopupMenuButton<String>(
@@ -322,23 +331,25 @@ class _LibraryHeader extends StatelessWidget {
               switch (v) {
                 case 'browse':
                   onBrowse();
-                case 'clear':
-                  onClear?.call();
+                case 'reset':
+                  onResetToDefault?.call();
                 case 'reload':
-                  onReload?.call();
+                  onReload();
               }
             },
             itemBuilder: (_) => [
-              const PopupMenuItem(value: 'browse', child: Text('Browse…')),
-              PopupMenuItem(
-                value: 'clear',
-                enabled: onClear != null,
-                child: const Text('Clear'),
+              const PopupMenuItem(
+                value: 'browse',
+                child: Text('Browse…'),
               ),
-              PopupMenuItem(
+              if (onResetToDefault != null)
+                const PopupMenuItem(
+                  value: 'reset',
+                  child: Text('Reset to default'),
+                ),
+              const PopupMenuItem(
                 value: 'reload',
-                enabled: onReload != null,
-                child: const Text('Reload from file'),
+                child: Text('Reload from file'),
               ),
             ],
           )
@@ -347,11 +358,14 @@ class _LibraryHeader extends StatelessWidget {
             onPressed: onBrowse,
             child: const Text('Browse…'),
           ),
-          const SizedBox(width: Spacing.sm),
-          OutlinedButton(
-            onPressed: onClear,
-            child: const Text('Clear'),
-          ),
+          if (onResetToDefault != null) ...[
+            const SizedBox(width: Spacing.sm),
+            OutlinedButton(
+              key: const Key('custom-materials-reset'),
+              onPressed: onResetToDefault,
+              child: const Text('Reset to default'),
+            ),
+          ],
           const SizedBox(width: Spacing.sm),
           OutlinedButton(
             key: const Key('custom-materials-reload'),
@@ -360,6 +374,31 @@ class _LibraryHeader extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+}
+
+class _DefaultChip extends StatelessWidget {
+  const _DefaultChip();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: Spacing.xs + 2,
+        vertical: 1,
+      ),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(Spacing.xs),
+      ),
+      child: Text(
+        '(default)',
+        style: theme.textTheme.labelSmall?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+        ),
+      ),
     );
   }
 }

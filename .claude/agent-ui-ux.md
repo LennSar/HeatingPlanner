@@ -511,9 +511,9 @@ The material field on each layer row is a **searchable dropdown** — tapping it
 
 1. **Search field** pinned at the top of the open dropdown — filters the list in real time (case-insensitive substring match on material name). Does not close the dropdown.
 
-2. **"+ New custom material…" row**, pinned directly below the search field and above the grouped entries. Always visible (not filtered by the search field). Tapping opens the Custom Material dialog (§5.7.2) pre-filled with empty fields. When `customMaterialLibraryPathProvider` is null, this row is **disabled** with a small secondary-text caption "*Pick a library file in Settings first*"; tapping it does nothing.
+2. **"+ New custom material…" row**, pinned directly below the search field and above the grouped entries. Always visible (not filtered by the search field) and always enabled — per `DECISIONS.md` ADR-021 Rule 14 a default library file is always available, so there is no "library not configured" disabled state. Tapping opens the Custom Material dialog (§5.7.2) pre-filled with empty fields.
 
-3. **"Manage custom materials…" row**, pinned at the bottom of the dropdown (below the grouped entries). Always visible. Tapping opens the Manage Custom Materials screen (§5.7.3) and closes the dropdown. Same disabled rule as item 2 — disabled when no library file is configured.
+3. **"Manage custom materials…" row**, pinned at the bottom of the dropdown (below the grouped entries). Always visible and always enabled (ADR-021 Rule 14). Tapping opens the Manage Custom Materials screen (§5.7.3) and closes the dropdown.
 
 4. **Grouped entries** below the "+ New custom material…" row. Materials are grouped by top-level category, derived by stripping the sub-category suffix (e.g. "Masonry - Historic" and "Masonry - Modern" both fold under a **"Masonry"** header). Group headers are non-selectable divider rows styled in `onSurfaceSecondary`. Order of groups: the built-in categories listed in `agent-hvac.md` §7.1 first, then any custom-only categories alphabetically. When the search field is non-empty, group headers are hidden and a flat filtered list is shown.
 
@@ -692,15 +692,18 @@ desktop.
   instead shows the **block message** from ADR-021 Rule 7 with a
   per-construction usage list and a single **OK** button — no delete.
 
-**Browse / Clear / Reload.**
+**Browse / Reset to default / Reload.**
 - **Browse…** → opens a file picker; accepts `*.json` /
   `*.matlib.json`. On selection, calls
-  `CustomMaterialLibraryService.setLibraryPath`. The screen reloads
-  its list automatically.
-- **Clear** → confirmation: *"Unlink the custom material library? The
-  file on disk will not be deleted, but your custom materials will
-  disappear from the app until you pick the file again."* On
-  confirm, calls `setLibraryPath(null)`.
+  `CustomMaterialLibraryService.setLibraryPath(<chosen>)`. The screen
+  reloads its list automatically.
+- **Reset to default** → only shown when an explicit user path is
+  active (i.e. `customMaterialLibraryPath != null`). Confirmation:
+  *"Switch back to the default library file? Your custom materials
+  from the current file will no longer appear unless you Browse back
+  to it. The current file on disk is not modified."* On confirm,
+  calls `setLibraryPath(null)`, which reverts to the ADR-021 Rule 14
+  default path.
 - **Reload from file** → calls `reloadFromFile()` and shows
   *"Reloaded N custom materials"* toast.
 
@@ -1071,47 +1074,51 @@ Accessible from the overflow menu (⋮) on tablet, and from the app menu bar on 
 ### 9.2 Custom Material Library
 
 A dedicated section in the Settings form, below the general settings.
-See `DECISIONS.md` ADR-021.
+See `DECISIONS.md` ADR-021. Per ADR-021 Rule 14 a default library
+file always exists, so there is no "library not configured" state.
 
 ```
 Custom material library
-  File path     [ ~/Dropbox/team/heating_planner.matlib.json   ]
-                [ Browse…  ]  [ Clear  ]  [ Reload from file  ]
+  File path     [ ~/Documents/HeatingPlanner/                 ]
+                [ custom_materials.matlib.json   (default)    ]
+                [ Browse…  ]  [ Reset to default  ]  [ Reload ]
                 Status: ✓ Loaded 12 custom materials
 
                                               [ Manage materials… ]
 ```
 
 **Behaviour.**
-- **File path** is a read-only display field showing the absolute path
-  from `customMaterialLibraryPathProvider` (truncated middle on
-  overflow with the full path in a tooltip). When unset, shows the
-  placeholder *"No library configured — pick a file to enable custom
-  materials"* in `onSurfaceSecondary`.
-- **Browse…** opens a file picker. Filter: `*.json`, `*.matlib.json`.
-  The picker is in **save-or-open** mode: if the chosen path does not
-  exist, the service creates it with an empty library skeleton
-  (`{"version":"1.0","materials":[]}`); if it exists and parses, its
-  entries are loaded per ADR-021 Rule 4.
-- **Clear** unlinks the library (sets the provider to null). Shows the
-  confirmation described in §5.7.3. The file on disk is **never**
-  deleted by Clear.
-- **Reload from file** re-runs the sync pass (ADR-021 Rule 6) and
-  shows a toast *"Reloaded N custom materials"*. Disabled when the
-  path is null.
+- **File path** is a read-only display field showing the *effective*
+  absolute path returned by
+  `CustomMaterialLibraryService.resolvedLibraryPath()`. When
+  `customMaterialLibraryPath == null` the resolved path is the
+  Rule 14 default; render a small `(default)` chip in
+  `onSurfaceSecondary` next to the truncated path. When non-null,
+  no chip. Tooltip on hover shows the full path.
+- **Browse…** opens a file picker. Filter: `*.json`,
+  `*.matlib.json`. The picker is in **save-or-open** mode: if the
+  chosen path does not exist, the service creates it with an empty
+  library skeleton (`{"version":"1.0","materials":[]}`); if it
+  exists and parses, its entries are loaded per ADR-021 Rule 4.
+  Sets `customMaterialLibraryPath` to the chosen absolute path.
+- **Reset to default** — visible only when an explicit user path is
+  set. Calls `setLibraryPath(null)` after the confirmation in
+  §5.7.3. Reverts to the default file. The user-picked file on disk
+  is not touched.
+- **Reload from file** re-runs the sync pass and shows a toast
+  *"Reloaded N custom materials"*. Always enabled — the effective
+  path is always defined.
 - **Status line** shows one of:
   - "✓ Loaded N custom materials" (success, `success` colour)
-  - "⚠ File missing — pick a new path or restore the file"
-    (`warningAmber`)
-  - "⚠ File could not be parsed — check the JSON syntax"
-    (`warningAmber`)
-  - hidden when the path is null
-- **Manage materials…** button — full-width, right-aligned — opens the
-  Manage Custom Materials screen (§5.7.3). Disabled when the path is
-  null.
+  - "⚠ File could not be loaded — check the path and try Reload"
+    (`warningAmber`) — used for both missing-file and parse-error
+    cases; the toast from the sync pass carries the specific reason
+- **Manage materials…** button — full-width, right-aligned — opens
+  the Manage Custom Materials screen (§5.7.3). Always enabled.
 
 The library path is global (not per-project) and persisted in
-`AppPreferences.customMaterialLibraryPath`.
+`AppPreferences.customMaterialLibraryPath`. A null value persists as
+"use default" — it is **not** treated as "no library".
 
 ---
 

@@ -1535,9 +1535,11 @@ read-only.
 **Rule.**
 
 1. **AppPreferences field.** `AppPreferences` gains
-   `customMaterialLibraryPath: String?`, null when no library is
-   configured. Persisted alongside `gridSpacingMm` /
-   `lastOpenedProjectId` per existing preferences pattern.
+   `customMaterialLibraryPath: String?`. `null` means "use the default
+   location" (Rule 14) — **not** "no library". A non-null value is an
+   explicit user override (e.g. a Dropbox path). Persisted alongside
+   `gridSpacingMm` / `lastOpenedProjectId` per existing preferences
+   pattern.
 
 2. **File schema.** JSON, UTF-8:
 
@@ -1572,15 +1574,19 @@ read-only.
 
 4. **Sync pass.** On app launch and on every change to
    `customMaterialLibraryPath`:
-   1. Delete all rows in `material_entries` where `isBuiltIn = false`.
-   2. If the new path is non-null and the file exists and parses:
-      insert each entry into `material_entries` with
-      `isBuiltIn = false`, preserving its `id`.
-   3. If the file is missing, unreadable, or malformed: keep step 1's
-      empty custom set, surface a toast ("Custom material library
-      could not be loaded — check the path in Settings"), do **not**
-      clear `customMaterialLibraryPath` automatically (the user fixes
-      it from Settings).
+   1. Resolve the *effective path*: the stored value if non-null,
+      otherwise the default path from Rule 14.
+   2. Delete all rows in `material_entries` where `isBuiltIn = false`.
+   3. Ensure the effective path's file exists per Rule 14 (create the
+      empty skeleton if missing).
+   4. If the file exists and parses: insert each entry into
+      `material_entries` with `isBuiltIn = false`, preserving its
+      `id`.
+   5. If the file is unreadable or malformed: keep step 2's empty
+      custom set, surface a toast ("Custom material library could
+      not be loaded — check the path in Settings"), do **not** clear
+      `customMaterialLibraryPath` automatically (the user fixes it
+      from Settings).
 
 5. **CRUD write-through.** Add / edit / delete operations from the UI
    route through `CustomMaterialLibraryService.create` /
@@ -1678,15 +1684,39 @@ read-only.
     | Method | Behaviour |
     |--------|-----------|
     | `Stream<List<MaterialEntry>> watchCustom()` | Mirrors `customMaterialsProvider` |
-    | `Future<void> setLibraryPath(String? path)` | Updates `AppPreferences` and runs the sync pass (Rule 4) |
-    | `Future<void> reloadFromFile()` | Re-runs the sync pass with the current path |
+    | `Future<String> resolvedLibraryPath()` | Effective path = stored value or Rule 14 default |
+    | `Future<void> setLibraryPath(String? path)` | Updates `AppPreferences` (null = revert to default) and runs the sync pass (Rule 4) |
+    | `Future<void> reloadFromFile()` | Re-runs the sync pass with the current effective path |
     | `Future<MaterialEntry> create(MaterialEntry entry)` | UUID v4 id; write-through per Rule 5 |
     | `Future<void> update(MaterialEntry entry)` | Write-through per Rule 5 |
     | `Future<DeleteResult> delete(String id)` | Returns `DeleteResult.blocked(usages)` or `DeleteResult.ok()` per Rule 7 |
 
-    Mutating methods throw `LibraryNotConfiguredException` when
-    `customMaterialLibraryPath == null` — the UI must disable
-    affordances accordingly rather than catch.
+    All mutating methods always operate against the effective path
+    (Rule 14) — there is no "library not configured" state, so the
+    previously specified `LibraryNotConfiguredException` is removed.
+
+14. **Default library file.** When
+    `AppPreferences.customMaterialLibraryPath == null` the service
+    uses
+    `<applicationDocumentsDirectory>/HeatingPlanner/custom_materials.matlib.json`
+    as the effective path. `applicationDocumentsDirectory` comes from
+    the existing `path_provider` dependency. The service:
+    1. Creates the parent `HeatingPlanner/` directory if missing.
+    2. Creates the file with `{"version":"1.0","materials":[]}` if
+       missing.
+    3. Treats writes to the default file identically to writes to a
+       user-picked path (Rule 5).
+    The default file is **always** available — the picker's "+ New
+    custom material…" affordance is therefore never disabled on the
+    grounds of "no library configured". Previous spec text in
+    `agent-ui-ux.md §5.7.1 items 2 and 3` describing a disabled state
+    is superseded by this rule.
+
+    "Clear" in the Settings UI does not unset a configured library
+    into a no-library state; it **resets** an explicit user-picked
+    path back to the default (`setLibraryPath(null)`). The default
+    file remains on disk; its content is not touched by Clear. See
+    `agent-ui-ux.md §5.7.3` and `§9.2` for the renamed control.
 
 **Scope.**
 Affects `AppPreferences`; adds `CustomMaterialLibraryService` and two

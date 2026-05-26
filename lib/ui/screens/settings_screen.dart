@@ -11,8 +11,6 @@ import 'manage_custom_materials_screen.dart';
 /// Application Settings screen.
 ///
 /// Currently only hosts the §9.2 Custom material library section.
-/// Other settings (general, units, etc.) can be added to this scaffold
-/// without restructuring.
 class SettingsScreen extends StatelessWidget {
   /// Creates a [SettingsScreen].
   const SettingsScreen({super.key});
@@ -36,21 +34,22 @@ class SettingsScreen extends StatelessWidget {
 
 /// §9.2 Custom material library section.
 ///
-/// Shows the current library path, the four-state status line, and the
-/// Browse / Clear / Reload / Manage actions.
+/// Per ADR-021 Rule 14 a default library file always exists, so the
+/// effective path is always defined. The status line, Reload, and
+/// Manage actions are therefore always available. "Reset to default"
+/// only shows when an explicit user path has been picked.
 class CustomMaterialLibrarySection extends ConsumerWidget {
   /// Creates a [CustomMaterialLibrarySection].
   const CustomMaterialLibrarySection({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final path = ref.watch(customMaterialLibraryPathProvider);
-    final customs =
-        ref.watch(customMaterialsProvider).asData?.value ?? const [];
+    final storedPath = ref.watch(customMaterialLibraryPathProvider);
     final theme = Theme.of(context);
     final extColors = theme.extension<HeatingPlannerColors>()!;
 
     return Card(
+      key: const Key('settings-custom-material-library-card'),
       child: Padding(
         padding: const EdgeInsets.all(Spacing.md),
         child: Column(
@@ -61,34 +60,26 @@ class CustomMaterialLibrarySection extends ConsumerWidget {
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: Spacing.md),
-            _PathDisplay(path: path),
+            _EffectivePathDisplay(storedPath: storedPath),
             const SizedBox(height: Spacing.sm),
             _ActionRow(
-              path: path,
+              storedPath: storedPath,
               onBrowse: () =>
                   pickAndConfigureCustomMaterialLibrary(ref),
-              onClear: path == null
+              onResetToDefault: storedPath == null
                   ? null
-                  : () => _confirmClear(context, ref),
-              onReload: path == null
-                  ? null
-                  : () => _reload(context, ref),
+                  : () => _confirmResetToDefault(context, ref),
+              onReload: () => _reload(context, ref),
             ),
             const SizedBox(height: Spacing.sm),
-            _StatusLine(
-              path: path,
-              customCount: customs.length,
-              colors: extColors,
-            ),
+            _StatusLine(colors: extColors),
             const SizedBox(height: Spacing.md),
             Align(
               alignment: Alignment.centerRight,
               child: FilledButton(
                 key: const Key('settings-manage-materials'),
-                onPressed: path == null
-                    ? null
-                    : () =>
-                        openManageCustomMaterialsScreen(context),
+                onPressed: () =>
+                    openManageCustomMaterialsScreen(context),
                 child: const Text('Manage materials…'),
               ),
             ),
@@ -98,18 +89,18 @@ class CustomMaterialLibrarySection extends ConsumerWidget {
     );
   }
 
-  Future<void> _confirmClear(
+  Future<void> _confirmResetToDefault(
     BuildContext context,
     WidgetRef ref,
   ) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Unlink custom material library?'),
+        title: const Text('Switch back to the default library file?'),
         content: const Text(
-          'The file on disk will not be deleted, but your custom '
-          'materials will disappear from the app until you pick the '
-          'file again.',
+          'Your custom materials from the current file will no longer '
+          'appear unless you Browse back to it. The current file on '
+          'disk is not modified.',
         ),
         actions: [
           TextButton(
@@ -118,7 +109,7 @@ class CustomMaterialLibrarySection extends ConsumerWidget {
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Unlink'),
+            child: const Text('Reset to default'),
           ),
         ],
       ),
@@ -145,30 +136,64 @@ class CustomMaterialLibrarySection extends ConsumerWidget {
   }
 }
 
-// ── Path display ────────────────────────────────────────────────────────────
+// ── Effective-path display ──────────────────────────────────────────────────
 
-class _PathDisplay extends StatelessWidget {
-  const _PathDisplay({required this.path});
+/// Resolves and displays the effective library path with a `(default)`
+/// chip when no explicit user path is stored.
+class _EffectivePathDisplay extends ConsumerWidget {
+  const _EffectivePathDisplay({required this.storedPath});
 
-  final String? path;
+  /// `null` ⇒ Rule 14 default is in effect.
+  final String? storedPath;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final resolved =
+        ref.watch(resolvedLibraryPathProvider).asData?.value ?? '';
+    return Tooltip(
+      message: resolved,
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              resolved,
+              key: const Key('settings-library-path'),
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodyMedium,
+            ),
+          ),
+          if (storedPath == null) ...[
+            const SizedBox(width: Spacing.sm),
+            const _DefaultChip(),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DefaultChip extends StatelessWidget {
+  const _DefaultChip();
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    if (path == null) {
-      return Text(
-        'No library configured — pick a file to enable custom materials',
-        style: theme.textTheme.bodyMedium?.copyWith(
+    return Container(
+      key: const Key('settings-library-default-chip'),
+      padding: const EdgeInsets.symmetric(
+        horizontal: Spacing.xs + 2,
+        vertical: 1,
+      ),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(Spacing.xs),
+      ),
+      child: Text(
+        '(default)',
+        style: theme.textTheme.labelSmall?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
         ),
-      );
-    }
-    return Tooltip(
-      message: path!,
-      child: Text(
-        path!,
-        overflow: TextOverflow.ellipsis,
-        style: theme.textTheme.bodyMedium,
       ),
     );
   }
@@ -178,16 +203,16 @@ class _PathDisplay extends StatelessWidget {
 
 class _ActionRow extends StatelessWidget {
   const _ActionRow({
-    required this.path,
+    required this.storedPath,
     required this.onBrowse,
-    required this.onClear,
+    required this.onResetToDefault,
     required this.onReload,
   });
 
-  final String? path;
+  final String? storedPath;
   final VoidCallback onBrowse;
-  final VoidCallback? onClear;
-  final VoidCallback? onReload;
+  final VoidCallback? onResetToDefault;
+  final VoidCallback onReload;
 
   @override
   Widget build(BuildContext context) {
@@ -200,11 +225,12 @@ class _ActionRow extends StatelessWidget {
           onPressed: onBrowse,
           child: const Text('Browse…'),
         ),
-        OutlinedButton(
-          key: const Key('settings-clear-library'),
-          onPressed: onClear,
-          child: const Text('Clear'),
-        ),
+        if (storedPath != null)
+          OutlinedButton(
+            key: const Key('settings-reset-library'),
+            onPressed: onResetToDefault,
+            child: const Text('Reset to default'),
+          ),
         OutlinedButton(
           key: const Key('settings-reload-library'),
           onPressed: onReload,
@@ -217,56 +243,38 @@ class _ActionRow extends StatelessWidget {
 
 // ── Status line ─────────────────────────────────────────────────────────────
 
-class _StatusLine extends StatelessWidget {
-  const _StatusLine({
-    required this.path,
-    required this.customCount,
-    required this.colors,
-  });
+/// Two-state status line per UI/UX §9.2 (updated).
+///
+/// - ✓ Loaded N custom materials  (success)
+/// - ⚠ File could not be loaded — check the path and try Reload
+class _StatusLine extends ConsumerWidget {
+  const _StatusLine({required this.colors});
 
-  final String? path;
-  final int customCount;
   final HeatingPlannerColors colors;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final path =
+        ref.watch(resolvedLibraryPathProvider).asData?.value;
+    final customs =
+        ref.watch(customMaterialsProvider).asData?.value ?? const [];
+
     if (path == null) return const SizedBox.shrink();
 
-    final file = File(path!);
-    final exists = file.existsSync();
-    final theme = Theme.of(context);
-
-    if (!exists) {
+    if (!File(path).existsSync()) {
       return Row(
         children: [
           Icon(Icons.warning_amber_rounded,
               size: 16, color: colors.warningAmber),
           const SizedBox(width: Spacing.xs),
-          Text(
-            'File missing — pick a new path or restore the file',
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: colors.warningAmber),
-          ),
-        ],
-      );
-    }
-
-    // Heuristic: when the file exists but the sync pass ended up with
-    // zero materials AND the file is non-empty, treat it as a parse
-    // failure. (Empty skeleton + zero customs is a legitimate state.)
-    final isLikelyParseError = customCount == 0 &&
-        file.lengthSync() > _emptySkeletonByteCount;
-
-    if (isLikelyParseError) {
-      return Row(
-        children: [
-          Icon(Icons.warning_amber_rounded,
-              size: 16, color: colors.warningAmber),
-          const SizedBox(width: Spacing.xs),
-          Text(
-            'File could not be parsed — check the JSON syntax',
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: colors.warningAmber),
+          Flexible(
+            child: Text(
+              'File could not be loaded — '
+              'check the path and try Reload',
+              style: theme.textTheme.bodySmall
+                  ?.copyWith(color: colors.warningAmber),
+            ),
           ),
         ],
       );
@@ -277,14 +285,11 @@ class _StatusLine extends StatelessWidget {
         Icon(Icons.check_circle, size: 16, color: colors.zoneGreen),
         const SizedBox(width: Spacing.xs),
         Text(
-          'Loaded $customCount custom material'
-          '${customCount == 1 ? '' : 's'}',
+          'Loaded ${customs.length} custom material'
+          '${customs.length == 1 ? '' : 's'}',
           style: theme.textTheme.bodySmall,
         ),
       ],
     );
   }
 }
-
-const int _emptySkeletonByteCount =
-    32; // '{"version":"1.0","materials":[]}' = 32 bytes

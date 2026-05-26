@@ -5,6 +5,8 @@ import 'dart:io';
 import 'package:drift/drift.dart' as drift;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logging/logging.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 import '../core/utils/id_generator.dart';
 import '../data/database/app_database.dart' as $db;
@@ -14,21 +16,16 @@ import 'app_preferences.dart';
 /// File-format version embedded in the JSON library file.
 const String _libraryFileFormatVersion = '1.0';
 
-// ── Exceptions ────────────────────────────────────────────────────────────────
+/// Skeleton content used when bootstrapping a fresh library file
+/// (Rule 14).
+const String _emptyLibrarySkeleton = '{"version":"1.0","materials":[]}';
 
-/// Thrown by mutating methods on [CustomMaterialLibraryService] when no
-/// library path is configured.
-///
-/// Per `DECISIONS.md` ADR-021 Rule 13 the UI must disable affordances when
-/// no library is configured rather than catch this exception.
-class LibraryNotConfiguredException implements Exception {
-  /// Creates a [LibraryNotConfiguredException].
-  const LibraryNotConfiguredException();
+/// Default sub-directory under the application documents directory
+/// that hosts the default custom-material library file (Rule 14).
+const String _defaultLibraryDirName = 'HeatingPlanner';
 
-  @override
-  String toString() =>
-      'LibraryNotConfiguredException: no custom material library path set';
-}
+/// File name of the default custom-material library (Rule 14).
+const String _defaultLibraryFileName = 'custom_materials.matlib.json';
 
 // ── DeleteResult ──────────────────────────────────────────────────────────────
 
@@ -56,18 +53,31 @@ class DeleteBlocked extends DeleteResult {
 
 // ── Service ───────────────────────────────────────────────────────────────────
 
-/// Owns the user-pickable JSON custom-material library file and mirrors
-/// its entries into `material_entries` with `isBuiltIn = false`.
+/// Owns the custom-material library JSON file and mirrors its entries
+/// into `material_entries` with `isBuiltIn = false`.
 ///
 /// Sole code path that mutates `isBuiltIn = false` rows — see
-/// `DECISIONS.md` ADR-021 Rule 13.
+/// `DECISIONS.md` ADR-021 Rule 13. The library file is *always*
+/// available: when [AppPreferences.customMaterialLibraryPath] is
+/// `null` the service falls back to the Rule 14 default under
+/// `<applicationDocumentsDirectory>/HeatingPlanner/`.
 class CustomMaterialLibraryService {
   /// Creates a [CustomMaterialLibraryService] bound to [ref].
-  CustomMaterialLibraryService(this._ref);
+  ///
+  /// [appDocumentsDir] is a test back door for redirecting the
+  /// default-path resolution onto a temporary directory; production
+  /// callers leave it null and the service uses
+  /// `path_provider.getApplicationDocumentsDirectory()`.
+  CustomMaterialLibraryService(
+    this._ref, {
+    Future<Directory> Function()? appDocumentsDir,
+  }) : _appDocumentsDir =
+            appDocumentsDir ?? getApplicationDocumentsDirectory;
 
   static final _log = Logger('CustomMaterialLibraryService');
 
   final Ref _ref;
+  final Future<Directory> Function() _appDocumentsDir;
 
   $db.AppDatabase get _db => _ref.read($db.appDatabaseProvider);
 
@@ -86,36 +96,51 @@ class CustomMaterialLibraryService {
         .map((rows) => rows.map(_entryFromRow).toList());
   }
 
-  /// Updates the library path in [AppPreferences] and runs the sync
-  /// pass (ADR-021 Rule 4).
+  /// Effective path of the library file (ADR-021 Rule 13).
+  ///
+  /// Returns the stored override when
+  /// `AppPreferences.customMaterialLibraryPath != null`; otherwise the
+  /// Rule 14 default path. Calling this does **not** create the file
+  /// or directory; use [_ensureLibraryFile] when a write is imminent.
+  Future<String> resolvedLibraryPath() async {
+    final stored = _ref.read(customMaterialLibraryPathProvider);
+    if (stored != null) return stored;
+    final dir = await _appDocumentsDir();
+    return p.join(
+      dir.path,
+      _defaultLibraryDirName,
+      _defaultLibraryFileName,
+    );
+  }
+
+  /// Updates the stored library path in [AppPreferences] and re-runs
+  /// the sync pass (ADR-021 Rule 4).
+  ///
+  /// Passing `null` reverts to the Rule 14 default location. The
+  /// default file is created on disk if it does not yet exist.
   Future<void> setLibraryPath(String? path) async {
     await _prefs.setCustomMaterialLibraryPath(path);
     _ref.read(customMaterialLibraryPathProvider.notifier).set(path);
-    await _runSyncPass(path);
+    await _runSyncPass();
   }
 
-  /// Re-runs the sync pass against the currently configured path.
-  Future<void> reloadFromFile() async {
-    final path = _ref.read(customMaterialLibraryPathProvider);
-    await _runSyncPass(path);
-  }
+  /// Re-runs the sync pass against the current effective path.
+  Future<void> reloadFromFile() => _runSyncPass();
 
   /// Runs the sync pass at app startup using the path persisted in
   /// [AppPreferences].
   ///
   /// Must be called once before the editor loads.
   Future<void> initializeOnStartup() async {
-    final path = await _prefs.getCustomMaterialLibraryPath();
-    _ref.read(customMaterialLibraryPathProvider.notifier).set(path);
-    await _runSyncPass(path);
+    final stored = await _prefs.getCustomMaterialLibraryPath();
+    _ref.read(customMaterialLibraryPathProvider.notifier).set(stored);
+    await _runSyncPass();
   }
 
   /// Creates a new custom material with a fresh UUID v4 id.
-  ///
-  /// Writes through to SQLite and rewrites the JSON file. Rolls the
-  /// SQLite mutation back if the file write throws (ADR-021 Rule 5).
   Future<MaterialEntry> create(MaterialEntry entry) async {
-    final path = _requireLibraryPath();
+    final path = await resolvedLibraryPath();
+    await _ensureLibraryFile(path);
     final created = entry.copyWith(
       id: IdGenerator.newId(),
       isBuiltIn: false,
@@ -135,7 +160,8 @@ class CustomMaterialLibraryService {
   /// Updates an existing custom material in SQLite and rewrites the
   /// JSON file. Rolls back on file-write failure (ADR-021 Rule 5).
   Future<void> update(MaterialEntry entry) async {
-    final path = _requireLibraryPath();
+    final path = await resolvedLibraryPath();
+    await _ensureLibraryFile(path);
     final next = entry.copyWith(isBuiltIn: false);
     final before = await _fetchById(next.id);
     await _writeThrough(
@@ -161,10 +187,9 @@ class CustomMaterialLibraryService {
   ///
   /// Returns [DeleteBlocked] without touching either store when any
   /// [MaterialLayer] row references the material (ADR-021 Rule 7).
-  /// Otherwise removes the SQLite row, rewrites the JSON file, and
-  /// returns [DeleteOk] — rolling back on file-write failure.
   Future<DeleteResult> delete(String id) async {
-    final path = _requireLibraryPath();
+    final path = await resolvedLibraryPath();
+    await _ensureLibraryFile(path);
     final usages = await _findUsages(id);
     if (usages.isNotEmpty) {
       return DeleteBlocked(usages);
@@ -187,42 +212,44 @@ class CustomMaterialLibraryService {
 
   // ── Internal ───────────────────────────────────────────────────────────────
 
-  String _requireLibraryPath() {
-    final path = _ref.read(customMaterialLibraryPathProvider);
-    if (path == null) {
-      throw const LibraryNotConfiguredException();
-    }
-    return path;
-  }
-
-  /// Runs the sync pass per ADR-021 Rule 4.
+  /// Runs the sync pass per ADR-021 Rule 4:
   ///
-  /// 1. Delete every `material_entries` row where `isBuiltIn = false`.
-  /// 2. If [path] is non-null and the file parses, re-insert each
-  ///    entry from the file with `isBuiltIn = false`, preserving
-  ///    every `id`.
-  /// 3. If the file is missing, unreadable, or malformed, keep the
-  ///    empty custom set and do not throw — the UI surfaces a toast
-  ///    when reading the path back.
-  Future<void> _runSyncPass(String? path) async {
+  /// 1. Resolve the effective path.
+  /// 2. Delete every `material_entries` row where `isBuiltIn = false`.
+  /// 3. Ensure the effective path's file exists (create the empty
+  ///    skeleton if missing).
+  /// 4. Read and decode the file; insert each entry with
+  ///    `isBuiltIn = false`, preserving every `id`.
+  /// 5. On unreadable / malformed: keep the empty custom set; never
+  ///    throw.
+  Future<void> _runSyncPass() async {
+    final path = await resolvedLibraryPath();
+
     await (_db.delete(_db.materialEntries)
           ..where((t) => t.isBuiltIn.equals(false)))
         .go();
 
-    if (path == null) return;
-
-    final file = File(path);
-    if (!file.existsSync()) {
-      _log.warning('Custom material library file not found at $path');
+    try {
+      await _ensureLibraryFile(path);
+    } catch (e, st) {
+      _log.warning(
+        'Could not ensure custom material library file at $path',
+        e,
+        st,
+      );
       return;
     }
 
     final List<MaterialEntry> entries;
     try {
-      final raw = await file.readAsString();
+      final raw = await File(path).readAsString();
       entries = _decodeLibraryFile(raw);
     } catch (e, st) {
-      _log.warning('Failed to parse custom material library at $path', e, st);
+      _log.warning(
+        'Failed to parse custom material library at $path',
+        e,
+        st,
+      );
       return;
     }
 
@@ -231,6 +258,15 @@ class CustomMaterialLibraryService {
             _entryToCompanion(entry.copyWith(isBuiltIn: false)),
           );
     }
+  }
+
+  /// Creates the parent directory and an empty skeleton file at
+  /// [path] when the file does not exist (ADR-021 Rule 14).
+  Future<void> _ensureLibraryFile(String path) async {
+    final file = File(path);
+    if (file.existsSync()) return;
+    await file.parent.create(recursive: true);
+    await file.writeAsString(_emptyLibrarySkeleton, flush: true);
   }
 
   Future<MaterialEntry?> _fetchById(String id) async {
@@ -391,8 +427,8 @@ class CustomMaterialLibraryPathNotifier extends Notifier<String?> {
   }
 }
 
-/// Currently configured absolute path of the custom-material library
-/// JSON file, or `null` when no library is configured.
+/// Stored library-path override, or `null` for "use the Rule 14
+/// default location" (not "no library").
 ///
 /// Seeded from [AppPreferences] by
 /// [CustomMaterialLibraryService.initializeOnStartup].
@@ -416,4 +452,20 @@ final customMaterialLibraryServiceProvider =
 final customMaterialsProvider =
     StreamProvider<List<MaterialEntry>>((ref) {
   return ref.watch(customMaterialLibraryServiceProvider).watchCustom();
+});
+
+/// Resolves the effective library path (ADR-021 Rule 13 / Rule 14)
+/// and caches it until [customMaterialLibraryPathProvider] changes.
+///
+/// Widgets should watch this provider instead of calling
+/// `service.resolvedLibraryPath()` inline in their `build` method — an
+/// inline `FutureBuilder` recreates the future on every rebuild and
+/// can cause `pumpAndSettle` to hang in tests.
+final resolvedLibraryPathProvider = FutureProvider<String>((ref) async {
+  // Watching the stored-path provider re-runs this future whenever the
+  // user picks a different path or resets to default.
+  ref.watch(customMaterialLibraryPathProvider);
+  return ref
+      .read(customMaterialLibraryServiceProvider)
+      .resolvedLibraryPath();
 });

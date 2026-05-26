@@ -3,7 +3,10 @@
 // Uses an in-memory AppDatabase and a temporary directory for the
 // JSON library file. SharedPreferencesAsync is replaced with the
 // in-memory backend so AppPreferences round-trips do not touch a
-// platform channel.
+// platform channel. The "application documents directory" path
+// resolution is injected via the service's `appDocumentsDir` back
+// door so the Rule 14 default location resolves inside the test's
+// temp dir.
 
 import 'dart:convert';
 import 'dart:io';
@@ -15,6 +18,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/data/database/app_database.dart' as $db;
 import 'package:heating_planner/data/models/material_entry.dart';
 import 'package:heating_planner/repositories/custom_material_library_service.dart';
+import 'package:path/path.dart' as p;
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
@@ -41,10 +45,23 @@ MaterialEntry _sampleEntry({
   );
 }
 
-ProviderContainer _buildContainer($db.AppDatabase db) {
+/// Builds a [ProviderContainer] whose [appDatabaseProvider] is the
+/// caller-supplied [db] and whose
+/// [customMaterialLibraryServiceProvider] redirects
+/// `applicationDocumentsDirectory` onto [docsDir].
+ProviderContainer _buildContainer(
+  $db.AppDatabase db, {
+  required Directory docsDir,
+}) {
   return ProviderContainer(
     overrides: [
       $db.appDatabaseProvider.overrideWithValue(db),
+      customMaterialLibraryServiceProvider.overrideWith(
+        (ref) => CustomMaterialLibraryService(
+          ref,
+          appDocumentsDir: () async => docsDir,
+        ),
+      ),
     ],
   );
 }
@@ -107,13 +124,21 @@ Future<void> _seedCustomRow(
       );
 }
 
+String _defaultPathFor(Directory docsDir) => p.join(
+      docsDir.path,
+      'HeatingPlanner',
+      'custom_materials.matlib.json',
+    );
+
 void main() {
   late Directory tempDir;
+  late Directory docsDir;
 
   setUp(() async {
     SharedPreferencesAsyncPlatform.instance =
         InMemorySharedPreferencesAsync.empty();
     tempDir = await Directory.systemTemp.createTemp('custom-mat-lib-test-');
+    docsDir = await Directory(p.join(tempDir.path, 'docs')).create();
   });
 
   tearDown(() async {
@@ -129,7 +154,7 @@ void main() {
     () async {
       final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
-      final container = _buildContainer(db);
+      final container = _buildContainer(db, docsDir: docsDir);
       addTearDown(container.dispose);
 
       final service =
@@ -175,7 +200,7 @@ void main() {
     () async {
       final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
-      final container = _buildContainer(db);
+      final container = _buildContainer(db, docsDir: docsDir);
       addTearDown(container.dispose);
 
       final service =
@@ -217,11 +242,11 @@ void main() {
 
   test(
     'malformed JSON leaves the custom set empty and does not throw '
-    '(Rule 4.3)',
+    '(Rule 4.5)',
     () async {
       final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
-      final container = _buildContainer(db);
+      final container = _buildContainer(db, docsDir: docsDir);
       addTearDown(container.dispose);
 
       final service =
@@ -249,7 +274,7 @@ void main() {
     () async {
       final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
-      final container = _buildContainer(db);
+      final container = _buildContainer(db, docsDir: docsDir);
       addTearDown(container.dispose);
 
       final service =
@@ -281,30 +306,30 @@ void main() {
     },
   );
 
-  // ── File-write failure rolls back the SQLite mutation ───────────────────
+  // ── File-write failure leaves SQLite untouched ─────────────────────────
 
   test(
-    'file-write failure rolls the SQLite mutation back',
+    'file-write failure leaves SQLite untouched (rollback semantics)',
     () async {
       final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
-      final container = _buildContainer(db);
+      final container = _buildContainer(db, docsDir: docsDir);
       addTearDown(container.dispose);
 
       final service =
           container.read(customMaterialLibraryServiceProvider);
 
-      // Configure a path inside a directory we'll delete to force the
-      // atomic write to fail (the parent.create call also fails because
-      // the parent is a file).
+      // The library path is *under* a file rather than a directory —
+      // any attempt to create the parent directory or write the file
+      // throws a FileSystemException. The service must surface that
+      // error and leave the custom-rows table empty.
       final blockingFile = File('${tempDir.path}/not-a-dir');
       await blockingFile.writeAsString('placeholder');
-      // The library path is *under* a file rather than a directory —
-      // writing to its parent fails with a FileSystemException.
       final libraryPath = '${blockingFile.path}/library.json';
-      // Bypass setLibraryPath's sync pass (it only deletes rows when
-      // the file is missing) and inject the path directly via the
-      // notifier. Subsequent mutating ops must still see this path.
+
+      // Push the path through `setLibraryPath` would also crash; bypass
+      // by writing the override directly so we can prove `create()`
+      // itself rolls back on failure.
       container
           .read(customMaterialLibraryPathProvider.notifier)
           .set(libraryPath);
@@ -318,7 +343,86 @@ void main() {
       expect(thrown, isNotNull,
           reason: 'create must rethrow when the JSON write fails');
       expect(await _customRows(db), isEmpty,
-          reason: 'SQLite must be rolled back when the file write fails');
+          reason: 'SQLite must stay empty when the file write fails');
+    },
+  );
+
+  // ── Rule 14: default file bootstrap on first launch ─────────────────────
+
+  test(
+    'first launch with no stored path creates the default file and loads '
+    'an empty custom set',
+    () async {
+      final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      final container = _buildContainer(db, docsDir: docsDir);
+      addTearDown(container.dispose);
+
+      final service =
+          container.read(customMaterialLibraryServiceProvider);
+
+      // No prior path stored → initialise as on app launch.
+      await service.initializeOnStartup();
+
+      final expectedPath = _defaultPathFor(docsDir);
+      expect(File(expectedPath).existsSync(), isTrue,
+          reason:
+              'service must bootstrap the default library file on first launch');
+      expect(await File(expectedPath).readAsString(),
+          '{"version":"1.0","materials":[]}');
+      expect(await _customRows(db), isEmpty,
+          reason: 'fresh skeleton has zero custom entries');
+
+      final resolved = await service.resolvedLibraryPath();
+      expect(resolved, equals(expectedPath),
+          reason:
+              'resolvedLibraryPath must return the Rule 14 default when no '
+              'override is set');
+    },
+  );
+
+  // ── Rule 14: setLibraryPath(null) reverts to default ───────────────────
+
+  test(
+    'setLibraryPath(null) after an explicit user path reverts to the '
+    'default file',
+    () async {
+      final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      final container = _buildContainer(db, docsDir: docsDir);
+      addTearDown(container.dispose);
+
+      final service =
+          container.read(customMaterialLibraryServiceProvider);
+
+      // Step 1 — point at a user-picked file containing one entry.
+      final userPath = '${tempDir.path}/user-picked.matlib.json';
+      await File(userPath).writeAsString(jsonEncode({
+        'version': '1.0',
+        'materials': [
+          _sampleEntry(id: 'user-1', name: 'From user file').toJson()
+            ..remove('isBuiltIn'),
+        ],
+      }));
+      await service.setLibraryPath(userPath);
+
+      expect(
+        (await _customRows(db)).map((r) => r.id).toSet(),
+        {'user-1'},
+      );
+
+      // Step 2 — reset to default.
+      await service.setLibraryPath(null);
+
+      final resolved = await service.resolvedLibraryPath();
+      expect(resolved, equals(_defaultPathFor(docsDir)));
+      expect(File(resolved).existsSync(), isTrue,
+          reason: 'default file must be bootstrapped on reset');
+      expect(await _customRows(db), isEmpty,
+          reason: 'the user-file entry must be gone after the reset');
+      // The user file on disk must NOT have been touched by the reset.
+      expect(File(userPath).existsSync(), isTrue,
+          reason: 'reset does not delete the user-picked file on disk');
     },
   );
 }

@@ -81,25 +81,36 @@ Widget _buildPicker({required String? libraryPath}) {
 
 void main() {
   testWidgets(
-    'pinned rows are disabled with the caption when no library is configured',
+    'pinned rows are always enabled (ADR-021 Rule 14: default library '
+    'always available)',
     (tester) async {
       await tester.pumpWidget(_buildPicker(libraryPath: null));
       await tester.pump();
 
-      // Both pinned rows present.
+      // Both pinned rows present and have no disabled-state caption.
       expect(find.text('New custom material…'), findsOneWidget);
       expect(find.text('Manage custom materials…'), findsOneWidget);
-
-      // Disabled caption shows beside each pinned row.
       expect(
         find.text('Pick a library file in Settings first'),
-        findsNWidgets(2),
+        findsNothing,
       );
 
-      // Tapping the new-row does not open the dialog: nothing changes.
-      await tester.tap(find.byKey(const Key('material-picker-new-custom')));
-      await tester.pump();
-      expect(find.text('Add Custom Material'), findsNothing);
+      // Each row's InkWell has a non-null onTap callback — always enabled.
+      final newRowInkWell = tester.widget<InkWell>(
+        find.descendant(
+          of: find.byKey(const Key('material-picker-new-custom')),
+          matching: find.byType(InkWell),
+        ),
+      );
+      expect(newRowInkWell.onTap, isNotNull);
+
+      final manageRowInkWell = tester.widget<InkWell>(
+        find.descendant(
+          of: find.byKey(const Key('material-picker-manage')),
+          matching: find.byType(InkWell),
+        ),
+      );
+      expect(manageRowInkWell.onTap, isNotNull);
     },
   );
 

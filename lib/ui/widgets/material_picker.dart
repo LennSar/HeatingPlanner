@@ -13,10 +13,6 @@ import '../dialogs/custom_material_dialog.dart';
 import 'collapsible_group_tile.dart';
 import 'material_entry_tile.dart';
 
-/// Caption shown next to the disabled pinned rows when the user has not
-/// configured a custom material library yet (UI/UX §5.7.1 items 2 / 3).
-const _disabledLibraryCaption = 'Pick a library file in Settings first';
-
 /// Searchable, grouped material picker for use in the wall construction editor.
 ///
 /// Renders a pinned search field, a pinned "+ New custom material…" row,
@@ -142,9 +138,6 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
     final colorScheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context)!;
 
-    final libraryPath = ref.watch(customMaterialLibraryPathProvider);
-    final libraryConfigured = libraryPath != null;
-
     final grouped = ref.watch(localizedGroupedMaterialsProvider);
 
     return Column(
@@ -182,14 +175,13 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
         ),
 
         // ── "+ New custom material…" pinned row ──────────────────────────
+        // ADR-021 Rule 14: a default library file is always available,
+        // so this row is always enabled.
         _PinnedActionRow(
           key: const Key('material-picker-new-custom'),
           icon: Icons.add,
           label: 'New custom material…',
-          enabled: libraryConfigured,
-          disabledCaption:
-              libraryConfigured ? null : _disabledLibraryCaption,
-          onTap: libraryConfigured ? _createCustom : null,
+          onTap: _createCustom,
         ),
         const Divider(height: 1),
 
@@ -232,16 +224,14 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
         ),
 
         // ── "Manage custom materials…" pinned row ────────────────────────
+        // ADR-021 Rule 14: always enabled.
         if (widget.onManageRequested != null) ...[
           const Divider(height: 1),
           _PinnedActionRow(
             key: const Key('material-picker-manage'),
             icon: Icons.settings,
             label: 'Manage custom materials…',
-            enabled: libraryConfigured,
-            disabledCaption:
-                libraryConfigured ? null : _disabledLibraryCaption,
-            onTap: libraryConfigured ? widget.onManageRequested : null,
+            onTap: widget.onManageRequested!,
           ),
         ],
       ],
@@ -256,26 +246,20 @@ class _PinnedActionRow extends StatelessWidget {
     super.key,
     required this.icon,
     required this.label,
-    required this.enabled,
-    required this.disabledCaption,
     required this.onTap,
   });
 
   final IconData icon;
   final String label;
-  final bool enabled;
-  final String? disabledCaption;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = enabled
-        ? theme.colorScheme.primary
-        : theme.colorScheme.onSurfaceVariant;
+    final color = theme.colorScheme.primary;
 
     return InkWell(
-      onTap: enabled ? onTap : null,
+      onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(
           horizontal: Spacing.sm,
@@ -286,24 +270,9 @@ class _PinnedActionRow extends StatelessWidget {
             Icon(icon, size: Spacing.md, color: color),
             const SizedBox(width: Spacing.sm),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    label,
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: color,
-                    ),
-                  ),
-                  if (!enabled && disabledCaption != null)
-                    Text(
-                      disabledCaption!,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                ],
+              child: Text(
+                label,
+                style: theme.textTheme.bodyMedium?.copyWith(color: color),
               ),
             ),
           ],
