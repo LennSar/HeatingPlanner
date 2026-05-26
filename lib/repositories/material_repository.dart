@@ -94,21 +94,13 @@ class MaterialRepository with SaveStateMixin {
 
   MaterialDao get _dao => ref.read(materialDaoProvider);
 
-  /// Inserts or replaces a user-created [entry] and marks dirty.
-  Future<void> upsertCustomMaterial(MaterialEntry entry) async {
-    await _dao.upsert(_entryToCompanion(entry));
-    markProjectDirty();
-  }
-
   /// Inserts or replaces a built-in seed [entry] without marking dirty.
+  ///
+  /// Custom (user-created) materials must be written via
+  /// `CustomMaterialLibraryService` per ADR-021 Rule 13 — this
+  /// repository owns built-in seeds only.
   Future<void> upsertBuiltInMaterial(MaterialEntry entry) =>
       _dao.upsert(_entryToCompanion(entry));
-
-  /// Deletes the user-created material with [id] and marks dirty.
-  Future<void> deleteCustomMaterial(String id) async {
-    await _dao.deleteById(id);
-    markProjectDirty();
-  }
 
   /// Ensures the built-in material catalogue is up-to-date.
   ///

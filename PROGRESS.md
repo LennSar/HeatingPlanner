@@ -47,6 +47,7 @@ This file is maintained by the prompt engineer. Update it whenever the user conf
 | Wall construction editor | ✅ | |
 | Save wall construction as preset | 🔧 | Prompt generated; `isPreset` added to model + DB migration needed |
 | Load preset in other walls | 🔧 | Part of same prompt |
+| Custom material library (file-backed, shareable) | 🔧 | ADR-021; user-pickable JSON file mirrored into `material_entries`. Two prompts generated: data/service + UI |
 
 ---
 

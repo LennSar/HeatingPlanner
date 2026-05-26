@@ -13,6 +13,7 @@ const _kCanvasPanY = 'canvasPanY';
 const _kGridSpacingMm = 'gridSpacingMm';
 const _kLanguageCode = 'languageCode';
 const _kMaterialDbVersion = 'materialDbVersion';
+const _kCustomMaterialLibraryPath = 'customMaterialLibraryPath';
 const _kDefaultGridSpacingMm = 100;
 
 // ── AppPreferences ────────────────────────────────────────────────────────────
@@ -127,6 +128,25 @@ class AppPreferences {
       await _prefs.remove(_kLanguageCode);
     } else {
       await _prefs.setString(_kLanguageCode, code);
+    }
+  }
+
+  // ── customMaterialLibraryPath ────────────────────────────────────────────
+
+  /// Absolute path to the user-pickable JSON custom-material library, or
+  /// `null` when no library is configured.
+  ///
+  /// See `DECISIONS.md` ADR-021 Rule 1.
+  Future<String?> getCustomMaterialLibraryPath() =>
+      _prefs.getString(_kCustomMaterialLibraryPath);
+
+  /// Persists [path] as the absolute path to the user-pickable JSON
+  /// custom-material library. Pass `null` to clear.
+  Future<void> setCustomMaterialLibraryPath(String? path) async {
+    if (path == null) {
+      await _prefs.remove(_kCustomMaterialLibraryPath);
+    } else {
+      await _prefs.setString(_kCustomMaterialLibraryPath, path);
     }
   }
 

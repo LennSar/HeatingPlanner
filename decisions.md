@@ -1504,3 +1504,223 @@ Defined per implementation prompt. Acceptance criteria include:
   `isAutoDefault = true`; Rule 8b yields a wall whose `isAutoDefault`
   matches the adopted side.
 
+## ADR-021 — Custom material library is a user-pickable JSON file mirrored into the in-app DB
+
+**What.**
+Custom materials live in a single JSON file at a user-chosen path
+stored in `AppPreferences.customMaterialLibraryPath`. On launch and on
+every change to that path the app runs a *sync pass* that re-seeds the
+`material_entries` table from the file. Every add / edit / delete from
+the UI writes through to both SQLite (the source of truth for queries
+and `materialsProvider`) and the JSON file (the source of truth for
+sharing the library between users / installs). Built-in materials
+seeded from `assets/materials.json` remain `isBuiltIn = true` and are
+read-only.
+
+**Why.**
+- The user picked an explicit shareable file (Dropbox / network share /
+  USB) over both an OS app-data folder and an in-`.hsp` bundle. A
+  user-pickable path lets one team share one file without hard-coding a
+  per-OS location.
+- The picker dropdown already groups by category and feeds off
+  `materialsProvider`. Mirroring custom entries into the same table
+  keeps the picker uniform — no two-pass UI logic, no special-casing
+  search and grouping.
+- JSON is human-readable, easy to diff, and matches the existing
+  `assets/materials.json` shape, so the same `MaterialEntry.toJson`
+  serialisation is reused.
+- `MaterialEntry.isBuiltIn` already exists in the model (architect §5.3)
+  exactly for this distinction; no schema change to that table.
+
+**Rule.**
+
+1. **AppPreferences field.** `AppPreferences` gains
+   `customMaterialLibraryPath: String?`, null when no library is
+   configured. Persisted alongside `gridSpacingMm` /
+   `lastOpenedProjectId` per existing preferences pattern.
+
+2. **File schema.** JSON, UTF-8:
+
+   ```json
+   {
+     "version": "1.0",
+     "materials": [
+       {
+         "id": "uuid-v4",
+         "name": "...",
+         "category": "...",
+         "subcategory": "...",
+         "manufacturer": "...",
+         "lambdaDefault": 0.035,
+         "densityDefault": 50,
+         "specificHeatDefault": 1030,
+         "source": ""
+       }
+     ]
+   }
+   ```
+
+   Field names match `MaterialEntry.toJson()` exactly. `isBuiltIn` is
+   not stored in the file; on read it is forced to `false`. `version`
+   is reserved for future migrations — readers tolerate unknown
+   higher-version files by reading what they can and warning the user,
+   per the same forward-compat rule used for `.hsp` (architect §7.4).
+
+3. **Identifier.** Each entry's `id` is a UUID v4 generated at add time
+   in the dialog. It is the stable identifier across the JSON file and
+   the SQLite row — never regenerate it on sync.
+
+4. **Sync pass.** On app launch and on every change to
+   `customMaterialLibraryPath`:
+   1. Delete all rows in `material_entries` where `isBuiltIn = false`.
+   2. If the new path is non-null and the file exists and parses:
+      insert each entry into `material_entries` with
+      `isBuiltIn = false`, preserving its `id`.
+   3. If the file is missing, unreadable, or malformed: keep step 1's
+      empty custom set, surface a toast ("Custom material library
+      could not be loaded — check the path in Settings"), do **not**
+      clear `customMaterialLibraryPath` automatically (the user fixes
+      it from Settings).
+
+5. **CRUD write-through.** Add / edit / delete operations from the UI
+   route through `CustomMaterialLibraryService.create` /
+   `.update` / `.delete`. Each operation:
+   1. Mutates the SQLite row.
+   2. Rewrites the **entire JSON file** from the current set of
+      `isBuiltIn = false` rows (simple full-file write — atomic via
+      write-temp-then-rename per platform conventions; no append, no
+      partial diff).
+   3. If the file write throws, rolls the SQLite change back and
+      surfaces an error toast. The two stores must stay in sync.
+
+   The full-file-rewrite approach is intentional: the file is small,
+   diffing is cheap, and it guarantees the file always reflects the
+   complete current library — no chance of partial writes leaving
+   stale entries behind.
+
+6. **Concurrent edits across users.** Last-write-wins; no locking.
+   Settings exposes a "Reload from file" button that re-runs the sync
+   pass on demand. There is no background watcher or auto-reload in
+   v1 — users who share a file accept the trade-off that two
+   simultaneous edits can overwrite each other.
+
+7. **Delete blocked while referenced.** Before deleting a custom
+   material, query for any `MaterialLayer.materialId == thisId`. If
+   the count is > 0, abort the delete and show a dialog listing the
+   affected constructions:
+
+   ```
+   "Custom Hempcrete" is used in 3 layers:
+     - Exterior Wall South
+     - Living Room Floor
+     - Bathroom Ceiling
+   Remove or reassign those layers first, then try again.
+   ```
+
+   No FK-orphan path in v1. Rationale: keeps the data model unchanged
+   (no nullable FK migration) and avoids silently breaking
+   constructions a user may not be looking at right now.
+
+8. **Editing preserves captured values.** Changing a custom material's
+   `lambdaDefault` / `densityDefault` / `specificHeatDefault` updates
+   the `MaterialEntry` row only. Existing `MaterialLayer` rows that
+   reference the material keep their captured
+   `thermalConductivity` / `density` / `specificHeat` values
+   unchanged — this is the existing layer-override behaviour
+   (architect §5.3). The construction editor's per-layer overrides
+   continue to work the same way for both built-in and custom
+   materials.
+
+9. **Renaming is unrestricted.** A custom material's `name`,
+   `category`, `subcategory`, `manufacturer`, and `source` can change
+   freely. The picker shows the new name immediately because
+   `materialsProvider` is a stream off `material_entries`.
+
+10. **`.hsp` export not bundled in v1.** The library is the sharing
+    channel; `.hsp` is the per-project envelope. The architect's
+    `customMaterials` slot in `.hsp` (architect §7.4) stays reserved
+    but unpopulated. Rationale: bundling custom materials inside a
+    `.hsp` would create three sources of truth (file, DB, .hsp) and
+    require conflict resolution on import. Revisit only if users
+    explicitly ask for self-contained project bundles. **Note for
+    import path:** when a `.hsp` from a different installation
+    references `materialId`s that don't resolve in the current DB
+    (e.g. that user's custom materials are not in this user's
+    library), the imported `MaterialLayer` rows keep their captured
+    `thermalConductivity` / `density` / `specificHeat` values
+    (architect §5.3) — the missing material reference is logged as a
+    soft `ValidationResult` with severity `info` ("Layer references a
+    material not in your library") rather than blocking the import.
+
+11. **Free-form taxonomy.** Category and subcategory are arbitrary
+    strings on a custom entry — a custom material may invent new
+    values. The picker derives the visible taxonomy from
+    `SELECT DISTINCT category, subcategory FROM material_entries`,
+    union of built-in and custom. No validation against the built-in
+    list — the user explicitly asked to be able to create new
+    categories.
+
+12. **Provider contract.** Two new providers are added:
+    - `customMaterialLibraryPathProvider` — `StateProvider<String?>`
+      backed by `AppPreferences`. Writes invalidate
+      `customMaterialsProvider` and trigger a sync pass.
+    - `customMaterialsProvider` — `StreamProvider<List<MaterialEntry>>`
+      over `material_entries WHERE isBuiltIn = false`. Used by the
+      Manage Custom Materials screen; the wall construction editor
+      keeps using the union-view `materialsProvider`.
+
+13. **Service contract.** `CustomMaterialLibraryService` lives in the
+    repository layer
+    (`lib/repositories/custom_material_library_service.dart`) and is
+    the **only** code path that mutates `material_entries` rows where
+    `isBuiltIn = false`. Surface:
+
+    | Method | Behaviour |
+    |--------|-----------|
+    | `Stream<List<MaterialEntry>> watchCustom()` | Mirrors `customMaterialsProvider` |
+    | `Future<void> setLibraryPath(String? path)` | Updates `AppPreferences` and runs the sync pass (Rule 4) |
+    | `Future<void> reloadFromFile()` | Re-runs the sync pass with the current path |
+    | `Future<MaterialEntry> create(MaterialEntry entry)` | UUID v4 id; write-through per Rule 5 |
+    | `Future<void> update(MaterialEntry entry)` | Write-through per Rule 5 |
+    | `Future<DeleteResult> delete(String id)` | Returns `DeleteResult.blocked(usages)` or `DeleteResult.ok()` per Rule 7 |
+
+    Mutating methods throw `LibraryNotConfiguredException` when
+    `customMaterialLibraryPath == null` — the UI must disable
+    affordances accordingly rather than catch.
+
+**Scope.**
+Affects `AppPreferences`; adds `CustomMaterialLibraryService` and two
+new providers; adds the Manage Custom Materials screen, the Add/Edit
+Custom Material dialog, the Settings "Custom material library" section,
+and the picker affordances per `agent-ui-ux.md §5.7.1`. Does **not**
+change the `MaterialEntry` model, the `material_entries` table schema,
+the `.hsp` envelope, or any calculation engine. The built-in seed path
+from `assets/materials.json` is untouched and continues to run on first
+launch when the table is empty.
+
+**Verification.**
+Defined per implementation prompt. Acceptance criteria include:
+- Picking a fresh JSON file path in Settings creates the file (if
+  absent) with `{"version":"1.0","materials":[]}` and immediately
+  enables the picker's "+ New custom material…" affordance.
+- Adding a material via the dialog writes a new row to
+  `material_entries` with `isBuiltIn = false` and appends an entry
+  with the same `id` to the JSON file; the entry appears in the
+  picker dropdown grouped under its chosen category/subcategory
+  within one repaint.
+- Pointing the path at a pre-populated JSON file on launch loads all
+  its entries; pointing it at a different file clears the previous
+  custom set and loads the new one (Rule 4).
+- Deleting a custom material referenced by any `MaterialLayer` is
+  rejected with the per-construction usage list (Rule 7); after the
+  user removes the references, the delete succeeds and both the
+  SQLite row and the file entry are gone.
+- Editing a custom material's λ from 0.045 → 0.040 updates the
+  `MaterialEntry` but leaves every existing `MaterialLayer.thermalConductivity`
+  that captured the old value untouched (Rule 8).
+- A malformed JSON file does not crash the app; the toast is shown
+  and the picker behaves as if no library is configured (Rule 4.3).
+- `materialsProvider` continues to emit the union of built-in +
+  custom; the wall construction editor's dropdown sees both with no
+  changes to its existing grouping logic.
+

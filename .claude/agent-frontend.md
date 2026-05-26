@@ -13,6 +13,7 @@ lib/
 │   ├── screens/
 │   │   ├── project_list_screen.dart
 │   │   ├── editor_screen.dart
+│   │   ├── manage_custom_materials_screen.dart  # ADR-021 §5.7.3
 │   │   └── settings_screen.dart
 │   ├── canvas/
 │   │   ├── floor_plan_canvas.dart
@@ -49,6 +50,7 @@ lib/
 │   │   └── severity_badge.dart
 │   └── dialogs/
 │       ├── material_picker_dialog.dart
+│       ├── custom_material_dialog.dart    # ADR-021 §5.7.2
 │       ├── export_dialog.dart
 │       └── project_settings_dialog.dart
 ├── export/

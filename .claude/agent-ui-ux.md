@@ -511,11 +511,17 @@ The material field on each layer row is a **searchable dropdown** — tapping it
 
 1. **Search field** pinned at the top of the open dropdown — filters the list in real time (case-insensitive substring match on material name). Does not close the dropdown.
 
-2. **Grouped entries** below the search field. Materials are grouped by top-level category, derived by stripping the sub-category suffix (e.g. "Masonry - Historic" and "Masonry - Modern" both fold under a **"Masonry"** header). Group headers are non-selectable divider rows styled in `onSurfaceSecondary`. Order of groups matches `agent-hvac.md` §7.1 category order. When the search field is non-empty, group headers are hidden and a flat filtered list is shown.
+2. **"+ New custom material…" row**, pinned directly below the search field and above the grouped entries. Always visible (not filtered by the search field). Tapping opens the Custom Material dialog (§5.7.2) pre-filled with empty fields. When `customMaterialLibraryPathProvider` is null, this row is **disabled** with a small secondary-text caption "*Pick a library file in Settings first*"; tapping it does nothing.
 
-3. Each material entry shows the material name and λ value in secondary text (e.g. "λ 0.035 W/(m·K)").
+3. **"Manage custom materials…" row**, pinned at the bottom of the dropdown (below the grouped entries). Always visible. Tapping opens the Manage Custom Materials screen (§5.7.3) and closes the dropdown. Same disabled rule as item 2 — disabled when no library file is configured.
 
-4. Selecting an entry closes the dropdown and updates the layer row with the material name and its default λ.
+4. **Grouped entries** below the "+ New custom material…" row. Materials are grouped by top-level category, derived by stripping the sub-category suffix (e.g. "Masonry - Historic" and "Masonry - Modern" both fold under a **"Masonry"** header). Group headers are non-selectable divider rows styled in `onSurfaceSecondary`. Order of groups: the built-in categories listed in `agent-hvac.md` §7.1 first, then any custom-only categories alphabetically. When the search field is non-empty, group headers are hidden and a flat filtered list is shown.
+
+5. Each material entry shows the material name and λ value in secondary text (e.g. "λ 0.035 W/(m·K)"). Custom entries (`isBuiltIn = false`) are tagged with a small "*Custom*" chip in `primaryLight` next to the name to distinguish them at a glance — colour is not the sole indicator (accessibility §11).
+
+6. **Per-entry edit affordance on custom rows.** On desktop, hovering a custom entry reveals a pencil icon (✎) at the row's right edge; tapping it opens the Custom Material dialog (§5.7.2) in edit mode pre-filled with that entry. On tablet, long-press on a custom row opens a small popup with **Edit** / **Delete** actions. Built-in rows have no edit/delete affordances. Right-click on a custom row (desktop) shows the same Edit / Delete context menu.
+
+7. Selecting an entry closes the dropdown and updates the layer row with the material name and its default λ.
 
 **Preset buttons (second row in title area):**
 
@@ -535,6 +541,173 @@ The material field on each layer row is a **searchable dropdown** — tapping it
     is also replaced with the preset name. The user must still press "Save" to
     apply the loaded construction to the wall.
   - Loading does not modify the saved preset — it is always a copy.
+
+#### §5.7.2 Custom Material Dialog (Add / Edit)
+
+Opened from §5.7.1 item 2 (add), item 6 (edit), or from the Manage
+screen (§5.7.3). Modal dialog (`showDialog` on desktop,
+`showModalBottomSheet` on tablet). Backed by `DECISIONS.md` ADR-021.
+
+```
+┌──────────────────────────────────────────────────────┐
+│  Add Custom Material                          [✕]    │  ← or "Edit"
+├──────────────────────────────────────────────────────┤
+│                                                        │
+│  Name *           [_________________________________] │
+│                                                        │
+│  Category *       ( ) Pick existing  (●) Create new   │
+│                   ┌────────────────┐  ┌─────────────┐ │
+│                   │ Masonry      ▾ │  │ My Category │ │
+│                   └────────────────┘  └─────────────┘ │
+│                                                        │
+│  Subcategory *    ( ) Pick existing  (●) Create new   │
+│                   ┌────────────────┐  ┌─────────────┐ │
+│                   │ Historic brick▾│  │ My Sub      │ │
+│                   └────────────────┘  └─────────────┘ │
+│                                                        │
+│  Manufacturer     [Custom_________________________]    │
+│                                                        │
+│  λ  (W/(m·K)) *   [0.035____]                          │
+│  Density (kg/m³) *[50_______]                          │
+│  Spec. heat *     [1030_____]   J/(kg·K)               │
+│  Source URL       [https://________________________]   │
+│                                                        │
+│              [ Cancel ]    [ Save ]                    │
+└──────────────────────────────────────────────────────┘
+```
+
+**Fields and validation.** Reuses `validation_limits.dart` ranges.
+
+| Field | Required | Type | Range / rule |
+|-------|----------|------|--------------|
+| Name | yes | Text | 1–200 chars; must be unique among custom materials (case-insensitive) — error message *"A custom material with this name already exists"* |
+| Category | yes | Toggle + control | See **Category / subcategory toggle** below; 1–100 chars when typed |
+| Subcategory | yes | Toggle + control | Same as category; 1–100 chars when typed |
+| Manufacturer | no | Text | 0–100 chars; defaults to "Custom" when blank |
+| λ | yes | Numeric | 0.005 – 50.0 W/(m·K) per `minLambda` / `maxLambda` |
+| Density | yes | Numeric | 1.0 – 10 000.0 kg/m³ per `minDensity` / `maxDensity` |
+| Specific heat | yes | Numeric | 100.0 – 5 000.0 J/(kg·K) per `minSpecificHeat` / `maxSpecificHeat` |
+| Source URL | no | Text | Plain text, max 500 chars, no URL well-formedness check (we want users to be able to paste a path or a note) |
+
+Required-field stars (`*`) follow the typography convention in §3.2.
+Invalid values show an inline error in `errorRed` directly beneath the
+field. The **Save** button is disabled until all required fields are
+valid; the **Cancel** button always works.
+
+**Category / subcategory toggle.** Each row has a two-segment toggle:
+
+- **Pick existing** — a dropdown listing every distinct value
+  currently present in `material_entries` for that level. Categories
+  are union of built-in + custom; subcategories are filtered to the
+  selected category. If no categories exist yet, the toggle starts on
+  **Create new**, and **Pick existing** is disabled with a tooltip
+  *"No existing categories yet — create the first one"*.
+- **Create new** — a text field. Validation: 1–100 chars, trimmed; an
+  empty value blocks Save.
+
+Switching toggles clears the inactive control's value. Subcategory's
+"Pick existing" dropdown is filtered by the **currently chosen
+category value**, regardless of whether that value came from the
+existing-categories dropdown or a freshly-typed new category.
+
+**Save.**
+- New material: generates a UUID v4 `id`, calls
+  `CustomMaterialLibraryService.create`, closes the dialog. The picker
+  dropdown reflects the new entry on its next open. The newly-created
+  entry is auto-selected on the layer row that opened the dialog (if
+  the dialog was opened from a layer row).
+- Edit: calls `CustomMaterialLibraryService.update`. Per ADR-021
+  Rule 8, existing `MaterialLayer` rows that captured the old λ /
+  density / specific-heat values keep them. The save banner under the
+  Manage screen shows a brief confirmation; in the picker dropdown the
+  updated entry appears with the new values on next open.
+
+**Errors.**
+- File write failure → toast in `errorRed`: *"Could not save to library
+  file. Check disk space or permissions and try again."* The SQLite
+  row is rolled back per ADR-021 Rule 5; the dialog stays open with
+  the user's values intact.
+- Library not configured → the dialog never opens (its entry points
+  are disabled per §5.7.1 item 2 and §5.7.3).
+
+#### §5.7.3 Manage Custom Materials Screen
+
+Reached from:
+- §5.7.1 item 3 ("Manage custom materials…" link in the picker
+  dropdown).
+- Settings screen "Custom material library" → **Manage…** button
+  (§9.2).
+
+Full-screen scaffold on tablet, modal dialog (max width 720 px) on
+desktop.
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Custom Materials                          [+ Add]   [✕]   │
+├─────────────────────────────────────────────────────────────┤
+│  Library: ~/Dropbox/team/heating_planner.matlib.json        │
+│  [Browse…]  [Clear]  [Reload from file]                     │
+├─────────────────────────────────────────────────────────────┤
+│  [🔍 Search…                                       ]        │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  Insulation boards › Wood fibre                              │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │ STEICO flex 036          λ 0.036    [Edit]  [🗑]     │  │
+│  │ Custom hemp board        λ 0.040    [Edit]  [🗑]     │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                              │
+│  Masonry › Historic brick                                    │
+│  ┌──────────────────────────────────────────────────────┐  │
+│  │ My historic field brick  λ 0.90     [Edit]  [🗑]     │  │
+│  └──────────────────────────────────────────────────────┘  │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Layout.**
+- Header row with "+ Add" button (opens §5.7.2 in add mode) and a
+  close button (✕).
+- Library path summary with **Browse…**, **Clear**, **Reload from
+  file** buttons (mirrors Settings §9.2).
+- Search field that filters across name / manufacturer.
+- Grouped list using the same `category › subcategory` taxonomy as the
+  picker dropdown, listing only `isBuiltIn = false` entries. Empty
+  state: *"No custom materials yet. Press **+ Add** to create your
+  first one."*
+
+**Row affordances.**
+- **Edit** button → opens §5.7.2 in edit mode pre-filled with the
+  entry.
+- **Delete** (🗑) button → confirmation dialog:
+
+  ```
+  Delete "Custom hemp board"?
+  This will remove it from your custom material library file
+  and from the in-app database.
+  [ Cancel ]   [ Delete ]
+  ```
+
+  If the material is used by any `MaterialLayer`, the dialog
+  instead shows the **block message** from ADR-021 Rule 7 with a
+  per-construction usage list and a single **OK** button — no delete.
+
+**Browse / Clear / Reload.**
+- **Browse…** → opens a file picker; accepts `*.json` /
+  `*.matlib.json`. On selection, calls
+  `CustomMaterialLibraryService.setLibraryPath`. The screen reloads
+  its list automatically.
+- **Clear** → confirmation: *"Unlink the custom material library? The
+  file on disk will not be deleted, but your custom materials will
+  disappear from the app until you pick the file again."* On
+  confirm, calls `setLibraryPath(null)`.
+- **Reload from file** → calls `reloadFromFile()` and shows
+  *"Reloaded N custom materials"* toast.
+
+**Tablet adaptation.** Replaces "Edit" / "🗑" inline buttons with a
+trailing "⋮" overflow menu per row; the header collapses the three
+file-action buttons into a single overflow menu "⋮" to the right of
+the path.
 
 ### 5.8 Performance Dashboard
 
@@ -894,6 +1067,51 @@ Accessible from the overflow menu (⋮) on tablet, and from the app menu bar on 
 - **No "dimension display" toggle.** Per EN 12831 simplified method, the app
   always displays inner clear (Lichtmaß) dimensions; outer envelope is a
   derived rendering quantity only. See ADR-017.
+
+### 9.2 Custom Material Library
+
+A dedicated section in the Settings form, below the general settings.
+See `DECISIONS.md` ADR-021.
+
+```
+Custom material library
+  File path     [ ~/Dropbox/team/heating_planner.matlib.json   ]
+                [ Browse…  ]  [ Clear  ]  [ Reload from file  ]
+                Status: ✓ Loaded 12 custom materials
+
+                                              [ Manage materials… ]
+```
+
+**Behaviour.**
+- **File path** is a read-only display field showing the absolute path
+  from `customMaterialLibraryPathProvider` (truncated middle on
+  overflow with the full path in a tooltip). When unset, shows the
+  placeholder *"No library configured — pick a file to enable custom
+  materials"* in `onSurfaceSecondary`.
+- **Browse…** opens a file picker. Filter: `*.json`, `*.matlib.json`.
+  The picker is in **save-or-open** mode: if the chosen path does not
+  exist, the service creates it with an empty library skeleton
+  (`{"version":"1.0","materials":[]}`); if it exists and parses, its
+  entries are loaded per ADR-021 Rule 4.
+- **Clear** unlinks the library (sets the provider to null). Shows the
+  confirmation described in §5.7.3. The file on disk is **never**
+  deleted by Clear.
+- **Reload from file** re-runs the sync pass (ADR-021 Rule 6) and
+  shows a toast *"Reloaded N custom materials"*. Disabled when the
+  path is null.
+- **Status line** shows one of:
+  - "✓ Loaded N custom materials" (success, `success` colour)
+  - "⚠ File missing — pick a new path or restore the file"
+    (`warningAmber`)
+  - "⚠ File could not be parsed — check the JSON syntax"
+    (`warningAmber`)
+  - hidden when the path is null
+- **Manage materials…** button — full-width, right-aligned — opens the
+  Manage Custom Materials screen (§5.7.3). Disabled when the path is
+  null.
+
+The library path is global (not per-project) and persisted in
+`AppPreferences.customMaterialLibraryPath`.
 
 ---
 

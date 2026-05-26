@@ -28,12 +28,39 @@ class MaterialDao extends DatabaseAccessor<AppDatabase>
       (select(materialEntries)..where((t) => t.id.equals(id))).watchSingle();
 
   /// Inserts or replaces a material-entry row.
-  Future<void> upsert(MaterialEntriesCompanion companion) =>
-      into(materialEntries).insertOnConflictUpdate(companion);
+  ///
+  /// ADR-021 Rule 13: rows where `isBuiltIn = false` (custom materials)
+  /// must be written via `CustomMaterialLibraryService`. Calling this
+  /// with such a companion throws [StateError].
+  Future<void> upsert(MaterialEntriesCompanion companion) {
+    if (companion.isBuiltIn.present && companion.isBuiltIn.value == false) {
+      throw StateError(
+        'MaterialDao.upsert may only insert built-in materials. '
+        'Use CustomMaterialLibraryService to mutate custom rows '
+        '(ADR-021 Rule 13).',
+      );
+    }
+    return into(materialEntries).insertOnConflictUpdate(companion);
+  }
 
   /// Deletes the material entry with the given [id].
-  Future<void> deleteById(String id) =>
-      (delete(materialEntries)..where((t) => t.id.equals(id))).go();
+  ///
+  /// ADR-021 Rule 13: deleting `isBuiltIn = false` rows must go
+  /// through `CustomMaterialLibraryService`. Calls that target a
+  /// custom row throw [StateError].
+  Future<void> deleteById(String id) async {
+    final row = await (select(materialEntries)
+          ..where((t) => t.id.equals(id)))
+        .getSingleOrNull();
+    if (row != null && !row.isBuiltIn) {
+      throw StateError(
+        'MaterialDao.deleteById may only delete built-in materials. '
+        'Use CustomMaterialLibraryService to delete custom rows '
+        '(ADR-021 Rule 13).',
+      );
+    }
+    await (delete(materialEntries)..where((t) => t.id.equals(id))).go();
+  }
 
   /// Returns the locale-appropriate display name for [row].
   ///

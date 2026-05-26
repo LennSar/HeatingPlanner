@@ -8,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
 import 'l10n/app_localizations.dart';
 import 'repositories/app_preferences.dart';
+import 'repositories/custom_material_library_service.dart';
 import 'repositories/material_repository.dart';
 import 'repositories/project_repository.dart';
 import 'repositories/save_state_notifier.dart';
@@ -27,6 +28,11 @@ final _startupProjectIdProvider =
   // Ensure the built-in material catalogue is seeded / up-to-date.
   // Idempotent: skips immediately when the stored version matches.
   await ref.read(materialRepositoryProvider).ensureMaterialsSeeded();
+  // ADR-021 Rule 4: seed the custom-material library from the
+  // user-pickable JSON file before the editor loads.
+  await ref
+      .read(customMaterialLibraryServiceProvider)
+      .initializeOnStartup();
   final id = await ref.read(lastOpenedProjectIdProvider.future);
   if (id == null) return null;
   final project = await ref.read(projectRepositoryProvider).findById(id);

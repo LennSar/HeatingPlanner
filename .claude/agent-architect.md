@@ -163,6 +163,7 @@ lib/
 │   ├── building_repository.dart
 │   ├── construction_repository.dart
 │   ├── material_repository.dart
+│   ├── custom_material_library_service.dart  # ADR-021
 │   └── heating_repository.dart
 │
 ├── calculation/
@@ -553,6 +554,8 @@ Use `@riverpod` annotation with code generation. Every provider is defined in th
 | `constructionProvider` | StreamProvider.family | constructionId | WallConstruction | construction_repository.dart |
 | `layersProvider` | StreamProvider.family | constructionId | List\<MaterialLayer\> | construction_repository.dart |
 | `materialsProvider` | StreamProvider | — | List\<MaterialEntry\> | material_repository.dart |
+| `customMaterialsProvider` | StreamProvider | — | List\<MaterialEntry\> (`isBuiltIn=false` only) | custom_material_library_service.dart |
+| `customMaterialLibraryPathProvider` | StateProvider | — | String? | custom_material_library_service.dart |
 | `heatingZonesProvider` | StreamProvider.family | roomId | List\<HeatingZone\> | heating_repository.dart |
 | `distributorProvider` | StreamProvider.family | floorId | Distributor? | heating_repository.dart |
 | `circuitsProvider` | StreamProvider.family | distributorId | List\<HeatingCircuit\> | heating_repository.dart |
@@ -604,7 +607,14 @@ Group related tables into DAOs:
 - `ProjectDao` — projects
 - `BuildingDao` — floors, rooms, wall_segments, windows, doors
 - `ConstructionDao` — wall_constructions, material_layers
-- `MaterialDao` — material_entries
+- `MaterialDao` — material_entries (built-in seed + custom rows)
+- `CustomMaterialLibraryService` (`lib/repositories/`) — owns the
+  user-pickable JSON library file and mirrors its entries into
+  `material_entries` with `isBuiltIn = false`. Sole code path that
+  mutates `isBuiltIn = false` rows. Surface and rules per
+  `DECISIONS.md` **ADR-021** (Rules 4, 5, 12, 13). `MaterialDao` keeps
+  ownership of built-in seed inserts; it must not be used to mutate
+  custom rows.
 - `HeatingDao` — heating_zones, tube_types, flooring_materials, distributors, heating_circuits
 
 Each DAO exposes:
@@ -644,6 +654,24 @@ Gzip-compressed JSON. Structure:
 ```
 
 On import: generate new UUIDs for all entities to prevent collisions. Preserve unknown JSON fields for forward compatibility.
+
+The `customMaterials` slot is **reserved but unpopulated in v1** per
+`DECISIONS.md` ADR-021 Rule 10. The custom material library is shared
+out-of-band via the user-pickable JSON file, not bundled in `.hsp`.
+Import-side handling of layers whose `materialId` cannot resolve in
+the current DB: keep the layer's captured
+`thermalConductivity` / `density` / `specificHeat` and emit a
+`ValidationResult` of severity `info` referencing the layer.
+
+### 7.5 AppPreferences
+
+Single-row preferences store (existing). Fields used across the app:
+
+| Field | Type | Default | Notes |
+|-------|------|---------|-------|
+| `gridSpacingMm` | int | 100 | Canvas grid spacing (UI/UX §9.1) |
+| `lastOpenedProjectId` | String? | null | Session restore (frontend §8.5) |
+| `customMaterialLibraryPath` | String? | null | Absolute path to the user-pickable JSON custom-material library. Null = no library configured. See `DECISIONS.md` ADR-021 Rule 1. |
 
 ---
 
