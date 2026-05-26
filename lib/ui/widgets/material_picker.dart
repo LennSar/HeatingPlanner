@@ -7,36 +7,38 @@ import '../../core/utils/material_category_localizer.dart';
 import '../../data/models/localized_catalog_row.dart';
 import '../../data/models/material_entry.dart';
 import '../../l10n/app_localizations.dart';
+import '../../repositories/custom_material_library_service.dart';
 import '../../repositories/material_repository.dart';
+import '../dialogs/custom_material_dialog.dart';
 import 'collapsible_group_tile.dart';
 import 'material_entry_tile.dart';
 
+/// Caption shown next to the disabled pinned rows when the user has not
+/// configured a custom material library yet (UI/UX §5.7.1 items 2 / 3).
+const _disabledLibraryCaption = 'Pick a library file in Settings first';
+
 /// Searchable, grouped material picker for use in the wall construction editor.
 ///
-/// Renders a pinned search field followed by a three-level collapsible list:
-/// **Category (level 0) → Subcategory (level 1) → [MaterialEntryTile] (level 2)**.
-///
-/// All category and subcategory groups start collapsed. Selecting a
-/// [MaterialEntryTile] invokes [onSelected]; the caller is responsible for
-/// dismissing any surrounding overlay or dialog.
-///
-/// Place this widget inside a height-constrained parent (e.g. a [SizedBox]
-/// with a fixed height, or a [Dialog]) so the [Flexible] list region can
-/// scroll correctly.
-///
-/// ## Paths
-/// - **Search inactive**: grouped three-level tree via [_GroupedList] backed
-///   by [localizedGroupedMaterialsProvider].
-/// - **Search active**: flat [_FlatFilteredList] — case-insensitive substring
-///   match against the row's display name *and* its alternate-locale name
-///   (so a query typed in English finds DE rows and vice versa) plus the
-///   canonical subcategory.
+/// Renders a pinned search field, a pinned "+ New custom material…" row,
+/// a three-level collapsible list, and a pinned "Manage custom materials…"
+/// row at the bottom — see UI/UX §5.7.1.
 class MaterialPicker extends ConsumerStatefulWidget {
   /// Creates a [MaterialPicker].
-  const MaterialPicker({super.key, required this.onSelected});
+  const MaterialPicker({
+    super.key,
+    required this.onSelected,
+    this.onManageRequested,
+  });
 
   /// Called with the chosen [MaterialEntry] when the user taps a row.
   final void Function(MaterialEntry) onSelected;
+
+  /// Called when the user taps the pinned "Manage custom materials…"
+  /// row. The caller is responsible for dismissing any surrounding
+  /// dialog and pushing the manage screen.
+  ///
+  /// When null the pinned row is hidden entirely.
+  final VoidCallback? onManageRequested;
 
   @override
   ConsumerState<MaterialPicker> createState() => _MaterialPickerState();
@@ -55,11 +57,6 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
   }
 
   /// Returns true when [entry] matches [lowerQuery] on any searchable field.
-  ///
-  /// [lowerQuery] must already be lower-cased by the caller (done once per
-  /// build, not per item). Matches on the locale-resolved display name,
-  /// the alternate-locale name (so English queries match DE rows and
-  /// vice versa), and the canonical subcategory.
   static bool _matches(
     LocalizedCatalogRow<MaterialEntry> entry,
     String lowerQuery,
@@ -67,20 +64,94 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
       catalogRowMatchesQuery(entry, lowerQuery) ||
       entry.row.subcategory.toLowerCase().contains(lowerQuery);
 
+  Future<void> _createCustom() async {
+    final newEntry = await showAddCustomMaterialDialog(context);
+    if (newEntry == null || !mounted) return;
+    widget.onSelected(newEntry);
+  }
+
+  Future<void> _editCustom(MaterialEntry entry) async {
+    await showEditCustomMaterialDialog(context, entry);
+  }
+
+  Future<void> _deleteCustom(MaterialEntry entry) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('Delete "${entry.name}"?'),
+        content: const Text(
+          'This will remove it from your custom material library '
+          'file and from the in-app database.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final result = await ref
+        .read(customMaterialLibraryServiceProvider)
+        .delete(entry.id);
+    if (!mounted) return;
+    if (result is DeleteBlocked) {
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text('"${entry.name}" is in use'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '"${entry.name}" is used in ${result.usages.length} '
+                'layer${result.usages.length == 1 ? '' : 's'}:',
+              ),
+              const SizedBox(height: Spacing.sm),
+              for (final u in result.usages)
+                Padding(
+                  padding: const EdgeInsets.only(left: Spacing.sm),
+                  child: Text('• ${u.constructionName}'),
+                ),
+              const SizedBox(height: Spacing.sm),
+              const Text(
+                'Remove or reassign those layers first, then try again.',
+              ),
+            ],
+          ),
+          actions: [
+            FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(),
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context)!;
 
-    // Grouped data from the provider — empty while loading or on error.
+    final libraryPath = ref.watch(customMaterialLibraryPathProvider);
+    final libraryConfigured = libraryPath != null;
+
     final grouped = ref.watch(localizedGroupedMaterialsProvider);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // ── Search field — always pinned at top (UI/UX §5.7.1) ───────────
+        // ── Search field ─────────────────────────────────────────────────
         Padding(
           padding: const EdgeInsets.all(Spacing.sm),
           child: TextField(
@@ -94,7 +165,7 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
               ),
               prefixIcon: Icon(
                 Icons.search,
-                size: Spacing.md + Spacing.xs, // 20 px
+                size: Spacing.md + Spacing.xs,
                 color: colorScheme.onSurfaceVariant,
               ),
               isDense: true,
@@ -110,17 +181,24 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
           ),
         ),
 
+        // ── "+ New custom material…" pinned row ──────────────────────────
+        _PinnedActionRow(
+          key: const Key('material-picker-new-custom'),
+          icon: Icons.add,
+          label: 'New custom material…',
+          enabled: libraryConfigured,
+          disabledCaption:
+              libraryConfigured ? null : _disabledLibraryCaption,
+          onTap: libraryConfigured ? _createCustom : null,
+        ),
+        const Divider(height: 1),
+
         // ── List area ────────────────────────────────────────────────────
-        // Loading and error states are surfaced through the canonical
-        // `materialEntriesProvider` (handled by parent consumers); the
-        // localized variant is a plain Provider that emits an empty list
-        // until canonical data is ready.
         Flexible(
           child: Builder(
             builder: (_) {
               final materials =
                   ref.watch(localizedMaterialEntriesProvider);
-              // ── Search-active path ──────────────────────────────────────
               final q = _query.trim().toLowerCase();
               if (q.isNotEmpty) {
                 final filtered =
@@ -128,9 +206,10 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
                 return _FlatFilteredList(
                   materials: filtered,
                   onSelected: widget.onSelected,
+                  onEditCustom: _editCustom,
+                  onDeleteCustom: _deleteCustom,
                 );
               }
-              // ── Search-inactive path ────────────────────────────────────
               if (grouped.isEmpty) {
                 return Padding(
                   padding: const EdgeInsets.all(Spacing.md),
@@ -145,29 +224,109 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
               return _GroupedList(
                 grouped: grouped,
                 onSelected: widget.onSelected,
+                onEditCustom: _editCustom,
+                onDeleteCustom: _deleteCustom,
               );
             },
           ),
         ),
+
+        // ── "Manage custom materials…" pinned row ────────────────────────
+        if (widget.onManageRequested != null) ...[
+          const Divider(height: 1),
+          _PinnedActionRow(
+            key: const Key('material-picker-manage'),
+            icon: Icons.settings,
+            label: 'Manage custom materials…',
+            enabled: libraryConfigured,
+            disabledCaption:
+                libraryConfigured ? null : _disabledLibraryCaption,
+            onTap: libraryConfigured ? widget.onManageRequested : null,
+          ),
+        ],
       ],
     );
   }
 }
 
-// ── Private: flat filtered list (search-active path) ──────────────────────
+// ── Pinned action row ───────────────────────────────────────────────────────
 
-/// Flat [ListView] of [MaterialEntryTile] rows with no group headers.
-///
-/// Shown when the search field is non-empty. [materials] is already filtered
-/// by [_MaterialPickerState._matches]; this widget only renders them.
+class _PinnedActionRow extends StatelessWidget {
+  const _PinnedActionRow({
+    super.key,
+    required this.icon,
+    required this.label,
+    required this.enabled,
+    required this.disabledCaption,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool enabled;
+  final String? disabledCaption;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final color = enabled
+        ? theme.colorScheme.primary
+        : theme.colorScheme.onSurfaceVariant;
+
+    return InkWell(
+      onTap: enabled ? onTap : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(
+          horizontal: Spacing.sm,
+          vertical: Spacing.sm,
+        ),
+        child: Row(
+          children: [
+            Icon(icon, size: Spacing.md, color: color),
+            const SizedBox(width: Spacing.sm),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    label,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: color,
+                    ),
+                  ),
+                  if (!enabled && disabledCaption != null)
+                    Text(
+                      disabledCaption!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Private: flat filtered list ─────────────────────────────────────────────
+
 class _FlatFilteredList extends StatelessWidget {
   const _FlatFilteredList({
     required this.materials,
     required this.onSelected,
+    required this.onEditCustom,
+    required this.onDeleteCustom,
   });
 
   final List<LocalizedCatalogRow<MaterialEntry>> materials;
   final void Function(MaterialEntry) onSelected;
+  final Future<void> Function(MaterialEntry) onEditCustom;
+  final Future<void> Function(MaterialEntry) onDeleteCustom;
 
   @override
   Widget build(BuildContext context) {
@@ -186,63 +345,84 @@ class _FlatFilteredList extends StatelessWidget {
       shrinkWrap: true,
       padding: EdgeInsets.zero,
       itemCount: materials.length,
-      // indentLevel 0: no group headers to nest under, so tiles sit flush
-      // at the base indent (Spacing.sm = 8 px left padding).
-      itemBuilder: (_, i) => MaterialEntryTile(
-        entry: materials[i],
-        indentLevel: 0,
-        onTap: () => onSelected(materials[i].row),
-      ),
+      itemBuilder: (_, i) {
+        final entry = materials[i];
+        if (entry.row.isBuiltIn) {
+          return MaterialEntryTile(
+            entry: entry,
+            indentLevel: 0,
+            onTap: () => onSelected(entry.row),
+          );
+        }
+        return _CustomMaterialPickerRow(
+          entry: entry,
+          indentLevel: 0,
+          onTap: () => onSelected(entry.row),
+          onEdit: () => onEditCustom(entry.row),
+          onDelete: () => onDeleteCustom(entry.row),
+        );
+      },
     );
   }
 }
 
-// ── Private: grouped list (search-inactive path) ───────────────────────────
+// ── Private: grouped list ───────────────────────────────────────────────────
 
-/// Scrollable three-level grouped list backed by
-/// [localizedGroupedMaterialsProvider].
-///
-/// Extracted into its own [StatelessWidget] so the list is not rebuilt when
-/// the search field text changes (the search-active path is a separate
-/// sibling widget).
 class _GroupedList extends StatelessWidget {
   const _GroupedList({
     required this.grouped,
     required this.onSelected,
+    required this.onEditCustom,
+    required this.onDeleteCustom,
   });
 
   final Map<String, Map<String, List<LocalizedCatalogRow<MaterialEntry>>>>
       grouped;
   final void Function(MaterialEntry) onSelected;
+  final Future<void> Function(MaterialEntry) onEditCustom;
+  final Future<void> Function(MaterialEntry) onDeleteCustom;
+
+  Widget _buildMaterialTile(
+    BuildContext context,
+    LocalizedCatalogRow<MaterialEntry> entry, {
+    required int indentLevel,
+  }) {
+    if (entry.row.isBuiltIn) {
+      return MaterialEntryTile(
+        entry: entry,
+        indentLevel: indentLevel,
+        onTap: () => onSelected(entry.row),
+      );
+    }
+    return _CustomMaterialPickerRow(
+      entry: entry,
+      indentLevel: indentLevel,
+      onTap: () => onSelected(entry.row),
+      onEdit: () => onEditCustom(entry.row),
+      onDelete: () => onDeleteCustom(entry.row),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: EdgeInsets.zero,
-      // shrinkWrap allows the ListView to fit inside the Flexible region
-      // without requiring an explicit height; Flexible bounds the max size.
       shrinkWrap: true,
       children: [
         for (final catEntry in grouped.entries)
-          // Level 0 — category header. All groups start collapsed (spec).
-          // The map keys are canonical English; translation happens here
-          // at render time so storage / search / sort stay locale-free.
           CollapsibleGroupTile(
             title: localizeMaterialCategory(context, catEntry.key),
             indentLevel: 0,
             children: [
               for (final subcatEntry in catEntry.value.entries)
                 if (subcatEntry.key.isEmpty)
-                  // No subcategory — render materials directly at level 1
-                  // to avoid an empty-titled subcategory header.
                   for (final material in subcatEntry.value)
-                    MaterialEntryTile(
-                      entry: material,
+                    _buildMaterialTile(
+                      context,
+                      material,
                       indentLevel: 1,
-                      onTap: () => onSelected(material.row),
                     )
                 else
-                  // Level 1 — subcategory header.
                   CollapsibleGroupTile(
                     title: localizeMaterialSubcategory(
                       context,
@@ -251,16 +431,184 @@ class _GroupedList extends StatelessWidget {
                     indentLevel: 1,
                     children: [
                       for (final material in subcatEntry.value)
-                        // Level 2 — leaf material row.
-                        MaterialEntryTile(
-                          entry: material,
-                          onTap: () => onSelected(material.row),
+                        _buildMaterialTile(
+                          context,
+                          material,
+                          indentLevel: 2,
                         ),
                     ],
                   ),
             ],
           ),
       ],
+    );
+  }
+}
+
+// ── Private: custom material row with chip + edit affordance ─────────────────
+
+/// Picker row for an `isBuiltIn = false` entry.
+///
+/// - Adds a small "*Custom*" chip next to the name (UI/UX §5.7.1 item 5).
+/// - Right-click on desktop or long-press on tablet opens an Edit /
+///   Delete context menu (UI/UX §5.7.1 item 6).
+/// - On hover (desktop) reveals a pencil button at the row's right
+///   edge (also opens edit).
+class _CustomMaterialPickerRow extends StatefulWidget {
+  const _CustomMaterialPickerRow({
+    required this.entry,
+    required this.indentLevel,
+    required this.onTap,
+    required this.onEdit,
+    required this.onDelete,
+  });
+
+  final LocalizedCatalogRow<MaterialEntry> entry;
+  final int indentLevel;
+  final VoidCallback onTap;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
+
+  @override
+  State<_CustomMaterialPickerRow> createState() =>
+      _CustomMaterialPickerRowState();
+}
+
+class _CustomMaterialPickerRowState
+    extends State<_CustomMaterialPickerRow> {
+  bool _hover = false;
+  Offset? _menuPosition;
+
+  Future<void> _openContextMenu(Offset globalPosition) async {
+    final overlay =
+        Overlay.of(context).context.findRenderObject() as RenderBox?;
+    if (overlay == null) return;
+    final selection = await showMenu<String>(
+      context: context,
+      position: RelativeRect.fromLTRB(
+        globalPosition.dx,
+        globalPosition.dy,
+        overlay.size.width - globalPosition.dx,
+        overlay.size.height - globalPosition.dy,
+      ),
+      items: const [
+        PopupMenuItem(value: 'edit', child: Text('Edit')),
+        PopupMenuItem(value: 'delete', child: Text('Delete')),
+      ],
+    );
+    if (!mounted) return;
+    switch (selection) {
+      case 'edit':
+        widget.onEdit();
+      case 'delete':
+        widget.onDelete();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final extColors = theme.extension<HeatingPlannerColors>()!;
+    final secondary =
+        'λ ${widget.entry.row.lambdaDefault.toStringAsFixed(3)} W/(m·K)';
+    final leftPad = Spacing.sm + widget.indentLevel * Spacing.md;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hover = true),
+      onExit: (_) => setState(() => _hover = false),
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onLongPressStart: (d) {
+          _menuPosition = d.globalPosition;
+          _openContextMenu(d.globalPosition);
+        },
+        onSecondaryTapDown: (d) => _menuPosition = d.globalPosition,
+        onSecondaryTap: () {
+          final pos = _menuPosition;
+          if (pos != null) _openContextMenu(pos);
+        },
+        child: InkWell(
+          onTap: widget.onTap,
+          child: Padding(
+            padding: EdgeInsets.only(
+              left: leftPad,
+              right: Spacing.sm,
+              top: Spacing.sm,
+              bottom: Spacing.sm,
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              widget.entry.displayName,
+                              style: theme.textTheme.bodyMedium,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: Spacing.sm),
+                          _CustomChip(color: extColors.infoBlue),
+                        ],
+                      ),
+                      Text(
+                        secondary,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                if (_hover)
+                  IconButton(
+                    key: Key(
+                      'custom-entry-${widget.entry.row.id}-edit',
+                    ),
+                    tooltip: 'Edit',
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    onPressed: widget.onEdit,
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CustomChip extends StatelessWidget {
+  const _CustomChip({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      key: const Key('custom-material-chip'),
+      padding: const EdgeInsets.symmetric(
+        horizontal: Spacing.xs + 2,
+        vertical: 1,
+      ),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(Spacing.xs),
+      ),
+      child: Text(
+        'Custom',
+        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: color,
+              fontWeight: FontWeight.w600,
+            ),
+      ),
     );
   }
 }
