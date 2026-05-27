@@ -71,22 +71,21 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
   }
 
   Future<void> _deleteCustom(MaterialEntry entry) async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Delete "${entry.name}"?'),
-        content: const Text(
-          'This will remove it from your custom material library '
-          'file and from the in-app database.',
-        ),
+        title:
+            Text(l10n.manageCustomMaterialsDeleteTitle(entry.name)),
+        content: Text(l10n.manageCustomMaterialsDeleteBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.customMaterialButtonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete'),
+            child: Text(l10n.manageCustomMaterialsRowDelete),
           ),
         ],
       ),
@@ -97,17 +96,22 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
         .delete(entry.id);
     if (!mounted) return;
     if (result is DeleteBlocked) {
+      final blockedL10n = AppLocalizations.of(context)!;
       await showDialog<void>(
         context: context,
         builder: (ctx) => AlertDialog(
-          title: Text('"${entry.name}" is in use'),
+          title: Text(
+            blockedL10n.manageCustomMaterialsBlockedTitle(entry.name),
+          ),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                '"${entry.name}" is used in ${result.usages.length} '
-                'layer${result.usages.length == 1 ? '' : 's'}:',
+                blockedL10n.manageCustomMaterialsBlockedBody(
+                  entry.name,
+                  result.usages.length,
+                ),
               ),
               const SizedBox(height: Spacing.sm),
               for (final u in result.usages)
@@ -116,15 +120,13 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
                   child: Text('• ${u.constructionName}'),
                 ),
               const SizedBox(height: Spacing.sm),
-              const Text(
-                'Remove or reassign those layers first, then try again.',
-              ),
+              Text(blockedL10n.manageCustomMaterialsBlockedFooter),
             ],
           ),
           actions: [
             FilledButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('OK'),
+              child: Text(blockedL10n.manageCustomMaterialsBlockedOk),
             ),
           ],
         ),
@@ -180,7 +182,7 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
         _PinnedActionRow(
           key: const Key('material-picker-new-custom'),
           icon: Icons.add,
-          label: 'New custom material…',
+          label: l10n.customMaterialPickerNewRow,
           onTap: _createCustom,
         ),
         const Divider(height: 1),
@@ -230,7 +232,7 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
           _PinnedActionRow(
             key: const Key('material-picker-manage'),
             icon: Icons.settings,
-            label: 'Manage custom materials…',
+            label: l10n.customMaterialPickerManageRow,
             onTap: widget.onManageRequested!,
           ),
         ],
@@ -452,6 +454,7 @@ class _CustomMaterialPickerRowState
     final overlay =
         Overlay.of(context).context.findRenderObject() as RenderBox?;
     if (overlay == null) return;
+    final l10n = AppLocalizations.of(context)!;
     final selection = await showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(
@@ -460,9 +463,15 @@ class _CustomMaterialPickerRowState
         overlay.size.width - globalPosition.dx,
         overlay.size.height - globalPosition.dy,
       ),
-      items: const [
-        PopupMenuItem(value: 'edit', child: Text('Edit')),
-        PopupMenuItem(value: 'delete', child: Text('Delete')),
+      items: [
+        PopupMenuItem(
+          value: 'edit',
+          child: Text(l10n.manageCustomMaterialsRowEdit),
+        ),
+        PopupMenuItem(
+          value: 'delete',
+          child: Text(l10n.manageCustomMaterialsRowDelete),
+        ),
       ],
     );
     if (!mounted) return;
@@ -541,7 +550,9 @@ class _CustomMaterialPickerRowState
                     key: Key(
                       'custom-entry-${widget.entry.row.id}-edit',
                     ),
-                    tooltip: 'Edit',
+                    tooltip:
+                        AppLocalizations.of(context)!
+                            .manageCustomMaterialsRowEdit,
                     icon: const Icon(Icons.edit_outlined, size: 18),
                     onPressed: widget.onEdit,
                   ),
@@ -572,7 +583,7 @@ class _CustomChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(Spacing.xs),
       ),
       child: Text(
-        'Custom',
+        AppLocalizations.of(context)!.customMaterialChip,
         style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: color,
               fontWeight: FontWeight.w600,

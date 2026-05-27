@@ -1266,4 +1266,212 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get layerStackRequiresOneLayer =>
       'Ein Aufbau muss mindestens eine Schicht enthalten.';
+
+  @override
+  String get customMaterialPickerNewRow =>
+      'Neues benutzerdefiniertes Material…';
+
+  @override
+  String get customMaterialPickerManageRow =>
+      'Benutzerdefinierte Materialien verwalten…';
+
+  @override
+  String get customMaterialChip => 'Benutzerdefiniert';
+
+  @override
+  String get customMaterialDialogAddTitle =>
+      'Benutzerdefiniertes Material hinzufügen';
+
+  @override
+  String get customMaterialDialogEditTitle =>
+      'Benutzerdefiniertes Material bearbeiten';
+
+  @override
+  String get customMaterialFieldName => 'Name';
+
+  @override
+  String get customMaterialFieldCategory => 'Kategorie';
+
+  @override
+  String get customMaterialFieldSubcategory => 'Unterkategorie';
+
+  @override
+  String get customMaterialFieldManufacturer => 'Hersteller';
+
+  @override
+  String get customMaterialManufacturerHint => 'Benutzerdefiniert';
+
+  @override
+  String get customMaterialFieldLambda => 'λ (W/(m·K))';
+
+  @override
+  String get customMaterialFieldDensity => 'Dichte (kg/m³)';
+
+  @override
+  String get customMaterialFieldSpecificHeat =>
+      'Spez. Wärmekapazität (J/(kg·K))';
+
+  @override
+  String get customMaterialFieldSourceUrl => 'Quellen-URL';
+
+  @override
+  String get customMaterialTogglePickExisting => 'Vorhandenes wählen';
+
+  @override
+  String get customMaterialToggleCreateNew => 'Neu anlegen';
+
+  @override
+  String get customMaterialTogglePickExistingDisabledTooltip =>
+      'Noch keine Kategorien vorhanden — lege die erste an';
+
+  @override
+  String get customMaterialButtonCancel => 'Abbrechen';
+
+  @override
+  String get customMaterialButtonSave => 'Speichern';
+
+  @override
+  String get customMaterialButtonAdd => 'Hinzufügen';
+
+  @override
+  String get customMaterialValidationRequired => 'Pflichtfeld';
+
+  @override
+  String customMaterialValidationMaxChars(int max) {
+    return 'Maximal $max Zeichen';
+  }
+
+  @override
+  String customMaterialValidationRange(String min, String max) {
+    return 'Zulässiger Bereich: $min–$max';
+  }
+
+  @override
+  String get customMaterialValidationDuplicateName =>
+      'Ein benutzerdefiniertes Material mit diesem Namen existiert bereits';
+
+  @override
+  String get customMaterialFileWriteFailedToast =>
+      'Speichern in der Bibliotheksdatei fehlgeschlagen. Prüfe Speicherplatz und Berechtigungen und versuche es erneut.';
+
+  @override
+  String get manageCustomMaterialsTitle => 'Benutzerdefinierte Materialien';
+
+  @override
+  String get manageCustomMaterialsAdd => 'Hinzufügen';
+
+  @override
+  String get manageCustomMaterialsBrowse => 'Durchsuchen…';
+
+  @override
+  String get manageCustomMaterialsResetToDefault => 'Auf Standard zurücksetzen';
+
+  @override
+  String get manageCustomMaterialsReload => 'Aus Datei neu laden';
+
+  @override
+  String get manageCustomMaterialsSearchHint => 'Suchen…';
+
+  @override
+  String get manageCustomMaterialsEmptyTitle =>
+      'Noch keine benutzerdefinierten Materialien.';
+
+  @override
+  String get manageCustomMaterialsEmptyHint =>
+      'Tippe auf \"+ Hinzufügen\", um das erste anzulegen.';
+
+  @override
+  String get manageCustomMaterialsNoMatches => 'Keine Treffer.';
+
+  @override
+  String get manageCustomMaterialsRowEdit => 'Bearbeiten';
+
+  @override
+  String get manageCustomMaterialsRowDelete => 'Löschen';
+
+  @override
+  String manageCustomMaterialsDeleteTitle(String name) {
+    return '\"$name\" löschen?';
+  }
+
+  @override
+  String get manageCustomMaterialsDeleteBody =>
+      'Das Material wird aus der Bibliotheksdatei und aus der App-Datenbank entfernt.';
+
+  @override
+  String manageCustomMaterialsBlockedTitle(String name) {
+    return '\"$name\" wird verwendet';
+  }
+
+  @override
+  String manageCustomMaterialsBlockedBody(String name, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count Schichten',
+      one: '1 Schicht',
+    );
+    return '\"$name\" wird in $_temp0 verwendet:';
+  }
+
+  @override
+  String get manageCustomMaterialsBlockedFooter =>
+      'Entferne oder ersetze diese Schichten zuerst und versuche es dann erneut.';
+
+  @override
+  String get manageCustomMaterialsBlockedOk => 'OK';
+
+  @override
+  String manageCustomMaterialsDeletedToast(String name) {
+    return '\"$name\" gelöscht';
+  }
+
+  @override
+  String manageCustomMaterialsReloadedToast(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count benutzerdefinierte Materialien neu geladen',
+      one: '1 benutzerdefiniertes Material neu geladen',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsCustomMaterialLibraryTitle =>
+      'Bibliothek für benutzerdefinierte Materialien';
+
+  @override
+  String get settingsCustomMaterialLibraryDefaultChip => '(Standard)';
+
+  @override
+  String get settingsCustomMaterialLibraryManageButton =>
+      'Materialien verwalten…';
+
+  @override
+  String settingsCustomMaterialLibraryStatusLoaded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count benutzerdefinierte Materialien geladen',
+      one: '1 benutzerdefiniertes Material geladen',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsCustomMaterialLibraryStatusError =>
+      'Datei konnte nicht geladen werden — Pfad prüfen und Neu laden versuchen';
+
+  @override
+  String get settingsCustomMaterialLibraryResetTitle =>
+      'Auf die Standardbibliothek zurücksetzen?';
+
+  @override
+  String get settingsCustomMaterialLibraryResetBody =>
+      'Benutzerdefinierte Materialien aus der aktuellen Datei werden nicht mehr angezeigt, bis du sie wieder über Durchsuchen auswählst. Die Datei auf dem Datenträger wird nicht verändert.';
+
+  @override
+  String get settingsCustomMaterialLibraryFilePickerTitle =>
+      'Bibliothek für benutzerdefinierte Materialien wählen';
 }

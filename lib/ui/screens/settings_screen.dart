@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
+import '../../l10n/app_localizations.dart';
 import '../../repositories/custom_material_library_service.dart';
 import 'custom_material_library_picker.dart';
 import 'manage_custom_materials_screen.dart';
@@ -44,6 +45,7 @@ class CustomMaterialLibrarySection extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final l10n = AppLocalizations.of(context)!;
     final storedPath = ref.watch(customMaterialLibraryPathProvider);
     final theme = Theme.of(context);
     final extColors = theme.extension<HeatingPlannerColors>()!;
@@ -56,7 +58,7 @@ class CustomMaterialLibrarySection extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              'Custom material library',
+              l10n.settingsCustomMaterialLibraryTitle,
               style: theme.textTheme.titleMedium,
             ),
             const SizedBox(height: Spacing.md),
@@ -64,8 +66,10 @@ class CustomMaterialLibrarySection extends ConsumerWidget {
             const SizedBox(height: Spacing.sm),
             _ActionRow(
               storedPath: storedPath,
-              onBrowse: () =>
-                  pickAndConfigureCustomMaterialLibrary(ref),
+              onBrowse: () => pickAndConfigureCustomMaterialLibrary(
+                ref,
+                context: context,
+              ),
               onResetToDefault: storedPath == null
                   ? null
                   : () => _confirmResetToDefault(context, ref),
@@ -80,7 +84,9 @@ class CustomMaterialLibrarySection extends ConsumerWidget {
                 key: const Key('settings-manage-materials'),
                 onPressed: () =>
                     openManageCustomMaterialsScreen(context),
-                child: const Text('Manage materials…'),
+                child: Text(
+                  l10n.settingsCustomMaterialLibraryManageButton,
+                ),
               ),
             ),
           ],
@@ -93,23 +99,20 @@ class CustomMaterialLibrarySection extends ConsumerWidget {
     BuildContext context,
     WidgetRef ref,
   ) async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Switch back to the default library file?'),
-        content: const Text(
-          'Your custom materials from the current file will no longer '
-          'appear unless you Browse back to it. The current file on '
-          'disk is not modified.',
-        ),
+        title: Text(l10n.settingsCustomMaterialLibraryResetTitle),
+        content: Text(l10n.settingsCustomMaterialLibraryResetBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.customMaterialButtonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Reset to default'),
+            child: Text(l10n.manageCustomMaterialsResetToDefault),
           ),
         ],
       ),
@@ -130,8 +133,12 @@ class CustomMaterialLibrarySection extends ConsumerWidget {
     if (!context.mounted) return;
     final count =
         ref.read(customMaterialsProvider).asData?.value.length ?? 0;
+    final l10n = AppLocalizations.of(context)!;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Reloaded $count custom materials')),
+      SnackBar(
+        content:
+            Text(l10n.manageCustomMaterialsReloadedToast(count)),
+      ),
     );
   }
 }
@@ -190,7 +197,8 @@ class _DefaultChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(Spacing.xs),
       ),
       child: Text(
-        '(default)',
+        AppLocalizations.of(context)!
+            .settingsCustomMaterialLibraryDefaultChip,
         style: theme.textTheme.labelSmall?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
         ),
@@ -216,6 +224,7 @@ class _ActionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     return Wrap(
       spacing: Spacing.sm,
       runSpacing: Spacing.xs,
@@ -223,18 +232,18 @@ class _ActionRow extends StatelessWidget {
         OutlinedButton(
           key: const Key('settings-browse-library'),
           onPressed: onBrowse,
-          child: const Text('Browse…'),
+          child: Text(l10n.manageCustomMaterialsBrowse),
         ),
         if (storedPath != null)
           OutlinedButton(
             key: const Key('settings-reset-library'),
             onPressed: onResetToDefault,
-            child: const Text('Reset to default'),
+            child: Text(l10n.manageCustomMaterialsResetToDefault),
           ),
         OutlinedButton(
           key: const Key('settings-reload-library'),
           onPressed: onReload,
-          child: const Text('Reload from file'),
+          child: Text(l10n.manageCustomMaterialsReload),
         ),
       ],
     );
@@ -244,9 +253,6 @@ class _ActionRow extends StatelessWidget {
 // ── Status line ─────────────────────────────────────────────────────────────
 
 /// Two-state status line per UI/UX §9.2 (updated).
-///
-/// - ✓ Loaded N custom materials  (success)
-/// - ⚠ File could not be loaded — check the path and try Reload
 class _StatusLine extends ConsumerWidget {
   const _StatusLine({required this.colors});
 
@@ -255,6 +261,7 @@ class _StatusLine extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     final path =
         ref.watch(resolvedLibraryPathProvider).asData?.value;
     final customs =
@@ -270,8 +277,7 @@ class _StatusLine extends ConsumerWidget {
           const SizedBox(width: Spacing.xs),
           Flexible(
             child: Text(
-              'File could not be loaded — '
-              'check the path and try Reload',
+              l10n.settingsCustomMaterialLibraryStatusError,
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: colors.warningAmber),
             ),
@@ -285,8 +291,9 @@ class _StatusLine extends ConsumerWidget {
         Icon(Icons.check_circle, size: 16, color: colors.zoneGreen),
         const SizedBox(width: Spacing.xs),
         Text(
-          'Loaded ${customs.length} custom material'
-          '${customs.length == 1 ? '' : 's'}',
+          l10n.settingsCustomMaterialLibraryStatusLoaded(
+            customs.length,
+          ),
           style: theme.textTheme.bodySmall,
         ),
       ],

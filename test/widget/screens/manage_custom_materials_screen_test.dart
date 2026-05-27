@@ -141,7 +141,8 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 800));
 
-      expect(find.text('Reloaded 1 custom materials'), findsOneWidget);
+      // Plural-aware via l10n: count == 1 → singular branch.
+      expect(find.text('Reloaded 1 custom material'), findsOneWidget);
     },
   );
 }

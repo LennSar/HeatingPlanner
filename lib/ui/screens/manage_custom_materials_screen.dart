@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../data/models/material_entry.dart';
+import '../../l10n/app_localizations.dart';
 import '../../repositories/custom_material_library_service.dart';
 import '../dialogs/custom_material_dialog.dart';
 import 'custom_material_library_picker.dart';
@@ -51,27 +52,26 @@ class _ManageCustomMaterialsScreenState
   }
 
   Future<void> _onBrowse() async {
-    await pickAndConfigureCustomMaterialLibrary(ref);
+    await pickAndConfigureCustomMaterialLibrary(ref, context: context);
   }
 
   Future<void> _onResetToDefault() async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('Switch back to the default library file?'),
-        content: const Text(
-          'Your custom materials from the current file will no longer '
-          'appear unless you Browse back to it. The current file on '
-          'disk is not modified.',
-        ),
+        title:
+            Text(l10n.settingsCustomMaterialLibraryResetTitle),
+        content:
+            Text(l10n.settingsCustomMaterialLibraryResetBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.customMaterialButtonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Reset to default'),
+            child: Text(l10n.manageCustomMaterialsResetToDefault),
           ),
         ],
       ),
@@ -89,8 +89,12 @@ class _ManageCustomMaterialsScreenState
     if (!mounted) return;
     final count =
         ref.read(customMaterialsProvider).asData?.value.length ?? 0;
+    final l10n = AppLocalizations.of(context)!;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Reloaded $count custom materials')),
+      SnackBar(
+        content:
+            Text(l10n.manageCustomMaterialsReloadedToast(count)),
+      ),
     );
   }
 
@@ -100,10 +104,15 @@ class _ManageCustomMaterialsScreenState
     final service = ref.read(customMaterialLibraryServiceProvider);
     final result = await service.delete(entry.id);
     if (!mounted) return;
+    final l10n = AppLocalizations.of(context)!;
     switch (result) {
       case DeleteOk():
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Deleted "${entry.name}"')),
+          SnackBar(
+            content: Text(
+              l10n.manageCustomMaterialsDeletedToast(entry.name),
+            ),
+          ),
         );
       case DeleteBlocked(:final usages):
         await _showBlockedDialog(entry, usages);
@@ -111,22 +120,22 @@ class _ManageCustomMaterialsScreenState
   }
 
   Future<void> _confirmAndDelete(MaterialEntry entry) async {
+    final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text('Delete "${entry.name}"?'),
-        content: const Text(
-          'This will remove it from your custom material library '
-          'file and from the in-app database.',
+        title: Text(
+          l10n.manageCustomMaterialsDeleteTitle(entry.name),
         ),
+        content: Text(l10n.manageCustomMaterialsDeleteBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('Cancel'),
+            child: Text(l10n.customMaterialButtonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('Delete'),
+            child: Text(l10n.manageCustomMaterialsRowDelete),
           ),
         ],
       ),
@@ -139,18 +148,23 @@ class _ManageCustomMaterialsScreenState
     MaterialEntry entry,
     List<({String constructionId, String constructionName})> usages,
   ) async {
+    final l10n = AppLocalizations.of(context)!;
     await showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
         key: const Key('custom-material-blocked-dialog'),
-        title: Text('"${entry.name}" is in use'),
+        title: Text(
+          l10n.manageCustomMaterialsBlockedTitle(entry.name),
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '"${entry.name}" is used in ${usages.length} '
-              'layer${usages.length == 1 ? '' : 's'}:',
+              l10n.manageCustomMaterialsBlockedBody(
+                entry.name,
+                usages.length,
+              ),
             ),
             const SizedBox(height: Spacing.sm),
             for (final u in usages)
@@ -159,15 +173,13 @@ class _ManageCustomMaterialsScreenState
                 child: Text('• ${u.constructionName}'),
               ),
             const SizedBox(height: Spacing.sm),
-            const Text(
-              'Remove or reassign those layers first, then try again.',
-            ),
+            Text(l10n.manageCustomMaterialsBlockedFooter),
           ],
         ),
         actions: [
           FilledButton(
             onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('OK'),
+            child: Text(l10n.manageCustomMaterialsBlockedOk),
           ),
         ],
       ),
@@ -178,6 +190,7 @@ class _ManageCustomMaterialsScreenState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final storedPath = ref.watch(customMaterialLibraryPathProvider);
     final customs =
         ref.watch(customMaterialsProvider).asData?.value ?? const [];
@@ -187,7 +200,7 @@ class _ManageCustomMaterialsScreenState
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Custom Materials'),
+        title: Text(l10n.manageCustomMaterialsTitle),
         actions: [
           // ADR-021 Rule 14: a default library always exists, so Add is
           // always enabled.
@@ -196,13 +209,14 @@ class _ManageCustomMaterialsScreenState
               key: const Key('custom-materials-add'),
               onPressed: _onAdd,
               icon: const Icon(Icons.add),
-              label: const Text('Add'),
+              label: Text(l10n.manageCustomMaterialsAdd),
             )
           else
             IconButton(
               key: const Key('custom-materials-add'),
               onPressed: _onAdd,
               icon: const Icon(Icons.add),
+              tooltip: l10n.manageCustomMaterialsAdd,
             ),
         ],
       ),
@@ -222,9 +236,9 @@ class _ManageCustomMaterialsScreenState
             const SizedBox(height: Spacing.md),
             TextField(
               controller: _searchCtrl,
-              decoration: const InputDecoration(
-                hintText: 'Search…',
-                prefixIcon: Icon(Icons.search),
+              decoration: InputDecoration(
+                hintText: l10n.manageCustomMaterialsSearchHint,
+                prefixIcon: const Icon(Icons.search),
                 isDense: true,
               ),
               onChanged: (v) => setState(() => _query = v),
@@ -337,40 +351,50 @@ class _LibraryHeader extends ConsumerWidget {
                   onReload();
               }
             },
-            itemBuilder: (_) => [
-              const PopupMenuItem(
-                value: 'browse',
-                child: Text('Browse…'),
-              ),
-              if (onResetToDefault != null)
-                const PopupMenuItem(
-                  value: 'reset',
-                  child: Text('Reset to default'),
+            itemBuilder: (_) {
+              final l10n = AppLocalizations.of(context)!;
+              return [
+                PopupMenuItem(
+                  value: 'browse',
+                  child: Text(l10n.manageCustomMaterialsBrowse),
                 ),
-              const PopupMenuItem(
-                value: 'reload',
-                child: Text('Reload from file'),
-              ),
-            ],
+                if (onResetToDefault != null)
+                  PopupMenuItem(
+                    value: 'reset',
+                    child:
+                        Text(l10n.manageCustomMaterialsResetToDefault),
+                  ),
+                PopupMenuItem(
+                  value: 'reload',
+                  child: Text(l10n.manageCustomMaterialsReload),
+                ),
+              ];
+            },
           )
         else ...[
           OutlinedButton(
             onPressed: onBrowse,
-            child: const Text('Browse…'),
+            child:
+                Text(AppLocalizations.of(context)!.manageCustomMaterialsBrowse),
           ),
           if (onResetToDefault != null) ...[
             const SizedBox(width: Spacing.sm),
             OutlinedButton(
               key: const Key('custom-materials-reset'),
               onPressed: onResetToDefault,
-              child: const Text('Reset to default'),
+              child: Text(
+                AppLocalizations.of(context)!
+                    .manageCustomMaterialsResetToDefault,
+              ),
             ),
           ],
           const SizedBox(width: Spacing.sm),
           OutlinedButton(
             key: const Key('custom-materials-reload'),
             onPressed: onReload,
-            child: const Text('Reload from file'),
+            child: Text(
+              AppLocalizations.of(context)!.manageCustomMaterialsReload,
+            ),
           ),
         ],
       ],
@@ -394,7 +418,8 @@ class _DefaultChip extends StatelessWidget {
         borderRadius: BorderRadius.circular(Spacing.xs),
       ),
       child: Text(
-        '(default)',
+        AppLocalizations.of(context)!
+            .settingsCustomMaterialLibraryDefaultChip,
         style: theme.textTheme.labelSmall?.copyWith(
           color: theme.colorScheme.onSurfaceVariant,
         ),
@@ -423,7 +448,7 @@ class _GroupedList extends StatelessWidget {
     if (grouped.isEmpty) {
       return Center(
         child: Text(
-          'No matches.',
+          AppLocalizations.of(context)!.manageCustomMaterialsNoMatches,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                 color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
@@ -496,23 +521,35 @@ class _CustomEntryRow extends StatelessWidget {
                     onDelete();
                 }
               },
-              itemBuilder: (_) => const [
-                PopupMenuItem(value: 'edit', child: Text('Edit')),
-                PopupMenuItem(value: 'delete', child: Text('Delete')),
-              ],
+              itemBuilder: (_) {
+                final l10n = AppLocalizations.of(context)!;
+                return [
+                  PopupMenuItem(
+                    value: 'edit',
+                    child: Text(l10n.manageCustomMaterialsRowEdit),
+                  ),
+                  PopupMenuItem(
+                    value: 'delete',
+                    child:
+                        Text(l10n.manageCustomMaterialsRowDelete),
+                  ),
+                ];
+              },
             )
           : Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 IconButton(
                   key: Key('custom-entry-${entry.id}-edit'),
-                  tooltip: 'Edit',
+                  tooltip: AppLocalizations.of(context)!
+                      .manageCustomMaterialsRowEdit,
                   onPressed: onEdit,
                   icon: const Icon(Icons.edit_outlined),
                 ),
                 IconButton(
                   key: Key('custom-entry-${entry.id}-delete'),
-                  tooltip: 'Delete',
+                  tooltip: AppLocalizations.of(context)!
+                      .manageCustomMaterialsRowDelete,
                   onPressed: onDelete,
                   icon: const Icon(Icons.delete_outline),
                 ),
@@ -530,17 +567,18 @@ class _EmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final l10n = AppLocalizations.of(context)!;
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            'No custom materials yet.',
+            l10n.manageCustomMaterialsEmptyTitle,
             style: theme.textTheme.titleMedium,
           ),
           const SizedBox(height: Spacing.sm),
           Text(
-            'Press "+ Add" to create your first one.',
+            l10n.manageCustomMaterialsEmptyHint,
             style: theme.textTheme.bodyMedium?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -549,7 +587,7 @@ class _EmptyState extends StatelessWidget {
           FilledButton.icon(
             onPressed: onAdd,
             icon: const Icon(Icons.add),
-            label: const Text('Add'),
+            label: Text(l10n.manageCustomMaterialsAdd),
           ),
         ],
       ),

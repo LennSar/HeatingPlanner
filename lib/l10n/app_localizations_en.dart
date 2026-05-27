@@ -1262,4 +1262,204 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get layerStackRequiresOneLayer =>
       'A construction must have at least one layer.';
+
+  @override
+  String get customMaterialPickerNewRow => 'New custom material…';
+
+  @override
+  String get customMaterialPickerManageRow => 'Manage custom materials…';
+
+  @override
+  String get customMaterialChip => 'Custom';
+
+  @override
+  String get customMaterialDialogAddTitle => 'Add Custom Material';
+
+  @override
+  String get customMaterialDialogEditTitle => 'Edit Custom Material';
+
+  @override
+  String get customMaterialFieldName => 'Name';
+
+  @override
+  String get customMaterialFieldCategory => 'Category';
+
+  @override
+  String get customMaterialFieldSubcategory => 'Subcategory';
+
+  @override
+  String get customMaterialFieldManufacturer => 'Manufacturer';
+
+  @override
+  String get customMaterialManufacturerHint => 'Custom';
+
+  @override
+  String get customMaterialFieldLambda => 'λ (W/(m·K))';
+
+  @override
+  String get customMaterialFieldDensity => 'Density (kg/m³)';
+
+  @override
+  String get customMaterialFieldSpecificHeat => 'Specific heat (J/(kg·K))';
+
+  @override
+  String get customMaterialFieldSourceUrl => 'Source URL';
+
+  @override
+  String get customMaterialTogglePickExisting => 'Pick existing';
+
+  @override
+  String get customMaterialToggleCreateNew => 'Create new';
+
+  @override
+  String get customMaterialTogglePickExistingDisabledTooltip =>
+      'No existing categories yet — create the first one';
+
+  @override
+  String get customMaterialButtonCancel => 'Cancel';
+
+  @override
+  String get customMaterialButtonSave => 'Save';
+
+  @override
+  String get customMaterialButtonAdd => 'Add';
+
+  @override
+  String get customMaterialValidationRequired => 'Required';
+
+  @override
+  String customMaterialValidationMaxChars(int max) {
+    return 'Maximum $max characters';
+  }
+
+  @override
+  String customMaterialValidationRange(String min, String max) {
+    return 'Allowed range: $min–$max';
+  }
+
+  @override
+  String get customMaterialValidationDuplicateName =>
+      'A custom material with this name already exists';
+
+  @override
+  String get customMaterialFileWriteFailedToast =>
+      'Could not save to library file. Check disk space or permissions and try again.';
+
+  @override
+  String get manageCustomMaterialsTitle => 'Custom Materials';
+
+  @override
+  String get manageCustomMaterialsAdd => 'Add';
+
+  @override
+  String get manageCustomMaterialsBrowse => 'Browse…';
+
+  @override
+  String get manageCustomMaterialsResetToDefault => 'Reset to default';
+
+  @override
+  String get manageCustomMaterialsReload => 'Reload from file';
+
+  @override
+  String get manageCustomMaterialsSearchHint => 'Search…';
+
+  @override
+  String get manageCustomMaterialsEmptyTitle => 'No custom materials yet.';
+
+  @override
+  String get manageCustomMaterialsEmptyHint =>
+      'Press \"+ Add\" to create your first one.';
+
+  @override
+  String get manageCustomMaterialsNoMatches => 'No matches.';
+
+  @override
+  String get manageCustomMaterialsRowEdit => 'Edit';
+
+  @override
+  String get manageCustomMaterialsRowDelete => 'Delete';
+
+  @override
+  String manageCustomMaterialsDeleteTitle(String name) {
+    return 'Delete \"$name\"?';
+  }
+
+  @override
+  String get manageCustomMaterialsDeleteBody =>
+      'This will remove it from your custom material library file and from the in-app database.';
+
+  @override
+  String manageCustomMaterialsBlockedTitle(String name) {
+    return '\"$name\" is in use';
+  }
+
+  @override
+  String manageCustomMaterialsBlockedBody(String name, int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: '$count layers',
+      one: '1 layer',
+    );
+    return '\"$name\" is used in $_temp0:';
+  }
+
+  @override
+  String get manageCustomMaterialsBlockedFooter =>
+      'Remove or reassign those layers first, then try again.';
+
+  @override
+  String get manageCustomMaterialsBlockedOk => 'OK';
+
+  @override
+  String manageCustomMaterialsDeletedToast(String name) {
+    return 'Deleted \"$name\"';
+  }
+
+  @override
+  String manageCustomMaterialsReloadedToast(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Reloaded $count custom materials',
+      one: 'Reloaded 1 custom material',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsCustomMaterialLibraryTitle => 'Custom material library';
+
+  @override
+  String get settingsCustomMaterialLibraryDefaultChip => '(default)';
+
+  @override
+  String get settingsCustomMaterialLibraryManageButton => 'Manage materials…';
+
+  @override
+  String settingsCustomMaterialLibraryStatusLoaded(int count) {
+    String _temp0 = intl.Intl.pluralLogic(
+      count,
+      locale: localeName,
+      other: 'Loaded $count custom materials',
+      one: 'Loaded 1 custom material',
+    );
+    return '$_temp0';
+  }
+
+  @override
+  String get settingsCustomMaterialLibraryStatusError =>
+      'File could not be loaded — check the path and try Reload';
+
+  @override
+  String get settingsCustomMaterialLibraryResetTitle =>
+      'Switch back to the default library file?';
+
+  @override
+  String get settingsCustomMaterialLibraryResetBody =>
+      'Your custom materials from the current file will no longer appear unless you Browse back to it. The current file on disk is not modified.';
+
+  @override
+  String get settingsCustomMaterialLibraryFilePickerTitle =>
+      'Pick custom material library';
 }

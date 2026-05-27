@@ -2377,6 +2377,318 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'A construction must have at least one layer.'**
   String get layerStackRequiresOneLayer;
+
+  /// Pinned row in the material picker dropdown that opens the Add Custom Material dialog (UI/UX §5.7.1 item 2)
+  ///
+  /// In en, this message translates to:
+  /// **'New custom material…'**
+  String get customMaterialPickerNewRow;
+
+  /// Pinned row at the bottom of the material picker dropdown that opens the Manage Custom Materials screen (UI/UX §5.7.1 item 3)
+  ///
+  /// In en, this message translates to:
+  /// **'Manage custom materials…'**
+  String get customMaterialPickerManageRow;
+
+  /// Chip label rendered next to the name of a custom (non-built-in) material entry in the picker (UI/UX §5.7.1 item 5)
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get customMaterialChip;
+
+  /// Dialog title when adding a new custom material (UI/UX §5.7.2)
+  ///
+  /// In en, this message translates to:
+  /// **'Add Custom Material'**
+  String get customMaterialDialogAddTitle;
+
+  /// Dialog title when editing an existing custom material (UI/UX §5.7.2)
+  ///
+  /// In en, this message translates to:
+  /// **'Edit Custom Material'**
+  String get customMaterialDialogEditTitle;
+
+  /// Field label — material name
+  ///
+  /// In en, this message translates to:
+  /// **'Name'**
+  String get customMaterialFieldName;
+
+  /// Field label — taxonomy category (UI/UX §5.7.2)
+  ///
+  /// In en, this message translates to:
+  /// **'Category'**
+  String get customMaterialFieldCategory;
+
+  /// Field label — taxonomy subcategory (UI/UX §5.7.2)
+  ///
+  /// In en, this message translates to:
+  /// **'Subcategory'**
+  String get customMaterialFieldSubcategory;
+
+  /// Field label — manufacturer (optional)
+  ///
+  /// In en, this message translates to:
+  /// **'Manufacturer'**
+  String get customMaterialFieldManufacturer;
+
+  /// Placeholder shown in the Manufacturer field when blank — also the persisted default per UI/UX §5.7.2
+  ///
+  /// In en, this message translates to:
+  /// **'Custom'**
+  String get customMaterialManufacturerHint;
+
+  /// Field label — thermal conductivity λ
+  ///
+  /// In en, this message translates to:
+  /// **'λ (W/(m·K))'**
+  String get customMaterialFieldLambda;
+
+  /// Field label — bulk density
+  ///
+  /// In en, this message translates to:
+  /// **'Density (kg/m³)'**
+  String get customMaterialFieldDensity;
+
+  /// Field label — specific heat capacity
+  ///
+  /// In en, this message translates to:
+  /// **'Specific heat (J/(kg·K))'**
+  String get customMaterialFieldSpecificHeat;
+
+  /// Field label — optional source / datasheet URL
+  ///
+  /// In en, this message translates to:
+  /// **'Source URL'**
+  String get customMaterialFieldSourceUrl;
+
+  /// Toggle segment label — pick from existing taxonomy values (UI/UX §5.7.2)
+  ///
+  /// In en, this message translates to:
+  /// **'Pick existing'**
+  String get customMaterialTogglePickExisting;
+
+  /// Toggle segment label — type a new taxonomy value (UI/UX §5.7.2)
+  ///
+  /// In en, this message translates to:
+  /// **'Create new'**
+  String get customMaterialToggleCreateNew;
+
+  /// Tooltip on the disabled 'Pick existing' segment when no taxonomy values exist yet
+  ///
+  /// In en, this message translates to:
+  /// **'No existing categories yet — create the first one'**
+  String get customMaterialTogglePickExistingDisabledTooltip;
+
+  /// Custom material dialog — Cancel button
+  ///
+  /// In en, this message translates to:
+  /// **'Cancel'**
+  String get customMaterialButtonCancel;
+
+  /// Custom material dialog — Save (Edit mode) button
+  ///
+  /// In en, this message translates to:
+  /// **'Save'**
+  String get customMaterialButtonSave;
+
+  /// Custom material dialog — Add (new-material mode) button
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get customMaterialButtonAdd;
+
+  /// Inline error shown beneath required fields when empty
+  ///
+  /// In en, this message translates to:
+  /// **'Required'**
+  String get customMaterialValidationRequired;
+
+  /// Inline error for text fields whose value exceeds the maximum length
+  ///
+  /// In en, this message translates to:
+  /// **'Maximum {max} characters'**
+  String customMaterialValidationMaxChars(int max);
+
+  /// Inline error for numeric fields outside the allowed min/max
+  ///
+  /// In en, this message translates to:
+  /// **'Allowed range: {min}–{max}'**
+  String customMaterialValidationRange(String min, String max);
+
+  /// Inline name-field error when a custom entry with the same (case-insensitive) name already exists
+  ///
+  /// In en, this message translates to:
+  /// **'A custom material with this name already exists'**
+  String get customMaterialValidationDuplicateName;
+
+  /// Toast shown when writing the JSON library file fails — the SQLite mutation has been rolled back
+  ///
+  /// In en, this message translates to:
+  /// **'Could not save to library file. Check disk space or permissions and try again.'**
+  String get customMaterialFileWriteFailedToast;
+
+  /// Manage Custom Materials screen title (UI/UX §5.7.3)
+  ///
+  /// In en, this message translates to:
+  /// **'Custom Materials'**
+  String get manageCustomMaterialsTitle;
+
+  /// Header button — opens the Add Custom Material dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Add'**
+  String get manageCustomMaterialsAdd;
+
+  /// Header button — open file picker to point at a JSON library file
+  ///
+  /// In en, this message translates to:
+  /// **'Browse…'**
+  String get manageCustomMaterialsBrowse;
+
+  /// Header button — clear the user-picked library path back to the ADR-021 Rule 14 default
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to default'**
+  String get manageCustomMaterialsResetToDefault;
+
+  /// Header button — re-run the sync pass against the current effective path
+  ///
+  /// In en, this message translates to:
+  /// **'Reload from file'**
+  String get manageCustomMaterialsReload;
+
+  /// Placeholder text in the screen's filter field
+  ///
+  /// In en, this message translates to:
+  /// **'Search…'**
+  String get manageCustomMaterialsSearchHint;
+
+  /// Empty-state title shown when the user has not added any custom materials
+  ///
+  /// In en, this message translates to:
+  /// **'No custom materials yet.'**
+  String get manageCustomMaterialsEmptyTitle;
+
+  /// Empty-state subtitle prompting the user to add a first material
+  ///
+  /// In en, this message translates to:
+  /// **'Press \"+ Add\" to create your first one.'**
+  String get manageCustomMaterialsEmptyHint;
+
+  /// Shown when the search field filters out every entry
+  ///
+  /// In en, this message translates to:
+  /// **'No matches.'**
+  String get manageCustomMaterialsNoMatches;
+
+  /// Per-row button label — open Edit Custom Material dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get manageCustomMaterialsRowEdit;
+
+  /// Per-row button label — delete this custom material
+  ///
+  /// In en, this message translates to:
+  /// **'Delete'**
+  String get manageCustomMaterialsRowDelete;
+
+  /// Title of the delete-confirmation dialog (UI/UX §5.7.3)
+  ///
+  /// In en, this message translates to:
+  /// **'Delete \"{name}\"?'**
+  String manageCustomMaterialsDeleteTitle(String name);
+
+  /// Body of the delete-confirmation dialog
+  ///
+  /// In en, this message translates to:
+  /// **'This will remove it from your custom material library file and from the in-app database.'**
+  String get manageCustomMaterialsDeleteBody;
+
+  /// Title of the dialog shown when a custom material cannot be deleted because it is referenced by one or more MaterialLayers (ADR-021 Rule 7)
+  ///
+  /// In en, this message translates to:
+  /// **'\"{name}\" is in use'**
+  String manageCustomMaterialsBlockedTitle(String name);
+
+  /// Body line of the delete-blocked dialog. count is plural-aware.
+  ///
+  /// In en, this message translates to:
+  /// **'\"{name}\" is used in {count, plural, =1{1 layer} other{{count} layers}}:'**
+  String manageCustomMaterialsBlockedBody(String name, int count);
+
+  /// Footer line of the delete-blocked dialog explaining how the user can unblock the delete
+  ///
+  /// In en, this message translates to:
+  /// **'Remove or reassign those layers first, then try again.'**
+  String get manageCustomMaterialsBlockedFooter;
+
+  /// Dismiss button on the delete-blocked dialog
+  ///
+  /// In en, this message translates to:
+  /// **'OK'**
+  String get manageCustomMaterialsBlockedOk;
+
+  /// Toast shown after a successful delete
+  ///
+  /// In en, this message translates to:
+  /// **'Deleted \"{name}\"'**
+  String manageCustomMaterialsDeletedToast(String name);
+
+  /// Toast shown after Reload from file (UI/UX §5.7.3)
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Reloaded 1 custom material} other{Reloaded {count} custom materials}}'**
+  String manageCustomMaterialsReloadedToast(int count);
+
+  /// Section title in the Settings screen (UI/UX §9.2)
+  ///
+  /// In en, this message translates to:
+  /// **'Custom material library'**
+  String get settingsCustomMaterialLibraryTitle;
+
+  /// Small chip rendered next to the effective path when no explicit user path is set (ADR-021 Rule 14)
+  ///
+  /// In en, this message translates to:
+  /// **'(default)'**
+  String get settingsCustomMaterialLibraryDefaultChip;
+
+  /// Full-width settings button that opens the Manage Custom Materials screen
+  ///
+  /// In en, this message translates to:
+  /// **'Manage materials…'**
+  String get settingsCustomMaterialLibraryManageButton;
+
+  /// Status line below the path display when the file exists and parses (UI/UX §9.2 status variants)
+  ///
+  /// In en, this message translates to:
+  /// **'{count, plural, =1{Loaded 1 custom material} other{Loaded {count} custom materials}}'**
+  String settingsCustomMaterialLibraryStatusLoaded(int count);
+
+  /// Status line when the effective path is missing or the file is malformed (UI/UX §9.2)
+  ///
+  /// In en, this message translates to:
+  /// **'File could not be loaded — check the path and try Reload'**
+  String get settingsCustomMaterialLibraryStatusError;
+
+  /// Confirmation dialog title for Reset-to-default (UI/UX §5.7.3 / §9.2)
+  ///
+  /// In en, this message translates to:
+  /// **'Switch back to the default library file?'**
+  String get settingsCustomMaterialLibraryResetTitle;
+
+  /// Confirmation dialog body for Reset-to-default
+  ///
+  /// In en, this message translates to:
+  /// **'Your custom materials from the current file will no longer appear unless you Browse back to it. The current file on disk is not modified.'**
+  String get settingsCustomMaterialLibraryResetBody;
+
+  /// Native file picker title shown by Browse… in Settings / Manage screen
+  ///
+  /// In en, this message translates to:
+  /// **'Pick custom material library'**
+  String get settingsCustomMaterialLibraryFilePickerTitle;
 }
 
 class _AppLocalizationsDelegate

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../core/constants/validation_limits.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/material_entry.dart';
+import '../../l10n/app_localizations.dart';
 import '../../repositories/custom_material_library_service.dart';
 import '../../repositories/material_repository.dart';
 
@@ -147,9 +148,14 @@ class _CustomMaterialDialogState
 
   // ── Validation ──────────────────────────────────────────────────────────
 
-  String? _validateName(List<MaterialEntry> customs) {
-    if (_name.isEmpty) return 'Required';
-    if (_name.length > 200) return 'Maximum 200 characters';
+  String? _validateName(
+    AppLocalizations l10n,
+    List<MaterialEntry> customs,
+  ) {
+    if (_name.isEmpty) return l10n.customMaterialValidationRequired;
+    if (_name.length > 200) {
+      return l10n.customMaterialValidationMaxChars(200);
+    }
     final lower = _name.toLowerCase();
     final clash = customs.any(
       (m) =>
@@ -157,52 +163,67 @@ class _CustomMaterialDialogState
           m.name.toLowerCase() == lower,
     );
     if (clash) {
-      return 'A custom material with this name already exists';
+      return l10n.customMaterialValidationDuplicateName;
     }
     return null;
   }
 
-  String? _validateText(String value, {int max = 100}) {
-    if (value.isEmpty) return 'Required';
-    if (value.length > max) return 'Maximum $max characters';
+  String? _validateText(
+    AppLocalizations l10n,
+    String value, {
+    int max = 100,
+  }) {
+    if (value.isEmpty) return l10n.customMaterialValidationRequired;
+    if (value.length > max) {
+      return l10n.customMaterialValidationMaxChars(max);
+    }
     return null;
   }
 
-  String? _validateLambda() {
+  String? _validateLambda(AppLocalizations l10n) {
     final v = _lambda;
-    if (v == null) return 'Required';
+    if (v == null) return l10n.customMaterialValidationRequired;
     if (v < minLambda || v > maxLambda) {
-      return 'Allowed range: $minLambda – $maxLambda';
+      return l10n.customMaterialValidationRange(
+        minLambda.toString(),
+        maxLambda.toString(),
+      );
     }
     return null;
   }
 
-  String? _validateDensity() {
+  String? _validateDensity(AppLocalizations l10n) {
     final v = _density;
-    if (v == null) return 'Required';
+    if (v == null) return l10n.customMaterialValidationRequired;
     if (v < minDensity || v > maxDensity) {
-      return 'Allowed range: $minDensity – $maxDensity';
+      return l10n.customMaterialValidationRange(
+        minDensity.toString(),
+        maxDensity.toString(),
+      );
     }
     return null;
   }
 
-  String? _validateSpecificHeat() {
+  String? _validateSpecificHeat(AppLocalizations l10n) {
     final v = _specificHeat;
-    if (v == null) return 'Required';
+    if (v == null) return l10n.customMaterialValidationRequired;
     if (v < minSpecificHeat || v > maxSpecificHeat) {
-      return 'Allowed range: $minSpecificHeat – $maxSpecificHeat';
+      return l10n.customMaterialValidationRange(
+        minSpecificHeat.toString(),
+        maxSpecificHeat.toString(),
+      );
     }
     return null;
   }
 
-  bool _canSave(List<MaterialEntry> customs) {
+  bool _canSave(AppLocalizations l10n, List<MaterialEntry> customs) {
     if (_saving) return false;
-    if (_validateName(customs) != null) return false;
-    if (_validateText(_category) != null) return false;
-    if (_validateText(_subcategory) != null) return false;
-    if (_validateLambda() != null) return false;
-    if (_validateDensity() != null) return false;
-    if (_validateSpecificHeat() != null) return false;
+    if (_validateName(l10n, customs) != null) return false;
+    if (_validateText(l10n, _category) != null) return false;
+    if (_validateText(l10n, _subcategory) != null) return false;
+    if (_validateLambda(l10n) != null) return false;
+    if (_validateDensity(l10n) != null) return false;
+    if (_validateSpecificHeat(l10n) != null) return false;
     return true;
   }
 
@@ -243,15 +264,13 @@ class _CustomMaterialDialogState
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
+      final l10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: Theme.of(context)
               .extension<HeatingPlannerColors>()!
               .errorRed,
-          content: const Text(
-            'Could not save to library file. Check disk space or '
-            'permissions and try again.',
-          ),
+          content: Text(l10n.customMaterialFileWriteFailedToast),
         ),
       );
     }
@@ -261,6 +280,7 @@ class _CustomMaterialDialogState
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final customs =
         ref.watch(customMaterialsProvider).asData?.value ?? const [];
     final allEntries =
@@ -302,14 +322,14 @@ class _CustomMaterialDialogState
                   Expanded(
                     child: Text(
                       _isEdit
-                          ? 'Edit Custom Material'
-                          : 'Add Custom Material',
+                          ? l10n.customMaterialDialogEditTitle
+                          : l10n.customMaterialDialogAddTitle,
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                   ),
                   IconButton(
                     icon: const Icon(Icons.close),
-                    tooltip: 'Cancel',
+                    tooltip: l10n.customMaterialButtonCancel,
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                 ],
@@ -318,13 +338,13 @@ class _CustomMaterialDialogState
 
               // Name
               _LabelRow(
-                label: 'Name',
+                label: l10n.customMaterialFieldName,
                 required: true,
                 child: TextField(
                   controller: _nameCtrl,
                   key: const Key('custom-material-name'),
                   decoration: InputDecoration(
-                    errorText: _validateName(customs),
+                    errorText: _validateName(l10n, customs),
                     isDense: true,
                   ),
                 ),
@@ -333,7 +353,7 @@ class _CustomMaterialDialogState
 
               // Category
               _TaxonomyRow(
-                label: 'Category',
+                label: l10n.customMaterialFieldCategory,
                 mode: _categoryMode,
                 onModeChanged: (m) {
                   setState(() {
@@ -352,13 +372,13 @@ class _CustomMaterialDialogState
                 availableValues: categoriesAvailable,
                 newKey: const Key('custom-material-category-new'),
                 pickKey: const Key('custom-material-category-pick'),
-                errorText: _validateText(_category),
+                errorText: _validateText(l10n, _category),
               ),
               const SizedBox(height: Spacing.md),
 
               // Subcategory
               _TaxonomyRow(
-                label: 'Subcategory',
+                label: l10n.customMaterialFieldSubcategory,
                 mode: _subcategoryMode,
                 onModeChanged: (m) {
                   setState(() {
@@ -377,18 +397,18 @@ class _CustomMaterialDialogState
                 availableValues: subcategoriesAvailable,
                 newKey: const Key('custom-material-subcategory-new'),
                 pickKey: const Key('custom-material-subcategory-pick'),
-                errorText: _validateText(_subcategory),
+                errorText: _validateText(l10n, _subcategory),
               ),
               const SizedBox(height: Spacing.md),
 
               // Manufacturer (optional)
               _LabelRow(
-                label: 'Manufacturer',
+                label: l10n.customMaterialFieldManufacturer,
                 required: false,
                 child: TextField(
                   controller: _manufacturerCtrl,
-                  decoration: const InputDecoration(
-                    hintText: 'Custom',
+                  decoration: InputDecoration(
+                    hintText: l10n.customMaterialManufacturerHint,
                     isDense: true,
                   ),
                 ),
@@ -397,7 +417,7 @@ class _CustomMaterialDialogState
 
               // λ
               _LabelRow(
-                label: 'λ (W/(m·K))',
+                label: l10n.customMaterialFieldLambda,
                 required: true,
                 child: TextField(
                   controller: _lambdaCtrl,
@@ -410,7 +430,7 @@ class _CustomMaterialDialogState
                     ),
                   ],
                   decoration: InputDecoration(
-                    errorText: _validateLambda(),
+                    errorText: _validateLambda(l10n),
                     isDense: true,
                   ),
                 ),
@@ -419,7 +439,7 @@ class _CustomMaterialDialogState
 
               // Density
               _LabelRow(
-                label: 'Density (kg/m³)',
+                label: l10n.customMaterialFieldDensity,
                 required: true,
                 child: TextField(
                   controller: _densityCtrl,
@@ -432,7 +452,7 @@ class _CustomMaterialDialogState
                     ),
                   ],
                   decoration: InputDecoration(
-                    errorText: _validateDensity(),
+                    errorText: _validateDensity(l10n),
                     isDense: true,
                   ),
                 ),
@@ -441,7 +461,7 @@ class _CustomMaterialDialogState
 
               // Specific heat
               _LabelRow(
-                label: 'Specific heat (J/(kg·K))',
+                label: l10n.customMaterialFieldSpecificHeat,
                 required: true,
                 child: TextField(
                   controller: _specificHeatCtrl,
@@ -454,7 +474,7 @@ class _CustomMaterialDialogState
                     ),
                   ],
                   decoration: InputDecoration(
-                    errorText: _validateSpecificHeat(),
+                    errorText: _validateSpecificHeat(l10n),
                     isDense: true,
                   ),
                 ),
@@ -463,7 +483,7 @@ class _CustomMaterialDialogState
 
               // Source URL (optional)
               _LabelRow(
-                label: 'Source URL',
+                label: l10n.customMaterialFieldSourceUrl,
                 required: false,
                 child: TextField(
                   controller: _sourceCtrl,
@@ -483,13 +503,18 @@ class _CustomMaterialDialogState
                     onPressed: _saving
                         ? null
                         : () => Navigator.of(context).pop(),
-                    child: const Text('Cancel'),
+                    child: Text(l10n.customMaterialButtonCancel),
                   ),
                   const SizedBox(width: Spacing.sm),
                   FilledButton(
                     key: const Key('custom-material-save'),
-                    onPressed: _canSave(customs) ? _onSave : null,
-                    child: Text(_isEdit ? 'Save' : 'Add'),
+                    onPressed:
+                        _canSave(l10n, customs) ? _onSave : null,
+                    child: Text(
+                      _isEdit
+                          ? l10n.customMaterialButtonSave
+                          : l10n.customMaterialButtonAdd,
+                    ),
                   ),
                 ],
               ),
@@ -565,6 +590,7 @@ class _TaxonomyRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = AppLocalizations.of(context)!;
     final emptyAvailable = availableValues.isEmpty;
     final effectiveMode =
         emptyAvailable ? _PickMode.createNew : mode;
@@ -580,15 +606,17 @@ class _TaxonomyRow extends StatelessWidget {
             segments: [
               ButtonSegment(
                 value: _PickMode.pickExisting,
-                label: const Text('Pick existing'),
+                label:
+                    Text(l10n.customMaterialTogglePickExisting),
                 tooltip: emptyAvailable
-                    ? 'No existing categories yet — create the first one'
+                    ? l10n
+                        .customMaterialTogglePickExistingDisabledTooltip
                     : null,
                 enabled: !emptyAvailable,
               ),
-              const ButtonSegment(
+              ButtonSegment(
                 value: _PickMode.createNew,
-                label: Text('Create new'),
+                label: Text(l10n.customMaterialToggleCreateNew),
               ),
             ],
             selected: {effectiveMode},
