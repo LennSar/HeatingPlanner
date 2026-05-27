@@ -86,11 +86,18 @@ class _CustomMaterialDialogState
     _lambdaCtrl = TextEditingController(
       text: e != null ? e.lambdaDefault.toStringAsFixed(3) : '',
     );
+    // 0.0 is the in-database sentinel for "unknown" (UI/UX §5.7.2).
+    // Edit mode renders it as a blank field so the user can leave it
+    // empty without having to delete a misleading "0".
     _densityCtrl = TextEditingController(
-      text: e != null ? e.densityDefault.toStringAsFixed(0) : '',
+      text: e != null && e.densityDefault != 0.0
+          ? e.densityDefault.toStringAsFixed(0)
+          : '',
     );
     _specificHeatCtrl = TextEditingController(
-      text: e != null ? e.specificHeatDefault.toStringAsFixed(0) : '',
+      text: e != null && e.specificHeatDefault != 0.0
+          ? e.specificHeatDefault.toStringAsFixed(0)
+          : '',
     );
     _sourceCtrl = TextEditingController();
 
@@ -146,6 +153,18 @@ class _CustomMaterialDialogState
   double? get _specificHeat =>
       double.tryParse(_specificHeatCtrl.text.trim());
 
+  /// `true` when the field is empty or parses to a value equal to `0`.
+  ///
+  /// UI/UX §5.7.2: a user-typed `0` is treated identically to blank for
+  /// the optional density / specific-heat fields — both map to the
+  /// in-database `0.0` sentinel on save.
+  bool _isBlankOrZero(TextEditingController ctrl) {
+    final text = ctrl.text.trim();
+    if (text.isEmpty) return true;
+    final v = double.tryParse(text);
+    return v != null && v == 0;
+  }
+
   // ── Validation ──────────────────────────────────────────────────────────
 
   String? _validateName(
@@ -192,9 +211,19 @@ class _CustomMaterialDialogState
     return null;
   }
 
+  /// Density and specific heat are optional (UI/UX §5.7.2 "Why
+  /// density and specific heat are optional"). Blank or a typed `0`
+  /// is accepted and persists as the `0.0` sentinel; a non-blank,
+  /// non-zero value must still fall inside the allowed range.
   String? _validateDensity(AppLocalizations l10n) {
+    if (_isBlankOrZero(_densityCtrl)) return null;
     final v = _density;
-    if (v == null) return l10n.customMaterialValidationRequired;
+    if (v == null) {
+      return l10n.customMaterialValidationRange(
+        minDensity.toString(),
+        maxDensity.toString(),
+      );
+    }
     if (v < minDensity || v > maxDensity) {
       return l10n.customMaterialValidationRange(
         minDensity.toString(),
@@ -205,8 +234,14 @@ class _CustomMaterialDialogState
   }
 
   String? _validateSpecificHeat(AppLocalizations l10n) {
+    if (_isBlankOrZero(_specificHeatCtrl)) return null;
     final v = _specificHeat;
-    if (v == null) return l10n.customMaterialValidationRequired;
+    if (v == null) {
+      return l10n.customMaterialValidationRange(
+        minSpecificHeat.toString(),
+        maxSpecificHeat.toString(),
+      );
+    }
     if (v < minSpecificHeat || v > maxSpecificHeat) {
       return l10n.customMaterialValidationRange(
         minSpecificHeat.toString(),
@@ -233,6 +268,12 @@ class _CustomMaterialDialogState
     setState(() => _saving = true);
     final service = ref.read(customMaterialLibraryServiceProvider);
     final initial = widget.initialEntry;
+    // Blank or typed-0 → 0.0 sentinel (UI/UX §5.7.2). Non-blank values
+    // have already been range-checked by `_canSave`, so `!` is safe.
+    final density =
+        _isBlankOrZero(_densityCtrl) ? 0.0 : _density!;
+    final specificHeat =
+        _isBlankOrZero(_specificHeatCtrl) ? 0.0 : _specificHeat!;
     try {
       MaterialEntry result;
       if (initial == null) {
@@ -243,8 +284,8 @@ class _CustomMaterialDialogState
             category: _category,
             subcategory: _subcategory,
             lambdaDefault: _lambda!,
-            densityDefault: _density!,
-            specificHeatDefault: _specificHeat!,
+            densityDefault: density,
+            specificHeatDefault: specificHeat,
             isBuiltIn: false,
           ),
         );
@@ -254,8 +295,8 @@ class _CustomMaterialDialogState
           category: _category,
           subcategory: _subcategory,
           lambdaDefault: _lambda!,
-          densityDefault: _density!,
-          specificHeatDefault: _specificHeat!,
+          densityDefault: density,
+          specificHeatDefault: specificHeat,
         );
         await service.update(result);
       }
@@ -437,10 +478,10 @@ class _CustomMaterialDialogState
               ),
               const SizedBox(height: Spacing.md),
 
-              // Density
+              // Density (optional — UI/UX §5.7.2)
               _LabelRow(
                 label: l10n.customMaterialFieldDensity,
-                required: true,
+                required: false,
                 child: TextField(
                   controller: _densityCtrl,
                   key: const Key('custom-material-density'),
@@ -459,10 +500,10 @@ class _CustomMaterialDialogState
               ),
               const SizedBox(height: Spacing.md),
 
-              // Specific heat
+              // Specific heat (optional — UI/UX §5.7.2)
               _LabelRow(
                 label: l10n.customMaterialFieldSpecificHeat,
-                required: true,
+                required: false,
                 child: TextField(
                   controller: _specificHeatCtrl,
                   key: const Key('custom-material-specific-heat'),

@@ -82,7 +82,8 @@ bool _isSaveEnabled(WidgetTester tester) {
 
 void main() {
   testWidgets(
-    'save is disabled until every required field is valid',
+    'save is disabled until every required field is valid; '
+    'density and specific heat are optional (UI/UX §5.7.2)',
     (tester) async {
       await tester.pumpWidget(_build());
       await _openDialog(tester);
@@ -90,7 +91,8 @@ void main() {
       // Initially everything is empty → save disabled.
       expect(_isSaveEnabled(tester), isFalse);
 
-      // Fill required fields.
+      // Fill required fields one at a time. Save stays disabled until
+      // the last required field (λ) is filled.
       await tester.enterText(
         find.byKey(const Key('custom-material-name')),
         'Fresh material',
@@ -117,23 +119,96 @@ void main() {
         '0.07',
       );
       await tester.pump();
+
+      // Density and specific heat are optional — save is already
+      // enabled while both fields remain blank.
+      expect(_isSaveEnabled(tester), isTrue);
+    },
+  );
+
+  testWidgets(
+    'out-of-range density blocks save; in-range value re-enables it',
+    (tester) async {
+      await tester.pumpWidget(_build());
+      await _openDialog(tester);
+
+      // Fill the four required fields so the gating field is density.
+      await tester.enterText(
+        find.byKey(const Key('custom-material-name')),
+        'Fresh material',
+      );
+      await tester.enterText(
+        find.byKey(const Key('custom-material-category-new')),
+        'Bio',
+      );
+      await tester.enterText(
+        find.byKey(const Key('custom-material-subcategory-new')),
+        'Plant',
+      );
+      await tester.enterText(
+        find.byKey(const Key('custom-material-lambda')),
+        '0.07',
+      );
+      await tester.pump();
+      expect(_isSaveEnabled(tester), isTrue,
+          reason: 'baseline — required fields filled, optional blank');
+
+      // Out-of-range density (> maxDensity = 10 000) → save blocks.
+      await tester.enterText(
+        find.byKey(const Key('custom-material-density')),
+        '99999',
+      );
+      await tester.pump();
       expect(_isSaveEnabled(tester), isFalse);
 
+      // In-range value → save re-enables.
       await tester.enterText(
         find.byKey(const Key('custom-material-density')),
         '275',
       );
       await tester.pump();
-      expect(_isSaveEnabled(tester), isFalse);
+      expect(_isSaveEnabled(tester), isTrue);
 
+      // Typed `0` is treated as blank (UI/UX §5.7.2 Rule 4).
       await tester.enterText(
-        find.byKey(const Key('custom-material-specific-heat')),
-        '1700',
+        find.byKey(const Key('custom-material-density')),
+        '0',
       );
       await tester.pump();
-
-      // Now everything required is filled and within range → enabled.
       expect(_isSaveEnabled(tester), isTrue);
+    },
+  );
+
+  testWidgets(
+    'out-of-range specific heat blocks save',
+    (tester) async {
+      await tester.pumpWidget(_build());
+      await _openDialog(tester);
+
+      await tester.enterText(
+        find.byKey(const Key('custom-material-name')),
+        'Fresh material',
+      );
+      await tester.enterText(
+        find.byKey(const Key('custom-material-category-new')),
+        'Bio',
+      );
+      await tester.enterText(
+        find.byKey(const Key('custom-material-subcategory-new')),
+        'Plant',
+      );
+      await tester.enterText(
+        find.byKey(const Key('custom-material-lambda')),
+        '0.07',
+      );
+
+      // Above maxSpecificHeat = 5000 → out of range.
+      await tester.enterText(
+        find.byKey(const Key('custom-material-specific-heat')),
+        '99999',
+      );
+      await tester.pump();
+      expect(_isSaveEnabled(tester), isFalse);
     },
   );
 

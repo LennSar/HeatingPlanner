@@ -585,9 +585,11 @@ screen (§5.7.3). Modal dialog (`showDialog` on desktop,
 | Subcategory | yes | Toggle + control | Same as category; 1–100 chars when typed |
 | Manufacturer | no | Text | 0–100 chars; defaults to "Custom" when blank |
 | λ | yes | Numeric | 0.005 – 50.0 W/(m·K) per `minLambda` / `maxLambda` |
-| Density | yes | Numeric | 1.0 – 10 000.0 kg/m³ per `minDensity` / `maxDensity` |
-| Specific heat | yes | Numeric | 100.0 – 5 000.0 J/(kg·K) per `minSpecificHeat` / `maxSpecificHeat` |
+| Density | **no** | Numeric | If blank, stored as `0.0` (sentinel for "unknown" — no current calculation reads density). If non-blank, must satisfy 1.0 – 10 000.0 kg/m³ per `minDensity` / `maxDensity`. |
+| Specific heat | **no** | Numeric | If blank, stored as `0.0` (sentinel for "unknown" — no current calculation reads specific heat). If non-blank, must satisfy 100.0 – 5 000.0 J/(kg·K) per `minSpecificHeat` / `maxSpecificHeat`. |
 | Source URL | no | Text | Plain text, max 500 chars, no URL well-formedness check (we want users to be able to paste a path or a note) |
+
+> **Why density and specific heat are optional.** No current calculation engine reads either field (only λ matters for U-value, R-value, temperature profile, EN 12831 heat demand, EN 1264 heat output). The fields are kept on the data model for forward compatibility with transient / thermal-mass features, and for parity with the built-in `materials.json` schema, but the dialog does not force users to enter values that nothing reads. If a transient-analysis feature is added later, it must surface its own validation when a layer it touches has a `0.0` sentinel value.
 
 Required-field stars (`*`) follow the typography convention in §3.2.
 Invalid values show an inline error in `errorRed` directly beneath the
