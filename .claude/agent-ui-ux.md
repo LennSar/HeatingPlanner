@@ -515,9 +515,17 @@ The material field on each layer row is a **searchable dropdown** — tapping it
 
 3. **"Manage custom materials…" row**, pinned at the bottom of the dropdown (below the grouped entries). Always visible and always enabled (ADR-021 Rule 14). Tapping opens the Manage Custom Materials screen (§5.7.3) and closes the dropdown.
 
-4. **Grouped entries** below the "+ New custom material…" row. Materials are grouped by their full `categoryPath` rendered as a breadcrumb (`"Insulation boards › Wood fibre"`) — per `DECISIONS.md` ADR-022 the taxonomy is an arbitrary-depth path. Group headers are non-selectable divider rows styled in `onSurfaceSecondary` and sort **alphabetically by full path** (built-in and custom interleave naturally — the prior "built-in first" hint is retired with ADR-022). When the search field is non-empty, group headers are hidden and a flat filtered list is shown.
+4. **Inline-disclosure tree** below the "+ New custom material…" row, replacing the prior flat-breadcrumb-headers grouping. Per `DECISIONS.md` ADR-022 Rule 5 the tree is built from the set of all `MaterialEntry.categoryPath` values:
 
-5. Each material entry shows the material name and λ value in secondary text (e.g. "λ 0.035 W/(m·K)"). Custom entries (`isBuiltIn = false`) are tagged with a small "*Custom*" chip in `primaryLight` next to the name to distinguish them at a glance — colour is not the sole indicator (accessibility §11).
+   - Each unique path prefix is a tree node. A node may contain sub-nodes (paths one segment longer) and/or materials (entries whose `categoryPath` equals this node's path exactly).
+   - **All nodes are collapsed by default** when the dropdown opens. The compact initial view shows only the top-level category rows (e.g. *Concrete & Screed*, *Insulation boards*, …).
+   - A node row shows: a leading **▶ / ▼ chevron** in `onSurfaceSecondary` (▶ collapsed, ▼ expanded) when the node has any children; the node's **last segment** as the label in `bodyMedium`; an optional secondary-text count to the right (e.g. *"12"*) showing the number of materials in the subtree. Tap anywhere on the row toggles the chevron.
+   - Indentation: each level is indented by `md` (16 px) from its parent's left edge. Use a hairline guide line in `gridLine` from each expanded parent's chevron down to the bottom of its open subtree to make hierarchy scannable.
+   - When expanded, a node's children appear in this order: **sub-nodes first, then materials**, each set sorted alphabetically by its label (sub-node label = its own last segment; material label = its name).
+   - **Expansion state is preserved across reopens of the dropdown for the lifetime of the wall construction editor.** Closing the editor resets all nodes to collapsed. A `Set<String>` of expanded path joins held in an editor-scoped Riverpod state provider is sufficient.
+   - **Search behaviour (unchanged in spirit):** when the search field is non-empty, the tree is hidden and a flat filtered list of materials is shown. Each result row shows the material name in `bodyMedium` and its full breadcrumb path (`"A › B › C"`) in `bodySmall onSurfaceSecondary` as a subtitle. Clearing the search restores the tree at its previously-expanded state.
+
+5. Each material entry (in the tree or in the search results) shows the material name and λ value in secondary text (e.g. *"λ 0.035 W/(m·K)"*). Custom entries (`isBuiltIn = false`) are tagged with a small "*Custom*" chip in `primaryLight` next to the name to distinguish them at a glance — colour is not the sole indicator (accessibility §11). Tapping a material row selects it and closes the dropdown.
 
 6. **Per-entry edit affordance on custom rows.** On desktop, hovering a custom entry reveals a pencil icon (✎) at the row's right edge; tapping it opens the Custom Material dialog (§5.7.2) in edit mode pre-filled with that entry. On tablet, long-press on a custom row opens a small popup with **Edit** / **Delete** actions. Built-in rows have no edit/delete affordances. Right-click on a custom row (desktop) shows the same Edit / Delete context menu.
 
@@ -596,15 +604,20 @@ section. Per `DECISIONS.md` ADR-022 the taxonomy is an arbitrary-depth
 path; this control lets the user anchor at any existing node and
 extend with any number of new segments.
 
-- **Start under** — a single dropdown listing every distinct existing
-  `categoryPath` in `material_entries`, rendered as breadcrumbs
-  (`"Insulation boards › Stone wool board"`). Sorted alphabetically by
-  full path. A special **"(root)"** option is pinned to the top; it
-  anchors the new material at top-level (empty prefix). The dropdown
-  is searchable (type to filter). Default selection in Add mode:
-  "(root)" when no existing paths exist, otherwise leave the field
-  empty and surface inline error *"Pick a starting location"* on
-  Save-attempt with the field unset.
+- **Start under** — a single searchable dropdown listing **every
+  distinct prefix** of every existing `categoryPath` in
+  `material_entries` (length 1 through length N for each material),
+  rendered as breadcrumbs (`"Insulation boards"`,
+  `"Insulation boards › Stone wool board"`, …). Per `DECISIONS.md`
+  ADR-022 Rule 6, intermediate prefixes are first-class options —
+  picking *"Concrete & Screed"* alone anchors the new material
+  directly under that node without forcing the user into one of its
+  existing subcategories. Sorted alphabetically by full path. A
+  special **"(root)"** option is pinned to the top; it anchors the
+  new material at top-level (empty prefix). Default selection in Add
+  mode: "(root)" when no existing prefixes exist, otherwise leave
+  the field empty and surface inline error *"Pick a starting
+  location"* on Save-attempt with the field unset.
 
 - **Typed extensions** — below the Start picker, a vertical stack of
   editable text fields, one per appended segment, indented visually

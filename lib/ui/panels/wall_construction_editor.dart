@@ -12,6 +12,7 @@ import '../../data/models/wall_construction.dart';
 import '../../data/models/wall_segment.dart';
 import '../dialogs/material_picker_dialog.dart';
 import '../providers/editor_state_provider.dart';
+import '../providers/material_tree_expansion_provider.dart';
 import '../../repositories/material_repository.dart';
 
 // ---------------------------------------------------------------
@@ -89,6 +90,16 @@ class _SlabConstructionDialogState
   void initState() {
     super.initState();
     _loadFromState();
+    // Each editor session starts with the material-tree fully collapsed
+    // (UI/UX §5.7.1 item 4 / ADR-022 Rule 5): reset on open. Deferred so
+    // we don't mutate a provider during the build phase. Resetting on
+    // open (rather than dispose) avoids modifying a provider during
+    // widget-tree teardown, which Riverpod forbids.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(materialTreeExpansionProvider.notifier).reset();
+      }
+    });
   }
 
   void _loadFromState() {
@@ -685,6 +696,16 @@ class _WallConstructionDialogState
   void initState() {
     super.initState();
     _loadFromState();
+    // Each editor session starts with the material-tree fully collapsed
+    // (UI/UX §5.7.1 item 4 / ADR-022 Rule 5): reset on open. Deferred so
+    // we don't mutate a provider during the build phase. Resetting on
+    // open (rather than dispose) avoids modifying a provider during
+    // widget-tree teardown, which Riverpod forbids.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        ref.read(materialTreeExpansionProvider.notifier).reset();
+      }
+    });
   }
 
   @override

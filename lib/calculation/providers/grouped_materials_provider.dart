@@ -58,10 +58,26 @@ final localizedMaterialsByPathProvider =
   ];
 });
 
-/// All distinct `categoryPath` values present in the catalog, sorted
-/// alphabetically by canonical English breadcrumb. Used by the Custom
-/// Material dialog's "Start under" picker per UI/UX §5.7.2.
+/// Every distinct **prefix** of every existing `categoryPath` in the
+/// catalog (length 1 through length N for each entry), sorted
+/// alphabetically by canonical English breadcrumb.
+///
+/// Used by the Custom Material dialog's "Start under" picker per
+/// `DECISIONS.md` ADR-022 Rule 6 / UI/UX §5.7.2: intermediate prefixes
+/// are first-class options, so a material can be anchored at any node in
+/// the tree (e.g. directly under `"Concrete & Screed"` without picking
+/// one of its existing subcategories). The empty prefix ("(root)") is
+/// **not** included here — the dialog pins it as a separate top option.
 final distinctCategoryPathsProvider = Provider<List<List<String>>>((ref) {
-  final groups = ref.watch(localizedMaterialsByPathProvider);
-  return [for (final g in groups) g.path];
+  final entries = ref.watch(localizedMaterialEntriesProvider);
+  final byKey = <String, List<String>>{};
+  for (final e in entries) {
+    final path = e.row.categoryPath;
+    for (var i = 1; i <= path.length; i++) {
+      final prefix = path.sublist(0, i);
+      byKey[breadcrumbFor(prefix)] = prefix;
+    }
+  }
+  final keys = byKey.keys.toList()..sort();
+  return [for (final k in keys) byKey[k]!];
 });

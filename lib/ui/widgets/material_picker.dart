@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../calculation/providers/grouped_materials_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/localized_catalog_row.dart';
 import '../../data/models/material_entry.dart';
@@ -9,7 +8,9 @@ import '../../l10n/app_localizations.dart';
 import '../../repositories/custom_material_library_service.dart';
 import '../../repositories/material_repository.dart';
 import '../dialogs/custom_material_dialog.dart';
+import '../providers/material_tree_expansion_provider.dart';
 import 'material_entry_tile.dart';
+import 'material_path_breadcrumb.dart';
 
 /// Searchable, grouped material picker for use in the wall construction editor.
 ///
@@ -139,8 +140,6 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
     final colorScheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context)!;
 
-    final pathGroups = ref.watch(localizedMaterialsByPathProvider);
-
     return Column(
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -203,7 +202,7 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
                   onDeleteCustom: _deleteCustom,
                 );
               }
-              if (pathGroups.isEmpty) {
+              if (materials.isEmpty) {
                 return Padding(
                   padding: const EdgeInsets.all(Spacing.md),
                   child: Text(
@@ -214,8 +213,8 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
                   ),
                 );
               }
-              return _PathGroupedList(
-                groups: pathGroups,
+              return _TaxonomyTree(
+                roots: _buildTaxonomy(materials),
                 onSelected: widget.onSelected,
                 onEditCustom: _editCustom,
                 onDeleteCustom: _deleteCustom,
@@ -317,16 +316,20 @@ class _FlatFilteredList extends StatelessWidget {
       itemCount: materials.length,
       itemBuilder: (_, i) {
         final entry = materials[i];
+        // Search results carry a full breadcrumb subtitle (UI/UX
+        // §5.7.1 item 4) instead of the λ secondary text.
         if (entry.row.isBuiltIn) {
           return MaterialEntryTile(
             entry: entry,
             indentLevel: 0,
+            breadcrumbPath: entry.row.categoryPath,
             onTap: () => onSelected(entry.row),
           );
         }
         return _CustomMaterialPickerRow(
           entry: entry,
           indentLevel: 0,
+          breadcrumbPath: entry.row.categoryPath,
           onTap: () => onSelected(entry.row),
           onEdit: () => onEditCustom(entry.row),
           onDelete: () => onDeleteCustom(entry.row),
@@ -336,39 +339,117 @@ class _FlatFilteredList extends StatelessWidget {
   }
 }
 
-// ── Private: path-grouped list (ADR-022 Rule 5 / UI/UX §5.7.1 item 4) ──
+// ── Private: inline-disclosure taxonomy tree ───────────────────────────────
+// (ADR-022 Rule 5 / UI/UX §5.7.1 item 4)
 
-class _PathGroupedList extends StatelessWidget {
-  const _PathGroupedList({
-    required this.groups,
+/// Width of the leading chevron slot. Doubles as the per-level indent
+/// step (UI/UX §5.7.1 item 4: "each level inset by `md`").
+const double _chevronSlot = Spacing.md;
+
+/// One node in the material taxonomy: a unique `categoryPath` prefix with
+/// its child sub-nodes and the materials anchored exactly at this path.
+class _TaxonomyNode {
+  _TaxonomyNode({
+    required this.path,
+    required this.childNodes,
+    required this.directMaterials,
+    required this.subtreeMaterialCount,
+  });
+
+  /// Full path from the root to this node (its last segment is the label).
+  final List<String> path;
+
+  /// Sub-nodes (paths one segment longer), alphabetical by last segment.
+  final List<_TaxonomyNode> childNodes;
+
+  /// Materials whose `categoryPath` equals [path] exactly, alphabetical
+  /// by display name.
+  final List<LocalizedCatalogRow<MaterialEntry>> directMaterials;
+
+  /// Count of materials in this node and every descendant.
+  final int subtreeMaterialCount;
+
+  /// Last path segment — the row label.
+  String get segment => path.last;
+
+  /// Stable expansion key (segments can't contain `/` per ADR-022 R1).
+  String get joinedPath => path.join('/');
+
+  /// Whether the node has anything to disclose (sub-nodes or materials).
+  bool get hasChildren => childNodes.isNotEmpty || directMaterials.isNotEmpty;
+}
+
+/// Mutable scratch node used while assembling the taxonomy.
+class _MutableNode {
+  _MutableNode(this.path);
+  final List<String> path;
+  final Map<String, _MutableNode> children = {};
+  final List<LocalizedCatalogRow<MaterialEntry>> materials = [];
+}
+
+/// Pure builder: turns the flat material list into a tree of
+/// [_TaxonomyNode] roots. Sub-nodes are alphabetical by last segment and
+/// materials alphabetical by display name within each node (UI/UX
+/// §5.7.1 item 4 — sub-nodes are rendered before materials).
+List<_TaxonomyNode> _buildTaxonomy(
+  List<LocalizedCatalogRow<MaterialEntry>> entries,
+) {
+  final roots = <String, _MutableNode>{};
+  for (final e in entries) {
+    final path = e.row.categoryPath;
+    if (path.isEmpty) continue;
+    var level = roots;
+    _MutableNode? node;
+    final acc = <String>[];
+    for (final seg in path) {
+      acc.add(seg);
+      node = level.putIfAbsent(seg, () => _MutableNode(List<String>.of(acc)));
+      level = node.children;
+    }
+    node!.materials.add(e);
+  }
+  return _freezeTaxonomy(roots);
+}
+
+List<_TaxonomyNode> _freezeTaxonomy(Map<String, _MutableNode> level) {
+  final nodes = <_TaxonomyNode>[];
+  for (final m in level.values) {
+    final children = _freezeTaxonomy(m.children);
+    final childCount =
+        children.fold<int>(0, (sum, c) => sum + c.subtreeMaterialCount);
+    final materials = [...m.materials]..sort(
+        (a, b) => a.displayName
+            .toLowerCase()
+            .compareTo(b.displayName.toLowerCase()),
+      );
+    nodes.add(
+      _TaxonomyNode(
+        path: m.path,
+        childNodes: children,
+        directMaterials: materials,
+        subtreeMaterialCount: m.materials.length + childCount,
+      ),
+    );
+  }
+  nodes.sort(
+    (a, b) => a.segment.toLowerCase().compareTo(b.segment.toLowerCase()),
+  );
+  return nodes;
+}
+
+/// Scrollable list of root [_TaxonomyNode]s rendered as an inline tree.
+class _TaxonomyTree extends StatelessWidget {
+  const _TaxonomyTree({
+    required this.roots,
     required this.onSelected,
     required this.onEditCustom,
     required this.onDeleteCustom,
   });
 
-  final List<MaterialPathGroup> groups;
+  final List<_TaxonomyNode> roots;
   final void Function(MaterialEntry) onSelected;
   final Future<void> Function(MaterialEntry) onEditCustom;
   final Future<void> Function(MaterialEntry) onDeleteCustom;
-
-  Widget _buildMaterialTile(
-    LocalizedCatalogRow<MaterialEntry> entry,
-  ) {
-    if (entry.row.isBuiltIn) {
-      return MaterialEntryTile(
-        entry: entry,
-        indentLevel: 1,
-        onTap: () => onSelected(entry.row),
-      );
-    }
-    return _CustomMaterialPickerRow(
-      entry: entry,
-      indentLevel: 1,
-      onTap: () => onSelected(entry.row),
-      onEdit: () => onEditCustom(entry.row),
-      onDelete: () => onDeleteCustom(entry.row),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -376,40 +457,149 @@ class _PathGroupedList extends StatelessWidget {
       padding: EdgeInsets.zero,
       shrinkWrap: true,
       children: [
-        for (final group in groups) ...[
-          _BreadcrumbHeader(path: group.path),
-          for (final material in group.entries) _buildMaterialTile(material),
-        ],
+        for (final node in roots)
+          _NodeView(
+            node: node,
+            onSelected: onSelected,
+            onEditCustom: onEditCustom,
+            onDeleteCustom: onDeleteCustom,
+          ),
       ],
     );
   }
 }
 
-/// Non-selectable divider row that renders [path] as a breadcrumb
-/// (`"A › B › C"`) per UI/UX §5.7.1 item 4. Style follows the
-/// `onSurfaceSecondary` design token (i.e. `ColorScheme.onSurfaceVariant`).
-class _BreadcrumbHeader extends StatelessWidget {
-  const _BreadcrumbHeader({required this.path});
+/// One node row plus — when expanded — its children, recursively. The
+/// expanded/collapsed state lives in [materialTreeExpansionProvider]
+/// (editor-scoped) so it survives the dropdown reopening.
+class _NodeView extends ConsumerWidget {
+  const _NodeView({
+    required this.node,
+    required this.onSelected,
+    required this.onEditCustom,
+    required this.onDeleteCustom,
+  });
 
-  final List<String> path;
+  final _TaxonomyNode node;
+  final void Function(MaterialEntry) onSelected;
+  final Future<void> Function(MaterialEntry) onEditCustom;
+  final Future<void> Function(MaterialEntry) onDeleteCustom;
+
+  Widget _materialRow(LocalizedCatalogRow<MaterialEntry> entry) {
+    // Indent the material label so it aligns under sibling sub-node
+    // labels (which sit after the chevron slot). The tile already adds
+    // its own Spacing.sm, so the extra pad is the remainder.
+    final tile = entry.row.isBuiltIn
+        ? MaterialEntryTile(
+            entry: entry,
+            indentLevel: 0,
+            onTap: () => onSelected(entry.row),
+          )
+        : _CustomMaterialPickerRow(
+            entry: entry,
+            indentLevel: 0,
+            onTap: () => onSelected(entry.row),
+            onEdit: () => onEditCustom(entry.row),
+            onDelete: () => onDeleteCustom(entry.row),
+          );
+    return Padding(
+      padding: const EdgeInsets.only(left: _chevronSlot - Spacing.sm),
+      child: tile,
+    );
+  }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(
-        Spacing.sm,
-        Spacing.sm,
-        Spacing.sm,
-        Spacing.xs,
-      ),
-      child: Text(
-        breadcrumbFor(path),
-        style: theme.textTheme.labelMedium?.copyWith(
-          color: theme.colorScheme.onSurfaceVariant,
-          fontWeight: FontWeight.w600,
+    final secondary = theme.colorScheme.onSurfaceVariant;
+    final expanded =
+        ref.watch(materialTreeExpansionProvider).contains(node.joinedPath);
+
+    final row = InkWell(
+      onTap: node.hasChildren
+          ? () => ref
+              .read(materialTreeExpansionProvider.notifier)
+              .toggle(node.joinedPath)
+          : null,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+        child: Row(
+          children: [
+            SizedBox(
+              width: _chevronSlot,
+              child: node.hasChildren
+                  ? Icon(
+                      expanded ? Icons.expand_more : Icons.chevron_right,
+                      size: _chevronSlot,
+                      color: secondary,
+                    )
+                  : null,
+            ),
+            Expanded(
+              child: Text(
+                node.segment,
+                style: theme.textTheme.bodyMedium,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            if (node.subtreeMaterialCount > 0)
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
+                child: Text(
+                  '${node.subtreeMaterialCount}',
+                  style: theme.textTheme.bodySmall?.copyWith(color: secondary),
+                ),
+              ),
+          ],
         ),
       ),
+    );
+
+    if (!expanded || !node.hasChildren) return row;
+
+    final children = <Widget>[
+      // Sub-nodes first, then materials (UI/UX §5.7.1 item 4).
+      for (final child in node.childNodes)
+        _NodeView(
+          node: child,
+          onSelected: onSelected,
+          onEditCustom: onEditCustom,
+          onDeleteCustom: onDeleteCustom,
+        ),
+      for (final material in node.directMaterials) _materialRow(material),
+    ];
+
+    final gridLine = theme.extension<HeatingPlannerColors>()!.gridLine;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        row,
+        // Hairline guide from the parent's chevron centre down the open
+        // subtree (UI/UX §5.7.1 item 4).
+        IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(width: _chevronSlot / 2),
+              Container(width: 1, color: gridLine),
+              Expanded(
+                child: Padding(
+                  padding:
+                      const EdgeInsets.only(left: _chevronSlot / 2 - 1),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    mainAxisSize: MainAxisSize.min,
+                    children: children,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
@@ -430,6 +620,7 @@ class _CustomMaterialPickerRow extends StatefulWidget {
     required this.onTap,
     required this.onEdit,
     required this.onDelete,
+    this.breadcrumbPath,
   });
 
   final LocalizedCatalogRow<MaterialEntry> entry;
@@ -437,6 +628,11 @@ class _CustomMaterialPickerRow extends StatefulWidget {
   final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
+
+  /// When non-null the secondary line renders this `categoryPath` as a
+  /// breadcrumb instead of the λ value (search-result rows, UI/UX
+  /// §5.7.1 item 4).
+  final List<String>? breadcrumbPath;
 
   @override
   State<_CustomMaterialPickerRow> createState() =>
@@ -534,12 +730,15 @@ class _CustomMaterialPickerRowState
                           _CustomChip(color: extColors.infoBlue),
                         ],
                       ),
-                      Text(
-                        secondary,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
+                      if (widget.breadcrumbPath != null)
+                        MaterialPathBreadcrumb(path: widget.breadcrumbPath!)
+                      else
+                        Text(
+                          secondary,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 ),

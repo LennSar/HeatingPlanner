@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 
+import '../../calculation/providers/grouped_materials_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/localized_catalog_row.dart';
 import '../../data/models/material_entry.dart';
+import 'material_path_breadcrumb.dart';
 
 /// A selectable row for an individual [MaterialEntry] inside a picker dropdown.
 ///
@@ -29,6 +31,7 @@ class MaterialEntryTile extends StatelessWidget {
     required this.entry,
     required this.onTap,
     this.indentLevel = 2,
+    this.breadcrumbPath,
   });
 
   /// The material to display, paired with its locale-resolved display name.
@@ -42,6 +45,11 @@ class MaterialEntryTile extends StatelessWidget {
   /// 0 = top-level / flat list; 1 = under a breadcrumb group header
   /// (the new default post-ADR-022 picker rendering).
   final int indentLevel;
+
+  /// When non-null the secondary line renders this `categoryPath` as a
+  /// breadcrumb (`"A › B › C"`) instead of the λ value. Used by the
+  /// search-result list per UI/UX §5.7.1 item 4.
+  final List<String>? breadcrumbPath;
 
   /// Secondary label: λ value formatted to 3 d.p. with unit.
   ///
@@ -57,9 +65,12 @@ class MaterialEntryTile extends StatelessWidget {
 
     // Left padding grows by Spacing.md per indent level, anchored at Spacing.sm.
     final leftPad = Spacing.sm + indentLevel * Spacing.md;
+    final path = breadcrumbPath;
+    final semanticSecondary =
+        path != null ? breadcrumbFor(path) : _secondaryText;
 
     return Semantics(
-      label: '${entry.displayName}, $_secondaryText',
+      label: '${entry.displayName}, $semanticSecondary',
       button: true,
       excludeSemantics: true,
       child: InkWell(
@@ -81,12 +92,15 @@ class MaterialEntryTile extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-              Text(
-                _secondaryText,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
+              if (path != null)
+                MaterialPathBreadcrumb(path: path)
+              else
+                Text(
+                  _secondaryText,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
-              ),
             ],
           ),
         ),
