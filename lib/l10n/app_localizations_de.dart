@@ -1290,10 +1290,26 @@ class AppLocalizationsDe extends AppLocalizations {
   String get customMaterialFieldName => 'Name';
 
   @override
-  String get customMaterialFieldCategory => 'Kategorie';
+  String get customMaterialFieldLocation => 'Verortung';
 
   @override
-  String get customMaterialFieldSubcategory => 'Unterkategorie';
+  String get customMaterialPathStartUnder => 'Einordnen unter';
+
+  @override
+  String get customMaterialPathRootOption => '(Wurzel)';
+
+  @override
+  String get customMaterialPathAddSubcategory => '+ Unterkategorie hinzufügen';
+
+  @override
+  String get customMaterialPathStartUnderHint => 'Bitte eine Einordnung wählen';
+
+  @override
+  String get customMaterialPathSegmentRequired =>
+      'Name der Unterkategorie erforderlich';
+
+  @override
+  String get customMaterialPathSegmentNoSlash => 'Darf kein \'/\' enthalten';
 
   @override
   String get customMaterialFieldManufacturer => 'Hersteller';
@@ -1313,16 +1329,6 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get customMaterialFieldSourceUrl => 'Quellen-URL';
-
-  @override
-  String get customMaterialTogglePickExisting => 'Vorhandenes wählen';
-
-  @override
-  String get customMaterialToggleCreateNew => 'Neu anlegen';
-
-  @override
-  String get customMaterialTogglePickExistingDisabledTooltip =>
-      'Noch keine Kategorien vorhanden — lege die erste an';
 
   @override
   String get customMaterialButtonCancel => 'Abbrechen';

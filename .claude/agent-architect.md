@@ -442,18 +442,28 @@ Each model below is defined in its own file under `lib/data/models/`. I am listi
 |-------|------|-----------|---------|
 | id | String | UUID v4 | auto |
 | name | String | 1-200 chars | required |
-| category | String | e.g. "Masonry", "Insulation boards" | required |
-| subcategory | String | e.g. "Historic brick", "Stone wool board" | required |
+| categoryPath | List\<String\> | length ≥ 1; each segment 1-100 chars, no `/`. Outside → inside (e.g. `["Insulation boards", "Wood fibre"]`). Per `DECISIONS.md` ADR-022. | required |
 | manufacturer | String | Company name or standard ref (e.g. "Rockwool", "DIN 4108-4") | required |
 | lambdaDefault | double | W/(mK) | required |
-| densityDefault | double | kg/m³ | required |
-| specificHeatDefault | double | J/(kgK) | required |
+| densityDefault | double | kg/m³. `0.0` is a sentinel for "unknown" (no current engine reads this — see UI/UX §5.7.2). | required (0.0 allowed) |
+| specificHeatDefault | double | J/(kgK). `0.0` is a sentinel for "unknown" — see above. | required (0.0 allowed) |
 | source | String | URL to datasheet/catalog PDF, empty if none | "" |
 | isBuiltIn | bool | true for seed data | true |
 
-**DB migration note:** `subcategory`, `manufacturer`, and `source` are new non-nullable TEXT columns on the `material_entries` table. Schema version must be incremented. Migration adds columns with `DEFAULT ''` for existing rows. After migration, re-seed built-in materials from `assets/materials.json` to populate correct values.
+**DB migration note (ADR-022):** Schema version bumps. The
+`material_entries` table drops the two old TEXT columns
+`category` and `subcategory` and gains `category_path TEXT NOT NULL`
+holding the JSON-encoded list. The step migration reads every row's
+`(category, subcategory)` and writes
+`category_path = json([category, subcategory])` before dropping the
+old columns. After the migration, re-seed built-in materials from
+the regenerated `assets/materials.json` (which exposes
+`categoryPath` directly) to confirm the seed and the table agree.
 
-**Material picker hierarchy:** The material picker dialog groups entries in a 3-level tree: `category` → `subcategory` → individual entries. Subcategories like "Historic brick" and "Modern thermal brick" are grouped under the "Masonry" parent. The UI agent handles this presentation logic.
+**Material picker hierarchy:** The material picker dialog groups
+entries by their full `categoryPath` rendered as a breadcrumb
+(`"Insulation boards › Wood fibre"`). Depth is unbounded. The UI
+agent handles presentation; the data model just stores the path.
 
 **HeatingZone**
 | Field | Type | Constraint | Default |

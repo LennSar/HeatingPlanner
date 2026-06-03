@@ -2,12 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../calculation/providers/grouped_materials_provider.dart';
 import '../../core/constants/validation_limits.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/material_entry.dart';
 import '../../l10n/app_localizations.dart';
 import '../../repositories/custom_material_library_service.dart';
-import '../../repositories/material_repository.dart';
 
 /// Opens the Add Custom Material dialog (UI/UX §5.7.2 add mode).
 ///
@@ -36,11 +36,13 @@ Future<MaterialEntry?> showEditCustomMaterialDialog(
 
 /// Add / Edit dialog for a custom [MaterialEntry] (UI/UX §5.7.2).
 ///
-/// When [initialEntry] is null the dialog is in **Add** mode; otherwise it
-/// pre-fills the fields and is in **Edit** mode. On Save the dialog
-/// calls [CustomMaterialLibraryService.create] / `.update` and pops with
-/// the resulting entry. On a file-write failure the dialog stays open
-/// with the user's values intact and surfaces a toast.
+/// The taxonomy is controlled through the **path builder** (ADR-022
+/// Rule 6 / UI/UX §5.7.2 "Path builder"): a "Start under" dropdown
+/// listing every distinct existing `categoryPath` plus a pinned
+/// "(root)" option, followed by a vertical stack of typed-extension
+/// fields. Each typed field has a trailing ✕ that cascade-removes
+/// every field below it. Save composes
+/// `categoryPath = startPath + typedSegments`.
 class CustomMaterialDialog extends ConsumerStatefulWidget {
   /// Creates a [CustomMaterialDialog].
   const CustomMaterialDialog({super.key, this.initialEntry});
@@ -53,25 +55,38 @@ class CustomMaterialDialog extends ConsumerStatefulWidget {
       _CustomMaterialDialogState();
 }
 
-/// Two-segment toggle state for category / subcategory rows.
-enum _PickMode { pickExisting, createNew }
+/// Sentinel for "Start under = (root)" in the dropdown selection.
+const List<String> _rootPath = <String>[];
 
 class _CustomMaterialDialogState
     extends ConsumerState<CustomMaterialDialog> {
   late final TextEditingController _nameCtrl;
-  late final TextEditingController _categoryNewCtrl;
-  late final TextEditingController _subcategoryNewCtrl;
   late final TextEditingController _manufacturerCtrl;
   late final TextEditingController _lambdaCtrl;
   late final TextEditingController _densityCtrl;
   late final TextEditingController _specificHeatCtrl;
   late final TextEditingController _sourceCtrl;
 
-  _PickMode _categoryMode = _PickMode.createNew;
-  _PickMode _subcategoryMode = _PickMode.createNew;
-  String? _categoryPicked;
-  String? _subcategoryPicked;
+  /// Currently chosen "Start under" prefix.
+  ///
+  /// - `null` means "not yet selected" (Add mode initial state when at
+  ///   least one existing path is available). Save surfaces inline
+  ///   error *"Pick a starting location"*.
+  /// - `_rootPath` (an empty list) means "(root)".
+  /// - any other list is a copy of an existing `categoryPath`.
+  List<String>? _startPath;
+
+  /// Typed-extension segments. One entry per row. Always at least one
+  /// element in Edit mode (the material's last segment). In Add mode
+  /// starts empty.
+  late List<TextEditingController> _typedCtrls;
+
+  /// Set to `true` while a save is in flight.
   bool _saving = false;
+
+  /// Focus node attached to the most recently added typed-extension
+  /// row so "+ Add subcategory" focuses the new field.
+  FocusNode? _pendingFocus;
 
   bool get _isEdit => widget.initialEntry != null;
 
@@ -80,15 +95,12 @@ class _CustomMaterialDialogState
     super.initState();
     final e = widget.initialEntry;
     _nameCtrl = TextEditingController(text: e?.name ?? '');
-    _categoryNewCtrl = TextEditingController(text: e?.category ?? '');
-    _subcategoryNewCtrl = TextEditingController(text: e?.subcategory ?? '');
     _manufacturerCtrl = TextEditingController();
     _lambdaCtrl = TextEditingController(
       text: e != null ? e.lambdaDefault.toStringAsFixed(3) : '',
     );
-    // 0.0 is the in-database sentinel for "unknown" (UI/UX §5.7.2).
-    // Edit mode renders it as a blank field so the user can leave it
-    // empty without having to delete a misleading "0".
+    // 0.0 is the in-database sentinel for "unknown" (UI/UX §5.7.2);
+    // render as a blank field so the user can leave it empty.
     _densityCtrl = TextEditingController(
       text: e != null && e.densityDefault != 0.0
           ? e.densityDefault.toStringAsFixed(0)
@@ -101,10 +113,20 @@ class _CustomMaterialDialogState
     );
     _sourceCtrl = TextEditingController();
 
+    if (e != null) {
+      // Edit mode: pre-fill "Start under" with categoryPath[:-1] (or
+      // "(root)" when length is 1); typed extensions has the last
+      // segment.
+      _startPath = e.categoryPath.length == 1
+          ? _rootPath
+          : List.unmodifiable(e.categoryPath.sublist(0, e.categoryPath.length - 1));
+      _typedCtrls = [TextEditingController(text: e.categoryPath.last)];
+    } else {
+      _typedCtrls = [];
+    }
+
     for (final c in [
       _nameCtrl,
-      _categoryNewCtrl,
-      _subcategoryNewCtrl,
       _manufacturerCtrl,
       _lambdaCtrl,
       _densityCtrl,
@@ -113,14 +135,15 @@ class _CustomMaterialDialogState
     ]) {
       c.addListener(_rebuild);
     }
+    for (final c in _typedCtrls) {
+      c.addListener(_rebuild);
+    }
   }
 
   @override
   void dispose() {
     for (final c in [
       _nameCtrl,
-      _categoryNewCtrl,
-      _subcategoryNewCtrl,
       _manufacturerCtrl,
       _lambdaCtrl,
       _densityCtrl,
@@ -129,6 +152,10 @@ class _CustomMaterialDialogState
     ]) {
       c.dispose();
     }
+    for (final c in _typedCtrls) {
+      c.dispose();
+    }
+    _pendingFocus?.dispose();
     super.dispose();
   }
 
@@ -138,15 +165,16 @@ class _CustomMaterialDialogState
 
   String get _name => _nameCtrl.text.trim();
 
-  String get _category => switch (_categoryMode) {
-        _PickMode.pickExisting => _categoryPicked ?? '',
-        _PickMode.createNew => _categoryNewCtrl.text.trim(),
-      };
-
-  String get _subcategory => switch (_subcategoryMode) {
-        _PickMode.pickExisting => _subcategoryPicked ?? '',
-        _PickMode.createNew => _subcategoryNewCtrl.text.trim(),
-      };
+  /// Final composed `categoryPath` per ADR-022 Rule 6.
+  ///
+  /// Returns `null` when "Start under" hasn't been picked yet — used
+  /// by [_canSave] to surface the inline error.
+  List<String>? _composedPath() {
+    final start = _startPath;
+    if (start == null) return null;
+    final typed = [for (final c in _typedCtrls) c.text.trim()];
+    return [...start, ...typed];
+  }
 
   double? get _lambda => double.tryParse(_lambdaCtrl.text.trim());
   double? get _density => double.tryParse(_densityCtrl.text.trim());
@@ -187,16 +215,28 @@ class _CustomMaterialDialogState
     return null;
   }
 
-  String? _validateText(
-    AppLocalizations l10n,
-    String value, {
-    int max = 100,
-  }) {
-    if (value.isEmpty) return l10n.customMaterialValidationRequired;
-    if (value.length > max) {
-      return l10n.customMaterialValidationMaxChars(max);
+  /// Returns the inline error for a typed extension at [index], or
+  /// `null` when valid. Errors surface eagerly (matching the rest of
+  /// the dialog's "Required"-on-open behaviour for blank required
+  /// fields).
+  String? _validateTypedSegment(int index, AppLocalizations l10n) {
+    final raw = _typedCtrls[index].text;
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) {
+      return l10n.customMaterialPathSegmentRequired;
+    }
+    if (trimmed.contains('/')) {
+      return l10n.customMaterialPathSegmentNoSlash;
+    }
+    if (trimmed.length > 100) {
+      return l10n.customMaterialValidationMaxChars(100);
     }
     return null;
+  }
+
+  /// Inline error on the "Start under" dropdown.
+  String? _validateStartPath(AppLocalizations l10n) {
+    return _startPath == null ? l10n.customMaterialPathStartUnderHint : null;
   }
 
   String? _validateLambda(AppLocalizations l10n) {
@@ -211,20 +251,10 @@ class _CustomMaterialDialogState
     return null;
   }
 
-  /// Density and specific heat are optional (UI/UX §5.7.2 "Why
-  /// density and specific heat are optional"). Blank or a typed `0`
-  /// is accepted and persists as the `0.0` sentinel; a non-blank,
-  /// non-zero value must still fall inside the allowed range.
   String? _validateDensity(AppLocalizations l10n) {
     if (_isBlankOrZero(_densityCtrl)) return null;
     final v = _density;
-    if (v == null) {
-      return l10n.customMaterialValidationRange(
-        minDensity.toString(),
-        maxDensity.toString(),
-      );
-    }
-    if (v < minDensity || v > maxDensity) {
+    if (v == null || v < minDensity || v > maxDensity) {
       return l10n.customMaterialValidationRange(
         minDensity.toString(),
         maxDensity.toString(),
@@ -236,13 +266,7 @@ class _CustomMaterialDialogState
   String? _validateSpecificHeat(AppLocalizations l10n) {
     if (_isBlankOrZero(_specificHeatCtrl)) return null;
     final v = _specificHeat;
-    if (v == null) {
-      return l10n.customMaterialValidationRange(
-        minSpecificHeat.toString(),
-        maxSpecificHeat.toString(),
-      );
-    }
-    if (v < minSpecificHeat || v > maxSpecificHeat) {
+    if (v == null || v < minSpecificHeat || v > maxSpecificHeat) {
       return l10n.customMaterialValidationRange(
         minSpecificHeat.toString(),
         maxSpecificHeat.toString(),
@@ -251,27 +275,77 @@ class _CustomMaterialDialogState
     return null;
   }
 
-  bool _canSave(AppLocalizations l10n, List<MaterialEntry> customs) {
-    if (_saving) return false;
+  /// `true` when every required field validates. Save uses this to
+  /// gate the button; inline errors are still surfaced (after the
+  /// first Save attempt) for whichever fields are wrong.
+  bool _isValid(AppLocalizations l10n, List<MaterialEntry> customs) {
     if (_validateName(l10n, customs) != null) return false;
-    if (_validateText(l10n, _category) != null) return false;
-    if (_validateText(l10n, _subcategory) != null) return false;
+    if (_startPath == null) return false;
+    for (var i = 0; i < _typedCtrls.length; i++) {
+      final raw = _typedCtrls[i].text.trim();
+      if (raw.isEmpty) return false;
+      if (raw.contains('/')) return false;
+      if (raw.length > 100) return false;
+    }
+    if (_composedPath()!.isEmpty) return false;
     if (_validateLambda(l10n) != null) return false;
     if (_validateDensity(l10n) != null) return false;
     if (_validateSpecificHeat(l10n) != null) return false;
     return true;
   }
 
+  // ── Path-builder actions ────────────────────────────────────────────────
+
+  void _onStartChanged(List<String>? next) {
+    setState(() {
+      _startPath = next;
+    });
+  }
+
+  void _addTypedSegment() {
+    final focus = FocusNode();
+    final ctrl = TextEditingController();
+    ctrl.addListener(_rebuild);
+    setState(() {
+      _typedCtrls.add(ctrl);
+      _pendingFocus?.dispose();
+      _pendingFocus = focus;
+    });
+    // Defer the focus request so the field is mounted first.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) focus.requestFocus();
+    });
+  }
+
+  /// Removes [index] and every segment below it (cascade). Disposes
+  /// the removed controllers.
+  void _removeFrom(int index) {
+    final removed = _typedCtrls.sublist(index);
+    setState(() {
+      _typedCtrls = _typedCtrls.sublist(0, index);
+    });
+    for (final c in removed) {
+      c.dispose();
+    }
+  }
+
+  /// Whether "+ Add subcategory" is enabled. Disabled while the
+  /// current last segment is empty (UI/UX §5.7.2: "finish the
+  /// in-progress segment first").
+  bool get _canAddSubcategory {
+    if (_typedCtrls.isEmpty) return true;
+    return _typedCtrls.last.text.trim().isNotEmpty;
+  }
+
   // ── Save ────────────────────────────────────────────────────────────────
 
-  Future<void> _onSave() async {
+  Future<void> _onSave(List<MaterialEntry> customs) async {
+    final l10n = AppLocalizations.of(context)!;
     setState(() => _saving = true);
     final service = ref.read(customMaterialLibraryServiceProvider);
     final initial = widget.initialEntry;
-    // Blank or typed-0 → 0.0 sentinel (UI/UX §5.7.2). Non-blank values
-    // have already been range-checked by `_canSave`, so `!` is safe.
-    final density =
-        _isBlankOrZero(_densityCtrl) ? 0.0 : _density!;
+    final path = _composedPath()!;
+    final density = _isBlankOrZero(_densityCtrl) ? 0.0 : _density!;
     final specificHeat =
         _isBlankOrZero(_specificHeatCtrl) ? 0.0 : _specificHeat!;
     try {
@@ -281,8 +355,7 @@ class _CustomMaterialDialogState
           MaterialEntry(
             id: 'placeholder',
             name: _name,
-            category: _category,
-            subcategory: _subcategory,
+            categoryPath: path,
             lambdaDefault: _lambda!,
             densityDefault: density,
             specificHeatDefault: specificHeat,
@@ -292,8 +365,7 @@ class _CustomMaterialDialogState
       } else {
         result = initial.copyWith(
           name: _name,
-          category: _category,
-          subcategory: _subcategory,
+          categoryPath: path,
           lambdaDefault: _lambda!,
           densityDefault: density,
           specificHeatDefault: specificHeat,
@@ -305,7 +377,6 @@ class _CustomMaterialDialogState
     } catch (e) {
       if (!mounted) return;
       setState(() => _saving = false);
-      final l10n = AppLocalizations.of(context)!;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           backgroundColor: Theme.of(context)
@@ -324,28 +395,24 @@ class _CustomMaterialDialogState
     final l10n = AppLocalizations.of(context)!;
     final customs =
         ref.watch(customMaterialsProvider).asData?.value ?? const [];
-    final allEntries =
-        ref.watch(materialEntriesProvider).asData?.value ?? const [];
+    final catalogPaths = ref.watch(distinctCategoryPathsProvider);
+    // Edit mode: ensure the material's parent path is offered in the
+    // dropdown even when no other material lives at that prefix —
+    // otherwise [DropdownMenu.initialSelection] can't match the pre-fill
+    // and the field renders empty (ADR-022 Rule 7).
+    final availablePaths = <List<String>>[
+      ...catalogPaths,
+      if (_startPath != null &&
+          _startPath!.isNotEmpty &&
+          !catalogPaths.any(
+              (p) => breadcrumbFor(p) == breadcrumbFor(_startPath!)))
+        _startPath!,
+    ]..sort((a, b) => breadcrumbFor(a).compareTo(breadcrumbFor(b)));
 
-    final categoriesAvailable =
-        allEntries.map((m) => m.category).toSet().toList()..sort();
-    if (_categoryMode == _PickMode.pickExisting &&
-        _categoryPicked != null &&
-        !categoriesAvailable.contains(_categoryPicked)) {
-      _categoryPicked = null;
-    }
-
-    final subcategoriesAvailable = allEntries
-        .where((m) => m.category == _category)
-        .map((m) => m.subcategory)
-        .where((s) => s.isNotEmpty)
-        .toSet()
-        .toList()
-      ..sort();
-    if (_subcategoryMode == _PickMode.pickExisting &&
-        _subcategoryPicked != null &&
-        !subcategoriesAvailable.contains(_subcategoryPicked)) {
-      _subcategoryPicked = null;
+    // In Add mode default to "(root)" when no existing paths exist
+    // (otherwise leave unset so the user makes an explicit choice).
+    if (!_isEdit && _startPath == null && availablePaths.isEmpty) {
+      _startPath = _rootPath;
     }
 
     return Dialog(
@@ -392,53 +459,22 @@ class _CustomMaterialDialogState
               ),
               const SizedBox(height: Spacing.md),
 
-              // Category
-              _TaxonomyRow(
-                label: l10n.customMaterialFieldCategory,
-                mode: _categoryMode,
-                onModeChanged: (m) {
-                  setState(() {
-                    _categoryMode = m;
-                    if (m == _PickMode.pickExisting) {
-                      _categoryNewCtrl.clear();
-                    } else {
-                      _categoryPicked = null;
-                    }
-                  });
-                },
-                pickedValue: _categoryPicked,
-                onPickedChanged: (v) =>
-                    setState(() => _categoryPicked = v),
-                newController: _categoryNewCtrl,
-                availableValues: categoriesAvailable,
-                newKey: const Key('custom-material-category-new'),
-                pickKey: const Key('custom-material-category-pick'),
-                errorText: _validateText(l10n, _category),
-              ),
-              const SizedBox(height: Spacing.md),
-
-              // Subcategory
-              _TaxonomyRow(
-                label: l10n.customMaterialFieldSubcategory,
-                mode: _subcategoryMode,
-                onModeChanged: (m) {
-                  setState(() {
-                    _subcategoryMode = m;
-                    if (m == _PickMode.pickExisting) {
-                      _subcategoryNewCtrl.clear();
-                    } else {
-                      _subcategoryPicked = null;
-                    }
-                  });
-                },
-                pickedValue: _subcategoryPicked,
-                onPickedChanged: (v) =>
-                    setState(() => _subcategoryPicked = v),
-                newController: _subcategoryNewCtrl,
-                availableValues: subcategoriesAvailable,
-                newKey: const Key('custom-material-subcategory-new'),
-                pickKey: const Key('custom-material-subcategory-pick'),
-                errorText: _validateText(l10n, _subcategory),
+              // Location — path builder (UI/UX §5.7.2)
+              _LabelRow(
+                label: l10n.customMaterialFieldLocation,
+                required: true,
+                child: _PathBuilder(
+                  l10n: l10n,
+                  availablePaths: availablePaths,
+                  startPath: _startPath,
+                  onStartChanged: _onStartChanged,
+                  startError: _validateStartPath(l10n),
+                  typedControllers: _typedCtrls,
+                  typedErrorFor: (i) => _validateTypedSegment(i, l10n),
+                  onRemoveFrom: _removeFrom,
+                  onAddSubcategory:
+                      _canAddSubcategory ? _addTypedSegment : null,
+                ),
               ),
               const SizedBox(height: Spacing.md),
 
@@ -466,9 +502,7 @@ class _CustomMaterialDialogState
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [
-                    FilteringTextInputFormatter.allow(
-                      RegExp(r'[0-9.]'),
-                    ),
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                   ],
                   decoration: InputDecoration(
                     errorText: _validateLambda(l10n),
@@ -478,7 +512,7 @@ class _CustomMaterialDialogState
               ),
               const SizedBox(height: Spacing.md),
 
-              // Density (optional — UI/UX §5.7.2)
+              // Density (optional)
               _LabelRow(
                 label: l10n.customMaterialFieldDensity,
                 required: false,
@@ -488,9 +522,7 @@ class _CustomMaterialDialogState
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [
-                    FilteringTextInputFormatter.allow(
-                      RegExp(r'[0-9.]'),
-                    ),
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                   ],
                   decoration: InputDecoration(
                     errorText: _validateDensity(l10n),
@@ -500,7 +532,7 @@ class _CustomMaterialDialogState
               ),
               const SizedBox(height: Spacing.md),
 
-              // Specific heat (optional — UI/UX §5.7.2)
+              // Specific heat (optional)
               _LabelRow(
                 label: l10n.customMaterialFieldSpecificHeat,
                 required: false,
@@ -510,9 +542,7 @@ class _CustomMaterialDialogState
                   keyboardType:
                       const TextInputType.numberWithOptions(decimal: true),
                   inputFormatters: [
-                    FilteringTextInputFormatter.allow(
-                      RegExp(r'[0-9.]'),
-                    ),
+                    FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
                   ],
                   decoration: InputDecoration(
                     errorText: _validateSpecificHeat(l10n),
@@ -549,8 +579,9 @@ class _CustomMaterialDialogState
                   const SizedBox(width: Spacing.sm),
                   FilledButton(
                     key: const Key('custom-material-save'),
-                    onPressed:
-                        _canSave(l10n, customs) ? _onSave : null,
+                    onPressed: (_saving || !_isValid(l10n, customs))
+                        ? null
+                        : () => _onSave(customs),
                     child: Text(
                       _isEdit
                           ? l10n.customMaterialButtonSave
@@ -602,88 +633,180 @@ class _LabelRow extends StatelessWidget {
   }
 }
 
-/// The two-segment "Pick existing" / "Create new" toggle row used for
-/// Category and Subcategory.
-class _TaxonomyRow extends StatelessWidget {
-  const _TaxonomyRow({
-    required this.label,
-    required this.mode,
-    required this.onModeChanged,
-    required this.pickedValue,
-    required this.onPickedChanged,
-    required this.newController,
-    required this.availableValues,
-    required this.newKey,
-    required this.pickKey,
-    required this.errorText,
+/// Path builder per UI/UX §5.7.2 / ADR-022 Rule 6.
+class _PathBuilder extends StatelessWidget {
+  const _PathBuilder({
+    required this.l10n,
+    required this.availablePaths,
+    required this.startPath,
+    required this.onStartChanged,
+    required this.startError,
+    required this.typedControllers,
+    required this.typedErrorFor,
+    required this.onRemoveFrom,
+    required this.onAddSubcategory,
   });
 
-  final String label;
-  final _PickMode mode;
-  final ValueChanged<_PickMode> onModeChanged;
-  final String? pickedValue;
-  final ValueChanged<String?> onPickedChanged;
-  final TextEditingController newController;
-  final List<String> availableValues;
-  final Key newKey;
-  final Key pickKey;
-  final String? errorText;
+  final AppLocalizations l10n;
+  final List<List<String>> availablePaths;
+  final List<String>? startPath;
+  final ValueChanged<List<String>?> onStartChanged;
+  final String? startError;
+  final List<TextEditingController> typedControllers;
+  final String? Function(int) typedErrorFor;
+  final ValueChanged<int> onRemoveFrom;
+  final VoidCallback? onAddSubcategory;
 
   @override
   Widget build(BuildContext context) {
-    final l10n = AppLocalizations.of(context)!;
-    final emptyAvailable = availableValues.isEmpty;
-    final effectiveMode =
-        emptyAvailable ? _PickMode.createNew : mode;
-
-    return _LabelRow(
-      label: label,
-      required: true,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          SegmentedButton<_PickMode>(
-            segments: [
-              ButtonSegment(
-                value: _PickMode.pickExisting,
-                label:
-                    Text(l10n.customMaterialTogglePickExisting),
-                tooltip: emptyAvailable
-                    ? l10n
-                        .customMaterialTogglePickExistingDisabledTooltip
-                    : null,
-                enabled: !emptyAvailable,
-              ),
-              ButtonSegment(
-                value: _PickMode.createNew,
-                label: Text(l10n.customMaterialToggleCreateNew),
-              ),
-            ],
-            selected: {effectiveMode},
-            showSelectedIcon: false,
-            onSelectionChanged: (s) => onModeChanged(s.first),
-          ),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // Start under
+        Text(
+          l10n.customMaterialPathStartUnder,
+          style: Theme.of(context).textTheme.labelSmall,
+        ),
+        const SizedBox(height: Spacing.xs),
+        _StartUnderDropdown(
+          l10n: l10n,
+          availablePaths: availablePaths,
+          value: startPath,
+          onChanged: onStartChanged,
+          errorText: startError,
+        ),
+        // Typed extensions stack
+        for (var i = 0; i < typedControllers.length; i++) ...[
           const SizedBox(height: Spacing.xs),
-          if (effectiveMode == _PickMode.pickExisting)
-            DropdownButtonFormField<String>(
-              key: pickKey,
-              initialValue: pickedValue,
-              isExpanded: true,
-              decoration: InputDecoration(
-                isDense: true,
-                errorText: errorText,
-              ),
-              items: [
-                for (final v in availableValues)
-                  DropdownMenuItem(value: v, child: Text(v)),
-              ],
-              onChanged: onPickedChanged,
-            )
-          else
-            TextField(
-              key: newKey,
-              controller: newController,
+          _TypedSegmentRow(
+            depth: i,
+            controller: typedControllers[i],
+            errorText: typedErrorFor(i),
+            onRemove: () => onRemoveFrom(i),
+            keyPrefix: 'custom-material-path-segment-$i',
+          ),
+        ],
+        // + Add subcategory
+        const SizedBox(height: Spacing.xs),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton(
+            key: const Key('custom-material-add-subcategory'),
+            onPressed: onAddSubcategory,
+            child: Text(l10n.customMaterialPathAddSubcategory),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Searchable dropdown listing every existing `categoryPath` plus a
+/// pinned "(root)" option.
+class _StartUnderDropdown extends StatelessWidget {
+  const _StartUnderDropdown({
+    required this.l10n,
+    required this.availablePaths,
+    required this.value,
+    required this.onChanged,
+    required this.errorText,
+  });
+
+  final AppLocalizations l10n;
+  final List<List<String>> availablePaths;
+  final List<String>? value;
+  final ValueChanged<List<String>?> onChanged;
+  final String? errorText;
+
+  /// Pinned-root sentinel exposed through DropdownMenuEntry's value.
+  static const String _rootKey = '__root__';
+
+  String _keyFor(List<String> path) =>
+      path.isEmpty ? _rootKey : breadcrumbFor(path);
+
+  @override
+  Widget build(BuildContext context) {
+    final entries = <DropdownMenuEntry<String>>[
+      DropdownMenuEntry(
+        value: _rootKey,
+        label: l10n.customMaterialPathRootOption,
+      ),
+      for (final p in availablePaths)
+        DropdownMenuEntry(
+          value: breadcrumbFor(p),
+          label: breadcrumbFor(p),
+        ),
+    ];
+
+    return DropdownMenu<String>(
+      key: const Key('custom-material-path-start'),
+      initialSelection: value == null ? null : _keyFor(value!),
+      width: double.infinity,
+      enableFilter: true,
+      enableSearch: true,
+      requestFocusOnTap: true,
+      hintText: l10n.customMaterialPathStartUnderHint,
+      errorText: errorText,
+      menuStyle: const MenuStyle(
+        alignment: AlignmentDirectional.bottomStart,
+      ),
+      onSelected: (selected) {
+        if (selected == null) {
+          onChanged(null);
+          return;
+        }
+        if (selected == _rootKey) {
+          onChanged(_rootPath);
+          return;
+        }
+        final hit = availablePaths.firstWhere(
+          (p) => breadcrumbFor(p) == selected,
+          orElse: () => const <String>[],
+        );
+        onChanged(hit);
+      },
+      dropdownMenuEntries: entries,
+    );
+  }
+}
+
+/// One typed-extension row: depth-indented `└─` glyph + text field + ✕.
+class _TypedSegmentRow extends StatelessWidget {
+  const _TypedSegmentRow({
+    required this.depth,
+    required this.controller,
+    required this.errorText,
+    required this.onRemove,
+    required this.keyPrefix,
+  });
+
+  /// Position in the typed stack (0 = first typed segment). Drives the
+  /// left-indent so the `└─` glyph cascades visually.
+  final int depth;
+  final TextEditingController controller;
+  final String? errorText;
+  final VoidCallback onRemove;
+  final String keyPrefix;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: EdgeInsets.only(left: Spacing.md * (depth + 1).toDouble()),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Text(
+            '└─ ',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+          ),
+          Expanded(
+            child: TextField(
+              key: Key(keyPrefix),
+              controller: controller,
               maxLength: 100,
               decoration: InputDecoration(
                 isDense: true,
@@ -691,6 +814,13 @@ class _TaxonomyRow extends StatelessWidget {
                 counterText: '',
               ),
             ),
+          ),
+          IconButton(
+            key: Key('$keyPrefix-remove'),
+            icon: const Icon(Icons.close, size: 18),
+            tooltip: MaterialLocalizations.of(context).deleteButtonTooltip,
+            onPressed: onRemove,
+          ),
         ],
       ),
     );

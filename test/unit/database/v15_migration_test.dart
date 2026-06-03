@@ -96,7 +96,7 @@ void main() {
                 $db.MaterialEntriesCompanion.insert(
                   id: id,
                   name: name,
-                  category: 'Plaster & Mortar',
+                  categoryPath: '["Plaster & Mortar"]',
                   lambdaDefault: 0.7,
                   densityDefault: 1600,
                   specificHeatDefault: 1000,

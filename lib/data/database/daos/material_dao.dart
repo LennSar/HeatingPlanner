@@ -14,11 +14,12 @@ class MaterialDao extends DatabaseAccessor<AppDatabase>
   /// Creates a [MaterialDao] bound to [db].
   MaterialDao(super.db);
 
-  /// All material entries ordered by [category] then [name].
+  /// All material entries ordered by category path (alphabetic by the
+  /// stored JSON-encoded path) then by [name].
   Stream<List<MaterialEntry>> watchAll() =>
       (select(materialEntries)
             ..orderBy([
-              (t) => OrderingTerm.asc(t.category),
+              (t) => OrderingTerm.asc(t.categoryPath),
               (t) => OrderingTerm.asc(t.name),
             ]))
           .watch();

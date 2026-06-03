@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../calculation/providers/grouped_materials_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/material_entry.dart';
 import '../../l10n/app_localizations.dart';
@@ -275,23 +276,30 @@ class _ManageCustomMaterialsScreenState
         .toList();
   }
 
-  static Map<String, Map<String, List<MaterialEntry>>> _group(
+  /// Groups custom entries by the full `categoryPath` rendered as a
+  /// breadcrumb (UI/UX §5.7.3 / ADR-022 Rule 9). Groups are sorted
+  /// alphabetically by canonical English breadcrumb; entries inside
+  /// each group are sorted by name (case-insensitive).
+  static List<({List<String> path, List<MaterialEntry> entries})> _group(
     List<MaterialEntry> entries,
   ) {
-    final result = <String, Map<String, List<MaterialEntry>>>{};
+    final byKey = <String, List<MaterialEntry>>{};
+    final keyToPath = <String, List<String>>{};
     for (final e in entries) {
-      result
-          .putIfAbsent(e.category, () => {})
-          .putIfAbsent(e.subcategory, () => [])
-          .add(e);
+      final key = breadcrumbFor(e.categoryPath);
+      keyToPath[key] = e.categoryPath;
+      byKey.putIfAbsent(key, () => []).add(e);
     }
-    for (final byCat in result.values) {
-      for (final list in byCat.values) {
-        list.sort((a, b) =>
-            a.name.toLowerCase().compareTo(b.name.toLowerCase()));
-      }
-    }
-    return result;
+    final sortedKeys = byKey.keys.toList()..sort();
+    return [
+      for (final k in sortedKeys)
+        (
+          path: keyToPath[k]!,
+          entries: byKey[k]!
+            ..sort((a, b) =>
+                a.name.toLowerCase().compareTo(b.name.toLowerCase())),
+        ),
+    ];
   }
 }
 
@@ -438,7 +446,9 @@ class _GroupedList extends StatelessWidget {
     required this.onDelete,
   });
 
-  final Map<String, Map<String, List<MaterialEntry>>> grouped;
+  /// One row per distinct `categoryPath`, already sorted alphabetically
+  /// by canonical English breadcrumb per UI/UX §5.7.3 / ADR-022 Rule 9.
+  final List<({List<String> path, List<MaterialEntry> entries})> grouped;
   final bool compact;
   final void Function(MaterialEntry) onEdit;
   final void Function(MaterialEntry) onDelete;
@@ -457,32 +467,23 @@ class _GroupedList extends StatelessWidget {
     }
     return ListView(
       children: [
-        for (final catEntry in grouped.entries) ...[
-          for (final subEntry in catEntry.value.entries) ...[
-            Padding(
-              padding: const EdgeInsets.symmetric(
-                vertical: Spacing.sm,
-              ),
-              child: Text(
-                '${catEntry.key} › ${subEntry.key}',
-                style: Theme.of(context)
-                    .textTheme
-                    .titleSmall
-                    ?.copyWith(
-                      color: Theme.of(context)
-                          .colorScheme
-                          .onSurfaceVariant,
-                    ),
-              ),
+        for (final group in grouped) ...[
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+            child: Text(
+              breadcrumbFor(group.path),
+              style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
             ),
-            for (final mat in subEntry.value)
-              _CustomEntryRow(
-                entry: mat,
-                compact: compact,
-                onEdit: () => onEdit(mat),
-                onDelete: () => onDelete(mat),
-              ),
-          ],
+          ),
+          for (final mat in group.entries)
+            _CustomEntryRow(
+              entry: mat,
+              compact: compact,
+              onEdit: () => onEdit(mat),
+              onDelete: () => onDelete(mat),
+            ),
         ],
       ],
     );

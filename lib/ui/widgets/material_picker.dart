@@ -3,14 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/providers/grouped_materials_provider.dart';
 import '../../core/theme/app_theme.dart';
-import '../../core/utils/material_category_localizer.dart';
 import '../../data/models/localized_catalog_row.dart';
 import '../../data/models/material_entry.dart';
 import '../../l10n/app_localizations.dart';
 import '../../repositories/custom_material_library_service.dart';
 import '../../repositories/material_repository.dart';
 import '../dialogs/custom_material_dialog.dart';
-import 'collapsible_group_tile.dart';
 import 'material_entry_tile.dart';
 
 /// Searchable, grouped material picker for use in the wall construction editor.
@@ -58,7 +56,8 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
     String lowerQuery,
   ) =>
       catalogRowMatchesQuery(entry, lowerQuery) ||
-      entry.row.subcategory.toLowerCase().contains(lowerQuery);
+      entry.row.categoryPath
+          .any((seg) => seg.toLowerCase().contains(lowerQuery));
 
   Future<void> _createCustom() async {
     final newEntry = await showAddCustomMaterialDialog(context);
@@ -140,7 +139,7 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
     final colorScheme = theme.colorScheme;
     final l10n = AppLocalizations.of(context)!;
 
-    final grouped = ref.watch(localizedGroupedMaterialsProvider);
+    final pathGroups = ref.watch(localizedMaterialsByPathProvider);
 
     return Column(
       mainAxisSize: MainAxisSize.min,
@@ -204,7 +203,7 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
                   onDeleteCustom: _deleteCustom,
                 );
               }
-              if (grouped.isEmpty) {
+              if (pathGroups.isEmpty) {
                 return Padding(
                   padding: const EdgeInsets.all(Spacing.md),
                   child: Text(
@@ -215,8 +214,8 @@ class _MaterialPickerState extends ConsumerState<MaterialPicker> {
                   ),
                 );
               }
-              return _GroupedList(
-                grouped: grouped,
+              return _PathGroupedList(
+                groups: pathGroups,
                 onSelected: widget.onSelected,
                 onEditCustom: _editCustom,
                 onDeleteCustom: _deleteCustom,
@@ -337,37 +336,34 @@ class _FlatFilteredList extends StatelessWidget {
   }
 }
 
-// ── Private: grouped list ───────────────────────────────────────────────────
+// ── Private: path-grouped list (ADR-022 Rule 5 / UI/UX §5.7.1 item 4) ──
 
-class _GroupedList extends StatelessWidget {
-  const _GroupedList({
-    required this.grouped,
+class _PathGroupedList extends StatelessWidget {
+  const _PathGroupedList({
+    required this.groups,
     required this.onSelected,
     required this.onEditCustom,
     required this.onDeleteCustom,
   });
 
-  final Map<String, Map<String, List<LocalizedCatalogRow<MaterialEntry>>>>
-      grouped;
+  final List<MaterialPathGroup> groups;
   final void Function(MaterialEntry) onSelected;
   final Future<void> Function(MaterialEntry) onEditCustom;
   final Future<void> Function(MaterialEntry) onDeleteCustom;
 
   Widget _buildMaterialTile(
-    BuildContext context,
-    LocalizedCatalogRow<MaterialEntry> entry, {
-    required int indentLevel,
-  }) {
+    LocalizedCatalogRow<MaterialEntry> entry,
+  ) {
     if (entry.row.isBuiltIn) {
       return MaterialEntryTile(
         entry: entry,
-        indentLevel: indentLevel,
+        indentLevel: 1,
         onTap: () => onSelected(entry.row),
       );
     }
     return _CustomMaterialPickerRow(
       entry: entry,
-      indentLevel: indentLevel,
+      indentLevel: 1,
       onTap: () => onSelected(entry.row),
       onEdit: () => onEditCustom(entry.row),
       onDelete: () => onDeleteCustom(entry.row),
@@ -380,38 +376,40 @@ class _GroupedList extends StatelessWidget {
       padding: EdgeInsets.zero,
       shrinkWrap: true,
       children: [
-        for (final catEntry in grouped.entries)
-          CollapsibleGroupTile(
-            title: localizeMaterialCategory(context, catEntry.key),
-            indentLevel: 0,
-            children: [
-              for (final subcatEntry in catEntry.value.entries)
-                if (subcatEntry.key.isEmpty)
-                  for (final material in subcatEntry.value)
-                    _buildMaterialTile(
-                      context,
-                      material,
-                      indentLevel: 1,
-                    )
-                else
-                  CollapsibleGroupTile(
-                    title: localizeMaterialSubcategory(
-                      context,
-                      subcatEntry.key,
-                    ),
-                    indentLevel: 1,
-                    children: [
-                      for (final material in subcatEntry.value)
-                        _buildMaterialTile(
-                          context,
-                          material,
-                          indentLevel: 2,
-                        ),
-                    ],
-                  ),
-            ],
-          ),
+        for (final group in groups) ...[
+          _BreadcrumbHeader(path: group.path),
+          for (final material in group.entries) _buildMaterialTile(material),
+        ],
       ],
+    );
+  }
+}
+
+/// Non-selectable divider row that renders [path] as a breadcrumb
+/// (`"A › B › C"`) per UI/UX §5.7.1 item 4. Style follows the
+/// `onSurfaceSecondary` design token (i.e. `ColorScheme.onSurfaceVariant`).
+class _BreadcrumbHeader extends StatelessWidget {
+  const _BreadcrumbHeader({required this.path});
+
+  final List<String> path;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(
+        Spacing.sm,
+        Spacing.sm,
+        Spacing.sm,
+        Spacing.xs,
+      ),
+      child: Text(
+        breadcrumbFor(path),
+        style: theme.textTheme.labelMedium?.copyWith(
+          color: theme.colorScheme.onSurfaceVariant,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }

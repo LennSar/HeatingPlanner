@@ -114,7 +114,7 @@ const _wall = WallSegment(
 const _testMaterial = MaterialEntry(
   id: 'mat-001',
   name: 'Solid brick',
-  category: 'Masonry',
+  categoryPath: ['Masonry'],
   lambdaDefault: 0.77,
   densityDefault: 1800,
   specificHeatDefault: 900,

@@ -19,11 +19,10 @@ abstract class MaterialEntry with _$MaterialEntry {
     /// Optional German display name. Falls back to [name] when absent.
     String? nameDe,
 
-    /// Material category string (e.g. "Masonry", "Insulation boards").
-    required String category,
-
-    /// Material subcategory string (e.g. "Historic brick", "Stone wool board").
-    @Default('') String subcategory,
+    /// Ordered taxonomy path (outside → inside), e.g.
+    /// `["Insulation boards", "Wood fibre"]`. Length ≥ 1; each segment
+    /// 1–100 chars and contains no `/`. Per `DECISIONS.md` ADR-022.
+    required List<String> categoryPath,
 
     /// Default thermal conductivity λ in W/(m·K).
     required double lambdaDefault,

@@ -65,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 17;
+  int get schemaVersion => 18;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -91,6 +91,26 @@ class AppDatabase extends _$AppDatabase {
             await heatingDao.seedDefaults();
             await m.database.customStatement('PRAGMA foreign_keys = ON');
             return;
+          }
+          // ADR-022 (v18): drop `category` + `subcategory` from
+          // `material_entries` and add `category_path` carrying the
+          // JSON-encoded path. Order is [category, subcategory]
+          // (outside → inside).
+          if (from < 18) {
+            await m.database.customStatement(
+              "ALTER TABLE material_entries "
+              "ADD COLUMN category_path TEXT NOT NULL DEFAULT '[]'",
+            );
+            await m.database.customStatement(
+              'UPDATE material_entries '
+              'SET category_path = json_array(category, subcategory)',
+            );
+            await m.database.customStatement(
+              'ALTER TABLE material_entries DROP COLUMN subcategory',
+            );
+            await m.database.customStatement(
+              'ALTER TABLE material_entries DROP COLUMN category',
+            );
           }
         },
       );

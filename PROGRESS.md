@@ -48,6 +48,7 @@ This file is maintained by the prompt engineer. Update it whenever the user conf
 | Save wall construction as preset | 🔧 | Prompt generated; `isPreset` added to model + DB migration needed |
 | Load preset in other walls | 🔧 | Part of same prompt |
 | Custom material library (file-backed, shareable) | 🔧 | ADR-021; user-pickable JSON file mirrored into `material_entries`. Two prompts generated: data/service + UI |
+| Material taxonomy as arbitrary-depth path | 🔧 | ADR-022; replaces fixed `category`/`subcategory` with `categoryPath: List<String>`. Two prompts generated: data/migration + UI |
 
 ---
 

@@ -134,8 +134,7 @@ void main() {
                 const MaterialEntry(
                   id: 'mat-016',
                   name: 'Vertical coring brick',
-                  category: 'Masonry',
-                  subcategory: 'Historic brick',
+                  categoryPath: ['Masonry', 'Historic brick'],
                   lambdaDefault: 0.50,
                   densityDefault: 1200,
                   specificHeatDefault: 900,

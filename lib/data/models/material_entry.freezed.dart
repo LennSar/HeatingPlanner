@@ -18,9 +18,10 @@ mixin _$MaterialEntry {
 /// UUID v4 primary key.
  String get id;/// Canonical English display name (1–200 chars).
  String get name;/// Optional German display name. Falls back to [name] when absent.
- String? get nameDe;/// Material category string (e.g. "Masonry", "Insulation boards").
- String get category;/// Material subcategory string (e.g. "Historic brick", "Stone wool board").
- String get subcategory;/// Default thermal conductivity λ in W/(m·K).
+ String? get nameDe;/// Ordered taxonomy path (outside → inside), e.g.
+/// `["Insulation boards", "Wood fibre"]`. Length ≥ 1; each segment
+/// 1–100 chars and contains no `/`. Per `DECISIONS.md` ADR-022.
+ List<String> get categoryPath;/// Default thermal conductivity λ in W/(m·K).
  double get lambdaDefault;/// Default bulk density in kg/m³.
  double get densityDefault;/// Default specific heat capacity in J/(kg·K).
  double get specificHeatDefault;/// True for seed/built-in materials that ship with the application.
@@ -37,16 +38,16 @@ $MaterialEntryCopyWith<MaterialEntry> get copyWith => _$MaterialEntryCopyWithImp
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is MaterialEntry&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.nameDe, nameDe) || other.nameDe == nameDe)&&(identical(other.category, category) || other.category == category)&&(identical(other.subcategory, subcategory) || other.subcategory == subcategory)&&(identical(other.lambdaDefault, lambdaDefault) || other.lambdaDefault == lambdaDefault)&&(identical(other.densityDefault, densityDefault) || other.densityDefault == densityDefault)&&(identical(other.specificHeatDefault, specificHeatDefault) || other.specificHeatDefault == specificHeatDefault)&&(identical(other.isBuiltIn, isBuiltIn) || other.isBuiltIn == isBuiltIn));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is MaterialEntry&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.nameDe, nameDe) || other.nameDe == nameDe)&&const DeepCollectionEquality().equals(other.categoryPath, categoryPath)&&(identical(other.lambdaDefault, lambdaDefault) || other.lambdaDefault == lambdaDefault)&&(identical(other.densityDefault, densityDefault) || other.densityDefault == densityDefault)&&(identical(other.specificHeatDefault, specificHeatDefault) || other.specificHeatDefault == specificHeatDefault)&&(identical(other.isBuiltIn, isBuiltIn) || other.isBuiltIn == isBuiltIn));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,nameDe,category,subcategory,lambdaDefault,densityDefault,specificHeatDefault,isBuiltIn);
+int get hashCode => Object.hash(runtimeType,id,name,nameDe,const DeepCollectionEquality().hash(categoryPath),lambdaDefault,densityDefault,specificHeatDefault,isBuiltIn);
 
 @override
 String toString() {
-  return 'MaterialEntry(id: $id, name: $name, nameDe: $nameDe, category: $category, subcategory: $subcategory, lambdaDefault: $lambdaDefault, densityDefault: $densityDefault, specificHeatDefault: $specificHeatDefault, isBuiltIn: $isBuiltIn)';
+  return 'MaterialEntry(id: $id, name: $name, nameDe: $nameDe, categoryPath: $categoryPath, lambdaDefault: $lambdaDefault, densityDefault: $densityDefault, specificHeatDefault: $specificHeatDefault, isBuiltIn: $isBuiltIn)';
 }
 
 
@@ -57,7 +58,7 @@ abstract mixin class $MaterialEntryCopyWith<$Res>  {
   factory $MaterialEntryCopyWith(MaterialEntry value, $Res Function(MaterialEntry) _then) = _$MaterialEntryCopyWithImpl;
 @useResult
 $Res call({
- String id, String name, String? nameDe, String category, String subcategory, double lambdaDefault, double densityDefault, double specificHeatDefault, bool isBuiltIn
+ String id, String name, String? nameDe, List<String> categoryPath, double lambdaDefault, double densityDefault, double specificHeatDefault, bool isBuiltIn
 });
 
 
@@ -74,14 +75,13 @@ class _$MaterialEntryCopyWithImpl<$Res>
 
 /// Create a copy of MaterialEntry
 /// with the given fields replaced by the non-null parameter values.
-@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? nameDe = freezed,Object? category = null,Object? subcategory = null,Object? lambdaDefault = null,Object? densityDefault = null,Object? specificHeatDefault = null,Object? isBuiltIn = null,}) {
+@pragma('vm:prefer-inline') @override $Res call({Object? id = null,Object? name = null,Object? nameDe = freezed,Object? categoryPath = null,Object? lambdaDefault = null,Object? densityDefault = null,Object? specificHeatDefault = null,Object? isBuiltIn = null,}) {
   return _then(_self.copyWith(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,nameDe: freezed == nameDe ? _self.nameDe : nameDe // ignore: cast_nullable_to_non_nullable
-as String?,category: null == category ? _self.category : category // ignore: cast_nullable_to_non_nullable
-as String,subcategory: null == subcategory ? _self.subcategory : subcategory // ignore: cast_nullable_to_non_nullable
-as String,lambdaDefault: null == lambdaDefault ? _self.lambdaDefault : lambdaDefault // ignore: cast_nullable_to_non_nullable
+as String?,categoryPath: null == categoryPath ? _self.categoryPath : categoryPath // ignore: cast_nullable_to_non_nullable
+as List<String>,lambdaDefault: null == lambdaDefault ? _self.lambdaDefault : lambdaDefault // ignore: cast_nullable_to_non_nullable
 as double,densityDefault: null == densityDefault ? _self.densityDefault : densityDefault // ignore: cast_nullable_to_non_nullable
 as double,specificHeatDefault: null == specificHeatDefault ? _self.specificHeatDefault : specificHeatDefault // ignore: cast_nullable_to_non_nullable
 as double,isBuiltIn: null == isBuiltIn ? _self.isBuiltIn : isBuiltIn // ignore: cast_nullable_to_non_nullable
@@ -170,10 +170,10 @@ return $default(_that);case _:
 /// }
 /// ```
 
-@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  String? nameDe,  String category,  String subcategory,  double lambdaDefault,  double densityDefault,  double specificHeatDefault,  bool isBuiltIn)?  $default,{required TResult orElse(),}) {final _that = this;
+@optionalTypeArgs TResult maybeWhen<TResult extends Object?>(TResult Function( String id,  String name,  String? nameDe,  List<String> categoryPath,  double lambdaDefault,  double densityDefault,  double specificHeatDefault,  bool isBuiltIn)?  $default,{required TResult orElse(),}) {final _that = this;
 switch (_that) {
 case _MaterialEntry() when $default != null:
-return $default(_that.id,_that.name,_that.nameDe,_that.category,_that.subcategory,_that.lambdaDefault,_that.densityDefault,_that.specificHeatDefault,_that.isBuiltIn);case _:
+return $default(_that.id,_that.name,_that.nameDe,_that.categoryPath,_that.lambdaDefault,_that.densityDefault,_that.specificHeatDefault,_that.isBuiltIn);case _:
   return orElse();
 
 }
@@ -191,10 +191,10 @@ return $default(_that.id,_that.name,_that.nameDe,_that.category,_that.subcategor
 /// }
 /// ```
 
-@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  String? nameDe,  String category,  String subcategory,  double lambdaDefault,  double densityDefault,  double specificHeatDefault,  bool isBuiltIn)  $default,) {final _that = this;
+@optionalTypeArgs TResult when<TResult extends Object?>(TResult Function( String id,  String name,  String? nameDe,  List<String> categoryPath,  double lambdaDefault,  double densityDefault,  double specificHeatDefault,  bool isBuiltIn)  $default,) {final _that = this;
 switch (_that) {
 case _MaterialEntry():
-return $default(_that.id,_that.name,_that.nameDe,_that.category,_that.subcategory,_that.lambdaDefault,_that.densityDefault,_that.specificHeatDefault,_that.isBuiltIn);case _:
+return $default(_that.id,_that.name,_that.nameDe,_that.categoryPath,_that.lambdaDefault,_that.densityDefault,_that.specificHeatDefault,_that.isBuiltIn);case _:
   throw StateError('Unexpected subclass');
 
 }
@@ -211,10 +211,10 @@ return $default(_that.id,_that.name,_that.nameDe,_that.category,_that.subcategor
 /// }
 /// ```
 
-@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  String? nameDe,  String category,  String subcategory,  double lambdaDefault,  double densityDefault,  double specificHeatDefault,  bool isBuiltIn)?  $default,) {final _that = this;
+@optionalTypeArgs TResult? whenOrNull<TResult extends Object?>(TResult? Function( String id,  String name,  String? nameDe,  List<String> categoryPath,  double lambdaDefault,  double densityDefault,  double specificHeatDefault,  bool isBuiltIn)?  $default,) {final _that = this;
 switch (_that) {
 case _MaterialEntry() when $default != null:
-return $default(_that.id,_that.name,_that.nameDe,_that.category,_that.subcategory,_that.lambdaDefault,_that.densityDefault,_that.specificHeatDefault,_that.isBuiltIn);case _:
+return $default(_that.id,_that.name,_that.nameDe,_that.categoryPath,_that.lambdaDefault,_that.densityDefault,_that.specificHeatDefault,_that.isBuiltIn);case _:
   return null;
 
 }
@@ -226,7 +226,7 @@ return $default(_that.id,_that.name,_that.nameDe,_that.category,_that.subcategor
 @JsonSerializable()
 
 class _MaterialEntry implements MaterialEntry {
-  const _MaterialEntry({required this.id, required this.name, this.nameDe, required this.category, this.subcategory = '', required this.lambdaDefault, required this.densityDefault, required this.specificHeatDefault, this.isBuiltIn = true});
+  const _MaterialEntry({required this.id, required this.name, this.nameDe, required final  List<String> categoryPath, required this.lambdaDefault, required this.densityDefault, required this.specificHeatDefault, this.isBuiltIn = true}): _categoryPath = categoryPath;
   factory _MaterialEntry.fromJson(Map<String, dynamic> json) => _$MaterialEntryFromJson(json);
 
 /// UUID v4 primary key.
@@ -235,10 +235,19 @@ class _MaterialEntry implements MaterialEntry {
 @override final  String name;
 /// Optional German display name. Falls back to [name] when absent.
 @override final  String? nameDe;
-/// Material category string (e.g. "Masonry", "Insulation boards").
-@override final  String category;
-/// Material subcategory string (e.g. "Historic brick", "Stone wool board").
-@override@JsonKey() final  String subcategory;
+/// Ordered taxonomy path (outside → inside), e.g.
+/// `["Insulation boards", "Wood fibre"]`. Length ≥ 1; each segment
+/// 1–100 chars and contains no `/`. Per `DECISIONS.md` ADR-022.
+ final  List<String> _categoryPath;
+/// Ordered taxonomy path (outside → inside), e.g.
+/// `["Insulation boards", "Wood fibre"]`. Length ≥ 1; each segment
+/// 1–100 chars and contains no `/`. Per `DECISIONS.md` ADR-022.
+@override List<String> get categoryPath {
+  if (_categoryPath is EqualUnmodifiableListView) return _categoryPath;
+  // ignore: implicit_dynamic_type
+  return EqualUnmodifiableListView(_categoryPath);
+}
+
 /// Default thermal conductivity λ in W/(m·K).
 @override final  double lambdaDefault;
 /// Default bulk density in kg/m³.
@@ -261,16 +270,16 @@ Map<String, dynamic> toJson() {
 
 @override
 bool operator ==(Object other) {
-  return identical(this, other) || (other.runtimeType == runtimeType&&other is _MaterialEntry&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.nameDe, nameDe) || other.nameDe == nameDe)&&(identical(other.category, category) || other.category == category)&&(identical(other.subcategory, subcategory) || other.subcategory == subcategory)&&(identical(other.lambdaDefault, lambdaDefault) || other.lambdaDefault == lambdaDefault)&&(identical(other.densityDefault, densityDefault) || other.densityDefault == densityDefault)&&(identical(other.specificHeatDefault, specificHeatDefault) || other.specificHeatDefault == specificHeatDefault)&&(identical(other.isBuiltIn, isBuiltIn) || other.isBuiltIn == isBuiltIn));
+  return identical(this, other) || (other.runtimeType == runtimeType&&other is _MaterialEntry&&(identical(other.id, id) || other.id == id)&&(identical(other.name, name) || other.name == name)&&(identical(other.nameDe, nameDe) || other.nameDe == nameDe)&&const DeepCollectionEquality().equals(other._categoryPath, _categoryPath)&&(identical(other.lambdaDefault, lambdaDefault) || other.lambdaDefault == lambdaDefault)&&(identical(other.densityDefault, densityDefault) || other.densityDefault == densityDefault)&&(identical(other.specificHeatDefault, specificHeatDefault) || other.specificHeatDefault == specificHeatDefault)&&(identical(other.isBuiltIn, isBuiltIn) || other.isBuiltIn == isBuiltIn));
 }
 
 @JsonKey(includeFromJson: false, includeToJson: false)
 @override
-int get hashCode => Object.hash(runtimeType,id,name,nameDe,category,subcategory,lambdaDefault,densityDefault,specificHeatDefault,isBuiltIn);
+int get hashCode => Object.hash(runtimeType,id,name,nameDe,const DeepCollectionEquality().hash(_categoryPath),lambdaDefault,densityDefault,specificHeatDefault,isBuiltIn);
 
 @override
 String toString() {
-  return 'MaterialEntry(id: $id, name: $name, nameDe: $nameDe, category: $category, subcategory: $subcategory, lambdaDefault: $lambdaDefault, densityDefault: $densityDefault, specificHeatDefault: $specificHeatDefault, isBuiltIn: $isBuiltIn)';
+  return 'MaterialEntry(id: $id, name: $name, nameDe: $nameDe, categoryPath: $categoryPath, lambdaDefault: $lambdaDefault, densityDefault: $densityDefault, specificHeatDefault: $specificHeatDefault, isBuiltIn: $isBuiltIn)';
 }
 
 
@@ -281,7 +290,7 @@ abstract mixin class _$MaterialEntryCopyWith<$Res> implements $MaterialEntryCopy
   factory _$MaterialEntryCopyWith(_MaterialEntry value, $Res Function(_MaterialEntry) _then) = __$MaterialEntryCopyWithImpl;
 @override @useResult
 $Res call({
- String id, String name, String? nameDe, String category, String subcategory, double lambdaDefault, double densityDefault, double specificHeatDefault, bool isBuiltIn
+ String id, String name, String? nameDe, List<String> categoryPath, double lambdaDefault, double densityDefault, double specificHeatDefault, bool isBuiltIn
 });
 
 
@@ -298,14 +307,13 @@ class __$MaterialEntryCopyWithImpl<$Res>
 
 /// Create a copy of MaterialEntry
 /// with the given fields replaced by the non-null parameter values.
-@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? nameDe = freezed,Object? category = null,Object? subcategory = null,Object? lambdaDefault = null,Object? densityDefault = null,Object? specificHeatDefault = null,Object? isBuiltIn = null,}) {
+@override @pragma('vm:prefer-inline') $Res call({Object? id = null,Object? name = null,Object? nameDe = freezed,Object? categoryPath = null,Object? lambdaDefault = null,Object? densityDefault = null,Object? specificHeatDefault = null,Object? isBuiltIn = null,}) {
   return _then(_MaterialEntry(
 id: null == id ? _self.id : id // ignore: cast_nullable_to_non_nullable
 as String,name: null == name ? _self.name : name // ignore: cast_nullable_to_non_nullable
 as String,nameDe: freezed == nameDe ? _self.nameDe : nameDe // ignore: cast_nullable_to_non_nullable
-as String?,category: null == category ? _self.category : category // ignore: cast_nullable_to_non_nullable
-as String,subcategory: null == subcategory ? _self.subcategory : subcategory // ignore: cast_nullable_to_non_nullable
-as String,lambdaDefault: null == lambdaDefault ? _self.lambdaDefault : lambdaDefault // ignore: cast_nullable_to_non_nullable
+as String?,categoryPath: null == categoryPath ? _self._categoryPath : categoryPath // ignore: cast_nullable_to_non_nullable
+as List<String>,lambdaDefault: null == lambdaDefault ? _self.lambdaDefault : lambdaDefault // ignore: cast_nullable_to_non_nullable
 as double,densityDefault: null == densityDefault ? _self.densityDefault : densityDefault // ignore: cast_nullable_to_non_nullable
 as double,specificHeatDefault: null == specificHeatDefault ? _self.specificHeatDefault : specificHeatDefault // ignore: cast_nullable_to_non_nullable
 as double,isBuiltIn: null == isBuiltIn ? _self.isBuiltIn : isBuiltIn // ignore: cast_nullable_to_non_nullable

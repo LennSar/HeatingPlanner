@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import '../core/utils/category_path_codec.dart';
 import '../data/database/app_database.dart' as $db;
 import '../data/models/distributor.dart';
 import '../data/models/door.dart';
@@ -246,7 +247,7 @@ class HspExporter {
       MaterialEntry(
         id: row.id,
         name: row.name,
-        category: row.category,
+        categoryPath: decodeCategoryPath(row.categoryPath),
         lambdaDefault: row.lambdaDefault,
         densityDefault: row.densityDefault,
         specificHeatDefault: row.specificHeatDefault,

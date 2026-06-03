@@ -2414,17 +2414,47 @@ abstract class AppLocalizations {
   /// **'Name'**
   String get customMaterialFieldName;
 
-  /// Field label — taxonomy category (UI/UX §5.7.2)
+  /// Field label — taxonomy location (path builder). UI/UX §5.7.2 (ADR-022).
   ///
   /// In en, this message translates to:
-  /// **'Category'**
-  String get customMaterialFieldCategory;
+  /// **'Location'**
+  String get customMaterialFieldLocation;
 
-  /// Field label — taxonomy subcategory (UI/UX §5.7.2)
+  /// Path-builder sub-label — dropdown of existing categoryPaths the new material can be anchored under. UI/UX §5.7.2 (ADR-022).
   ///
   /// In en, this message translates to:
-  /// **'Subcategory'**
-  String get customMaterialFieldSubcategory;
+  /// **'Start under'**
+  String get customMaterialPathStartUnder;
+
+  /// Special option in the 'Start under' dropdown that anchors the new material at top level (empty prefix). UI/UX §5.7.2 (ADR-022).
+  ///
+  /// In en, this message translates to:
+  /// **'(root)'**
+  String get customMaterialPathRootOption;
+
+  /// Button below the typed-extensions stack that appends a fresh empty editable segment. UI/UX §5.7.2 (ADR-022).
+  ///
+  /// In en, this message translates to:
+  /// **'+ Add subcategory'**
+  String get customMaterialPathAddSubcategory;
+
+  /// Hint/placeholder on the 'Start under' dropdown; also the inline error shown on Save when the dropdown is empty. UI/UX §5.7.2 (ADR-022).
+  ///
+  /// In en, this message translates to:
+  /// **'Pick a starting location'**
+  String get customMaterialPathStartUnderHint;
+
+  /// Inline error shown beneath a typed extension segment whose value is empty after trim. UI/UX §5.7.2 (ADR-022).
+  ///
+  /// In en, this message translates to:
+  /// **'Subcategory name required'**
+  String get customMaterialPathSegmentRequired;
+
+  /// Inline error shown beneath a typed extension segment that contains '/' (reserved for the breadcrumb separator). UI/UX §5.7.2 (ADR-022).
+  ///
+  /// In en, this message translates to:
+  /// **'Must not contain \'/\''**
+  String get customMaterialPathSegmentNoSlash;
 
   /// Field label — manufacturer (optional)
   ///
@@ -2461,24 +2491,6 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Source URL'**
   String get customMaterialFieldSourceUrl;
-
-  /// Toggle segment label — pick from existing taxonomy values (UI/UX §5.7.2)
-  ///
-  /// In en, this message translates to:
-  /// **'Pick existing'**
-  String get customMaterialTogglePickExisting;
-
-  /// Toggle segment label — type a new taxonomy value (UI/UX §5.7.2)
-  ///
-  /// In en, this message translates to:
-  /// **'Create new'**
-  String get customMaterialToggleCreateNew;
-
-  /// Tooltip on the disabled 'Pick existing' segment when no taxonomy values exist yet
-  ///
-  /// In en, this message translates to:
-  /// **'No existing categories yet — create the first one'**
-  String get customMaterialTogglePickExistingDisabledTooltip;
 
   /// Custom material dialog — Cancel button
   ///

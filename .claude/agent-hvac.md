@@ -605,9 +605,12 @@ Provide this JSON array. The MaterialDao seeds the Drift database on first app l
 
 The database contains **136 materials** across 10 categories and 33 subcategories, sourced from DIN 4108-4 design values, AMz-Bericht 8/2005 (historic masonry), and current manufacturer datasheets (STEICO, Kingspan, Rockwool, Knauf, Isover, Celotex, Wienerberger, Xella/Ytong, isofloc, Homatherm, Climacell). See the reference spreadsheet `materials_database.xlsx` for a human-readable version with full source attribution.
 
-### 7.1 Category / Subcategory Hierarchy
+### 7.1 Category Hierarchy
 
-The material picker uses a 3-level tree: **Category → Subcategory → Material**
+The material picker groups entries by full `categoryPath`
+(`DECISIONS.md` ADR-022). The built-in library uses 2-segment paths
+matching the table below — `Category → Subcategory`. Custom
+materials may extend any node with arbitrarily many segments.
 
 | Category | Subcategories | Count | λ range [W/(m·K)] |
 |----------|---------------|-------|-------------------|
@@ -629,8 +632,7 @@ Each entry follows this schema (full data is in `assets/materials.json`, not inl
 {
   "id": "mat-090",
   "name": "Rockwool Sonorock 035",
-  "category": "Insulation boards",
-  "subcategory": "Stone wool board",
+  "categoryPath": ["Insulation boards", "Stone wool board"],
   "manufacturer": "Rockwool",
   "lambdaDefault": 0.035,
   "densityDefault": 50,
@@ -639,6 +641,14 @@ Each entry follows this schema (full data is in `assets/materials.json`, not inl
   "notes": "Partition wall slab"
 }
 ```
+
+Per `DECISIONS.md` ADR-022 the legacy `category` / `subcategory`
+fields are replaced by a single `categoryPath: List<String>`. The
+built-in library uses 2-segment paths exactly equivalent to the
+prior `(category, subcategory)` tuples (§7.1 table). When
+regenerating `assets/materials.json` map each row by
+`categoryPath = [<category>, <subcategory>]` — no semantic change
+to the built-in taxonomy.
 
 ### 7.3 Key Manufacturers
 

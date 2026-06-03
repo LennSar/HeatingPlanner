@@ -515,7 +515,7 @@ The material field on each layer row is a **searchable dropdown** — tapping it
 
 3. **"Manage custom materials…" row**, pinned at the bottom of the dropdown (below the grouped entries). Always visible and always enabled (ADR-021 Rule 14). Tapping opens the Manage Custom Materials screen (§5.7.3) and closes the dropdown.
 
-4. **Grouped entries** below the "+ New custom material…" row. Materials are grouped by top-level category, derived by stripping the sub-category suffix (e.g. "Masonry - Historic" and "Masonry - Modern" both fold under a **"Masonry"** header). Group headers are non-selectable divider rows styled in `onSurfaceSecondary`. Order of groups: the built-in categories listed in `agent-hvac.md` §7.1 first, then any custom-only categories alphabetically. When the search field is non-empty, group headers are hidden and a flat filtered list is shown.
+4. **Grouped entries** below the "+ New custom material…" row. Materials are grouped by their full `categoryPath` rendered as a breadcrumb (`"Insulation boards › Wood fibre"`) — per `DECISIONS.md` ADR-022 the taxonomy is an arbitrary-depth path. Group headers are non-selectable divider rows styled in `onSurfaceSecondary` and sort **alphabetically by full path** (built-in and custom interleave naturally — the prior "built-in first" hint is retired with ADR-022). When the search field is non-empty, group headers are hidden and a flat filtered list is shown.
 
 5. Each material entry shows the material name and λ value in secondary text (e.g. "λ 0.035 W/(m·K)"). Custom entries (`isBuiltIn = false`) are tagged with a small "*Custom*" chip in `primaryLight` next to the name to distinguish them at a glance — colour is not the sole indicator (accessibility §11).
 
@@ -555,21 +555,17 @@ screen (§5.7.3). Modal dialog (`showDialog` on desktop,
 │                                                        │
 │  Name *           [_________________________________] │
 │                                                        │
-│  Category *       ( ) Pick existing  (●) Create new   │
-│                   ┌────────────────┐  ┌─────────────┐ │
-│                   │ Masonry      ▾ │  │ My Category │ │
-│                   └────────────────┘  └─────────────┘ │
-│                                                        │
-│  Subcategory *    ( ) Pick existing  (●) Create new   │
-│                   ┌────────────────┐  ┌─────────────┐ │
-│                   │ Historic brick▾│  │ My Sub      │ │
-│                   └────────────────┘  └─────────────┘ │
+│  Location *                                            │
+│    Start under   [ Insulation boards            ▾ ]   │  ← any existing path, or (root)
+│       └─ [ custom insulations         ]  [✕]          │  ← typed segment
+│          └─ [ funky new materials     ]  [✕]          │  ← typed segment
+│             [ + Add subcategory ]                     │  ← appears below the last segment
 │                                                        │
 │  Manufacturer     [Custom_________________________]    │
 │                                                        │
 │  λ  (W/(m·K)) *   [0.035____]                          │
-│  Density (kg/m³) *[50_______]                          │
-│  Spec. heat *     [1030_____]   J/(kg·K)               │
+│  Density (kg/m³)  [50_______]                          │
+│  Spec. heat      [1030_____]   J/(kg·K)                │
 │  Source URL       [https://________________________]   │
 │                                                        │
 │              [ Cancel ]    [ Save ]                    │
@@ -581,8 +577,7 @@ screen (§5.7.3). Modal dialog (`showDialog` on desktop,
 | Field | Required | Type | Range / rule |
 |-------|----------|------|--------------|
 | Name | yes | Text | 1–200 chars; must be unique among custom materials (case-insensitive) — error message *"A custom material with this name already exists"* |
-| Category | yes | Toggle + control | See **Category / subcategory toggle** below; 1–100 chars when typed |
-| Subcategory | yes | Toggle + control | Same as category; 1–100 chars when typed |
+| Location (`categoryPath`) | yes | Path builder | See **Path builder** below. Final path length ≥ 1; each segment trimmed 1–100 chars, no `/`. Per `DECISIONS.md` ADR-022. |
 | Manufacturer | no | Text | 0–100 chars; defaults to "Custom" when blank |
 | λ | yes | Numeric | 0.005 – 50.0 W/(m·K) per `minLambda` / `maxLambda` |
 | Density | **no** | Numeric | If blank, stored as `0.0` (sentinel for "unknown" — no current calculation reads density). If non-blank, must satisfy 1.0 – 10 000.0 kg/m³ per `minDensity` / `maxDensity`. |
@@ -596,21 +591,48 @@ Invalid values show an inline error in `errorRed` directly beneath the
 field. The **Save** button is disabled until all required fields are
 valid; the **Cancel** button always works.
 
-**Category / subcategory toggle.** Each row has a two-segment toggle:
+**Path builder.** Replaces the prior two-toggle category/subcategory
+section. Per `DECISIONS.md` ADR-022 the taxonomy is an arbitrary-depth
+path; this control lets the user anchor at any existing node and
+extend with any number of new segments.
 
-- **Pick existing** — a dropdown listing every distinct value
-  currently present in `material_entries` for that level. Categories
-  are union of built-in + custom; subcategories are filtered to the
-  selected category. If no categories exist yet, the toggle starts on
-  **Create new**, and **Pick existing** is disabled with a tooltip
-  *"No existing categories yet — create the first one"*.
-- **Create new** — a text field. Validation: 1–100 chars, trimmed; an
-  empty value blocks Save.
+- **Start under** — a single dropdown listing every distinct existing
+  `categoryPath` in `material_entries`, rendered as breadcrumbs
+  (`"Insulation boards › Stone wool board"`). Sorted alphabetically by
+  full path. A special **"(root)"** option is pinned to the top; it
+  anchors the new material at top-level (empty prefix). The dropdown
+  is searchable (type to filter). Default selection in Add mode:
+  "(root)" when no existing paths exist, otherwise leave the field
+  empty and surface inline error *"Pick a starting location"* on
+  Save-attempt with the field unset.
 
-Switching toggles clears the inactive control's value. Subcategory's
-"Pick existing" dropdown is filtered by the **currently chosen
-category value**, regardless of whether that value came from the
-existing-categories dropdown or a freshly-typed new category.
+- **Typed extensions** — below the Start picker, a vertical stack of
+  editable text fields, one per appended segment, indented visually
+  to convey nesting (└─ glyph). Each field has a trailing **✕**
+  button that removes that segment **and every segment below it**
+  (cascade). Segments are validated per the table row: trimmed,
+  1–100 chars, no `/`. An empty typed segment blocks Save with inline
+  error *"Subcategory name required"*.
+
+- **+ Add subcategory** — button below the last typed segment (or
+  directly below the Start picker when no segments have been added).
+  Tapping appends a fresh empty editable row and focuses it. The
+  button is **disabled** while the current last segment is empty —
+  finish the in-progress segment first.
+
+- **Duplicate-of-existing-sibling is allowed.** If the user types a
+  segment whose name matches an existing child of the chosen parent,
+  the material simply joins that existing bucket on Save — no
+  warning, no merge dialog. The picker's group-by-path query
+  collapses them naturally.
+
+- **Edit mode pre-fill** — "Start under" preselects the material's
+  current `categoryPath[:-1]` (or "(root)" when the path is length 1)
+  and the last segment is pre-populated as the single typed field.
+  The user can freely rename, delete, or extend from there.
+
+**Save** computes `categoryPath = startPath + typedSegments`.
+`startPath = []` when the user selected "(root)".
 
 **Save.**
 - New material: generates a UUID v4 `id`, calls
@@ -673,10 +695,11 @@ desktop.
 - Library path summary with **Browse…**, **Clear**, **Reload from
   file** buttons (mirrors Settings §9.2).
 - Search field that filters across name / manufacturer.
-- Grouped list using the same `category › subcategory` taxonomy as the
-  picker dropdown, listing only `isBuiltIn = false` entries. Empty
-  state: *"No custom materials yet. Press **+ Add** to create your
-  first one."*
+- Grouped list using the full `categoryPath` breadcrumb taxonomy
+  (`"A › B › C"`) per `DECISIONS.md` ADR-022, listing only
+  `isBuiltIn = false` entries. Groups sorted alphabetically by full
+  path. Empty state: *"No custom materials yet. Press **+ Add** to
+  create your first one."*
 
 **Row affordances.**
 - **Edit** button → opens §5.7.2 in edit mode pre-filled with the

@@ -347,8 +347,7 @@ class EditorStateNotifier extends Notifier<EditorState>
     return MaterialEntry(
       id: materialId,
       name: materialId,
-      category: 'Masonry',
-      subcategory: 'Historic brick',
+      categoryPath: const ['Masonry', 'Historic brick'],
       lambdaDefault: 0.50,
       densityDefault: 1200,
       specificHeatDefault: 900,

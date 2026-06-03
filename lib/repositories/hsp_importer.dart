@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:drift/drift.dart' show Value;
 import 'package:uuid/uuid.dart';
 
+import '../core/utils/category_path_codec.dart';
 import '../data/database/app_database.dart' as $db;
 import '../data/models/enums.dart';
 
@@ -243,17 +244,29 @@ class HspImporter {
   $db.MaterialEntriesCompanion _customMaterialCompanion(
     Map<String, dynamic> d,
     String Function(String) fresh,
-  ) =>
-      $db.MaterialEntriesCompanion.insert(
-        id: fresh(d['id'] as String),
-        name: d['name'] as String,
-        category: d['category'] as String,
-        lambdaDefault: _double(d, 'lambdaDefault'),
-        densityDefault: _double(d, 'densityDefault'),
-        specificHeatDefault:
-            _double(d, 'specificHeatDefault'),
-        isBuiltIn: const Value(false),
-      );
+  ) {
+    // ADR-022: post-v18 exports carry `categoryPath`. Legacy `.hsp`
+    // snapshots taken before ADR-022 still carry `category` (+ optional
+    // `subcategory`); reconstruct the path from them so old projects
+    // import without loss.
+    final List<String> path;
+    if (d['categoryPath'] is List) {
+      path = (d['categoryPath'] as List).map((e) => e as String).toList();
+    } else {
+      final cat = (d['category'] as String?) ?? '';
+      final sub = (d['subcategory'] as String?) ?? '';
+      path = sub.isEmpty ? [cat] : [cat, sub];
+    }
+    return $db.MaterialEntriesCompanion.insert(
+      id: fresh(d['id'] as String),
+      name: d['name'] as String,
+      categoryPath: encodeCategoryPath(path),
+      lambdaDefault: _double(d, 'lambdaDefault'),
+      densityDefault: _double(d, 'densityDefault'),
+      specificHeatDefault: _double(d, 'specificHeatDefault'),
+      isBuiltIn: const Value(false),
+    );
+  }
 
   $db.ProjectsCompanion _projectCompanion(
     Map<String, dynamic> d,

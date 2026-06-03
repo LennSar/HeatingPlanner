@@ -11,8 +11,9 @@ _MaterialEntry _$MaterialEntryFromJson(Map<String, dynamic> json) =>
       id: json['id'] as String,
       name: json['name'] as String,
       nameDe: json['nameDe'] as String?,
-      category: json['category'] as String,
-      subcategory: json['subcategory'] as String? ?? '',
+      categoryPath: (json['categoryPath'] as List<dynamic>)
+          .map((e) => e as String)
+          .toList(),
       lambdaDefault: (json['lambdaDefault'] as num).toDouble(),
       densityDefault: (json['densityDefault'] as num).toDouble(),
       specificHeatDefault: (json['specificHeatDefault'] as num).toDouble(),
@@ -24,8 +25,7 @@ Map<String, dynamic> _$MaterialEntryToJson(_MaterialEntry instance) =>
       'id': instance.id,
       'name': instance.name,
       'nameDe': instance.nameDe,
-      'category': instance.category,
-      'subcategory': instance.subcategory,
+      'categoryPath': instance.categoryPath,
       'lambdaDefault': instance.lambdaDefault,
       'densityDefault': instance.densityDefault,
       'specificHeatDefault': instance.specificHeatDefault,

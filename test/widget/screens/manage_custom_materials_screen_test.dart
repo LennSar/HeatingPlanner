@@ -49,8 +49,7 @@ class _FixedPathNotifier extends CustomMaterialLibraryPathNotifier {
 const _entry = MaterialEntry(
   id: 'mat-custom',
   name: 'Custom hempcrete',
-  category: 'Insulation boards',
-  subcategory: 'Bio-based',
+  categoryPath: ['Insulation boards', 'Bio-based'],
   lambdaDefault: 0.07,
   densityDefault: 275,
   specificHeatDefault: 1700,

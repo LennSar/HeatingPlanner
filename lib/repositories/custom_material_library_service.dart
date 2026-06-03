@@ -8,17 +8,23 @@ import 'package:logging/logging.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 
+import '../core/utils/category_path_codec.dart';
 import '../core/utils/id_generator.dart';
 import '../data/database/app_database.dart' as $db;
 import '../data/models/material_entry.dart';
 import 'app_preferences.dart';
 
 /// File-format version embedded in the JSON library file.
-const String _libraryFileFormatVersion = '1.0';
+///
+/// `"1.1"` is the post-ADR-022 shape (entries carry `categoryPath`).
+/// `"1.0"` files (with `category` + `subcategory`) are still accepted
+/// by [CustomMaterialLibraryService._decodeLibraryFile] and migrated on
+/// load.
+const String _libraryFileFormatVersion = '1.1';
 
 /// Skeleton content used when bootstrapping a fresh library file
 /// (Rule 14).
-const String _emptyLibrarySkeleton = '{"version":"1.0","materials":[]}';
+const String _emptyLibrarySkeleton = '{"version":"1.1","materials":[]}';
 
 /// Default sub-directory under the application documents directory
 /// that hosts the default custom-material library file (Rule 14).
@@ -84,12 +90,13 @@ class CustomMaterialLibraryService {
   AppPreferences get _prefs => _ref.read(appPreferencesProvider);
 
   /// Reactive stream of all custom material entries, ordered by
-  /// category then name.
+  /// category path (alphabetic by the stored JSON-encoded path) then by
+  /// name.
   Stream<List<MaterialEntry>> watchCustom() {
     return (_db.select(_db.materialEntries)
           ..where((t) => t.isBuiltIn.equals(false))
           ..orderBy([
-            (t) => drift.OrderingTerm.asc(t.category),
+            (t) => drift.OrderingTerm.asc(t.categoryPath),
             (t) => drift.OrderingTerm.asc(t.name),
           ]))
         .watch()
@@ -327,7 +334,7 @@ class CustomMaterialLibraryService {
     final rows = await (_db.select(_db.materialEntries)
           ..where((t) => t.isBuiltIn.equals(false))
           ..orderBy([
-            (t) => drift.OrderingTerm.asc(t.category),
+            (t) => drift.OrderingTerm.asc(t.categoryPath),
             (t) => drift.OrderingTerm.asc(t.name),
           ]))
         .get();
@@ -372,6 +379,14 @@ class CustomMaterialLibraryService {
         throw const FormatException('Each material entry must be an object');
       }
       final json = Map<String, dynamic>.from(raw)..['isBuiltIn'] = false;
+      // ADR-022 Rule 4: legacy `1.0` entries carry `category` and
+      // `subcategory` strings. Synthesise `categoryPath` from them and
+      // drop the obsolete keys before handing to `fromJson`.
+      if (!json.containsKey('categoryPath')) {
+        final cat = json.remove('category') as String? ?? '';
+        final sub = json.remove('subcategory') as String? ?? '';
+        json['categoryPath'] = sub.isEmpty ? [cat] : [cat, sub];
+      }
       result.add(MaterialEntry.fromJson(json));
     }
     return result;
@@ -385,8 +400,7 @@ MaterialEntry _entryFromRow($db.MaterialEntry row) {
     id: row.id,
     name: row.name,
     nameDe: row.nameDe,
-    category: row.category,
-    subcategory: row.subcategory,
+    categoryPath: decodeCategoryPath(row.categoryPath),
     lambdaDefault: row.lambdaDefault,
     densityDefault: row.densityDefault,
     specificHeatDefault: row.specificHeatDefault,
@@ -399,8 +413,7 @@ $db.MaterialEntriesCompanion _entryToCompanion(MaterialEntry entry) {
     id: drift.Value(entry.id),
     name: drift.Value(entry.name),
     nameDe: drift.Value(entry.nameDe),
-    category: drift.Value(entry.category),
-    subcategory: drift.Value(entry.subcategory),
+    categoryPath: drift.Value(encodeCategoryPath(entry.categoryPath)),
     lambdaDefault: drift.Value(entry.lambdaDefault),
     densityDefault: drift.Value(entry.densityDefault),
     specificHeatDefault: drift.Value(entry.specificHeatDefault),

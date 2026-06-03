@@ -31,7 +31,7 @@ void main() {
             $db.MaterialEntriesCompanion.insert(
               id: 'm-translated',
               name: 'Solid brick',
-              category: 'Masonry',
+              categoryPath: '["Masonry"]',
               lambdaDefault: 0.77,
               densityDefault: 1900,
               specificHeatDefault: 900,
@@ -51,7 +51,7 @@ void main() {
               $db.MaterialEntriesCompanion.insert(
                 id: 'm-untranslated',
                 name: 'User custom material',
-                category: 'Masonry',
+                categoryPath: '["Masonry"]',
                 lambdaDefault: 0.42,
                 densityDefault: 800,
                 specificHeatDefault: 900,
@@ -73,7 +73,7 @@ void main() {
             $db.MaterialEntriesCompanion.insert(
               id: 'm-en',
               name: 'Solid brick',
-              category: 'Masonry',
+              categoryPath: '["Masonry"]',
               lambdaDefault: 0.77,
               densityDefault: 1900,
               specificHeatDefault: 900,

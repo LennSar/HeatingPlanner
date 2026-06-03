@@ -1282,10 +1282,25 @@ class AppLocalizationsEn extends AppLocalizations {
   String get customMaterialFieldName => 'Name';
 
   @override
-  String get customMaterialFieldCategory => 'Category';
+  String get customMaterialFieldLocation => 'Location';
 
   @override
-  String get customMaterialFieldSubcategory => 'Subcategory';
+  String get customMaterialPathStartUnder => 'Start under';
+
+  @override
+  String get customMaterialPathRootOption => '(root)';
+
+  @override
+  String get customMaterialPathAddSubcategory => '+ Add subcategory';
+
+  @override
+  String get customMaterialPathStartUnderHint => 'Pick a starting location';
+
+  @override
+  String get customMaterialPathSegmentRequired => 'Subcategory name required';
+
+  @override
+  String get customMaterialPathSegmentNoSlash => 'Must not contain \'/\'';
 
   @override
   String get customMaterialFieldManufacturer => 'Manufacturer';
@@ -1304,16 +1319,6 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get customMaterialFieldSourceUrl => 'Source URL';
-
-  @override
-  String get customMaterialTogglePickExisting => 'Pick existing';
-
-  @override
-  String get customMaterialToggleCreateNew => 'Create new';
-
-  @override
-  String get customMaterialTogglePickExistingDisabledTooltip =>
-      'No existing categories yet — create the first one';
 
   @override
   String get customMaterialButtonCancel => 'Cancel';

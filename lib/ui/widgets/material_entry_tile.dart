@@ -12,10 +12,10 @@ import '../../data/models/material_entry.dart';
 /// Tapping the row invokes [onTap].
 ///
 /// [indentLevel] controls left-padding depth so material rows nest cleanly
-/// inside [CollapsibleGroupTile] headers:
+/// below breadcrumb group headers:
 /// - 0 → [Spacing.sm] (8 px) — flat/ungrouped use
-/// - 1 → [Spacing.sm] + [Spacing.md] (24 px) — under a category header
-/// - 2 → [Spacing.sm] + 2 × [Spacing.md] (40 px) — under a subcategory header (default)
+/// - 1 → [Spacing.sm] + [Spacing.md] (24 px) — under a path-group header (default
+///   for the picker post-ADR-022)
 ///
 /// **Note:** `MaterialEntry` does not currently store the manufacturer string
 /// (it is present in `assets/materials.json` but was not mapped into the
@@ -39,8 +39,8 @@ class MaterialEntryTile extends StatelessWidget {
 
   /// Nesting depth that determines left padding.
   ///
-  /// Matches the [CollapsibleGroupTile.indentLevel] convention:
-  /// 0 = top, 1 = subcategory peer, 2 = leaf material row (default).
+  /// 0 = top-level / flat list; 1 = under a breadcrumb group header
+  /// (the new default post-ADR-022 picker rendering).
   final int indentLevel;
 
   /// Secondary label: λ value formatted to 3 d.p. with unit.

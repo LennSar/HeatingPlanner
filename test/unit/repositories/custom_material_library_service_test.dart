@@ -12,6 +12,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:drift/drift.dart' show Value;
+import 'package:heating_planner/core/utils/category_path_codec.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -27,8 +28,7 @@ import 'package:shared_preferences_platform_interface/shared_preferences_async_p
 MaterialEntry _sampleEntry({
   String id = 'mat-1',
   String name = 'Hempcrete',
-  String category = 'Insulation',
-  String subcategory = 'Bio-based',
+  List<String> categoryPath = const ['Insulation', 'Bio-based'],
   double lambda = 0.07,
   double density = 275,
   double specificHeat = 1700,
@@ -36,8 +36,7 @@ MaterialEntry _sampleEntry({
   return MaterialEntry(
     id: id,
     name: name,
-    category: category,
-    subcategory: subcategory,
+    categoryPath: categoryPath,
     lambdaDefault: lambda,
     densityDefault: density,
     specificHeatDefault: specificHeat,
@@ -114,8 +113,7 @@ Future<void> _seedCustomRow(
           id: Value(entry.id),
           name: Value(entry.name),
           nameDe: Value(entry.nameDe),
-          category: Value(entry.category),
-          subcategory: Value(entry.subcategory),
+          categoryPath: Value(encodeCategoryPath(entry.categoryPath)),
           lambdaDefault: Value(entry.lambdaDefault),
           densityDefault: Value(entry.densityDefault),
           specificHeatDefault: Value(entry.specificHeatDefault),
@@ -171,7 +169,7 @@ void main() {
       // File now contains exactly one entry with the new id.
       final raw = await File(libraryPath).readAsString();
       final decoded = jsonDecode(raw) as Map<String, dynamic>;
-      expect(decoded['version'], '1.0');
+      expect(decoded['version'], '1.1');
       final list = decoded['materials'] as List;
       expect(list, hasLength(1));
       expect((list.first as Map)['id'], created.id);
@@ -208,7 +206,7 @@ void main() {
 
       final pathA = '${tempDir.path}/lib-a.json';
       await File(pathA).writeAsString(jsonEncode({
-        'version': '1.0',
+        'version': '1.1',
         'materials': [
           _sampleEntry(id: 'a-1', name: 'A-One').toJson()
             ..remove('isBuiltIn'),
@@ -223,7 +221,7 @@ void main() {
 
       final pathB = '${tempDir.path}/lib-b.json';
       await File(pathB).writeAsString(jsonEncode({
-        'version': '1.0',
+        'version': '1.1',
         'materials': [
           _sampleEntry(id: 'b-1', name: 'B-One').toJson()
             ..remove('isBuiltIn'),
@@ -263,6 +261,56 @@ void main() {
       await expectLater(service.setLibraryPath(brokenPath), completes);
 
       expect(await _customRows(db), isEmpty);
+    },
+  );
+
+  // ── ADR-022 Rule 4: legacy "1.0" file migration ────────────────────────
+
+  test(
+    'legacy "1.0" library file with category + subcategory loads and '
+    'migrates to categoryPath = [category, subcategory]',
+    () async {
+      final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
+      final container = _buildContainer(db, docsDir: docsDir);
+      addTearDown(container.dispose);
+
+      final service =
+          container.read(customMaterialLibraryServiceProvider);
+
+      final legacyPath = '${tempDir.path}/legacy-1-0.json';
+      await File(legacyPath).writeAsString(jsonEncode({
+        'version': '1.0',
+        'materials': [
+          {
+            'id': 'legacy-1',
+            'name': 'Legacy entry',
+            'category': 'Insulation boards',
+            'subcategory': 'Wood fibre',
+            'lambdaDefault': 0.04,
+            'densityDefault': 50,
+            'specificHeatDefault': 1030,
+          },
+          {
+            'id': 'legacy-2',
+            'name': 'Legacy without subcategory',
+            'category': 'Glass',
+            'subcategory': '',
+            'lambdaDefault': 1.0,
+            'densityDefault': 2500,
+            'specificHeatDefault': 750,
+          },
+        ],
+      }));
+
+      await service.setLibraryPath(legacyPath);
+
+      final rows = await _customRows(db);
+      expect(rows, hasLength(2));
+      final byId = {for (final r in rows) r.id: r};
+      expect(decodeCategoryPath(byId['legacy-1']!.categoryPath),
+          ['Insulation boards', 'Wood fibre']);
+      expect(decodeCategoryPath(byId['legacy-2']!.categoryPath), ['Glass']);
     },
   );
 
@@ -369,7 +417,7 @@ void main() {
           reason:
               'service must bootstrap the default library file on first launch');
       expect(await File(expectedPath).readAsString(),
-          '{"version":"1.0","materials":[]}');
+          '{"version":"1.1","materials":[]}');
       expect(await _customRows(db), isEmpty,
           reason: 'fresh skeleton has zero custom entries');
 
@@ -398,7 +446,7 @@ void main() {
       // Step 1 — point at a user-picked file containing one entry.
       final userPath = '${tempDir.path}/user-picked.matlib.json';
       await File(userPath).writeAsString(jsonEncode({
-        'version': '1.0',
+        'version': '1.1',
         'materials': [
           _sampleEntry(id: 'user-1', name: 'From user file').toJson()
             ..remove('isBuiltIn'),

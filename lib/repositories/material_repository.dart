@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import 'package:drift/drift.dart' show Value;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../core/utils/category_path_codec.dart';
+
 import '../data/database/app_database.dart' as $db;
 import '../data/database/daos/material_dao.dart';
 import '../data/models/localized_catalog_row.dart';
@@ -15,7 +17,7 @@ import 'save_state_notifier.dart';
 /// Increment this whenever [assets/materials.json] is updated. On next
 /// launch [MaterialRepository.ensureMaterialsSeeded] will detect the
 /// mismatch and re-upsert all entries.
-const materialDbVersion = 5;
+const materialDbVersion = 6;
 
 // ── DAO provider ──────────────────────────────────────────────────────────────
 
@@ -125,8 +127,9 @@ class MaterialRepository with SaveStateMixin {
         MaterialEntry(
           id: map['id'] as String,
           name: map['name'] as String,
-          category: map['category'] as String,
-          subcategory: (map['subcategory'] as String?) ?? '',
+          categoryPath: (map['categoryPath'] as List<dynamic>)
+              .map((e) => e as String)
+              .toList(),
           lambdaDefault: (map['lambdaDefault'] as num).toDouble(),
           densityDefault: (map['densityDefault'] as num).toDouble(),
           specificHeatDefault:
@@ -155,8 +158,7 @@ MaterialEntry _entryFromRow($db.MaterialEntry row) {
     id: row.id,
     name: row.name,
     nameDe: row.nameDe,
-    category: row.category,
-    subcategory: row.subcategory,
+    categoryPath: decodeCategoryPath(row.categoryPath),
     lambdaDefault: row.lambdaDefault,
     densityDefault: row.densityDefault,
     specificHeatDefault: row.specificHeatDefault,
@@ -171,8 +173,7 @@ $db.MaterialEntriesCompanion _entryToCompanion(MaterialEntry entry) {
     id: Value(entry.id),
     name: Value(entry.name),
     nameDe: Value(entry.nameDe),
-    category: Value(entry.category),
-    subcategory: Value(entry.subcategory),
+    categoryPath: Value(encodeCategoryPath(entry.categoryPath)),
     lambdaDefault: Value(entry.lambdaDefault),
     densityDefault: Value(entry.densityDefault),
     specificHeatDefault: Value(entry.specificHeatDefault),

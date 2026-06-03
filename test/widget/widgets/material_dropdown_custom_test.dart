@@ -25,8 +25,7 @@ import 'package:heating_planner/ui/widgets/material_picker.dart';
 const _builtIn = MaterialEntry(
   id: 'mat-built',
   name: 'Cement render',
-  category: 'Plaster & Mortar',
-  subcategory: 'Cement/Lime',
+  categoryPath: ['Plaster & Mortar', 'Cement/Lime'],
   lambdaDefault: 1.0,
   densityDefault: 1800,
   specificHeatDefault: 1000,
@@ -35,8 +34,7 @@ const _builtIn = MaterialEntry(
 const _custom = MaterialEntry(
   id: 'mat-custom',
   name: 'Custom hempcrete',
-  category: 'Insulation boards',
-  subcategory: 'Bio-based',
+  categoryPath: ['Insulation boards', 'Bio-based'],
   lambdaDefault: 0.07,
   densityDefault: 275,
   specificHeatDefault: 1700,
