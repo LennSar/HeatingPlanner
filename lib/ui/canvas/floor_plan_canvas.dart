@@ -21,17 +21,11 @@ import '../providers/selection_provider.dart';
 import '../providers/zone_color_state_provider.dart';
 import '../screens/editor_screen.dart';
 import 'canvas_controller.dart';
-import 'painters/annotation_painter.dart';
-import 'painters/grid_painter.dart';
-import 'painters/heating_zone_painter.dart';
 import 'painters/interaction_data.dart';
 import 'painters/interaction_painter.dart';
-import 'painters/opening_painter.dart';
-import 'painters/pipe_route_painter.dart';
-import 'painters/wall_painter.dart';
+import 'painters/world_layer_painters.dart';
 import '../../data/models/heating_zone.dart';
 import 'tools/editor_callbacks.dart';
-import 'painters/distributor_painter.dart';
 import 'tools/distributor_place_tool.dart';
 import 'tools/door_place_tool.dart';
 import 'tools/route_draw_tool.dart';
@@ -1128,27 +1122,51 @@ class _FloorPlanCanvasState
                     .colorScheme
                     .surface,
                 child: ClipRect(
-                  // Three independent layers, each behind its own
-                  // RepaintBoundary so pointer-move repaints touch
-                  // only the interaction layer.
+                  // Five independent layers, each behind its own
+                  // RepaintBoundary. The non-interactive world is split
+                  // into grid / committed-geometry / pipes+annotations so
+                  // a geometry edit repaints only the layers whose inputs
+                  // changed — the grid in particular never repaints during
+                  // a wall/room drag. Pointer-move repaints touch only the
+                  // interaction layer.
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
                       RepaintBoundary(
                         child: CustomPaint(
                           size: viewSize,
-                          painter: _StaticWorldPainter(
+                          painter: GridLayerPainter(
                             transform: canvasState.transform,
                             gridSpacingMm: gridSpacingMm,
                             visibleRect: visibleRect,
+                            dotColor: colors.gridDot,
+                          ),
+                        ),
+                      ),
+                      RepaintBoundary(
+                        child: CustomPaint(
+                          size: viewSize,
+                          painter: GeometryLayerPainter(
+                            transform: canvasState.transform,
                             colors: colors,
-                            onSurface: onSurface,
                             walls: editorState.walls,
                             rooms: editorState.rooms,
                             windows: editorState.windows,
                             doors: editorState.doors,
                             zones: editorState.zones,
                             zoneStates: zoneStates,
+                          ),
+                        ),
+                      ),
+                      RepaintBoundary(
+                        child: CustomPaint(
+                          size: viewSize,
+                          painter: PipeAnnotationLayerPainter(
+                            transform: canvasState.transform,
+                            colors: colors,
+                            onSurface: onSurface,
+                            walls: editorState.walls,
+                            rooms: editorState.rooms,
                             circuits: editorState.circuits,
                             distributor: editorState.distributor,
                             selectedWallId: selectedWallId,
@@ -1249,126 +1267,6 @@ class _FloorPlanCanvasState
       Vector3(point.dx, point.dy, 0),
     );
     return Offset(result.x, result.y);
-  }
-}
-
-/// Paints the non-interactive world layers — grid, zones, walls, openings,
-/// distributor, pipe routes, annotations — under a single transform setup.
-///
-/// Sits behind its own [RepaintBoundary] so a pointer-move that only changes
-/// hover/interaction state will not repaint this layer: [shouldRepaint]
-/// compares structural inputs (geometry lists, zone-state map, transform,
-/// theme colours) and returns false when none of them changed.
-class _StaticWorldPainter extends CustomPainter {
-  const _StaticWorldPainter({
-    required this.transform,
-    required this.gridSpacingMm,
-    required this.visibleRect,
-    required this.colors,
-    required this.onSurface,
-    required this.walls,
-    required this.rooms,
-    required this.windows,
-    required this.doors,
-    required this.zones,
-    required this.zoneStates,
-    required this.circuits,
-    this.distributor,
-    this.selectedWallId,
-  });
-
-  final Matrix4 transform;
-  final double gridSpacingMm;
-  final Rect visibleRect;
-  final HeatingPlannerColors colors;
-  final Color onSurface;
-  final List<WallSegment> walls;
-  final List<Room> rooms;
-  final List<WindowElement> windows;
-  final List<Door> doors;
-  final List<HeatingZone> zones;
-  final Map<String, ZoneColorState> zoneStates;
-  final List<HeatingCircuit> circuits;
-  final Distributor? distributor;
-  final String? selectedWallId;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    canvas.save();
-    canvas.transform(transform.storage);
-
-    GridPainter(
-      gridSpacingMm: gridSpacingMm,
-      visibleRect: visibleRect,
-      dotColor: colors.gridDot,
-    ).paint(canvas, size);
-
-    HeatingZonePainter(
-      zoneGreen: colors.zoneGreen,
-      zoneYellow: colors.zoneYellow,
-      zoneRed: colors.zoneRed,
-      zoneGrey: colors.zoneGrey,
-      supplyPipe: colors.supplyPipe,
-      zones: zones,
-      zoneStates: zoneStates,
-    ).paint(canvas, size);
-
-    WallPainter(
-      wallFill: colors.wallFill,
-      wallStroke: colors.wallStroke,
-      walls: walls,
-      rooms: rooms,
-    ).paint(canvas, size);
-
-    OpeningPainter(
-      windowFill: colors.windowFill,
-      doorFill: colors.doorFill,
-      walls: walls,
-      windows: windows,
-      doors: doors,
-    ).paint(canvas, size);
-
-    if (distributor != null) {
-      DistributorPainter(
-        distributor: distributor!,
-        bodyColor: colors.wallFill,
-        strokeColor: colors.wallStroke,
-        labelColor: colors.wallStroke,
-      ).paint(canvas, size);
-    }
-
-    PipeRoutePainter(
-      supplyPipe: colors.supplyPipe,
-      returnPipe: colors.returnPipe,
-      circuits: circuits,
-    ).paint(canvas, size);
-
-    AnnotationPainter(
-      textColor: onSurface,
-      walls: walls,
-      rooms: rooms,
-      selectedWallId: selectedWallId,
-    ).paint(canvas, size);
-
-    canvas.restore();
-  }
-
-  @override
-  bool shouldRepaint(_StaticWorldPainter oldDelegate) {
-    return transform != oldDelegate.transform ||
-        gridSpacingMm != oldDelegate.gridSpacingMm ||
-        visibleRect != oldDelegate.visibleRect ||
-        !identical(colors, oldDelegate.colors) ||
-        onSurface != oldDelegate.onSurface ||
-        !identical(walls, oldDelegate.walls) ||
-        !identical(rooms, oldDelegate.rooms) ||
-        !identical(windows, oldDelegate.windows) ||
-        !identical(doors, oldDelegate.doors) ||
-        !identical(zones, oldDelegate.zones) ||
-        !identical(zoneStates, oldDelegate.zoneStates) ||
-        !identical(circuits, oldDelegate.circuits) ||
-        distributor != oldDelegate.distributor ||
-        selectedWallId != oldDelegate.selectedWallId;
   }
 }
 
