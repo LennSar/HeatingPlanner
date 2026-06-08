@@ -152,6 +152,19 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   void updateZone(HeatingZone zone) {}
   @override
+  void updateWallTransient(WallSegment wall) => updateWall(wall);
+  @override
+  void updateRoomTransient(Room room) => updateRoom(room);
+  @override
+  void updateZoneTransient(HeatingZone zone) => updateZone(zone);
+  @override
+  void updateWindowTransient(WindowElement window) => updateWindow(window);
+  @override
+  void updateDoorTransient(Door door) => updateDoor(door);
+  @override
+  void updateDistributorTransient(Distributor distributor) =>
+      updateDistributor(distributor);
+  @override
   void removeZone(String zoneId) {}
   @override
   String get currentFloorId => 'floor-1';
@@ -361,6 +374,19 @@ class _RoomAwareStubCallbacks implements EditorCallbacks {
   @override
   void updateZone(HeatingZone zone) {}
   @override
+  void updateWallTransient(WallSegment wall) => updateWall(wall);
+  @override
+  void updateRoomTransient(Room room) => updateRoom(room);
+  @override
+  void updateZoneTransient(HeatingZone zone) => updateZone(zone);
+  @override
+  void updateWindowTransient(WindowElement window) => updateWindow(window);
+  @override
+  void updateDoorTransient(Door door) => updateDoor(door);
+  @override
+  void updateDistributorTransient(Distributor distributor) =>
+      updateDistributor(distributor);
+  @override
   void removeZone(String zoneId) {}
   @override
   String get currentFloorId => 'floor-1';
@@ -542,6 +568,22 @@ class _ProviderWallDrawCallbacks implements EditorCallbacks {
   void commitZone(HeatingZone zone) => _n.addZone(zone);
   @override
   void updateZone(HeatingZone zone) => _n.updateZone(zone);
+  @override
+  void updateWallTransient(WallSegment wall) =>
+      _n.updateWallTransient(wall);
+  @override
+  void updateRoomTransient(Room room) => _n.updateRoomTransient(room);
+  @override
+  void updateZoneTransient(HeatingZone zone) =>
+      _n.updateZoneTransient(zone);
+  @override
+  void updateWindowTransient(WindowElement window) =>
+      _n.updateWindowTransient(window);
+  @override
+  void updateDoorTransient(Door door) => _n.updateDoorTransient(door);
+  @override
+  void updateDistributorTransient(Distributor d) =>
+      _n.updateDistributorTransient(d);
   @override
   void removeZone(String zoneId) => _n.removeZone(zoneId);
 

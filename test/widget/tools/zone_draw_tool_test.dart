@@ -158,6 +158,19 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   void updateZone(HeatingZone zone) {}
   @override
+  void updateWallTransient(WallSegment wall) => updateWall(wall);
+  @override
+  void updateRoomTransient(Room room) => updateRoom(room);
+  @override
+  void updateZoneTransient(HeatingZone zone) => updateZone(zone);
+  @override
+  void updateWindowTransient(WindowElement window) => updateWindow(window);
+  @override
+  void updateDoorTransient(Door door) => updateDoor(door);
+  @override
+  void updateDistributorTransient(Distributor distributor) =>
+      updateDistributor(distributor);
+  @override
   void removeZone(String zoneId) => _zones.removeWhere((z) => z.id == zoneId);
   @override
   String get currentFloorId => 'floor-1';

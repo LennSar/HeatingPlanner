@@ -151,12 +151,30 @@ class ProjectSettingsNotifier
     _persist();
   }
 
+  /// In-memory-only variant of [setDesignOutdoorTempC] for a slider drag
+  /// in progress. Updates [state] every tick but does **not** write the
+  /// project row to SQLite; the `onChangeEnd` call to the persisting
+  /// [setDesignOutdoorTempC] performs the single write.
+  void setDesignOutdoorTempCTransient(double value) {
+    state = state.copyWith(
+      designOutdoorTempC: value.clamp(-50.0, 10.0),
+    );
+  }
+
   /// Set the default indoor temperature (clamped to 15…30 °C).
   void setDefaultIndoorTempC(double value) {
     state = state.copyWith(
       defaultIndoorTempC: value.clamp(15.0, 30.0),
     );
     _persist();
+  }
+
+  /// In-memory-only variant of [setDefaultIndoorTempC] — see
+  /// [setDesignOutdoorTempCTransient] for the debounce contract.
+  void setDefaultIndoorTempCTransient(double value) {
+    state = state.copyWith(
+      defaultIndoorTempC: value.clamp(15.0, 30.0),
+    );
   }
 
   /// Set the default floor height (clamped to 2000…6000 mm).
@@ -167,12 +185,28 @@ class ProjectSettingsNotifier
     _persist();
   }
 
+  /// In-memory-only variant of [setFloorHeightMm] — see
+  /// [setDesignOutdoorTempCTransient] for the debounce contract.
+  void setFloorHeightMmTransient(int value) {
+    state = state.copyWith(
+      floorHeightMm: value.clamp(2000, 6000),
+    );
+  }
+
   /// Set the default unheated space temperature (clamped to 0…25 °C).
   void setUnheatedSpaceTempC(double value) {
     state = state.copyWith(
       unheatedSpaceTempC: value.clamp(0.0, 25.0),
     );
     _persist();
+  }
+
+  /// In-memory-only variant of [setUnheatedSpaceTempC] — see
+  /// [setDesignOutdoorTempCTransient] for the debounce contract.
+  void setUnheatedSpaceTempCTransient(double value) {
+    state = state.copyWith(
+      unheatedSpaceTempC: value.clamp(0.0, 25.0),
+    );
   }
 
   /// Set the default exterior wall thickness in mm (clamped to 50…1000).

@@ -252,7 +252,9 @@ class _HeatingZonePropertiesState
               _spacingController.text = mm.toString();
               ref
                   .read(editorStateProvider.notifier)
-                  .updateZone(zone.copyWith(tubeSpacingMm: mm));
+                  .updateZoneTransient(
+                    zone.copyWith(tubeSpacingMm: mm),
+                  );
             },
             onChangeEnd: (value) {
               final start = _zoneAtSliderStart;
@@ -303,7 +305,7 @@ class _HeatingZonePropertiesState
                 _heightController.text = mm.toString();
                 ref
                     .read(editorStateProvider.notifier)
-                    .updateZone(zone.copyWith(heightMm: mm));
+                    .updateZoneTransient(zone.copyWith(heightMm: mm));
               },
               onChangeEnd: (value) {
                 final start = _zoneAtSliderStart;
@@ -363,7 +365,7 @@ class _HeatingZonePropertiesState
                 _borderController.text = mm.toString();
                 ref
                     .read(editorStateProvider.notifier)
-                    .updateZone(
+                    .updateZoneTransient(
                       zone.copyWith(borderDistanceMm: mm),
                     );
               },

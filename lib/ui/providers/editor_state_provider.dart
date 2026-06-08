@@ -580,6 +580,55 @@ class EditorStateNotifier extends Notifier<EditorState>
     }
   }
 
+  /// In-memory-only variant of [updateWall] for transient interactions
+  /// (a wall drag in progress). Updates [state] every frame — including
+  /// the ADR-011 mirror partner — but issues **no** DAO write and does
+  /// **not** mark the project dirty. The committing call (`onDragEnd`'s
+  /// undo command, which routes through the persisting [updateWall]) is
+  /// the sole path that writes the final value to SQLite. Keeping the
+  /// canvas state live each frame while debouncing the database write to
+  /// the interaction boundary avoids one SQLite write per pointer-move.
+  void updateWallTransient(WallSegment wall) {
+    final w = _withOrientation(wall);
+    final partnerId = w.mirrorId;
+
+    if (partnerId != null) {
+      final partnerIdx =
+          state.walls.indexWhere((s) => s.id == partnerId);
+      if (partnerIdx != -1) {
+        final partner = state.walls[partnerIdx];
+        final updatedPartner = _withOrientation(
+          partner.copyWith(
+            constructionId: w.constructionId,
+            startPoint: w.endPoint,
+            endPoint: w.startPoint,
+            wallType: w.wallType,
+            thicknessMm: w.thicknessMm,
+            anchorMode: w.anchorMode,
+          ),
+        );
+        state = state.copyWith(
+          walls: [
+            for (final s in state.walls)
+              if (s.id == w.id)
+                w
+              else if (s.id == partnerId)
+                updatedPartner
+              else
+                s,
+          ],
+        );
+        return;
+      }
+    }
+
+    state = state.copyWith(
+      walls: state.walls
+          .map((s) => s.id == w.id ? w : s)
+          .toList(),
+    );
+  }
+
   /// Assign [constructionId] to wall [wallId] and re-anchor its
   /// centerline per ADR-017 Rule 6.
   ///
@@ -726,6 +775,19 @@ class EditorStateNotifier extends Notifier<EditorState>
     final dao = ref.read(buildingDaoProvider);
     unawaited(upsertRoom(dao, room));
     markProjectDirty();
+  }
+
+  /// In-memory-only variant of [updateRoom] for transient interactions
+  /// (room-polygon rebuild while a wall is dragged, or a slider in
+  /// flight). Updates [state] only — no DAO write, no dirty marking.
+  /// The interaction's commit (undo command via persisting [updateRoom])
+  /// performs the single SQLite write.
+  void updateRoomTransient(Room room) {
+    state = state.copyWith(
+      rooms: state.rooms
+          .map((r) => r.id == room.id ? room : r)
+          .toList(),
+    );
   }
 
   /// Remove a room by ID.
@@ -928,6 +990,18 @@ class EditorStateNotifier extends Notifier<EditorState>
     markProjectDirty();
   }
 
+  /// In-memory-only variant of [updateWindow] for transient interactions
+  /// (an opening drag in progress). Updates [state] only — no DAO write,
+  /// no dirty marking. The drag's commit (undo command via persisting
+  /// [updateWindow]) performs the single SQLite write.
+  void updateWindowTransient(WindowElement window) {
+    state = state.copyWith(
+      windows: state.windows
+          .map((w) => w.id == window.id ? window : w)
+          .toList(),
+    );
+  }
+
   /// Remove a window by ID.
   void removeWindow(String windowId) {
     state = state.copyWith(
@@ -981,6 +1055,18 @@ class EditorStateNotifier extends Notifier<EditorState>
     final dao = ref.read(buildingDaoProvider);
     unawaited(upsertDoor(dao, door));
     markProjectDirty();
+  }
+
+  /// In-memory-only variant of [updateDoor] for transient interactions
+  /// (an opening drag in progress). Updates [state] only — no DAO write,
+  /// no dirty marking. The drag's commit (undo command via persisting
+  /// [updateDoor]) performs the single SQLite write.
+  void updateDoorTransient(Door door) {
+    state = state.copyWith(
+      doors: state.doors
+          .map((d) => d.id == door.id ? door : d)
+          .toList(),
+    );
   }
 
   /// Remove a door by ID.
@@ -1038,6 +1124,19 @@ class EditorStateNotifier extends Notifier<EditorState>
     markProjectDirty();
   }
 
+  /// In-memory-only variant of [updateZone] for transient interactions
+  /// (a zone drag, or a zone slider in flight). Updates [state] only —
+  /// no DAO write, no dirty marking. The interaction's commit (undo
+  /// command via persisting [updateZone]) performs the single SQLite
+  /// write.
+  void updateZoneTransient(HeatingZone zone) {
+    state = state.copyWith(
+      zones: state.zones
+          .map((z) => z.id == zone.id ? zone : z)
+          .toList(),
+    );
+  }
+
   /// Updates wall heating zones whose [HeatingZone.heightMm] equals
   /// [oldHeightMm] to [newHeightMm].
   ///
@@ -1064,6 +1163,40 @@ class EditorStateNotifier extends Notifier<EditorState>
     if (changed.isNotEmpty) {
       final dao = ref.read(heatingDaoProvider);
       for (final z in changed) {
+        unawaited(upsertHeatingZone(dao, z));
+      }
+      markProjectDirty();
+    }
+  }
+
+  /// Sets every zone in [zoneIds] to [newHeightMm].
+  ///
+  /// In-memory only when [persist] is false — used by the project-settings
+  /// room-height slider so each pointer tick updates the canvas without a
+  /// SQLite write. The single `onChangeEnd` call with [persist] = true
+  /// upserts exactly the affected zones once. The caller captures the set
+  /// of "auto" wall-zone ids (those whose `heightMm` matched the floor
+  /// height) at drag start, so manually-adjusted zones are never touched.
+  void setWallZoneHeightsForIds(
+    Set<String> zoneIds,
+    int newHeightMm, {
+    required bool persist,
+  }) {
+    if (zoneIds.isEmpty) return;
+    final updated = <HeatingZone>[];
+    final newZones = state.zones.map((z) {
+      if (zoneIds.contains(z.id)) {
+        final u = z.copyWith(heightMm: newHeightMm);
+        updated.add(u);
+        return u;
+      }
+      return z;
+    }).toList();
+    if (updated.isEmpty) return;
+    state = state.copyWith(zones: newZones);
+    if (persist) {
+      final dao = ref.read(heatingDaoProvider);
+      for (final z in updated) {
         unawaited(upsertHeatingZone(dao, z));
       }
       markProjectDirty();
@@ -1146,6 +1279,15 @@ class EditorStateNotifier extends Notifier<EditorState>
     final dao = ref.read(heatingDaoProvider);
     unawaited(upsertDistributor(dao, d));
     markProjectDirty();
+  }
+
+  /// In-memory-only variant of [updateDistributor] for transient
+  /// interactions (a distributor drag, or a temperature slider in
+  /// flight). Updates [state] only — no DAO write, no dirty marking.
+  /// The interaction's commit (undo command or `onChangeEnd`, via the
+  /// persisting [updateDistributor]) performs the single SQLite write.
+  void updateDistributorTransient(Distributor d) {
+    state = state.copyWith(distributor: d);
   }
 
   /// Remove the distributor.

@@ -56,6 +56,12 @@ class _ProjectSettingsDialogState
   late TextEditingController _intWallController;
   late TextEditingController _partWallController;
 
+  /// Ids of the wall-heating zones that followed the floor height at the
+  /// start of a room-height slider drag. Captured in `onChangeStart` so
+  /// per-tick transient updates touch only those zones, and the single
+  /// persist at `onChangeEnd` upserts exactly them.
+  Set<String>? _autoWallZoneIdsAtStart;
+
   @override
   void initState() {
     super.initState();
@@ -476,9 +482,17 @@ class _ProjectSettingsDialogState
                               projectSettingsProvider
                                   .notifier,
                             )
-                            .setDesignOutdoorTempC(v);
+                            .setDesignOutdoorTempCTransient(v);
                         _outdoorController.text =
                             v.toStringAsFixed(1);
+                      },
+                      onSliderChangeEnd: (v) {
+                        ref
+                            .read(
+                              projectSettingsProvider
+                                  .notifier,
+                            )
+                            .setDesignOutdoorTempC(v);
                       },
                       onFieldSubmitted: _applyOutdoor,
                       rangeLabel: l10n.designOutdoorTempRange,
@@ -514,9 +528,17 @@ class _ProjectSettingsDialogState
                               projectSettingsProvider
                                   .notifier,
                             )
-                            .setDefaultIndoorTempC(v);
+                            .setDefaultIndoorTempCTransient(v);
                         _indoorController.text =
                             v.toStringAsFixed(1);
+                      },
+                      onSliderChangeEnd: (v) {
+                        ref
+                            .read(
+                              projectSettingsProvider
+                                  .notifier,
+                            )
+                            .setDefaultIndoorTempC(v);
                       },
                       onFieldSubmitted: _applyIndoor,
                       rangeLabel: l10n.defaultIndoorTempRange,
@@ -542,26 +564,64 @@ class _ProjectSettingsDialogState
                     _HeightRow(
                       controller: _heightController,
                       sliderValue: settings.floorHeightMm,
-                      onSliderChanged: (v) {
-                        final oldHeight = ref
+                      onSliderChangeStart: (_) {
+                        // Snapshot the wall zones that currently follow
+                        // the floor height so per-tick updates touch only
+                        // them (manually-adjusted zones stay put).
+                        final h = ref
                             .read(projectSettingsProvider)
                             .floorHeightMm;
+                        _autoWallZoneIdsAtStart = ref
+                            .read(editorStateProvider)
+                            .zones
+                            .where(
+                              (z) =>
+                                  z.zoneType ==
+                                      ZoneType.wallHeating &&
+                                  z.heightMm == h,
+                            )
+                            .map((z) => z.id)
+                            .toSet();
+                      },
+                      onSliderChanged: (v) {
+                        // Transient: no SQLite write until onChangeEnd.
                         ref
                             .read(
                               projectSettingsProvider
                                   .notifier,
                             )
-                            .setFloorHeightMm(v);
+                            .setFloorHeightMmTransient(v);
                         _heightController.text =
                             v.toString();
                         ref
                             .read(
                               editorStateProvider.notifier,
                             )
-                            .updateWallZoneHeightsForFloor(
-                              oldHeight,
+                            .setWallZoneHeightsForIds(
+                              _autoWallZoneIdsAtStart ??
+                                  const {},
                               v,
+                              persist: false,
                             );
+                      },
+                      onSliderChangeEnd: (v) {
+                        ref
+                            .read(
+                              projectSettingsProvider
+                                  .notifier,
+                            )
+                            .setFloorHeightMm(v);
+                        ref
+                            .read(
+                              editorStateProvider.notifier,
+                            )
+                            .setWallZoneHeightsForIds(
+                              _autoWallZoneIdsAtStart ??
+                                  const {},
+                              v,
+                              persist: true,
+                            );
+                        _autoWallZoneIdsAtStart = null;
                       },
                       onFieldSubmitted: _applyHeight,
                       rangeLabel: l10n.defaultRoomHeightRange,
@@ -597,9 +657,17 @@ class _ProjectSettingsDialogState
                               projectSettingsProvider
                                   .notifier,
                             )
-                            .setUnheatedSpaceTempC(v);
+                            .setUnheatedSpaceTempCTransient(v);
                         _unheatedController.text =
                             v.toStringAsFixed(1);
+                      },
+                      onSliderChangeEnd: (v) {
+                        ref
+                            .read(
+                              projectSettingsProvider
+                                  .notifier,
+                            )
+                            .setUnheatedSpaceTempC(v);
                       },
                       onFieldSubmitted: _applyUnheated,
                       rangeLabel: l10n.unheatedSpaceTempRange,
@@ -817,6 +885,7 @@ class _TempRow extends StatelessWidget {
     required this.max,
     required this.divisions,
     required this.onSliderChanged,
+    required this.onSliderChangeEnd,
     required this.onFieldSubmitted,
     required this.rangeLabel,
   });
@@ -826,7 +895,12 @@ class _TempRow extends StatelessWidget {
   final double min;
   final double max;
   final int divisions;
+
+  /// Per-tick handler — should update in-memory state only (no persist).
   final ValueChanged<double> onSliderChanged;
+
+  /// Drag-end handler — performs the single SQLite write.
+  final ValueChanged<double> onSliderChangeEnd;
   final ValueChanged<String> onFieldSubmitted;
   final String rangeLabel;
 
@@ -850,6 +924,7 @@ class _TempRow extends StatelessWidget {
                 label:
                     '${sliderValue.toStringAsFixed(1)} \u00B0C',
                 onChanged: onSliderChanged,
+                onChangeEnd: onSliderChangeEnd,
               ),
             ),
             const SizedBox(width: Spacing.sm),
@@ -1157,14 +1232,25 @@ class _HeightRow extends StatelessWidget {
   const _HeightRow({
     required this.controller,
     required this.sliderValue,
+    required this.onSliderChangeStart,
     required this.onSliderChanged,
+    required this.onSliderChangeEnd,
     required this.onFieldSubmitted,
     required this.rangeLabel,
   });
 
   final TextEditingController controller;
   final int sliderValue;
+
+  /// Fires once when the drag begins — used to snapshot which wall zones
+  /// follow the floor height.
+  final ValueChanged<int> onSliderChangeStart;
+
+  /// Per-tick handler — should update in-memory state only (no persist).
   final ValueChanged<int> onSliderChanged;
+
+  /// Drag-end handler — performs the single SQLite write.
+  final ValueChanged<int> onSliderChangeEnd;
   final ValueChanged<String> onFieldSubmitted;
   final String rangeLabel;
 
@@ -1185,7 +1271,9 @@ class _HeightRow extends StatelessWidget {
                 max: 6000,
                 divisions: 40,
                 label: '$sliderValue mm',
+                onChangeStart: (v) => onSliderChangeStart(v.round()),
                 onChanged: (v) => onSliderChanged(v.round()),
+                onChangeEnd: (v) => onSliderChangeEnd(v.round()),
               ),
             ),
             const SizedBox(width: Spacing.sm),

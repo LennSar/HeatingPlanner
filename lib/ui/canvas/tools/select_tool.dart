@@ -103,6 +103,10 @@ class SelectTool extends CanvasTool {
   DragHandleType? _dragHandle;
   WallSegment? _dragStartWall;
   List<WallSegment> _dragStartConnected = const [];
+  // World point where a wall-body (translate) drag was grabbed, so the
+  // wall follows the pointer by that offset instead of snapping its
+  // midpoint to the cursor (no jump when grabbed away from the middle).
+  Point2D? _wallDragAnchor;
   Room? _dragStartRoom;
   // ADR-011: snapshot of the mirror wall's room at drag start.
   Room? _dragStartMirrorRoom;
@@ -808,6 +812,8 @@ class SelectTool extends CanvasTool {
     }
 
     _dragHandle = handleType;
+    _wallDragAnchor =
+        handleType == DragHandleType.mid ? worldPoint : null;
     _dragStartWall = _selectedWall;
     _dragStartConnected = _findConnectedWalls(_selectedWall!);
     if (_selectedWall!.roomId.isNotEmpty) {
@@ -990,7 +996,9 @@ class SelectTool extends CanvasTool {
 
     switch (_dragHandle!) {
       case DragHandleType.mid:
-        _applyMidDrag(snap.point);
+        // Wall-body translate: snapping is handled inside _applyMidDrag
+        // relative to the grab anchor, so pass the raw cursor.
+        _applyMidDrag(worldPoint);
       case DragHandleType.start:
         _applyEndpointDrag(snap.point, isStart: true);
       case DragHandleType.end:
@@ -1262,10 +1270,11 @@ class SelectTool extends CanvasTool {
 
   @override
   void cancel() {
-    // Revert distributor drag.
+    // Revert distributor drag. The drag was transient (no DB write), so
+    // an in-memory restore returns to the persisted pre-drag value.
     if (_distributorDragAnchor != null) {
       if (_distributorAtDragStart != null) {
-        callbacks.updateDistributor(_distributorAtDragStart!);
+        callbacks.updateDistributorTransient(_distributorAtDragStart!);
       }
       _clearDistributorDragState();
       onStateChanged();
@@ -1275,7 +1284,7 @@ class SelectTool extends CanvasTool {
     // Revert wall zone drag.
     if (_wallZoneDragHandle != null) {
       if (_zoneAtDragStart != null) {
-        callbacks.updateZone(_zoneAtDragStart!);
+        callbacks.updateZoneTransient(_zoneAtDragStart!);
         _selectedZone = _zoneAtDragStart;
       }
       _clearWallZoneDragState();
@@ -1286,7 +1295,7 @@ class SelectTool extends CanvasTool {
     // Revert zone drag.
     if (_zoneDragAnchorPoint != null) {
       if (_zoneAtDragStart != null) {
-        callbacks.updateZone(_zoneAtDragStart!);
+        callbacks.updateZoneTransient(_zoneAtDragStart!);
         _selectedZone = _zoneAtDragStart;
       }
       _clearZoneDragState();
@@ -1297,10 +1306,10 @@ class SelectTool extends CanvasTool {
     // Revert opening drag.
     if (_openingDragHandle != null) {
       if (_dragStartWindow != null) {
-        callbacks.updateWindow(_dragStartWindow!);
+        callbacks.updateWindowTransient(_dragStartWindow!);
       }
       if (_dragStartDoor != null) {
-        callbacks.updateDoor(_dragStartDoor!);
+        callbacks.updateDoorTransient(_dragStartDoor!);
       }
       _clearOpeningDragState();
       onStateChanged();
@@ -1449,13 +1458,13 @@ class SelectTool extends CanvasTool {
           w;
       final start = currentWall.startPoint;
       final end = currentWall.endPoint;
-      final mid = Point2D(
-        x: (start.x + end.x) / 2,
-        y: (start.y + end.y) / 2,
-      );
-      handles.addAll([start, mid, end]);
-      if (_dragHandle != null) {
-        activeIdx = _dragHandle!.index;
+      // Only the two endpoint handles are drawn. The wall body itself is
+      // grabbable to translate the wall, so no midpoint dot is shown.
+      handles.addAll([start, end]);
+      if (_dragHandle == DragHandleType.start) {
+        activeIdx = 0;
+      } else if (_dragHandle == DragHandleType.end) {
+        activeIdx = 1;
       }
     }
 
@@ -1504,7 +1513,7 @@ class SelectTool extends CanvasTool {
       final newPolygon = List<Point2D>.from(zone.polygon);
       newPolygon[_zoneHandleDragIndex!] = snapped;
       final newZone = zone.copyWith(polygon: newPolygon);
-      callbacks.updateZone(newZone);
+      callbacks.updateZoneTransient(newZone);
       _selectedZone = newZone;
     } else {
       // Body drag: translate all vertices by the delta from the anchor.
@@ -1515,7 +1524,7 @@ class SelectTool extends CanvasTool {
           .map((v) => Point2D(x: v.x + dx, y: v.y + dy))
           .toList();
       final newZone = zone.copyWith(polygon: newPolygon);
-      callbacks.updateZone(newZone);
+      callbacks.updateZoneTransient(newZone);
       _selectedZone = newZone;
     }
   }
@@ -1533,7 +1542,9 @@ class SelectTool extends CanvasTool {
     final allValid =
         zone.polygon.every((v) => _isZonePointValid(v, zone));
     if (!allValid) {
-      callbacks.updateZone(_zoneAtDragStart!);
+      // Transient revert: the drag never persisted, so restoring the
+      // pre-drag zone in memory is enough — no DB write needed.
+      callbacks.updateZoneTransient(_zoneAtDragStart!);
       _selectedZone = _zoneAtDragStart;
       callbacks.showToast('Zone must stay within valid rooms');
       return;
@@ -1776,7 +1787,7 @@ class SelectTool extends CanvasTool {
       widthMm: widthMm,
       polygon: polygon,
     );
-    callbacks.updateZone(updated);
+    callbacks.updateZoneTransient(updated);
     _selectedZone = updated;
   }
 
@@ -2080,14 +2091,14 @@ class SelectTool extends CanvasTool {
   /// Update provider state for the selected opening.
   void _applyOpeningUpdate(double posOnWall, int widthMm) {
     if (_dragStartWindow != null) {
-      callbacks.updateWindow(
+      callbacks.updateWindowTransient(
         _dragStartWindow!.copyWith(
           positionOnWallMm: posOnWall,
           widthMm: widthMm,
         ),
       );
     } else if (_dragStartDoor != null) {
-      callbacks.updateDoor(
+      callbacks.updateDoorTransient(
         _dragStartDoor!.copyWith(
           positionOnWallMm: posOnWall,
           widthMm: widthMm,
@@ -2306,16 +2317,13 @@ class SelectTool extends CanvasTool {
     final wall = _currentWallState(_selectedWall!);
     final start = wall.startPoint;
     final end = wall.endPoint;
-    final mid = Point2D(
-      x: (start.x + end.x) / 2,
-      y: (start.y + end.y) / 2,
-    );
 
     final zoom = callbacks.currentZoom;
     final thresholdMm = zoom > 0
         ? _handleHitRadiusPx / zoom
         : _handleRadiusMm;
 
+    // Endpoint handles (resize) take priority near the ends.
     if (GeometryEngine.distanceMm(worldPoint, start) <=
         thresholdMm) {
       return DragHandleType.start;
@@ -2324,8 +2332,11 @@ class SelectTool extends CanvasTool {
         thresholdMm) {
       return DragHandleType.end;
     }
-    if (GeometryEngine.distanceMm(worldPoint, mid) <=
-        thresholdMm) {
+    // Anywhere else along the wall body translates the whole wall. Uses
+    // the same hit band as wall selection so the entire wall is grabbable
+    // (no midpoint dot required).
+    if (GeometryUtils.distanceToSegment(worldPoint, start, end) <=
+        _wallHitThresholdMm) {
       return DragHandleType.mid;
     }
     return null;
@@ -2335,14 +2346,30 @@ class SelectTool extends CanvasTool {
   // Mid-handle drag (translate wall)
   // ================================================================
 
-  void _applyMidDrag(Point2D snappedPoint) {
+  void _applyMidDrag(Point2D worldPoint) {
     final orig = _dragStartWall!;
-    final origMid = Point2D(
-      x: (orig.startPoint.x + orig.endPoint.x) / 2,
-      y: (orig.startPoint.y + orig.endPoint.y) / 2,
+    // Anchor: the world point where the wall was grabbed. The wall is
+    // translated by the pointer delta from that anchor (so grabbing
+    // anywhere along the wall — not just its midpoint — feels natural).
+    // Falls back to the midpoint if the anchor was somehow not captured.
+    final anchor = _wallDragAnchor ??
+        Point2D(
+          x: (orig.startPoint.x + orig.endPoint.x) / 2,
+          y: (orig.startPoint.y + orig.endPoint.y) / 2,
+        );
+
+    // Grid-snap the moved start point so the wall stays aligned, then
+    // translate both endpoints by that snapped delta.
+    final movedStart = Point2D(
+      x: orig.startPoint.x + (worldPoint.x - anchor.x),
+      y: orig.startPoint.y + (worldPoint.y - anchor.y),
     );
-    final dx = snappedPoint.x - origMid.x;
-    final dy = snappedPoint.y - origMid.y;
+    final snappedStart = SnapService.snapToGrid(
+      movedStart,
+      callbacks.currentGridSpacingMm,
+    );
+    final dx = snappedStart.x - orig.startPoint.x;
+    final dy = snappedStart.y - orig.startPoint.y;
 
     final newStart = Point2D(
       x: orig.startPoint.x + dx,
@@ -2353,7 +2380,7 @@ class SelectTool extends CanvasTool {
       y: orig.endPoint.y + dy,
     );
 
-    callbacks.updateWall(
+    callbacks.updateWallTransient(
       orig.copyWith(startPoint: newStart, endPoint: newEnd),
     );
     _adjustConnectedWalls(orig, newStart: newStart, newEnd: newEnd);
@@ -2372,7 +2399,7 @@ class SelectTool extends CanvasTool {
     final updated = isStart
         ? orig.copyWith(startPoint: snappedPoint)
         : orig.copyWith(endPoint: snappedPoint);
-    callbacks.updateWall(updated);
+    callbacks.updateWallTransient(updated);
     _adjustConnectedWallAtEndpoint(
       orig,
       movedEndpoint:
@@ -2432,7 +2459,7 @@ class SelectTool extends CanvasTool {
           conn.endPoint, origWall.endPoint)) {
         updated = conn.copyWith(endPoint: newEnd);
       }
-      if (updated != null) callbacks.updateWall(updated);
+      if (updated != null) callbacks.updateWallTransient(updated);
     }
   }
 
@@ -2450,7 +2477,7 @@ class SelectTool extends CanvasTool {
       } else if (_pointsEqual(conn.endPoint, movedEndpoint)) {
         updated = conn.copyWith(endPoint: newPosition);
       }
-      if (updated != null) callbacks.updateWall(updated);
+      if (updated != null) callbacks.updateWallTransient(updated);
     }
   }
 
@@ -2468,7 +2495,7 @@ class SelectTool extends CanvasTool {
       if (roomWalls.length >= 3) {
         final polygon = _buildPolygonFromWalls(roomWalls);
         if (polygon.isNotEmpty) {
-          callbacks.updateRoom(
+          callbacks.updateRoomTransient(
             _dragStartRoom!.copyWith(polygon: polygon),
           );
         }
@@ -2483,7 +2510,7 @@ class SelectTool extends CanvasTool {
       if (mirrorRoomWalls.length >= 3) {
         final polygon = _buildPolygonFromWalls(mirrorRoomWalls);
         if (polygon.isNotEmpty) {
-          callbacks.updateRoom(
+          callbacks.updateRoomTransient(
             _dragStartMirrorRoom!.copyWith(polygon: polygon),
           );
         }
@@ -2760,23 +2787,28 @@ class SelectTool extends CanvasTool {
   // ================================================================
 
   void _revertDrag() {
+    // Transient: the drag never persisted (every frame went through the
+    // `*Transient` mutators), so the database still holds the pre-drag
+    // values — restoring in-memory state is enough and avoids a
+    // redundant write.
     if (_dragStartWall != null) {
-      callbacks.updateWall(_dragStartWall!);
+      callbacks.updateWallTransient(_dragStartWall!);
     }
     for (final conn in _dragStartConnected) {
-      callbacks.updateWall(conn);
+      callbacks.updateWallTransient(conn);
     }
     if (_dragStartRoom != null) {
-      callbacks.updateRoom(_dragStartRoom!);
+      callbacks.updateRoomTransient(_dragStartRoom!);
     }
     // ADR-011: also restore the mirror room polygon.
     if (_dragStartMirrorRoom != null) {
-      callbacks.updateRoom(_dragStartMirrorRoom!);
+      callbacks.updateRoomTransient(_dragStartMirrorRoom!);
     }
   }
 
   void _clearDragState() {
     _dragHandle = null;
+    _wallDragAnchor = null;
     _dragStartWall = null;
     _dragStartConnected = const [];
     _dragStartRoom = null;
@@ -3477,7 +3509,7 @@ class SelectTool extends CanvasTool {
         );
         final newWidth = (halfW - newLeftProj).round();
         final newCenterOffset = (halfW + newLeftProj) / 2.0;
-        callbacks.updateDistributor(orig.copyWith(
+        callbacks.updateDistributorTransient(orig.copyWith(
           position: Point2D(
             x: orig.position.x + newCenterOffset * cosA,
             y: orig.position.y + newCenterOffset * sinA,
@@ -3491,7 +3523,7 @@ class SelectTool extends CanvasTool {
         );
         final newWidth = (newRightProj + halfW).round();
         final newCenterOffset = (-halfW + newRightProj) / 2.0;
-        callbacks.updateDistributor(orig.copyWith(
+        callbacks.updateDistributorTransient(orig.copyWith(
           position: Point2D(
             x: orig.position.x + newCenterOffset * cosA,
             y: orig.position.y + newCenterOffset * sinA,
@@ -3508,7 +3540,7 @@ class SelectTool extends CanvasTool {
           orig.rotationDeg,
           callbacks.currentWalls,
         );
-        callbacks.updateDistributor(orig.copyWith(
+        callbacks.updateDistributorTransient(orig.copyWith(
           position: snapped,
           rotationDeg: newRotation,
         ));

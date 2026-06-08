@@ -502,9 +502,11 @@ class _RoomPropertiesState
               _roomAtSliderStart = room;
             },
             onChanged: (value) {
+              // Transient: keep the canvas/panel live each tick without a
+              // SQLite write. onChangeEnd persists the final value once.
               ref
                   .read(editorStateProvider.notifier)
-                  .updateRoom(
+                  .updateRoomTransient(
                     room.copyWith(targetTempC: value),
                   );
             },

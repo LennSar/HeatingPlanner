@@ -40,8 +40,14 @@ import 'package:heating_planner/data/models/point2d.dart';
 import 'package:heating_planner/data/models/room.dart';
 import 'package:heating_planner/data/models/wall_segment.dart';
 import 'package:heating_planner/data/models/window_element.dart';
+import 'package:heating_planner/data/database/daos/building_dao.dart';
+import 'package:heating_planner/data/database/daos/heating_dao.dart';
 import 'package:heating_planner/l10n/app_localizations.dart';
 import 'package:heating_planner/l10n/app_localizations_en.dart';
+import 'package:heating_planner/repositories/building_repository.dart'
+    show buildingDaoProvider;
+import 'package:heating_planner/repositories/heating_repository.dart'
+    show heatingDaoProvider;
 import 'package:heating_planner/ui/canvas/tools/editor_callbacks.dart';
 import 'package:heating_planner/ui/canvas/tools/select_tool.dart';
 import 'package:heating_planner/ui/canvas/tools/undo_redo_service.dart';
@@ -108,6 +114,22 @@ class _StubCallbacks implements EditorCallbacks {
     final idx = _zones.indexWhere((z) => z.id == zone.id);
     if (idx >= 0) _zones[idx] = zone;
   }
+
+  // Transient variants delegate to the persisting ones so this stub's
+  // observable state matches the pre-debounce behaviour.
+  @override
+  void updateWallTransient(WallSegment wall) => updateWall(wall);
+  @override
+  void updateRoomTransient(Room room) => updateRoom(room);
+  @override
+  void updateZoneTransient(HeatingZone zone) => updateZone(zone);
+  @override
+  void updateWindowTransient(WindowElement window) => updateWindow(window);
+  @override
+  void updateDoorTransient(Door door) => updateDoor(door);
+  @override
+  void updateDistributorTransient(Distributor distributor) =>
+      updateDistributor(distributor);
 
   @override
   void showToast(String message) => _toasts.add(message);
@@ -1392,6 +1414,93 @@ void main() {
       expect(aLeft.endPoint.x, -1000);
     });
   });
+
+  // ── Debounced persistence: a mid-handle wall drag must not write to
+  // SQLite every frame; the commit at onDragEnd persists each element once.
+  group('Debounced persistence (transient drag)', () {
+    test(
+        'no DB upsert during a multi-frame wall drag; one upsert per element '
+        'on drop', () {
+      final bDao = _CountingDragBuildingDao();
+      final hDao = _CountingDragHeatingDao();
+      final container = ProviderContainer(overrides: [
+        buildingDaoProvider.overrideWithValue(bDao),
+        heatingDaoProvider.overrideWithValue(hDao),
+      ]);
+      addTearDown(container.dispose);
+      final notifier = container.read(editorStateProvider.notifier);
+
+      // A 3000×2000 rectangular room.
+      const tl = Point2D(x: 0, y: 0);
+      const tr = Point2D(x: 3000, y: 0);
+      const br = Point2D(x: 3000, y: 2000);
+      const bl = Point2D(x: 0, y: 2000);
+      final walls = <WallSegment>[
+        const WallSegment(
+          id: 'wall-top',
+          roomId: 'room-1',
+          startPoint: tl,
+          endPoint: tr,
+        ),
+        const WallSegment(
+          id: 'wall-right',
+          roomId: 'room-1',
+          startPoint: tr,
+          endPoint: br,
+        ),
+        const WallSegment(
+          id: 'wall-bottom',
+          roomId: 'room-1',
+          startPoint: br,
+          endPoint: bl,
+        ),
+        const WallSegment(
+          id: 'wall-left',
+          roomId: 'room-1',
+          startPoint: bl,
+          endPoint: tl,
+        ),
+      ];
+      const room = Room(
+        id: 'room-1',
+        floorId: 'floor-1',
+        name: 'Room 1',
+        polygon: [tl, tr, br, bl],
+      );
+      notifier.replaceAllWallsAndRooms(walls, const [room]);
+
+      final cb = _ProviderBridgeCallbacks(container);
+      final tool = _makeTool(cb);
+
+      // Select the top wall, then grab its mid handle (its midpoint).
+      const mid = Point2D(x: 1500, y: 0);
+      tool.onTap(mid, PointerDeviceKind.mouse);
+      tool.onPointerDown(mid, 1);
+
+      // Five-frame drag downward — pure in-memory, no DB writes.
+      for (var dy = -100; dy >= -500; dy -= 100) {
+        tool.onDragUpdate(Point2D(x: 1500, y: dy.toDouble()));
+      }
+      expect(bDao.wallUpserts, 0,
+          reason: 'no wall upsert during a multi-frame drag');
+      expect(bDao.roomUpserts, 0,
+          reason: 'no room upsert during a multi-frame drag');
+
+      // Drop: commits the final geometry exactly once per element.
+      tool.onDragEnd(const Point2D(x: 1500, y: -500));
+
+      expect(bDao.roomUpserts, 1, reason: 'room persisted once on commit');
+      expect(bDao.upsertedRoomIds, ['room-1']);
+      expect(bDao.wallUpserts, greaterThan(0),
+          reason: 'the moved walls are persisted on commit');
+      expect(bDao.upsertedWallIds, contains('wall-top'));
+      expect(
+        bDao.upsertedWallIds.toSet().length,
+        bDao.upsertedWallIds.length,
+        reason: 'each wall is persisted at most once per interaction',
+      );
+    });
+  });
 }
 
 // ════════════════════════════════════════════════════════════════════════════
@@ -1436,6 +1545,20 @@ class _ReshapeStubCallbacks implements EditorCallbacks {
     final idx = _rooms.indexWhere((r) => r.id == room.id);
     if (idx >= 0) _rooms[idx] = room;
   }
+
+  @override
+  void updateWallTransient(WallSegment wall) => updateWall(wall);
+  @override
+  void updateRoomTransient(Room room) => updateRoom(room);
+  @override
+  void updateZoneTransient(HeatingZone zone) => updateZone(zone);
+  @override
+  void updateWindowTransient(WindowElement window) => updateWindow(window);
+  @override
+  void updateDoorTransient(Door door) => updateDoor(door);
+  @override
+  void updateDistributorTransient(Distributor distributor) =>
+      updateDistributor(distributor);
 
   @override
   void replaceAllWalls(List<WallSegment> walls) {
@@ -1615,6 +1738,25 @@ class _ProviderBridgeCallbacks implements EditorCallbacks {
   void updateRoom(Room room) => _notifier.updateRoom(room);
 
   @override
+  void updateWallTransient(WallSegment wall) =>
+      _notifier.updateWallTransient(wall);
+  @override
+  void updateRoomTransient(Room room) =>
+      _notifier.updateRoomTransient(room);
+  @override
+  void updateZoneTransient(HeatingZone zone) =>
+      _notifier.updateZoneTransient(zone);
+  @override
+  void updateWindowTransient(WindowElement window) =>
+      _notifier.updateWindowTransient(window);
+  @override
+  void updateDoorTransient(Door door) =>
+      _notifier.updateDoorTransient(door);
+  @override
+  void updateDistributorTransient(Distributor distributor) =>
+      _notifier.updateDistributorTransient(distributor);
+
+  @override
   void replaceAllWalls(List<WallSegment> walls) =>
       _notifier.replaceAllWalls(walls);
 
@@ -1741,4 +1883,40 @@ class _ProviderBridgeCallbacks implements EditorCallbacks {
   double get currentZoom => 1.0;
   @override
   double get currentGridSpacingMm => 100.0;
+}
+
+// ════════════════════════════════════════════════════════════════════════════
+// Counting DAOs for the debounced-persistence drag test
+// ════════════════════════════════════════════════════════════════════════════
+
+/// Records wall/room upserts (with ids) without a real database.
+/// `noSuchMethod` forwards every DAO call to the counters and returns a
+/// completed future so the `unawaited(upsert…)` calls resolve cleanly.
+class _CountingDragBuildingDao implements BuildingDao {
+  int wallUpserts = 0;
+  int roomUpserts = 0;
+  final List<String> upsertedWallIds = [];
+  final List<String> upsertedRoomIds = [];
+
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    final member = invocation.memberName;
+    if (member == #upsertWallSegment) {
+      wallUpserts++;
+      upsertedWallIds.add(
+        (invocation.positionalArguments.first as dynamic).id.value as String,
+      );
+    } else if (member == #upsertRoom) {
+      roomUpserts++;
+      upsertedRoomIds.add(
+        (invocation.positionalArguments.first as dynamic).id.value as String,
+      );
+    }
+    return Future<void>.value();
+  }
+}
+
+class _CountingDragHeatingDao implements HeatingDao {
+  @override
+  dynamic noSuchMethod(Invocation invocation) => Future<void>.value();
 }

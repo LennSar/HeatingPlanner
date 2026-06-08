@@ -76,6 +76,12 @@ abstract class EditorCallbacks {
   /// Replace an existing wall segment (same ID).
   void updateWall(WallSegment wall);
 
+  /// In-memory-only wall update for a drag in progress: mutates editor
+  /// state every frame but issues no database write. The committing
+  /// [updateWall] at `onDragEnd` performs the single persist. See the
+  /// debounced-persistence contract on `EditorStateNotifier`.
+  void updateWallTransient(WallSegment wall);
+
   /// Remove a wall by ID.
   void removeWall(String wallId);
 
@@ -112,6 +118,11 @@ abstract class EditorCallbacks {
 
   /// Update a room (e.g. polygon change during drag).
   void updateRoom(Room room);
+
+  /// In-memory-only room update for a drag in progress (room-polygon
+  /// rebuild while a wall is dragged). Mutates editor state only; the
+  /// committing [updateRoom] at `onDragEnd` performs the single persist.
+  void updateRoomTransient(Room room);
 
   /// Replace the entire wall list atomically (for undo/redo).
   void replaceAllWalls(List<WallSegment> walls);
@@ -159,6 +170,10 @@ abstract class EditorCallbacks {
   /// Replace an existing window element (same ID).
   void updateWindow(WindowElement window);
 
+  /// In-memory-only window update for a drag in progress. Mutates editor
+  /// state only; the committing [updateWindow] at `onDragEnd` persists.
+  void updateWindowTransient(WindowElement window);
+
   /// Remove a window by ID.
   void removeWindow(String windowId);
 
@@ -170,6 +185,10 @@ abstract class EditorCallbacks {
   /// Replace an existing door element (same ID).
   void updateDoor(Door door);
 
+  /// In-memory-only door update for a drag in progress. Mutates editor
+  /// state only; the committing [updateDoor] at `onDragEnd` persists.
+  void updateDoorTransient(Door door);
+
   /// Remove a door by ID.
   void removeDoor(String doorId);
 
@@ -180,6 +199,11 @@ abstract class EditorCallbacks {
 
   /// Replace the existing distributor in-place (same ID).
   void updateDistributor(Distributor distributor);
+
+  /// In-memory-only distributor update for a drag in progress. Mutates
+  /// editor state only; the committing [updateDistributor] at
+  /// `onDragEnd` performs the single persist.
+  void updateDistributorTransient(Distributor distributor);
 
   /// Remove the current distributor from the editor state.
   void removeDistributor();
@@ -230,6 +254,10 @@ abstract class EditorCallbacks {
 
   /// Replace an existing heating zone (same ID).
   void updateZone(HeatingZone zone);
+
+  /// In-memory-only zone update for a drag in progress. Mutates editor
+  /// state only; the committing [updateZone] at `onDragEnd` persists.
+  void updateZoneTransient(HeatingZone zone);
 
   /// Remove a heating zone by ID.
   void removeZone(String zoneId);

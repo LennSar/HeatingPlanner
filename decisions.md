@@ -1007,10 +1007,15 @@ maintained by the same code path that mutates either source.
     - The properties-panel Width/Height fields (ADR-015) are interpreted as
       **inner clear** dimensions; back-computing the four centerline corners
       uses the wall thicknesses on each side.
-    - When a wall is selected, a small lock/pin glyph is drawn on the
+    - ~~When a wall is selected, a small lock/pin glyph is drawn on the
       anchored face (inner face for `innerFace`, outer face for `outerFace`).
       For `centerline` (and therefore every shared wall) no glyph is drawn —
-      centerline is the implicit default.
+      centerline is the implicit default.~~ **Superseded (UX):** the
+      anchored-face pin glyph was removed at user request — it read as a
+      pressable "button" and cluttered the selected wall. `WallPainter` no
+      longer renders it (the `selectedWallId` / `pinFill` / `pinStroke` /
+      `worldToScreen` parameters were dropped). The anchor mode still drives
+      the thickness re-anchor math (Rule 6); it just has no on-canvas glyph.
 
 11. **No backwards compatibility.** Migration of pre-ADR-017 project data is
     out of scope. The expectation is that development databases are
@@ -1912,4 +1917,92 @@ Acceptance criteria include:
 - A legacy `"1.0"` custom-library file loads correctly via the
   ADR-022 Rule 4 migration and is rewritten at `"1.1"` on the
   next add/edit/delete.
+
+---
+
+## ADR-023 — Drag/slider DB writes are debounced to the interaction boundary
+
+**What.**
+The editor-state mutators (`EditorStateNotifier.updateWall` /
+`updateRoom` / `updateZone` / `updateWindow` / `updateDoor` /
+`updateDistributor`) each do two things: update the in-memory `state`
+**and** issue an immediate `unawaited(upsert…(dao, …))` to SQLite plus
+`markProjectDirty()`. Every one of those mutators now has a **transient
+twin** — `updateWallTransient`, `updateRoomTransient`, etc. — that
+updates `state` (and, for walls, the ADR-011 mirror partner) but performs
+**no** DAO write and does **not** mark the project dirty.
+
+Continuous interactions call the transient twin on every frame/tick; the
+**single** persisting call happens only when the interaction commits:
+
+- **Canvas drags (`SelectTool`).** Every per-frame `_apply*` path
+  (`_applyMidDrag`, `_applyEndpointDrag`, `_adjustConnectedWalls`,
+  `_adjustConnectedWallAtEndpoint`, `_updateRoomPolygon`, `_applyZoneDrag`,
+  `_applyWallZoneUpdate`, `_applyOpeningUpdate`, `_applyDistributorDrag`)
+  and every drag-revert path (`_revertDrag`, the `cancel()` reverts, the
+  invalid-zone-drag revert in `_commitZoneDrag`) call the **transient**
+  twins. The commit at `onDragEnd` already re-applies the final value
+  through the undo command's `execute()` (e.g. `_MoveWallCommand` →
+  persisting `updateWall`/`updateRoom`), so the database is written once
+  per changed element.
+- **Property-panel sliders.** `onChanged` calls the transient twin;
+  `onChangeEnd` performs the single persist. Room (`room_properties`),
+  zone (`heating_zone_properties` — spacing/height/border) and distributor
+  (`distributor_properties` — supply/return temp) sliders follow this.
+  The distributor sliders previously persisted every tick with no undo
+  entry and gained an `onChangeStart`/`onChangeEnd` commit that writes once.
+- **Project-settings sliders.** `ProjectSettingsNotifier` gained transient
+  setters (`setDesignOutdoorTempCTransient`, `setDefaultIndoorTempCTransient`,
+  `setUnheatedSpaceTempCTransient`, `setFloorHeightMmTransient`); the
+  temperature sliders call them on `onChanged` and the persisting setter on
+  `onChangeEnd`. The room-height slider also cascades to wall-zone heights:
+  the dialog snapshots the "auto" wall-zone ids (those matching the floor
+  height) at `onChangeStart` and drives `EditorStateNotifier`'s
+  `setWallZoneHeightsForIds(ids, h, persist: …)` — `persist: false` per
+  tick, `persist: true` once on release.
+
+**Why.**
+A single wall mid-drag frame fans out into several mutator calls
+(`_adjustConnectedWalls` + `_updateRoomPolygon`), so the prior code issued
+several synchronous SQLite writes **per pointer-move frame**; a slider did
+the same per tick. The canvas must read in-memory `state` synchronously
+every frame, so the state update has to stay live — but the durable write
+only needs the committed value. (The 3 s debounce in
+`SaveStateNotifier.markDirty` only governs the `.hsp` export, not the
+per-row SQLite writes.) Splitting "update state" from "persist" lets the
+hot path skip I/O entirely while keeping exactly one write — and exactly
+one undo entry — per interaction. Reverts use the transient twin because a
+transient drag never touched the database; the pre-drag values are still
+the persisted ones.
+
+**Rule.**
+1. Any new continuous interaction (drag, slider, scrub) MUST call the
+   `*Transient` mutator on the per-frame/per-tick path and the persisting
+   mutator exactly once at the commit boundary (`onDragEnd` /
+   `onChangeEnd`), normally via the undo command's `execute()`.
+2. The transient twins are the **only** mutators that may run on a hot
+   path. They never call a DAO and never `markProjectDirty()`. Persisting
+   mutators are unchanged: state + one upsert + `markProjectDirty()`.
+3. `updateWallTransient` replicates the ADR-011 mirror-partner sync
+   in-memory so a shared wall stays consistent mid-drag; it just omits the
+   two DAO writes.
+4. Tools reach the transient twins through `EditorCallbacks`
+   (`updateWallTransient` …); the canvas widget forwards them to the
+   notifier. Every `EditorCallbacks` implementer (including test stubs)
+   must provide them — test stubs may delegate the transient method to its
+   persisting counterpart.
+
+**Scope.**
+`EditorStateNotifier`, `ProjectSettingsNotifier`, `EditorCallbacks` +
+`FloorPlanCanvas`, `SelectTool` drag paths, and the room / heating-zone /
+distributor / project-settings slider panels. Undo/redo, mirror sync
+(ADR-011), and the persisting mutators' contracts are unchanged.
+
+**Verification.**
+`flutter analyze` clean. `test/unit/providers/transient_persistence_test.dart`:
+for each entity, N transient calls issue 0 upserts and one persisting call
+issues exactly 1 (plus the `setWallZoneHeightsForIds` persist flag).
+`test/widget/tools/select_tool_test.dart` "Debounced persistence": a
+five-frame mid-handle wall drag issues 0 wall/room upserts during the drag
+and, on drop, persists the room once and each moved wall at most once.
 

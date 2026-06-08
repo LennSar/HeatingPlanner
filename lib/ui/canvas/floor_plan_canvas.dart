@@ -293,6 +293,11 @@ class _FloorPlanCanvasState
   }
 
   @override
+  void updateWallTransient(WallSegment wall) {
+    ref.read(editorStateProvider.notifier).updateWallTransient(wall);
+  }
+
+  @override
   void removeWall(String wallId) {
     ref.read(editorStateProvider.notifier).removeWall(wallId);
   }
@@ -336,6 +341,11 @@ class _FloorPlanCanvasState
   @override
   void updateRoom(Room room) {
     ref.read(editorStateProvider.notifier).updateRoom(room);
+  }
+
+  @override
+  void updateRoomTransient(Room room) {
+    ref.read(editorStateProvider.notifier).updateRoomTransient(room);
   }
 
   @override
@@ -392,6 +402,11 @@ class _FloorPlanCanvasState
   }
 
   @override
+  void updateWindowTransient(WindowElement window) {
+    ref.read(editorStateProvider.notifier).updateWindowTransient(window);
+  }
+
+  @override
   void removeWindow(String windowId) {
     ref.read(editorStateProvider.notifier).removeWindow(windowId);
   }
@@ -409,6 +424,11 @@ class _FloorPlanCanvasState
   }
 
   @override
+  void updateDoorTransient(Door door) {
+    ref.read(editorStateProvider.notifier).updateDoorTransient(door);
+  }
+
+  @override
   void removeDoor(String doorId) {
     ref.read(editorStateProvider.notifier).removeDoor(doorId);
   }
@@ -423,6 +443,11 @@ class _FloorPlanCanvasState
   @override
   void updateZone(HeatingZone zone) {
     ref.read(editorStateProvider.notifier).updateZone(zone);
+  }
+
+  @override
+  void updateZoneTransient(HeatingZone zone) {
+    ref.read(editorStateProvider.notifier).updateZoneTransient(zone);
   }
 
   @override
@@ -627,6 +652,13 @@ class _FloorPlanCanvasState
   @override
   void updateDistributor(Distributor distributor) {
     ref.read(editorStateProvider.notifier).updateDistributor(distributor);
+  }
+
+  @override
+  void updateDistributorTransient(Distributor distributor) {
+    ref
+        .read(editorStateProvider.notifier)
+        .updateDistributorTransient(distributor);
   }
 
   @override
@@ -1286,8 +1318,6 @@ class _StaticWorldPainter extends CustomPainter {
       wallStroke: colors.wallStroke,
       walls: walls,
       rooms: rooms,
-      worldToScreen: transform,
-      selectedWallId: selectedWallId,
     ).paint(canvas, size);
 
     OpeningPainter(

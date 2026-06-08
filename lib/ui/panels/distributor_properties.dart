@@ -45,6 +45,10 @@ class _DistributorPropertiesState
 
   Distributor? _last;
 
+  /// Distributor captured at the start of a temperature-slider drag, so
+  /// `onChangeEnd` can skip the persist when nothing actually changed.
+  Distributor? _distAtSliderStart;
+
   @override
   void initState() {
     super.initState();
@@ -102,6 +106,14 @@ class _DistributorPropertiesState
     ref
         .read(editorStateProvider.notifier)
         .updateDistributor(updated);
+  }
+
+  /// In-memory-only update for a temperature slider in flight — no
+  /// SQLite write until `onChangeEnd` commits via [_update].
+  void _updateTransient(Distributor updated) {
+    ref
+        .read(editorStateProvider.notifier)
+        .updateDistributorTransient(updated);
   }
 
   @override
@@ -165,15 +177,25 @@ class _DistributorPropertiesState
                 .round(),
             label:
                 '${distributor.supplyTempC.toStringAsFixed(1)}°C',
+            onChangeStart: (_) => _distAtSliderStart = distributor,
             onChanged: (v) {
               final newReturn = distributor.returnTempC
                   .clamp(minReturnTempC, v - 1.0);
-              _update(
+              _updateTransient(
                 distributor.copyWith(
                   supplyTempC: v,
                   returnTempC: newReturn,
                 ),
               );
+            },
+            onChangeEnd: (v) {
+              final start = _distAtSliderStart;
+              _distAtSliderStart = null;
+              final current =
+                  ref.read(editorStateProvider).distributor;
+              if (current != null && current != start) {
+                _update(current);
+              }
             },
           ),
           _NumericField(
@@ -217,9 +239,19 @@ class _DistributorPropertiesState
                 .clamp(1, 9999),
             label:
                 '${distributor.returnTempC.toStringAsFixed(1)}°C',
-            onChanged: (v) => _update(
+            onChangeStart: (_) => _distAtSliderStart = distributor,
+            onChanged: (v) => _updateTransient(
               distributor.copyWith(returnTempC: v),
             ),
+            onChangeEnd: (v) {
+              final start = _distAtSliderStart;
+              _distAtSliderStart = null;
+              final current =
+                  ref.read(editorStateProvider).distributor;
+              if (current != null && current != start) {
+                _update(current);
+              }
+            },
           ),
           _NumericField(
             controller: _returnCtrl,
