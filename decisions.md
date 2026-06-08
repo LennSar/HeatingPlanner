@@ -2006,3 +2006,70 @@ issues exactly 1 (plus the `setWallZoneHeightsForIds` persist flag).
 five-frame mid-handle wall drag issues 0 wall/room upserts during the drag
 and, on drop, persists the room once and each moved wall at most once.
 
+## ADR-024 — Zone-colour recompute is debounced to the interaction boundary
+
+**What.**
+`zoneColorStatesProvider` (the ADR-004 `Map<zoneId, ZoneColorState>` the
+canvas paints) was a plain `Provider` that `ref.watch`ed
+`editorStateProvider` **and**, per zone, `roomHeatDemandProvider(roomId)`
+and `zoneHeatOutputProvider(zoneId)`. It is now a debounced
+`NotifierProvider` (`ZoneColorStatesNotifier`). The notifier `ref.watch`es
+**only the cheap trigger signals** — `editorStateProvider`,
+`designOutdoorTempCProvider`, `defaultIndoorTempCProvider`,
+`unheatedSpaceTempCProvider`, `floorHeightMmProvider` — and `ref.read`s (never
+watches) the heavy demand / output providers inside its compute. The first
+build computes synchronously (correct colours at rest / on load); every
+subsequent trigger cancels and restarts a trailing
+`zoneColorDebounceDuration` (100 ms) timer and returns the **previous** map
+instance (so listeners are not notified) until the timer fires with the
+settled value.
+
+**Why.**
+The colour result is expensive: each zone runs the full EN 12831 heat-load
+graph (`roomHeatDemandProvider`) plus `zoneHeatOutputProvider`. Per ADR-023 a
+continuous interaction mutates in-memory state every frame/tick — a zone drag
+mutates `editorStateProvider`; a project-settings temperature slider mutates
+`designOutdoorTempCProvider`, which invalidates **every** room's demand per
+tick. Because the old provider *watched* the heavy providers, every tick
+re-ran the whole graph for all rooms and rebuilt the canvas — many times per
+second — even though only the settled value affects the colours. By watching
+only the cheap triggers and *reading* the heavy providers post-debounce,
+nothing subscribes to them during the burst, so they are not eagerly
+recomputed each tick; they are evaluated **once**, lazily, when the timer
+fires (O(1) per burst instead of O(N)). Geometry still renders live every
+frame: the canvas watches `editorStateProvider` directly for wall / room /
+zone outlines and only depends on this notifier for fill colour.
+
+**Rule.**
+1. The debounce lives in the UI-provider notifier, **not** in the calculation
+   engines or the demand / output providers — those stay pure and unchanged.
+2. The notifier must watch the complete set of cheap trigger signals so no
+   legitimate at-rest change is missed; all building geometry is mirrored in
+   `editorStateProvider` and the thermal settings are the only other source.
+   It must **not** watch the heavy demand / output providers, or the O(N)
+   burst returns.
+3. The committed (final) value of any drag/slider is the last state change, so
+   the surviving timer recomputes against it — colours are never left stale
+   once the interaction settles. There is no separate explicit flush.
+4. The debounce only fires while `zoneColorStatesProvider` has an active
+   listener (eager rebuild); the canvas always `ref.watch`es it, so this holds
+   in production. Tests must `listen` (not merely `read`) to exercise it.
+
+**User-visible effect.**
+Zone *outlines* still drag live. Zone *fill colour* holds its last-settled
+value during an active drag / slider sweep and snaps to the correct final
+value ~100 ms after the user stops. The final colour always matches the
+non-debounced result.
+
+**Scope.**
+`zoneColorStatesProvider` only. ADR-004 priority order, ADR-023 transient
+persistence, and the demand / output providers' contracts are unchanged.
+
+**Verification.**
+`flutter analyze` clean.
+`test/unit/providers/zone_color_state_debounce_test.dart`: a 10-tick outdoor-
+temperature burst evaluates the (instrumented) demand provider exactly once
+for the whole burst (O(1), not O(N)); the colour map holds its pre-burst value
+mid-burst; and after the debounce the map equals the colour computed directly
+from the final demand / output values.
+
