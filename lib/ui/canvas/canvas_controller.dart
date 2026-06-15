@@ -78,31 +78,55 @@ class CanvasState {
 class CanvasController extends Notifier<CanvasState> {
   Offset? _lastFocalPoint;
 
+  /// Zoom at the moment the current pinch gesture started.
+  ///
+  /// The gesture's `scale` is cumulative (1.0 at gesture start), so the
+  /// target zoom is always `_gestureStartZoom * scale`. Anchoring on this
+  /// stored value — instead of multiplying the live zoom by a per-event
+  /// delta derived from a stale, build-time snapshot — keeps zoom stable when
+  /// several scale events fire within one frame, which otherwise caused the
+  /// zoom to spike and snap back (flicker).
+  double? _gestureStartZoom;
+
   @override
   CanvasState build() => CanvasState.initial;
 
   /// Begin a pan/zoom gesture at [focalPoint].
   void onScaleStart(Offset focalPoint) {
     _lastFocalPoint = focalPoint;
+    _gestureStartZoom = state.zoom;
   }
 
   /// Update pan and zoom during a gesture.
+  ///
+  /// [scale] is the gesture's cumulative scale since [onScaleStart] (1.0 at
+  /// the start of the gesture). The zoom is anchored at [focalPoint] so the
+  /// point under the fingers stays fixed while pinching.
   void onScaleUpdate({
     required Offset focalPoint,
     required double scale,
   }) {
-    final delta =
-        focalPoint - (_lastFocalPoint ?? focalPoint);
-    _lastFocalPoint = focalPoint;
-
-    final newZoom = (state.zoom * scale).clamp(
+    final startZoom = _gestureStartZoom ?? state.zoom;
+    final oldZoom = state.zoom;
+    final newZoom = (startZoom * scale).clamp(
       CanvasState.minZoom,
       CanvasState.maxZoom,
     );
 
+    // Pan from finger movement since the last event.
+    final panDelta =
+        focalPoint - (_lastFocalPoint ?? focalPoint);
+    _lastFocalPoint = focalPoint;
+    final pannedOffset = state.panOffset + panDelta;
+
+    // Keep the focal point fixed under the fingers while zooming.
+    final zoomRatio = oldZoom == 0 ? 1.0 : newZoom / oldZoom;
+    final newPan =
+        focalPoint - (focalPoint - pannedOffset) * zoomRatio;
+
     state = state.copyWith(
       zoom: newZoom,
-      panOffset: state.panOffset + delta,
+      panOffset: newPan,
     );
   }
 

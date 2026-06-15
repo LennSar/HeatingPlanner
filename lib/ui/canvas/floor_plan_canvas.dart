@@ -259,8 +259,6 @@ class _FloorPlanCanvasState
   final ValueNotifier<_InteractionState> _interactionState =
       ValueNotifier(_emptyInteractionState);
 
-  double _initialZoom = 1.0;
-
   /// Whether the canvas zoom has been initialised from the
   /// actual widget size. Set on the first [LayoutBuilder]
   /// callback so the initial view always shows ≥12 m in the
@@ -1106,22 +1104,22 @@ class _FloorPlanCanvasState
           child: GestureDetector(
             onScaleStart: (details) {
               if (_isDragging) return;
-              _initialZoom = canvasState.zoom;
               ref
                   .read(canvasControllerProvider.notifier)
                   .onScaleStart(details.localFocalPoint);
             },
             onScaleUpdate: (details) {
               if (_isDragging) return;
+              // Pass the cumulative gesture scale straight through; the
+              // controller anchors it on the zoom captured at gesture start.
+              // Deriving a per-event delta here from the build-time
+              // `canvasState` snapshot made zoom flicker when several scale
+              // events fired within one frame (the snapshot was stale).
               ref
                   .read(canvasControllerProvider.notifier)
                   .onScaleUpdate(
                     focalPoint: details.localFocalPoint,
-                    scale: details.scale == 1.0
-                        ? 1.0
-                        : details.scale /
-                            (canvasState.zoom /
-                                _initialZoom),
+                    scale: details.scale,
                   );
             },
             onTapDown: (details) {
