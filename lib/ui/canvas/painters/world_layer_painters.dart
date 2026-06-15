@@ -16,17 +16,19 @@ import 'opening_painter.dart';
 import 'pipe_route_painter.dart';
 import 'wall_painter.dart';
 
-/// The non-interactive world is split into three stacked [CustomPaint]
-/// layers — [GridLayerPainter], [GeometryLayerPainter] and
-/// [PipeAnnotationLayerPainter] — each sitting behind its own
+/// The non-interactive world is split into four stacked [CustomPaint]
+/// layers — [GridLayerPainter], [GeometryLayerPainter], [PipeLayerPainter]
+/// and [AnnotationLayerPainter] — each sitting behind its own
 /// `RepaintBoundary`. The split groups sub-painters by what invalidates
 /// them so a geometry edit (which mints fresh `walls`/`rooms` list
 /// identities every drag frame) repaints only the layers whose inputs
 /// actually changed. In particular the grid depends on none of the
-/// geometry and therefore never repaints during a wall or room drag.
+/// geometry and therefore never repaints during a wall or room drag, and the
+/// expensive annotation text layout (ADR-026) is isolated on its own layer
+/// fed by a drag-throttled geometry snapshot.
 ///
 /// Stacking order, bottom → top: grid, then geometry (zones → walls →
-/// openings), then pipes/distributor/annotations. This reproduces the
+/// openings), then pipes/distributor, then annotations. This reproduces the
 /// exact draw order of the former single-pass painter.
 
 /// Bottom layer: the dot grid.
@@ -167,24 +169,20 @@ class GeometryLayerPainter extends CustomPainter {
   }
 }
 
-/// Top non-interactive layer: pipe routes, the distributor, and dimension
-/// annotations.
+/// Third layer: pipe routes and the distributor.
 ///
-/// Annotations read wall/room geometry, so this layer repaints during a
-/// wall drag (the labels genuinely change); the pipe routes and
-/// distributor ride along. It does **not** repaint on hover or pointer
-/// motion — those flow through the separate interaction layer.
-class PipeAnnotationLayerPainter extends CustomPainter {
-  /// Creates a [PipeAnnotationLayerPainter].
-  const PipeAnnotationLayerPainter({
+/// Cheap vector draws keyed on [circuits] / [distributor]. Split out from the
+/// annotation layer (ADR-026) so a distributor or pipe edit never drags the
+/// expensive whole-floor text layout along with it, and vice-versa. Does
+/// **not** repaint on hover or pointer motion — those flow through the
+/// separate interaction layer.
+class PipeLayerPainter extends CustomPainter {
+  /// Creates a [PipeLayerPainter].
+  const PipeLayerPainter({
     required this.transform,
     required this.colors,
-    required this.onSurface,
-    required this.walls,
-    required this.rooms,
     required this.circuits,
     this.distributor,
-    this.selectedWallId,
   });
 
   /// World → screen transform.
@@ -193,23 +191,11 @@ class PipeAnnotationLayerPainter extends CustomPainter {
   /// Theme colours (identity-stable across rebuilds unless the theme changes).
   final HeatingPlannerColors colors;
 
-  /// Colour for annotation text (`ColorScheme.onSurface`).
-  final Color onSurface;
-
-  /// All wall segments — read by the annotation painter.
-  final List<WallSegment> walls;
-
-  /// All rooms — read by the annotation painter.
-  final List<Room> rooms;
-
   /// All heating circuits — read by the pipe-route painter.
   final List<HeatingCircuit> circuits;
 
   /// The single distributor, or null when none is placed.
   final Distributor? distributor;
-
-  /// Id of the currently selected wall, for the centerline sub-label.
-  final String? selectedWallId;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -231,23 +217,72 @@ class PipeAnnotationLayerPainter extends CustomPainter {
       circuits: circuits,
     ).paint(canvas, size);
 
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(PipeLayerPainter oldDelegate) {
+    return transform != oldDelegate.transform ||
+        !identical(colors, oldDelegate.colors) ||
+        !identical(circuits, oldDelegate.circuits) ||
+        distributor != oldDelegate.distributor;
+  }
+}
+
+/// Top non-interactive layer: dimension annotations (per-wall *Lichtmaß*
+/// length labels and per-room width × height labels).
+///
+/// [AnnotationPainter] lays out a fresh `ui.Paragraph` for every wall and
+/// every room on each paint — the most expensive thing the world layers draw.
+/// Isolating it behind its own `RepaintBoundary` and keying `shouldRepaint`
+/// solely on [walls] / [rooms] / [selectedWallId] means the text layout runs
+/// only when that geometry's list identity actually changes. The canvas feeds
+/// this layer from [annotationGeometryProvider], which throttles that identity
+/// to ~10 fps during a drag (ADR-026): the wall outline moves live every frame,
+/// the labels follow at the sampled rate, and a distributor/pipe edit never
+/// touches this layer at all.
+class AnnotationLayerPainter extends CustomPainter {
+  /// Creates an [AnnotationLayerPainter].
+  const AnnotationLayerPainter({
+    required this.transform,
+    required this.onSurface,
+    required this.walls,
+    required this.rooms,
+    this.selectedWallId,
+  });
+
+  /// World → screen transform.
+  final Matrix4 transform;
+
+  /// Colour for annotation text (`ColorScheme.onSurface`).
+  final Color onSurface;
+
+  /// All wall segments — read by the annotation painter.
+  final List<WallSegment> walls;
+
+  /// All rooms — read by the annotation painter.
+  final List<Room> rooms;
+
+  /// Id of the currently selected wall, for the centerline sub-label.
+  final String? selectedWallId;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    canvas.save();
+    canvas.transform(transform.storage);
     AnnotationPainter(
       textColor: onSurface,
       walls: walls,
       rooms: rooms,
       selectedWallId: selectedWallId,
     ).paint(canvas, size);
-
     canvas.restore();
   }
 
   @override
-  bool shouldRepaint(PipeAnnotationLayerPainter oldDelegate) {
+  bool shouldRepaint(AnnotationLayerPainter oldDelegate) {
     return transform != oldDelegate.transform ||
-        !identical(colors, oldDelegate.colors) ||
         onSurface != oldDelegate.onSurface ||
-        !identical(circuits, oldDelegate.circuits) ||
-        distributor != oldDelegate.distributor ||
         !identical(walls, oldDelegate.walls) ||
         !identical(rooms, oldDelegate.rooms) ||
         selectedWallId != oldDelegate.selectedWallId;

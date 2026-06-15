@@ -1,18 +1,19 @@
 // Tests for the split non-interactive world layers (agent-frontend.md §4.3).
 //
-// The floor plan's static world is painted as three stacked layers —
-// GridLayerPainter, GeometryLayerPainter, PipeAnnotationLayerPainter — each
-// behind its own RepaintBoundary with a tight shouldRepaint keyed only on its
-// real inputs. The central guarantee verified here: a geometry edit (which
-// mints fresh walls/rooms list identities every drag frame) must NOT repaint
-// the grid layer, because the grid depends only on transform / spacing /
-// visibleRect / dot colour.
+// The floor plan's static world is painted as four stacked layers —
+// GridLayerPainter, GeometryLayerPainter, PipeLayerPainter, AnnotationLayerPainter
+// — each behind its own RepaintBoundary with a tight shouldRepaint keyed only on
+// its real inputs. Central guarantees verified here: a geometry edit (which mints
+// fresh walls/rooms list identities every drag frame) must NOT repaint the grid
+// or pipe layers, and the expensive annotation layer must stay still between the
+// ~10 fps geometry samples it is fed during a drag (ADR-026).
 //
-// Naming: WLP-Gnn grid layer, WLP-GEnn geometry layer, WLP-PAnn pipe/annotation.
+// Naming: WLP-Gnn grid, WLP-GEnn geometry, WLP-PInn pipe, WLP-ANnn annotation.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/core/theme/app_theme.dart';
+import 'package:heating_planner/data/models/heating_circuit.dart';
 import 'package:heating_planner/data/models/point2d.dart';
 import 'package:heating_planner/data/models/room.dart';
 import 'package:heating_planner/data/models/wall_segment.dart';
@@ -114,45 +115,72 @@ void main() {
     });
   });
 
-  group('PipeAnnotationLayerPainter.shouldRepaint', () {
-    PipeAnnotationLayerPainter pipes({
+  group('PipeLayerPainter.shouldRepaint', () {
+    PipeLayerPainter pipes({List<HeatingCircuit>? circuits}) {
+      return PipeLayerPainter(
+        transform: transform,
+        colors: colors,
+        circuits: circuits ?? const [],
+      );
+    }
+
+    test('WLP-PI01: a fresh walls/rooms identity does NOT repaint the pipe '
+        'layer (ADR-026: geometry lives on the geometry/annotation layers)',
+        () {
+      // The pipe layer holds no wall/room geometry, so the per-frame geometry
+      // churn of a wall drag must never invalidate it.
+      expect(pipes().shouldRepaint(pipes()), isFalse);
+    });
+
+    test('WLP-PI02: repaints when the circuits identity changes', () {
+      // const [] is canonical (identical); a fresh list forces a repaint.
+      expect(pipes(circuits: []).shouldRepaint(pipes()), isTrue);
+    });
+  });
+
+  group('AnnotationLayerPainter.shouldRepaint', () {
+    AnnotationLayerPainter annotations({
       required List<WallSegment> walls,
       required List<Room> rooms,
       String? selectedWallId,
     }) {
-      return PipeAnnotationLayerPainter(
+      return AnnotationLayerPainter(
         transform: transform,
-        colors: colors,
         onSurface: onSurface,
         walls: walls,
         rooms: rooms,
-        circuits: const [],
         selectedWallId: selectedWallId,
       );
     }
 
-    test('WLP-PA01: repaints when wall geometry changes (annotation labels)',
+    test('WLP-AN01: repaints when wall geometry changes (annotation labels)',
         () {
       final rooms = [createTestRoom()];
-      final before = pipes(walls: [createTestWall()], rooms: rooms);
-      final after = pipes(walls: [createTestWall()], rooms: rooms);
-      // Fresh walls list identity each frame → annotation labels may change.
+      // A new sample from annotationGeometryProvider mints a fresh walls list.
+      final before = annotations(walls: [createTestWall()], rooms: rooms);
+      final after = annotations(walls: [createTestWall()], rooms: rooms);
       expect(after.shouldRepaint(before), isTrue);
     });
 
-    test('WLP-PA02: repaints when the selected wall changes', () {
+    test('WLP-AN02: repaints when the selected wall changes', () {
       final walls = [createTestWall()];
       final rooms = [createTestRoom()];
-      final before = pipes(walls: walls, rooms: rooms);
-      final after = pipes(walls: walls, rooms: rooms, selectedWallId: 'wall-1');
+      final before = annotations(walls: walls, rooms: rooms);
+      final after =
+          annotations(walls: walls, rooms: rooms, selectedWallId: 'wall-1');
       expect(after.shouldRepaint(before), isTrue);
     });
 
-    test('WLP-PA03: does NOT repaint when nothing changed', () {
+    test(
+        'WLP-AN03: does NOT repaint when the geometry identity is unchanged '
+        '(stable between 10 fps samples → no text layout)', () {
+      // Between samples annotationGeometryProvider returns the SAME lists, so
+      // the layer must not repaint and the per-wall/room text layout is skipped
+      // — the whole point of ADR-026.
       final walls = [createTestWall()];
       final rooms = [createTestRoom()];
-      final before = pipes(walls: walls, rooms: rooms);
-      final after = pipes(walls: walls, rooms: rooms);
+      final before = annotations(walls: walls, rooms: rooms);
+      final after = annotations(walls: walls, rooms: rooms);
       expect(after.shouldRepaint(before), isFalse);
     });
   });

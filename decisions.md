@@ -2073,3 +2073,73 @@ for the whole burst (O(1), not O(N)); the colour map holds its pre-burst value
 mid-burst; and after the debounce the map equals the colour computed directly
 from the final demand / output values.
 
+
+---
+
+## ADR-026 — Dimension labels are throttled to ~10 fps during an active drag
+
+**What.**
+The former combined pipe+annotation world layer is split into two
+`RepaintBoundary`-isolated layers: `PipeLayerPainter` (pipe routes +
+distributor) and `AnnotationLayerPainter` (the per-wall *Lichtmaß* length
+labels and per-room width × height labels). The annotation layer's
+`shouldRepaint` is keyed solely on `walls` / `rooms` / `selectedWallId`
+identity, so its `ui.Paragraph` text layout runs only when that geometry's
+list identity actually changes.
+
+The canvas no longer feeds the annotation layer `editorState` directly. It
+feeds it `annotationGeometryProvider` (`AnnotationGeometryNotifier`), which:
+
+- at rest, `ref.watch`es `editorStateProvider` and returns its live
+  `walls` / `rooms` (same identity → an edit relayouts labels immediately);
+- while `activeDragProvider` is true, `ref.read`s the geometry once (so the
+  build does not re-subscribe and therefore does not re-run per frame) and
+  arms a `Timer.periodic(annotationSampleInterval = 100 ms)` that pushes a
+  fresh snapshot ~10×/second. Between samples the emitted list identity is
+  stable → the annotation layer does not repaint → no text layout. Holding
+  still is free: the lists are unchanged, and List `==` is identity, so the
+  Notifier suppresses the no-op notification.
+
+`activeDragProvider` (`ActiveDragNotifier`, `NotifierProvider<bool>`) is
+flipped on at the `!_isDragging` transition in `onPointerMove` and off on
+`onPointerUp`; the off-transition makes the feed snap back to the live,
+settled geometry.
+
+**Why.**
+`AnnotationPainter` lays out a fresh `ui.Paragraph` (full text layout — among
+the most expensive Flutter canvas operations) for **every wall and every
+room** on each paint. Per ADR-023 a wall/room drag re-mints the
+`editorState.walls` / `rooms` lists every frame, so the annotation layer
+re-ran the whole-floor text layout ~60×/second — the remaining cause of
+wall-drag lag after ADR-023/024/025. The first cut fully *suppressed* the
+labels during a drag, but those mm dimensions are genuinely useful for sizing
+a room while dragging. Sampling the geometry at ~10 fps keeps the labels
+live-updating at a rate that reads as smooth while cutting the text-layout
+cost by ~6× and leaving the wall outline itself moving at full frame rate (it
+lives on the geometry layer, fed live).
+
+The split is what makes the throttle airtight: because annotations sit on
+their own layer keyed only on geometry identity, a distributor or pipe drag
+(which churns `distributor` / `circuits`, not `walls`) never drags the text
+layout along — and a wall drag never needlessly repaints the pipes.
+
+**Scope.**
+Active *tool drags* only (gated by the same `_isDragging` flag that already
+gates pan). Pan/zoom still relayouts annotations every frame (transform
+changed) — a smaller, separate cost left for a future paragraph-cache if it
+ever matters. The timer is cancelled on every non-dragging rebuild and via
+`ref.onDispose`; `end()` is idempotent and balanced against `_isDragging`, so
+a no-op/cancelled drag cannot strand the sampler running.
+
+**Verification.**
+`flutter analyze` clean.
+`test/widget/canvas/world_layer_painters_test.dart`: WLP-PI01 — a fresh
+walls/rooms identity does not repaint the pipe layer; WLP-AN03 — the
+annotation layer does not repaint when geometry identity is unchanged (stable
+between samples → no layout); WLP-AN01/02 — it does repaint on a real geometry
+or selection change.
+`test/unit/providers/annotation_geometry_throttle_test.dart`: at rest the feed
+shares `editorState`'s list identity; during a drag a burst of transient
+frames within one sample window does **not** change the emitted identity; one
+`annotationSampleInterval` later the feed catches up to the latest geometry;
+and drag-end snaps back to the live settled geometry.

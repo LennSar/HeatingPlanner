@@ -1,3 +1,5 @@
+import 'dart:async' show Timer;
+
 import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
@@ -78,6 +80,88 @@ final toolRotateDistributorProvider =
     NotifierProvider<ToolRotateDistributorNotifier, int>(
   ToolRotateDistributorNotifier.new,
 );
+
+/// Whether a tool drag (wall/room/zone/opening move) is currently in
+/// progress (ADR-026).
+///
+/// Flipped on as soon as a pointer-down drag starts moving and off again on
+/// pointer-up. Drives [annotationGeometryProvider], which samples the geometry
+/// the dimension labels read at ~10 fps while this is true (instead of the
+/// per-frame whole-floor text layout that made wall drags lag). Kept as a
+/// provider (rather than local widget state) so the flip drives a single
+/// canvas rebuild at each drag boundary and the behaviour is unit-testable.
+final activeDragProvider =
+    NotifierProvider<ActiveDragNotifier, bool>(ActiveDragNotifier.new);
+
+/// Notifier backing [activeDragProvider].
+class ActiveDragNotifier extends Notifier<bool> {
+  @override
+  bool build() => false;
+
+  /// Marks a drag as started; no-op if already active.
+  void begin() {
+    if (!state) state = true;
+  }
+
+  /// Marks a drag as ended; no-op if already idle.
+  void end() {
+    if (state) state = false;
+  }
+}
+
+/// The walls + rooms snapshot the dimension-annotation layer reads.
+typedef AnnotationGeometry = ({List<WallSegment> walls, List<Room> rooms});
+
+/// Sample rate for the dimension labels while a drag is in progress (ADR-026).
+const Duration annotationSampleInterval = Duration(milliseconds: 100);
+
+/// Geometry feed for the annotation layer, throttled during a drag.
+///
+/// At rest it mirrors [editorStateProvider] live, so a normal edit updates the
+/// mm labels immediately. While [activeDragProvider] is true it instead samples
+/// the live (transient) geometry every [annotationSampleInterval] (~10 fps):
+/// between samples the walls/rooms list identity is stable, so the annotation
+/// layer's `shouldRepaint` returns false and the expensive per-wall / per-room
+/// `ui.Paragraph` layout does not run. The wall *outline* still moves live at
+/// full frame rate — only the labels lag by up to one sample.
+final annotationGeometryProvider =
+    NotifierProvider<AnnotationGeometryNotifier, AnnotationGeometry>(
+  AnnotationGeometryNotifier.new,
+);
+
+/// Notifier backing [annotationGeometryProvider].
+class AnnotationGeometryNotifier extends Notifier<AnnotationGeometry> {
+  Timer? _timer;
+
+  @override
+  AnnotationGeometry build() {
+    final dragging = ref.watch(activeDragProvider);
+    ref.onDispose(() {
+      _timer?.cancel();
+      _timer = null;
+    });
+
+    if (!dragging) {
+      // At rest: track live geometry so edits relayout labels immediately.
+      _timer?.cancel();
+      _timer = null;
+      final s = ref.watch(editorStateProvider);
+      return (walls: s.walls, rooms: s.rooms);
+    }
+
+    // Dragging: read (not watch) so build does not re-run every frame; a
+    // periodic timer pushes ~10 fps snapshots instead. Return the drag-start
+    // geometry now and let the timer advance it. Setting state to a record
+    // whose lists are unchanged (user holding still) is a no-op — List `==` is
+    // identity, so the Notifier suppresses the notification.
+    final s = ref.read(editorStateProvider);
+    _timer ??= Timer.periodic(annotationSampleInterval, (_) {
+      final e = ref.read(editorStateProvider);
+      state = (walls: e.walls, rooms: e.rooms);
+    });
+    return (walls: s.walls, rooms: s.rooms);
+  }
+}
 
 // ----------------------------------------------------------
 // Wall modifier flags (Shift / Ctrl / Alt and tablet toggles)
@@ -822,6 +906,11 @@ class _FloorPlanCanvasState
             .watch(gridSpacingMmProvider)
             .when(data: (v) => v.toDouble(), loading: () => 100.0, error: (_, __) => 100.0);
     final hoveredElement = ref.watch(hoveredElementProvider);
+
+    // ADR-026: the annotation layer reads a geometry snapshot that is throttled
+    // to ~10 fps during a drag, so the whole-floor text layout no longer runs
+    // every frame.
+    final annotationGeometry = ref.watch(annotationGeometryProvider);
     final colors = Theme.of(context)
         .extension<HeatingPlannerColors>()!;
     final onSurface =
@@ -981,6 +1070,8 @@ class _FloorPlanCanvasState
               );
               if (!_isDragging) {
                 _isDragging = true;
+                // ADR-026: suppress the dimension-label layer for the drag.
+                ref.read(activeDragProvider.notifier).begin();
               }
               _activeTool?.onDragUpdate(worldPoint);
 
@@ -1002,6 +1093,9 @@ class _FloorPlanCanvasState
             if (_isDragging) {
               _activeTool?.onDragEnd(worldPoint);
               _isDragging = false;
+              // ADR-026: drag committed — bring the labels back (one repaint,
+              // recomputed from the settled geometry).
+              ref.read(activeDragProvider.notifier).end();
             } else {
               // Non-drag pointer-up: let tools execute deferred
               // actions (e.g. zone body drag threshold not reached).
@@ -1161,14 +1255,24 @@ class _FloorPlanCanvasState
                       RepaintBoundary(
                         child: CustomPaint(
                           size: viewSize,
-                          painter: PipeAnnotationLayerPainter(
+                          painter: PipeLayerPainter(
                             transform: canvasState.transform,
                             colors: colors,
-                            onSurface: onSurface,
-                            walls: editorState.walls,
-                            rooms: editorState.rooms,
                             circuits: editorState.circuits,
                             distributor: editorState.distributor,
+                          ),
+                        ),
+                      ),
+                      RepaintBoundary(
+                        child: CustomPaint(
+                          size: viewSize,
+                          // ADR-026: throttled geometry → labels relayout at
+                          // ~10 fps during a drag, full rate at rest.
+                          painter: AnnotationLayerPainter(
+                            transform: canvasState.transform,
+                            onSurface: onSurface,
+                            walls: annotationGeometry.walls,
+                            rooms: annotationGeometry.rooms,
                             selectedWallId: selectedWallId,
                           ),
                         ),
