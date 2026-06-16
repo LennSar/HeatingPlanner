@@ -49,8 +49,23 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
   // ---- Rect-mode drag state ----
   Point2D? _dragStart;
 
+  // ---- Non-rect press-hold-drag state ----
+
+  /// Snapped world point captured on pointer-down (the anchor for a
+  /// press-hold-drag when no [_startPoint] has been set yet).
+  Point2D? _pressSnapped;
+
+  /// Timestamp of the last pointer-down, used to tell a deliberate
+  /// press-hold-drag from an accidental micro-jitter during a click.
+  DateTime? _pressTime;
+
   /// Minimum wall length in mm (prevents zero-length walls).
   static const double _minLengthMm = 100.0;
+
+  /// A press held at least this long before release is treated as a
+  /// deliberate hold-drag (commits the wall) even if the cursor barely
+  /// moved. Shorter presses fall back to click-click semantics.
+  static const int _holdThresholdMs = 200;
 
   @override
   String get name => 'Draw Wall';
@@ -78,7 +93,16 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
 
   @override
   void onPointerDown(Point2D worldPoint, int buttons) {
-    if (!rectMode) return;
+    if (!rectMode) {
+      // Non-rect: record the press so a press-hold-drag can commit a
+      // wall on release. The actual commit/click decision is made in
+      // onDragEnd (moved while pressed) or onPointerUp (pure click).
+      _pressTime = DateTime.now();
+      _pressSnapped = applyOrtho(_startPoint ?? worldPoint, _snap(worldPoint));
+      _currentSnapped = _pressSnapped;
+      onStateChanged();
+      return;
+    }
     // Grid snap then corner snap (ADR-009 §Rule 1).
     _dragStart = SnapService.snapRectCorner(
       _snap(worldPoint),
@@ -91,7 +115,16 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
 
   @override
   void onDragUpdate(Point2D worldPoint) {
-    if (!rectMode || _dragStart == null) return;
+    if (!rectMode) {
+      // Non-rect press-hold-drag: live ghost line from the anchor
+      // (existing start point, or the press point for a fresh wall).
+      final anchor = _startPoint ?? _pressSnapped;
+      if (anchor == null) return;
+      _currentSnapped = applyOrtho(anchor, _snap(worldPoint));
+      onStateChanged();
+      return;
+    }
+    if (_dragStart == null) return;
     // Grid snap → ortho → corner snap.
     final orthoSnapped = applyOrtho(_dragStart!, _snap(worldPoint));
     _currentSnapped = SnapService.snapRectCorner(
@@ -104,7 +137,10 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
 
   @override
   void onDragEnd(Point2D worldPoint) {
-    if (!rectMode) return;
+    if (!rectMode) {
+      _endNonRectGesture(worldPoint, moved: true);
+      return;
+    }
     final start = _dragStart;
     _dragStart = null;
     if (start == null) return;
@@ -228,29 +264,86 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
     Point2D worldPoint,
     PointerDeviceKind deviceKind,
   ) {
-    if (rectMode) return; // rect mode uses drag, not tap
+    // Non-rect wall drawing is driven by the raw pointer events
+    // (onPointerDown / onDragUpdate / onDragEnd / onPointerUp) so a
+    // single press-hold-drag can commit a wall on release as well as
+    // the click-click flow. The GestureDetector tap path fires on
+    // press (before a drag is known) and is intentionally unused here.
+  }
 
-    final snapped = applyOrtho(
-      _startPoint ?? worldPoint,
-      _snap(worldPoint),
-    );
+  @override
+  void onPointerUp(Point2D worldPoint) {
+    // Pure click (no drag occurred): click-click flow.
+    if (rectMode) return;
+    _endNonRectGesture(worldPoint, moved: false);
+  }
 
-    if (_startPoint == null) {
-      // First click: set start point.
-      _startPoint = snapped;
+  /// Resolve a finished non-rect pointer gesture into either a
+  /// click-click step or a press-hold-drag commit.
+  ///
+  /// [moved] is true when the pointer dragged while pressed (the
+  /// canvas fired onDragEnd), false for a pure click (onPointerUp).
+  void _endNonRectGesture(Point2D worldPoint, {required bool moved}) {
+    final pressTime = _pressTime;
+    _pressTime = null;
+    final pressSnapped = _pressSnapped;
+    _pressSnapped = null;
+
+    final anchor = _startPoint ?? pressSnapped ?? _snap(worldPoint);
+    final end = applyOrtho(anchor, _snap(worldPoint));
+    final lengthMm = GeometryEngine.distanceMm(anchor, end);
+
+    final heldLongEnough = pressTime != null &&
+        DateTime.now().difference(pressTime).inMilliseconds >= _holdThresholdMs;
+
+    // A deliberate press-hold-drag commits the wall and finishes the
+    // chain on release. We treat the gesture as a hold-drag when the
+    // pointer moved and either the press was held a typical duration
+    // or the resulting wall is long enough to be intentional.
+    final isHoldDrag = moved && (heldLongEnough || lengthMm >= _minLengthMm);
+
+    if (isHoldDrag) {
+      if (lengthMm < _minLengthMm) {
+        // Held long but barely moved — nothing to commit.
+        _currentSnapped = _startPoint;
+        onStateChanged();
+        return;
+      }
+      _commitWall(anchor, end);
+      // Press-hold-drag finishes the wall on release (no chaining).
+      _startPoint = null;
+      _currentSnapped = null;
+      _currentSnapType = null;
       onStateChanged();
       return;
     }
 
-    // Second click: validate and commit wall.
-    final lengthMm = GeometryEngine.distanceMm(_startPoint!, snapped);
-    if (lengthMm < _minLengthMm) return;
+    // Click-click flow (also catches a stray micro-jitter during a
+    // click, which is treated as a plain click rather than a drag).
+    if (_startPoint == null) {
+      // First click: set start point.
+      _startPoint = anchor;
+      _currentSnapped = anchor;
+      onStateChanged();
+      return;
+    }
 
+    // Second click: validate and commit wall, then chain.
+    if (lengthMm < _minLengthMm) return;
+    _commitWall(_startPoint!, end);
+    _startPoint = end;
+    _currentSnapped = end;
+    onStateChanged();
+  }
+
+  /// Build, commit (with host-wall split), register undo for, and run
+  /// room detection on a single wall from [start] to [end].
+  void _commitWall(Point2D start, Point2D end) {
     final wall = WallSegment(
       id: IdGenerator.newId(),
       roomId: '',
-      startPoint: _startPoint!,
-      endPoint: snapped,
+      startPoint: start,
+      endPoint: end,
     );
 
     // Snapshot walls before commit for undo.
@@ -267,13 +360,9 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
       newWalls: newWalls,
     ));
 
-    // Chain: use endpoint as next start.
-    _startPoint = snapped;
-    onStateChanged();
-
     // Check for room detection.
-    final allWalls = callbacks.currentWalls;
-    final detected = RoomDetection.detectClosedRoom(allWalls, wall);
+    final detected =
+        RoomDetection.detectClosedRoom(callbacks.currentWalls, wall);
     if (detected != null) {
       callbacks.requestRoomDialog(detected.polygon, detected.wallIds);
     }
@@ -310,6 +399,8 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
   void cancel() {
     _startPoint = null;
     _dragStart = null;
+    _pressSnapped = null;
+    _pressTime = null;
     _currentSnapped = null;
     _currentSnapType = null;
     onStateChanged();
