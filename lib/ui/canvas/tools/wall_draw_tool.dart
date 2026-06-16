@@ -48,6 +48,14 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
   /// Snap type for the current cursor position.
   SnapType? _currentSnapType;
 
+  /// Existing room corner the current endpoint is X-aligned to (vertical
+  /// alignment guide), or null when no corner shares the endpoint's X.
+  Point2D? _alignXAnchor;
+
+  /// Existing room corner the current endpoint is Y-aligned to (horizontal
+  /// alignment guide), or null when no corner shares the endpoint's Y.
+  Point2D? _alignYAnchor;
+
   // ---- Rect-mode drag state ----
   Point2D? _dragStart;
 
@@ -91,6 +99,57 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
     return result.point;
   }
 
+  /// Resolve the prospective wall endpoint for [worldPoint]: grid/endpoint/wall
+  /// snap → ortho constraint (from [anchor]) → corner alignment.
+  ///
+  /// [anchor] is the effective start of the segment being drawn (the click-
+  /// chain [_startPoint], or the press point for a fresh press-hold-drag); when
+  /// null the raw snapped point is returned (placing the start point itself).
+  ///
+  /// Captures any aligned corner(s) in [_alignXAnchor] / [_alignYAnchor] so
+  /// [getInteractionData] can draw the dashed alignment guides. Alignment is
+  /// always active while an [anchor] exists; under ortho ([orthoSnap]) only the
+  /// free axis is re-aligned so the constrained axis stays locked. When the
+  /// point already endpoint-snaps onto a corner, no extra alignment is applied.
+  Point2D _resolveEndpoint(Point2D worldPoint, Point2D? anchor) {
+    final snapped = _snap(worldPoint);
+    if (anchor == null) {
+      _alignXAnchor = null;
+      _alignYAnchor = null;
+      return snapped;
+    }
+
+    final ortho = applyOrtho(anchor, snapped);
+
+    // Alt bypasses snapping entirely (raw placement); skip alignment too.
+    // Already exactly on a corner — nothing to align further.
+    if (freePlacement || _currentSnapType == SnapType.endpoint) {
+      _alignXAnchor = null;
+      _alignYAnchor = null;
+      return ortho;
+    }
+
+    // Under ortho the constrained axis is fixed; only re-align the free axis.
+    var alignX = true;
+    var alignY = true;
+    if (orthoSnap) {
+      final horizontal =
+          (snapped.x - anchor.x).abs() >= (snapped.y - anchor.y).abs();
+      alignX = horizontal; // horizontal run → Y locked → X is free
+      alignY = !horizontal;
+    }
+
+    final result = SnapService.alignToCorners(
+      ortho,
+      callbacks.currentWalls,
+      alignX: alignX,
+      alignY: alignY,
+    );
+    _alignXAnchor = result.xAnchor;
+    _alignYAnchor = result.yAnchor;
+    return result.point;
+  }
+
   // ---- CanvasTool overrides ----
 
   @override
@@ -100,7 +159,7 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
       // wall on release (handled in onDragEnd). A pure click without a
       // drag is still handled by onTap (click-click), unchanged.
       _pressTime = DateTime.now();
-      _pressSnapped = applyOrtho(_startPoint ?? worldPoint, _snap(worldPoint));
+      _pressSnapped = _resolveEndpoint(worldPoint, _startPoint);
       _currentSnapped = _pressSnapped;
       onStateChanged();
       return;
@@ -122,7 +181,7 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
       // (existing start point, or the press point for a fresh wall).
       final anchor = _startPoint ?? _pressSnapped;
       if (anchor == null) return;
-      _currentSnapped = applyOrtho(anchor, _snap(worldPoint));
+      _currentSnapped = _resolveEndpoint(worldPoint, anchor);
       onStateChanged();
       return;
     }
@@ -151,7 +210,7 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
       _pressTime = null;
       if (anchor == null) return;
 
-      final end = applyOrtho(anchor, _snap(worldPoint));
+      final end = _resolveEndpoint(worldPoint, anchor);
       final lengthMm = GeometryEngine.distanceMm(anchor, end);
       final heldLongEnough = pressTime != null &&
           DateTime.now().difference(pressTime).inMilliseconds >=
@@ -300,10 +359,7 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
   ) {
     if (rectMode) return; // rect mode uses drag, not tap
 
-    final snapped = applyOrtho(
-      _startPoint ?? worldPoint,
-      _snap(worldPoint),
-    );
+    final snapped = _resolveEndpoint(worldPoint, _startPoint);
 
     if (_startPoint == null) {
       // First click: set start point.
@@ -369,15 +425,9 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
         );
       }
     } else {
-      final snap = SnapService.snap(
-        worldPoint,
-        callbacks.currentWalls,
-        callbacks.currentGridSpacingMm,
-      );
-      _currentSnapped = _startPoint != null
-          ? applyOrtho(_startPoint!, snap.point)
-          : snap.point;
-      _currentSnapType = snap.type;
+      // _resolveEndpoint applies snap (sets _currentSnapType), ortho, and
+      // corner alignment, capturing any alignment anchors for the guides.
+      _currentSnapped = _resolveEndpoint(worldPoint, _startPoint);
     }
     onStateChanged();
   }
@@ -390,6 +440,8 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
     _pressTime = null;
     _currentSnapped = null;
     _currentSnapType = null;
+    _alignXAnchor = null;
+    _alignYAnchor = null;
     onStateChanged();
   }
 
@@ -419,6 +471,8 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
       snapType: _currentSnapType?.name,
       orthoGuidelineStart: orthoStart,
       orthoGuidelineEnd: orthoEnd,
+      alignXAnchor: _alignXAnchor,
+      alignYAnchor: _alignYAnchor,
     );
   }
 }

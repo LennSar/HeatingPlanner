@@ -37,6 +37,7 @@ import 'package:heating_planner/data/models/wall_segment.dart';
 import 'package:heating_planner/data/models/window_element.dart';
 import 'package:heating_planner/l10n/app_localizations.dart';
 import 'package:heating_planner/l10n/app_localizations_en.dart';
+import 'package:heating_planner/ui/canvas/painters/interaction_data.dart';
 import 'package:heating_planner/ui/canvas/tools/editor_callbacks.dart';
 import 'package:heating_planner/ui/canvas/tools/snap_service.dart';
 import 'package:heating_planner/ui/canvas/tools/undo_redo_service.dart';
@@ -1300,6 +1301,118 @@ void main() {
       tool.onDragEnd(const Point2D(x: 3000, y: 0));
 
       expect(cb.currentWalls, isEmpty);
+    },
+  );
+
+  // WDT-18 ───────────────────────────────────────────────────────────────────
+  //
+  // Alignment guides (ADR-028): while drawing, the prospective endpoint snaps
+  // onto the axis of an existing room corner and the tool exposes the tracked
+  // corner so the painter can draw a dashed helper line.
+  //
+  // Existing wall: (3000,0) → (3000,1930). Its corner at y=1930 is OFF the
+  // 100 mm grid. With a start at (0,0) and the cursor near that height but far
+  // in X, grid snap alone would land the endpoint at y=2000; the Y-alignment
+  // must override it to y=1930 and report alignYAnchor (and no X anchor).
+
+  test(
+    'WDT-18: free draw — endpoint Y snaps to an off-grid corner and reports '
+    'the alignment anchor',
+    () {
+      final cb = _StubCallbacks();
+      cb.commitWall(const WallSegment(
+        id: 'w-anchor',
+        roomId: '',
+        startPoint: Point2D(x: 3000, y: 0),
+        endPoint: Point2D(x: 3000, y: 1930),
+      ));
+      final tool = _makeTool(cb);
+
+      // Start point well away from the existing wall.
+      tool.onTap(const Point2D(x: 0, y: 0), PointerDeviceKind.mouse);
+      // Cursor: X far from x=3000, Y near 1930 (grid would snap to 2000).
+      tool.onPointerMove(const Point2D(x: 500, y: 1950));
+
+      final data = tool.getInteractionData();
+      expect(data, isA<GhostLineData>());
+      final ghost = data! as GhostLineData;
+      expect(ghost.currentPoint.y, closeTo(1930, 0.5),
+          reason: 'Y must align to the corner (1930), overriding grid 2000');
+      expect(ghost.alignYAnchor, isNotNull);
+      expect(ghost.alignYAnchor!.y, closeTo(1930, 0.5));
+      expect(ghost.alignXAnchor, isNull,
+          reason: 'X is far from the corner — no X guide');
+
+      // Committing the second tap uses the aligned endpoint.
+      tool.onTap(const Point2D(x: 500, y: 1950), PointerDeviceKind.mouse);
+      expect(cb.currentWalls, hasLength(2));
+      expect(cb.currentWalls.last.endPoint.y, closeTo(1930, 0.5));
+    },
+  );
+
+  // WDT-19 ───────────────────────────────────────────────────────────────────
+  //
+  // The key scenario: drawing the right wall of an adjacent room downward with
+  // Shift held. Ortho locks X to the start; the free Y axis aligns to an
+  // existing room corner's height so the wall reaches the connection point.
+  //
+  // Existing wall corner at (3000,1930). New wall starts at (5000,0); dragging
+  // down with Shift → X stays 5000 (ortho) and Y snaps to 1930 (alignment).
+
+  test(
+    'WDT-19: Shift vertical run — free Y axis aligns to a corner while X stays '
+    'ortho-locked',
+    () {
+      final cb = _StubCallbacks();
+      cb.commitWall(const WallSegment(
+        id: 'w-anchor',
+        roomId: '',
+        startPoint: Point2D(x: 3000, y: 0),
+        endPoint: Point2D(x: 3000, y: 1930),
+      ));
+      final tool = _makeTool(cb);
+
+      tool.onTap(const Point2D(x: 5000, y: 0), PointerDeviceKind.mouse);
+      tool.updateModifiers(shift: true, ctrl: false, alt: false);
+      // Δy ≫ Δx → vertical ortho; Y near 1930 (grid would give 2000).
+      tool.onPointerMove(const Point2D(x: 5040, y: 1950));
+
+      final ghost = tool.getInteractionData()! as GhostLineData;
+      expect(ghost.currentPoint.x, closeTo(5000, 0.5),
+          reason: 'ortho keeps X locked to the start');
+      expect(ghost.currentPoint.y, closeTo(1930, 0.5),
+          reason: 'free Y axis aligns to the corner height');
+      expect(ghost.alignYAnchor, isNotNull);
+      expect(ghost.alignXAnchor, isNull,
+          reason: 'X is ortho-locked, so it is not re-aligned');
+    },
+  );
+
+  // WDT-20 ───────────────────────────────────────────────────────────────────
+  //
+  // Outside the 150 mm alignment tolerance on both axes → no snap, no anchors.
+
+  test(
+    'WDT-20: endpoint beyond alignment tolerance reports no guides',
+    () {
+      final cb = _StubCallbacks();
+      cb.commitWall(const WallSegment(
+        id: 'w-anchor',
+        roomId: '',
+        startPoint: Point2D(x: 3000, y: 0),
+        endPoint: Point2D(x: 3000, y: 1930),
+      ));
+      final tool = _makeTool(cb);
+
+      tool.onTap(const Point2D(x: 0, y: 0), PointerDeviceKind.mouse);
+      // X 2500 mm from corner; Y 230 mm from corner — both > 150 mm.
+      tool.onPointerMove(const Point2D(x: 500, y: 1700));
+
+      final ghost = tool.getInteractionData()! as GhostLineData;
+      expect(ghost.alignXAnchor, isNull);
+      expect(ghost.alignYAnchor, isNull);
+      expect(ghost.currentPoint.x, closeTo(500, 0.5));
+      expect(ghost.currentPoint.y, closeTo(1700, 0.5));
     },
   );
 }

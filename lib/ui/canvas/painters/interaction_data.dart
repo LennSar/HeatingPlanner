@@ -72,6 +72,8 @@ class GhostLineData extends InteractionData {
     this.snapType,
     this.orthoGuidelineStart,
     this.orthoGuidelineEnd,
+    this.alignXAnchor,
+    this.alignYAnchor,
   });
 
   /// Fixed start of the ghost line (world mm).
@@ -98,6 +100,19 @@ class GhostLineData extends InteractionData {
   /// Pair with [orthoGuidelineStart]. Both are null when ortho-snap
   /// is inactive.
   final Point2D? orthoGuidelineEnd;
+
+  /// Existing room corner the endpoint is X-aligned to (world mm), or null.
+  ///
+  /// When non-null the painter draws a dashed vertical alignment guide from
+  /// this corner to [currentPoint] (both share the same X). Signals "you are
+  /// vertically in line with this corner" (CAD object-snap tracking).
+  final Point2D? alignXAnchor;
+
+  /// Existing room corner the endpoint is Y-aligned to (world mm), or null.
+  ///
+  /// When non-null the painter draws a dashed horizontal alignment guide from
+  /// this corner to [currentPoint] (both share the same Y).
+  final Point2D? alignYAnchor;
 }
 
 /// Highlight data for selected elements.

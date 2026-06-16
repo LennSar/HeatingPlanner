@@ -20,6 +20,26 @@ class SnapResult {
   final SnapType type;
 }
 
+/// Result of an alignment-guide snap ([SnapService.alignToCorners]).
+///
+/// Conveys the (possibly) axis-snapped point plus the existing corner(s)
+/// the point was aligned to, so the tool can draw a dashed helper line back
+/// to each anchor.
+@immutable
+class AlignmentResult {
+  /// Creates an [AlignmentResult].
+  const AlignmentResult({required this.point, this.xAnchor, this.yAnchor});
+
+  /// The point after axis alignment (unchanged when nothing aligned).
+  final Point2D point;
+
+  /// Corner sharing the snapped X coordinate (draws a vertical guide), or null.
+  final Point2D? xAnchor;
+
+  /// Corner sharing the snapped Y coordinate (draws a horizontal guide), or null.
+  final Point2D? yAnchor;
+}
+
 /// The kind of snap applied.
 enum SnapType {
   /// Snapped to an existing wall endpoint.
@@ -280,6 +300,69 @@ abstract final class SnapService {
 
     if (newX == dragEnd.x && newY == dragEnd.y) return dragEnd;
     return Point2D(x: newX, y: newY);
+  }
+
+  /// Alignment-guide tolerance in mm (CAD-style object-snap tracking).
+  ///
+  /// Sits between [gridSpacingMm] (100) and [endpointThresholdMm] (200): wide
+  /// enough to catch a corner's axis while drawing, tight enough not to feel
+  /// sticky. Applied *after* grid snap so a nearby corner axis overrides the
+  /// grid.
+  static const double alignThresholdMm = 150.0;
+
+  /// Snap [point] onto the X and/or Y axis of the nearest existing wall
+  /// endpoint (room corner) within [toleranceMm].
+  ///
+  /// For each axis the nearest qualifying corner (smallest absolute axis
+  /// distance) wins independently, so the result may align to one corner in X
+  /// and a different corner in Y. [alignX] / [alignY] gate each axis so a
+  /// caller holding an ortho-locked axis fixed can disable re-alignment there.
+  ///
+  /// Returns the adjusted point plus the corner(s) aligned to, so the caller
+  /// can draw a dashed guide back to each anchor. When nothing qualifies the
+  /// point is returned unchanged with null anchors.
+  static AlignmentResult alignToCorners(
+    Point2D point,
+    List<WallSegment> walls, {
+    double toleranceMm = alignThresholdMm,
+    bool alignX = true,
+    bool alignY = true,
+  }) {
+    Point2D? xAnchor;
+    Point2D? yAnchor;
+    var bestXDist = toleranceMm;
+    var bestYDist = toleranceMm;
+
+    for (final wall in walls) {
+      for (final ep in [wall.startPoint, wall.endPoint]) {
+        if (alignX) {
+          final dx = (ep.x - point.x).abs();
+          if (dx <= bestXDist) {
+            bestXDist = dx;
+            xAnchor = ep;
+          }
+        }
+        if (alignY) {
+          final dy = (ep.y - point.y).abs();
+          if (dy <= bestYDist) {
+            bestYDist = dy;
+            yAnchor = ep;
+          }
+        }
+      }
+    }
+
+    if (xAnchor == null && yAnchor == null) {
+      return AlignmentResult(point: point);
+    }
+    return AlignmentResult(
+      point: Point2D(
+        x: xAnchor?.x ?? point.x,
+        y: yAnchor?.y ?? point.y,
+      ),
+      xAnchor: xAnchor,
+      yAnchor: yAnchor,
+    );
   }
 
   /// Default wall-hover threshold for opening placement (mm).

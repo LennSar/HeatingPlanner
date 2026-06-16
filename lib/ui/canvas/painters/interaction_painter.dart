@@ -48,7 +48,8 @@ class InteractionPainter extends CustomPainter {
       switch (interactionData!) {
         case GhostLineData(:final startPoint, :final currentPoint,
               :final snapIndicator, :final snapType,
-              :final orthoGuidelineStart, :final orthoGuidelineEnd):
+              :final orthoGuidelineStart, :final orthoGuidelineEnd,
+              :final alignXAnchor, :final alignYAnchor):
           _drawGhostLine(
             canvas,
             Offset(startPoint.x, startPoint.y),
@@ -62,6 +63,12 @@ class InteractionPainter extends CustomPainter {
                 : null,
             orthoGuidelineEnd != null
                 ? Offset(orthoGuidelineEnd.x, orthoGuidelineEnd.y)
+                : null,
+            alignXAnchor != null
+                ? Offset(alignXAnchor.x, alignXAnchor.y)
+                : null,
+            alignYAnchor != null
+                ? Offset(alignYAnchor.x, alignYAnchor.y)
                 : null,
           );
         case SelectionHighlightData(:final selectedWalls,
@@ -588,6 +595,8 @@ class InteractionPainter extends CustomPainter {
     String? snapType, [
     Offset? orthoGuidelineStart,
     Offset? orthoGuidelineEnd,
+    Offset? alignXAnchor,
+    Offset? alignYAnchor,
   ]) {
     // Dashed ortho-constraint guideline (§6.3 — drawn behind ghost line).
     if (orthoGuidelineStart != null && orthoGuidelineEnd != null) {
@@ -603,6 +612,12 @@ class InteractionPainter extends CustomPainter {
         20.0,
       );
     }
+
+    // Dashed alignment guides to the tracked room corner(s). Drawn in orange
+    // (the same colour as the endpoint-snap indicator below) so the guide
+    // reads as "tracking a corner" and is distinct from the blue ortho guide.
+    if (alignXAnchor != null) _drawAlignmentGuide(canvas, alignXAnchor, end);
+    if (alignYAnchor != null) _drawAlignmentGuide(canvas, alignYAnchor, end);
 
     // Dashed ghost line.
     final ghostPaint = Paint()
@@ -660,6 +675,27 @@ class InteractionPainter extends CustomPainter {
       ..color = selectionHighlightColor ?? Colors.blue
       ..style = PaintingStyle.fill;
     canvas.drawCircle(start, 8.0, startPaint);
+  }
+
+  /// Draws a dashed alignment guide from a tracked room corner [anchor] to the
+  /// current ghost endpoint [end], with a small ring marking the corner.
+  ///
+  /// Rendered in orange to match the endpoint-snap indicator, signalling that
+  /// the endpoint is axis-aligned with that corner (CAD object-snap tracking).
+  void _drawAlignmentGuide(Canvas canvas, Offset anchor, Offset end) {
+    final paint = Paint()
+      ..color = Colors.orange.withValues(alpha: 0.6)
+      ..strokeWidth = 6.0
+      ..style = PaintingStyle.stroke;
+    _drawDashedLine(canvas, anchor, end, paint, 30.0);
+    canvas.drawCircle(
+      anchor,
+      20.0,
+      Paint()
+        ..color = Colors.orange
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.0,
+    );
   }
 
   void _drawDashedLine(

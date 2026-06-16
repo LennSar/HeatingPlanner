@@ -2237,3 +2237,63 @@ to it).
 ADR-027-1 (Ctrl + diagonal mid-drag of the top wall keeps the room a rectangle —
 sideways component ignored), ADR-027-2 (Shift alone engages it), and ADR-027-3
 (no modifier slants the side walls).
+
+## ADR-028 — Alignment guides snap a drawn wall's endpoint to existing room corners
+
+**What.**
+While `WallDrawTool` is drawing a wall segment (a `_startPoint` exists), the
+prospective endpoint is aligned onto the X and/or Y axis of the nearest existing
+**room corner** (= any existing wall endpoint) within
+`SnapService.alignThresholdMm` (**150 mm**), and a dashed orange **alignment
+guide** is drawn from that corner to the endpoint (CAD-style "object-snap
+tracking"). This lets the user find the length at which a new wall is level with
+an existing room's corner, so the subsequent endpoint snap (200 mm) lands on the
+connection point and the shared-wall / room-detection path fires.
+
+Mechanics (`SnapService.alignToCorners` + `WallDrawTool._resolveEndpoint`):
+- The single endpoint-resolution pipeline is **grid/endpoint/wall snap → ortho
+  constraint → corner alignment**. Alignment runs on the already grid/ortho-
+  resolved point, so a corner axis within 150 mm **overrides** grid snap (this is
+  what pulls the endpoint onto an *off-grid* room height such as 1930 mm).
+- Each axis is resolved **independently** — the nearest qualifying corner in X
+  and the nearest in Y may differ. The aligned corner(s) are returned so the
+  painter can draw a vertical guide (shared X) and/or horizontal guide (shared Y)
+  back to the tracked corner, with a small ring marking the corner.
+- **Ortho-aware:** under Shift the constrained axis is left fixed and only the
+  **free** axis is re-aligned (horizontal run → only X; vertical run → only Y),
+  so alignment never breaks the ortho lock. This is the primary scenario:
+  dragging an adjacent room's side wall with Shift to reach the neighbour's
+  corner height.
+- **Priority / skips:** when the point already endpoint-snaps exactly onto a
+  corner (`SnapType.endpoint`), no extra alignment is applied; **Alt**
+  (`freePlacement`, raw placement) bypasses alignment along with all other
+  snapping. Guides are **always on** otherwise — they are not gated on Shift.
+- **Rect mode is untouched** — it already matches adjacent dimensions via
+  `snapRectCorner` (ADR-009) + `snapRectDimension` (ADR-010).
+
+Carried to the interaction layer via two nullable `GhostLineData` fields
+(`alignXAnchor`, `alignYAnchor`), mirroring the existing ortho-guideline plumbing
+(`orthoGuideline{Start,End}`); drawn by `InteractionPainter._drawAlignmentGuide`
+in orange (the endpoint-snap colour) to distinguish them from the blue ortho
+guide.
+
+**Why.**
+Before this, the only length cue while drawing was the grid; landing a new wall
+exactly on an existing room corner — especially when that corner sits off the
+grid (e.g. a 1930 mm room height) — was trial-and-error, and missing it by more
+than the 200 mm endpoint threshold meant no shared wall was created. Alignment
+guides make "reach the neighbour's corner" a visible, snapping affordance.
+150 mm sits between the 100 mm grid and the 200 mm endpoint threshold: wide
+enough to catch a corner axis while drawing, tight enough not to feel sticky.
+Reusing the ortho-guideline data/painter pattern keeps one rendering path for
+transient draw guides.
+
+**Verification.**
+`flutter analyze` clean. `test/widget/canvas/snap_service_test.dart` SS-AL01–04
+(`alignToCorners`: both-axis snap, per-axis gating, outside-tolerance no-op,
+nearest-per-axis); `test/widget/tools/wall_draw_tool_test.dart` WDT-18 (free draw
+Y-aligns to an off-grid corner and reports the anchor), WDT-19 (Shift vertical:
+free Y aligns while X stays ortho-locked), WDT-20 (beyond tolerance → no guides).
+End to end, `test/integration/alignment_guide_wall_draw_test.dart` drives the real
+`EditorScreen`: a wall drawn next to an existing room snaps its endpoint onto the
+room's corner row (y = 3000), overriding grid snap (which would land at y = 2900).

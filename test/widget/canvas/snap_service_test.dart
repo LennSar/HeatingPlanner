@@ -290,4 +290,62 @@ void main() {
       expect(result.point.y, closeTo(7100, 0.5));
     });
   });
+
+  // ── Alignment guides: alignToCorners ──────────────────────────────────────
+  //
+  // Naming: SS-ALnn. The corner anchor is an existing wall endpoint; the
+  // tolerance is SnapService.alignThresholdMm (150 mm) per axis.
+
+  group('alignToCorners — CAD-style object-snap tracking', () {
+    test('SS-AL01: within tolerance on both axes snaps point to the corner', () {
+      final wall = _wall(3000, 1930, 3000, 0); // corner at (3000, 1930)
+      final r = SnapService.alignToCorners(
+        const Point2D(x: 2900, y: 2000), // dx=100, dy=70 — both ≤ 150
+        [wall],
+      );
+      expect(r.point.x, closeTo(3000, 0.5));
+      expect(r.point.y, closeTo(1930, 0.5));
+      expect(r.xAnchor, isNotNull);
+      expect(r.yAnchor, isNotNull);
+    });
+
+    test('SS-AL02: alignX:false leaves X untouched and aligns only Y', () {
+      final wall = _wall(3000, 1930, 3000, 0);
+      final r = SnapService.alignToCorners(
+        const Point2D(x: 5000, y: 2000), // X far from corner; Y within 150
+        [wall],
+        alignX: false,
+      );
+      expect(r.point.x, closeTo(5000, 0.5), reason: 'X axis gated off');
+      expect(r.point.y, closeTo(1930, 0.5));
+      expect(r.xAnchor, isNull);
+      expect(r.yAnchor, isNotNull);
+    });
+
+    test('SS-AL03: outside tolerance on both axes returns point unchanged', () {
+      final wall = _wall(3000, 1930, 3000, 0);
+      final r = SnapService.alignToCorners(
+        const Point2D(x: 500, y: 1700), // dx=2500, dy=230 — both > 150
+        [wall],
+      );
+      expect(r.point.x, closeTo(500, 0.5));
+      expect(r.point.y, closeTo(1700, 0.5));
+      expect(r.xAnchor, isNull);
+      expect(r.yAnchor, isNull);
+    });
+
+    test('SS-AL04: nearest corner per axis wins independently', () {
+      // Two corners: x-align candidate at (3000,*), y-align candidate at (*,500).
+      final wallA = _wall(3000, 5000, 3000, 4000); // corner x = 3000
+      final wallB = _wall(0, 500, 1000, 500); // corner y = 500
+      final r = SnapService.alignToCorners(
+        const Point2D(x: 2950, y: 540), // x→3000 (50), y→500 (40)
+        [wallA, wallB],
+      );
+      expect(r.point.x, closeTo(3000, 0.5));
+      expect(r.point.y, closeTo(500, 0.5));
+      expect(r.xAnchor!.x, closeTo(3000, 0.5));
+      expect(r.yAnchor!.y, closeTo(500, 0.5));
+    });
+  });
 }
