@@ -154,6 +154,7 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
 
   @override
   void onPointerDown(Point2D worldPoint, int buttons) {
+    syncModifiersFromHardware();
     if (!rectMode) {
       // Non-rect: record the press so a press-hold-drag can commit a
       // wall on release (handled in onDragEnd). A pure click without a
@@ -357,6 +358,7 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
     Point2D worldPoint,
     PointerDeviceKind deviceKind,
   ) {
+    syncModifiersFromHardware();
     if (rectMode) return; // rect mode uses drag, not tap
 
     final snapped = _resolveEndpoint(worldPoint, _startPoint);

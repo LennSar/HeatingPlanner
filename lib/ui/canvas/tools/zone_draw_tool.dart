@@ -136,6 +136,7 @@ class ZoneDrawTool extends CanvasTool with ModifierDrawTool {
 
   @override
   void onTap(Point2D worldPoint, PointerDeviceKind deviceKind) {
+    syncModifiersFromHardware();
     if (rectMode) return; // rect mode uses drag, not tap
 
     // Detect double-tap by both time *and* position proximity. Two taps
@@ -221,6 +222,7 @@ class ZoneDrawTool extends CanvasTool with ModifierDrawTool {
 
   @override
   void onPointerDown(Point2D worldPoint, int buttons) {
+    syncModifiersFromHardware();
     if (!rectMode) return;
     // Grid snap only — ADR-013 does NOT apply snapRectCorner.
     _rectDragStart = _snapZone(worldPoint);

@@ -1,3 +1,5 @@
+import 'package:flutter/services.dart';
+
 import '../../../data/models/point2d.dart';
 import 'tool_base.dart';
 
@@ -40,6 +42,59 @@ mixin ModifierDrawTool on CanvasTool {
     required bool ctrl,
     required bool alt,
   }) {
+    orthoSnap = shift;
+    rectMode = ctrl;
+    freePlacement = alt;
+    onStateChanged();
+  }
+
+  /// Logical keys that count as Shift / Ctrl / Alt. Cmd on macOS maps to
+  /// the same Ctrl role via the keyboard-shortcut layer.
+  static final Set<LogicalKeyboardKey> _shiftKeys = {
+    LogicalKeyboardKey.shiftLeft,
+    LogicalKeyboardKey.shiftRight,
+    LogicalKeyboardKey.shift,
+  };
+  static final Set<LogicalKeyboardKey> _ctrlKeys = {
+    LogicalKeyboardKey.controlLeft,
+    LogicalKeyboardKey.controlRight,
+    LogicalKeyboardKey.control,
+    LogicalKeyboardKey.metaLeft,
+    LogicalKeyboardKey.metaRight,
+    LogicalKeyboardKey.meta,
+  };
+  static final Set<LogicalKeyboardKey> _altKeys = {
+    LogicalKeyboardKey.altLeft,
+    LogicalKeyboardKey.altRight,
+    LogicalKeyboardKey.alt,
+  };
+
+  /// Test seam: when true, [syncModifiersFromHardware] is a no-op so unit
+  /// tests can drive the flags purely through [updateModifiers] without
+  /// the (empty) test hardware-key state clobbering them.
+  static bool debugDisableHardwareSync = false;
+
+  /// Re-sync the modifier flags from the live hardware key state.
+  ///
+  /// The cached flags track key-down/up events forwarded from the canvas
+  /// keyboard handler, but those events can be lost when focus shifts
+  /// mid-stroke — e.g. pressing Ctrl on the canvas, clicking into a
+  /// properties text field, then releasing Ctrl there (the canvas handler
+  /// ignores the key-up while a field is focused). That strands a flag
+  /// "on" (rect/square mode stuck enabled) or "off" (Shift/Ctrl drawing
+  /// can't be re-enabled). Polling [HardwareKeyboard] at the start of a
+  /// stroke makes the flags reflect the actual key state.
+  ///
+  /// Mirrors `SelectTool._syncCtrlHeldFromHardware` (ADR-012).
+  void syncModifiersFromHardware() {
+    if (debugDisableHardwareSync) return;
+    final pressed = HardwareKeyboard.instance.logicalKeysPressed;
+    final shift = pressed.any(_shiftKeys.contains);
+    final ctrl = pressed.any(_ctrlKeys.contains);
+    final alt = pressed.any(_altKeys.contains);
+    if (shift == orthoSnap && ctrl == rectMode && alt == freePlacement) {
+      return;
+    }
     orthoSnap = shift;
     rectMode = ctrl;
     freePlacement = alt;

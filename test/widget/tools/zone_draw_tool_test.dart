@@ -33,6 +33,7 @@ import 'package:heating_planner/l10n/app_localizations_en.dart';
 import 'package:heating_planner/ui/canvas/painters/interaction_data.dart';
 import 'package:heating_planner/ui/canvas/tools/editor_callbacks.dart';
 import 'package:heating_planner/ui/canvas/tools/undo_redo_service.dart';
+import 'package:heating_planner/ui/canvas/tools/modifier_draw_tool.dart';
 import 'package:heating_planner/ui/canvas/tools/zone_draw_tool.dart';
 
 // ── Stub EditorCallbacks ─────────────────────────────────────────────────────
@@ -257,6 +258,13 @@ Map<String, void Function(ZoneDrawTool)> _zoneCreators() => {
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 void main() {
+  setUpAll(() {
+    // These tests drive the modifier flags directly via updateModifiers;
+    // disable the live-hardware re-sync so the (empty) test keyboard state
+    // doesn't clobber them at onPointerDown/onTap.
+    ModifierDrawTool.debugDisableHardwareSync = true;
+  });
+
   // ZDT-1 ───────────────────────────────────────────────────────────────────
 
   test(

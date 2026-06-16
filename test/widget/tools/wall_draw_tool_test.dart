@@ -39,6 +39,7 @@ import 'package:heating_planner/l10n/app_localizations.dart';
 import 'package:heating_planner/l10n/app_localizations_en.dart';
 import 'package:heating_planner/ui/canvas/painters/interaction_data.dart';
 import 'package:heating_planner/ui/canvas/tools/editor_callbacks.dart';
+import 'package:heating_planner/ui/canvas/tools/modifier_draw_tool.dart';
 import 'package:heating_planner/ui/canvas/tools/snap_service.dart';
 import 'package:heating_planner/ui/canvas/tools/undo_redo_service.dart';
 import 'package:heating_planner/ui/canvas/tools/wall_draw_tool.dart';
@@ -622,8 +623,48 @@ class _ProviderWallDrawCallbacks implements EditorCallbacks {
 void main() {
   setUpAll(() {
     driftRuntimeOptions.dontWarnAboutMultipleDatabases = true;
+    // These tests drive the modifier flags directly via updateModifiers;
+    // disable the live-hardware re-sync so the (empty) test keyboard state
+    // doesn't clobber them at onPointerDown/onTap.
+    ModifierDrawTool.debugDisableHardwareSync = true;
   });
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  // WDT-21 ───────────────────────────────────────────────────────────────────
+
+  test(
+    'WDT-21: onTap re-syncs a stranded rectMode flag from live hardware '
+    'so click-click drawing recovers when the Ctrl key-up was lost',
+    () {
+      // Reproduces the stuck-modifier bug: the canvas keyboard handler
+      // dropped a Ctrl key-up (e.g. focus moved to a properties field),
+      // leaving rectMode cached "on". With no Ctrl actually held, the
+      // hardware re-sync must clear it so taps fall back to click-click.
+      ModifierDrawTool.debugDisableHardwareSync = false;
+      addTearDown(
+        () => ModifierDrawTool.debugDisableHardwareSync = true,
+      );
+
+      final cb = _StubCallbacks();
+      final tool = _makeTool(cb);
+
+      // Strand rectMode "on" — no hardware key is pressed in the test.
+      tool.updateModifiers(shift: false, ctrl: true, alt: false);
+      expect(tool.rectMode, isTrue);
+
+      const start = Point2D(x: 0, y: 0);
+      const end = Point2D(x: 5000, y: 0);
+
+      // Pre-fix: onTap would return early (rect mode uses drag) and no
+      // wall would ever be drawn. Post-fix: the sync clears rectMode.
+      tool.onTap(start, PointerDeviceKind.mouse);
+      expect(tool.rectMode, isFalse);
+      tool.onTap(end, PointerDeviceKind.mouse);
+
+      expect(cb.currentWalls, hasLength(1));
+    },
+  );
+
   // WDT-1 ────────────────────────────────────────────────────────────────────
 
   test(

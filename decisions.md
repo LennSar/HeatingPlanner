@@ -2297,3 +2297,32 @@ free Y aligns while X stays ortho-locked), WDT-20 (beyond tolerance → no guide
 End to end, `test/integration/alignment_guide_wall_draw_test.dart` drives the real
 `EditorScreen`: a wall drawn next to an existing room snaps its endpoint onto the
 room's corner row (y = 3000), overriding grid snap (which would land at y = 2900).
+
+## ADR-029 — Draw-tool modifiers re-sync from live hardware at stroke start
+
+**What.**
+`ModifierDrawTool` (shared by `WallDrawTool` and `ZoneDrawTool`) gains
+`syncModifiersFromHardware()`, called at the top of `onPointerDown` and `onTap`.
+It re-reads `HardwareKeyboard.instance.logicalKeysPressed` and rewrites the
+`orthoSnap` (Shift), `rectMode` (Ctrl/Cmd) and `freePlacement` (Alt) flags to
+match the keys actually held. A static `debugDisableHardwareSync` test seam lets
+the tool unit tests keep driving the flags purely through `updateModifiers`.
+
+**Why.**
+The flags were tracked only by accumulating key-down/up events in
+`EditorShortcuts.onKeyEvent`. That handler bails out (`KeyEventResult.ignored`)
+whenever a text field has focus, and key events are also lost on window/focus
+changes — so a Ctrl/Shift/Alt key-up could be dropped, stranding a flag "on"
+(rectangle/square mode stuck enabled) or "off" (Shift-drag / Ctrl-draw could not
+be re-enabled). Symptom: after a little editing (drawing rooms, clicking into a
+properties field), square-room mode was always on or a modifier function could
+not be re-engaged. `SelectTool` already solved the identical class of bug with
+`_syncCtrlHeldFromHardware` (ADR-012); this applies the same drag-start hardware
+poll to the draw tools so the cached flags can never stay stranded past the next
+stroke.
+
+**Verification.**
+`flutter analyze` clean. `test/widget/tools/wall_draw_tool_test.dart` WDT-21
+(a stranded `rectMode` cache is cleared by the hardware sync at `onTap`, so
+click-click drawing recovers); existing WDT/ZDT modifier tests still pass with
+the sync disabled via the test seam.
