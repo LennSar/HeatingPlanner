@@ -160,6 +160,34 @@ class _RoomPropertiesState
     return SelectTool.rectangleCorners(roomWalls);
   }
 
+  /// Sum of the two bounding walls' half-thicknesses along each axis.
+  ///
+  /// The displayed Width/Height refer to the **inner-clear** room
+  /// dimensions (matching the on-canvas labels, which the annotation
+  /// painter derives by offsetting each wall centerline inward by
+  /// `thicknessMm / 2`). Subtracting these insets from the centerline
+  /// extents yields the inner dimensions; adding them back converts an
+  /// edited inner value to the centerline geometry the wall reshape uses.
+  ///
+  /// A vertical wall (Δx ≈ 0) bounds the x-extent (width); a horizontal
+  /// wall (Δy ≈ 0) bounds the y-extent (height).
+  ({double widthMm, double heightMm}) _wallThicknessInset(
+    List<WallSegment> roomWalls,
+  ) {
+    var widthInsetMm = 0.0;
+    var heightInsetMm = 0.0;
+    for (final w in roomWalls) {
+      final dx = (w.startPoint.x - w.endPoint.x).abs();
+      final dy = (w.startPoint.y - w.endPoint.y).abs();
+      if (dx < _dimTolMm) {
+        widthInsetMm += w.thicknessMm / 2.0;
+      } else if (dy < _dimTolMm) {
+        heightInsetMm += w.thicknessMm / 2.0;
+      }
+    }
+    return (widthMm: widthInsetMm, heightMm: heightInsetMm);
+  }
+
   /// Formats a millimetre extent as a centimetre string
   /// (mm / 10), trimming a redundant ".0" (ADR-015 Rule 2).
   String _formatCm(double mm) {
@@ -234,16 +262,24 @@ class _RoomPropertiesState
     final maxY = corners.map((c) => c.y).reduce(math.max);
     final curWidthMm = maxX - minX;
     final curHeightMm = maxY - minY;
-    final curMm = isWidth ? curWidthMm : curHeightMm;
+
+    // The field shows inner-clear dimensions; convert between inner and
+    // centerline using the bounding walls' thickness inset for this axis.
+    final roomWalls =
+        state.walls.where((w) => w.roomId == room.id).toList();
+    final inset = _wallThicknessInset(roomWalls);
+    final axisInsetMm = isWidth ? inset.widthMm : inset.heightMm;
+    final curInnerMm =
+        (isWidth ? curWidthMm : curHeightMm) - axisInsetMm;
 
     final parsed = double.tryParse(
       controller.text.trim().replaceAll(',', '.'),
     );
 
-    // ADR-015 Rule 5: reject non-numeric or < 10 cm — revert the
+    // ADR-015 Rule 5: reject non-numeric or < 10 cm (inner) — revert the
     // field, toast, mutate nothing.
     if (parsed == null || parsed < 10.0) {
-      controller.text = _formatCm(curMm);
+      controller.text = _formatCm(curInnerMm);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(l10n.roomTooSmallCm),
@@ -254,15 +290,18 @@ class _RoomPropertiesState
       return;
     }
 
-    // ADR-015 Rule 2/6: cm → mm = round(cm × 10), used verbatim.
-    final newMm = (parsed * 10).roundToDouble();
+    // ADR-015 Rule 2/6: cm → mm = round(cm × 10). The typed value is the
+    // inner dimension; add the wall inset back to get the centerline
+    // extent the four-wall reshape operates on.
+    final newInnerMm = (parsed * 10).roundToDouble();
+    final newMm = newInnerMm + axisInsetMm;
     final newWidthMm = isWidth ? newMm : curWidthMm;
     final newHeightMm = isWidth ? curHeightMm : newMm;
 
     // No-op when the extent is unchanged — normalize display only.
     if ((newWidthMm - curWidthMm).abs() < _dimTolMm &&
         (newHeightMm - curHeightMm).abs() < _dimTolMm) {
-      controller.text = _formatCm(curMm);
+      controller.text = _formatCm(curInnerMm);
       return;
     }
 
@@ -274,8 +313,6 @@ class _RoomPropertiesState
     final notifier = ref.read(editorStateProvider.notifier);
     final oldWalls = state.walls.toList();
     final oldRooms = state.rooms.toList();
-    final roomWalls =
-        state.walls.where((w) => w.roomId == room.id).toList();
 
     bool near(double a, double b) => (a - b).abs() < _dimTolMm;
     Point2D remap(Point2D p) => Point2D(
@@ -440,10 +477,16 @@ class _RoomPropertiesState
       final ys = rectCorners.map((c) => c.y);
       rectWidthMm = xs.reduce(math.max) - xs.reduce(math.min);
       rectHeightMm = ys.reduce(math.max) - ys.reduce(math.min);
+      // Show inner-clear dimensions so the panel matches the on-canvas
+      // labels (both refer to the inside of the room).
+      final roomWalls = editorState.walls
+          .where((w) => w.roomId == widget.roomId)
+          .toList();
+      final inset = _wallThicknessInset(roomWalls);
       _syncDimControllers(
         widget.roomId,
-        rectWidthMm,
-        rectHeightMm,
+        rectWidthMm - inset.widthMm,
+        rectHeightMm - inset.heightMm,
       );
     } else {
       // Force a fresh sync if the room becomes eligible again.

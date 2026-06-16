@@ -102,6 +102,39 @@ List<WallSegment> _rectWalls() => const [
       ),
     ];
 
+/// The 5000×4000 mm rectangle with 240 mm-thick walls, so the inner-clear
+/// extents are 4760×3760 mm (centerline minus thickness/2 on each side).
+List<WallSegment> _thickRectWalls() => const [
+      WallSegment(
+        id: 'w1',
+        roomId: _roomId,
+        startPoint: Point2D(x: 0, y: 0),
+        endPoint: Point2D(x: 5000, y: 0),
+        thicknessMm: 240,
+      ),
+      WallSegment(
+        id: 'w2',
+        roomId: _roomId,
+        startPoint: Point2D(x: 5000, y: 0),
+        endPoint: Point2D(x: 5000, y: 4000),
+        thicknessMm: 240,
+      ),
+      WallSegment(
+        id: 'w3',
+        roomId: _roomId,
+        startPoint: Point2D(x: 5000, y: 4000),
+        endPoint: Point2D(x: 0, y: 4000),
+        thicknessMm: 240,
+      ),
+      WallSegment(
+        id: 'w4',
+        roomId: _roomId,
+        startPoint: Point2D(x: 0, y: 4000),
+        endPoint: Point2D(x: 0, y: 0),
+        thicknessMm: 240,
+      ),
+    ];
+
 /// Five segments (the bottom edge is split) → not rectangle-eligible.
 List<WallSegment> _nonRectWalls() => const [
       WallSegment(
@@ -287,6 +320,59 @@ void main() {
       final undoRedo =
           _containerOf(tester).read(undoRedoProvider);
       expect(undoRedo.canUndo, isFalse);
+    },
+  );
+
+  // RD-6 ──────────────────────────────────────────────────────────────────────
+
+  testWidgets(
+    'RD-6: fields show inner-clear dimensions for thick walls',
+    (tester) async {
+      await sized(tester);
+      await tester.pumpWidget(
+        _build(
+          EditorState(rooms: const [_rectRoom], walls: _thickRectWalls()),
+        ),
+      );
+      await tester.pump();
+
+      // Centerline 5000×4000 minus 240 mm wall → inner 4760×3760 mm,
+      // shown as 476 × 376 cm (not the 500 × 400 centerline figures).
+      expect(find.text('476'), findsOneWidget);
+      expect(find.text('376'), findsOneWidget);
+      expect(find.text('500'), findsNothing);
+      expect(find.text('400'), findsNothing);
+    },
+  );
+
+  // RD-7 ──────────────────────────────────────────────────────────────────────
+
+  testWidgets(
+    'RD-7: editing inner Width converts back to centerline geometry',
+    (tester) async {
+      await sized(tester);
+      await tester.pumpWidget(
+        _build(
+          EditorState(rooms: const [_rectRoom], walls: _thickRectWalls()),
+        ),
+      );
+      await tester.pump();
+
+      // Type a new inner width of 500 cm (5000 mm). With a 240 mm wall
+      // inset the centerline must become 5240 mm, top-left anchored.
+      await tester.enterText(
+        find.byKey(const Key('roomWidthField')),
+        '500',
+      );
+      await tester.testTextInput.receiveAction(TextInputAction.done);
+      await tester.pump();
+
+      final state = _containerOf(tester).read(editorStateProvider);
+      final room = state.rooms.firstWhere((r) => r.id == _roomId);
+      final rb = _bbox(room.polygon);
+      expect(rb.minX, 0);
+      expect(rb.maxX, 5240);
+      expect(rb.maxY, 4000); // height untouched
     },
   );
 
