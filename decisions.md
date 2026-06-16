@@ -2143,3 +2143,97 @@ shares `editorState`'s list identity; during a drag a burst of transient
 frames within one sample window does **not** change the emitted identity; one
 `annotationSampleInterval` later the feed catches up to the latest geometry;
 and drag-end snaps back to the live settled geometry.
+
+---
+
+## ADR-027 — Keep-orientation wall-body translate (Shift / Ctrl + mid-handle drag)
+
+**What.**
+When the user grabs a wall's **mid handle** (the wall-body translate handle in
+`SelectTool`) while holding **Shift or Ctrl**, the drag slides the wall
+**parallel to itself** and reshapes the connected walls so their **orientation
+never changes** — only their length does. A square (or any axis-aligned
+rectangular) room therefore stays square/rectangular for the entire drag, even
+when the pointer moves diagonally.
+
+Concretely, for the dragged wall with original endpoints `A`/`B`:
+- Only the **perpendicular** component of the pointer motion (projected onto the
+  wall's unit normal `n`) is applied; the parallel component is discarded so the
+  wall never slides along its own axis.
+- The dragged wall's new line is the original line translated by that
+  perpendicular offset.
+- Each shared corner is recomputed as the **intersection of the connected
+  wall's own (fixed) line with the dragged wall's new line**. The connected
+  wall's far endpoint stays put, so it keeps its direction and merely changes
+  length.
+
+Without a modifier, the mid-handle drag is unchanged: it translates the wall by
+the full (snapped) 2-D delta, which slants the perpendicular neighbours and can
+easily turn a rectangle into a parallelogram-ish shape — the very problem this
+ADR solves on demand.
+
+**Why.**
+The default translate moves both wall endpoints by the same vector, so the two
+connected walls each have only one endpoint move and become slanted. Users
+frequently want to nudge one side of a rectangular room in/out while keeping the
+room rectangular; doing that with the default behaviour requires careful
+purely-axis-aligned mouse motion. Projecting onto the wall normal and
+re-intersecting the neighbour lines makes "keep the room square" a held-modifier
+affordance rather than a test of mouse precision. The line-intersection approach
+generalises to non-perpendicular neighbours (L-shapes, angled walls): every
+wall's *line* is preserved, only the corner where it meets the moved wall
+slides along it.
+
+This reuses the desktop modifier vocabulary already established for the canvas
+(Shift = ortho/constrain, Ctrl = rectangle semantics — ADR-009/012/013).
+Sampling the modifier once at drag-start and holding it for the whole gesture
+mirrors the ADR-012 Rule 7 convention (toggling mid-drag does not switch modes).
+
+**Rules.**
+
+1. **Trigger.** `SelectTool`, `DragHandleType.mid` only. At drag-start, after
+   re-syncing the live key state (`_syncCtrlHeldFromHardware`, extended to also
+   read Shift), `_keepWallOrientation` is set true iff the handle is `mid` **and**
+   (`_ctrlHeld || _shiftHeld`). Sampled once; held for the whole drag.
+
+2. **Perpendicular-only motion.** The pointer delta from the grab anchor is
+   projected onto the wall's unit normal `n = (−dirY, dirX)/|dir|`. Only that
+   scalar `perp` is applied; the along-wall component is discarded.
+
+3. **Grid snap along the normal.** Unless Alt (free placement) is held, the
+   perpendicularly-translated start point is grid-snapped
+   (`SnapService.snapToGrid`) and `perp` is recomputed from the snapped point's
+   normal component, so the wall stays exactly parallel to its original line and
+   axis-aligned walls land on grid lines.
+
+4. **Corner recomputation.** Each dragged endpoint's new position is the
+   intersection (`GeometryEngine.lineIntersection`, infinite lines) of the
+   connected wall's fixed line (through its far endpoint and the original shared
+   corner) and the dragged wall's new line. Falls back to the purely-translated
+   endpoint when no non-parallel connected wall is attached (free end or a
+   collinear continuation). The ADR-011 mirror partner is skipped (it is
+   collinear and is synced separately).
+
+5. **Connected-wall follow + room polygon.** After computing the two new
+   corners, the dragged wall is written via `updateWallTransient`, connected
+   walls follow through the existing `_adjustConnectedWalls`, and the room
+   polygon(s) rebuild through `_updateRoomPolygon` — identical to the default
+   mid-drag tail, so undo (`_MoveWallCommand`), ADR-011 mirror sync, and
+   debounced persistence (ADR-023) all apply unchanged.
+
+6. **Modifier plumbing.** `SelectTool.updateModifiers` gains a `shift` parameter;
+   `FloorPlanCanvas` forwards `mods.orthoSnap` as `shift`. A `debugShiftHeldOverride`
+   mirrors `debugCtrlHeldOverride` for stub-based tool tests.
+
+**Scope.**
+`SelectTool` mid-handle (wall-body) drag only. Endpoint-handle drag
+(ADR-012 rect-reshape, where Shift remains a no-op), room-interior move
+(ADR-016), zone drags, and openings are unchanged. `GeometryEngine` gains a
+public `lineIntersection` (the existing private `_lineIntersect` now delegates
+to it).
+
+**Verification.**
+`flutter analyze` clean; `test/widget/tools/select_tool_test.dart`
+ADR-027-1 (Ctrl + diagonal mid-drag of the top wall keeps the room a rectangle —
+sideways component ignored), ADR-027-2 (Shift alone engages it), and ADR-027-3
+(no modifier slants the side walls).

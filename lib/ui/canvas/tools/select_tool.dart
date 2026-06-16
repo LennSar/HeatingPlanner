@@ -116,6 +116,22 @@ class SelectTool extends CanvasTool {
   /// Ctrl modifier held (sampled by [updateModifiers]).
   bool _ctrlHeld = false;
 
+  /// Shift modifier held (sampled by [updateModifiers]).
+  ///
+  /// Used together with Ctrl to gate the keep-orientation wall-body
+  /// translate (ADR-027): while either is held, dragging a wall's mid
+  /// handle slides the wall parallel to itself and the connected walls
+  /// only change length, never orientation.
+  bool _shiftHeld = false;
+
+  /// True when the current mid-handle (wall-body) drag is in
+  /// keep-orientation mode (ADR-027).
+  ///
+  /// Sampled at drag-start (Shift or Ctrl held) and held for the whole
+  /// drag — toggling the modifier mid-drag does not switch modes,
+  /// mirroring the ADR-012 Rule 7 convention.
+  bool _keepWallOrientation = false;
+
   /// True when the current endpoint drag is in rect-reshape mode.
   ///
   /// Sampled at drag-start and held for the duration of the drag —
@@ -326,9 +342,14 @@ class SelectTool extends CanvasTool {
   /// layer. Call on both key-down and key-up so the flags stay in sync
   /// (mirrors [WallDrawTool.updateModifiers]). [alt] is read by the
   /// ADR-016 room-move drag to disable grid snap (free placement).
-  void updateModifiers({required bool ctrl, bool alt = false}) {
-    if (_ctrlHeld == ctrl && _altHeld == alt) return;
+  void updateModifiers({
+    required bool ctrl,
+    bool shift = false,
+    bool alt = false,
+  }) {
+    if (_ctrlHeld == ctrl && _shiftHeld == shift && _altHeld == alt) return;
     _ctrlHeld = ctrl;
+    _shiftHeld = shift;
     _altHeld = alt;
     onStateChanged();
   }
@@ -343,6 +364,14 @@ class SelectTool extends CanvasTool {
     LogicalKeyboardKey.metaLeft,
     LogicalKeyboardKey.metaRight,
     LogicalKeyboardKey.meta,
+  };
+
+  /// Set of logical keys that count as "Shift" for the keep-orientation
+  /// wall-drag gate (ADR-027).
+  static final Set<LogicalKeyboardKey> _shiftLogicalKeys = {
+    LogicalKeyboardKey.shiftLeft,
+    LogicalKeyboardKey.shiftRight,
+    LogicalKeyboardKey.shift,
   };
 
   /// Re-sync [_ctrlHeld] from the live hardware key state.
@@ -360,10 +389,16 @@ class SelectTool extends CanvasTool {
   void _syncCtrlHeldFromHardware() {
     if (debugCtrlHeldOverride != null) {
       _ctrlHeld = debugCtrlHeldOverride!;
-      return;
+    } else {
+      final pressed = HardwareKeyboard.instance.logicalKeysPressed;
+      _ctrlHeld = pressed.any(_ctrlLogicalKeys.contains);
     }
-    final pressed = HardwareKeyboard.instance.logicalKeysPressed;
-    _ctrlHeld = pressed.any(_ctrlLogicalKeys.contains);
+    if (debugShiftHeldOverride != null) {
+      _shiftHeld = debugShiftHeldOverride!;
+    } else {
+      final pressed = HardwareKeyboard.instance.logicalKeysPressed;
+      _shiftHeld = pressed.any(_shiftLogicalKeys.contains);
+    }
   }
 
   /// Test-only override for the live-hardware sync in
@@ -371,6 +406,11 @@ class SelectTool extends CanvasTool {
   /// uses this value instead of polling [HardwareKeyboard].
   @visibleForTesting
   bool? debugCtrlHeldOverride;
+
+  /// Test-only override for the Shift state read by
+  /// [_syncCtrlHeldFromHardware] (ADR-027 keep-orientation gate).
+  @visibleForTesting
+  bool? debugShiftHeldOverride;
 
   /// True when the canvas should swap the cursor to the rect-crosshair
   /// for the rect-reshape affordance (ADR-012 Rule 8).
@@ -831,6 +871,15 @@ class SelectTool extends CanvasTool {
     // dialog opens mid-Cmd+Z) cannot strand the gate "on" and force
     // rect-reshape on a plain corner drag.
     _syncCtrlHeldFromHardware();
+
+    // ADR-027: keep-orientation wall-body translate. When the mid handle
+    // is grabbed with Shift or Ctrl held, the wall slides parallel to
+    // itself and connected walls only change length, never orientation
+    // (a square room stays square). Sampled once and held for the whole
+    // drag, mirroring the ADR-012 Rule 7 convention.
+    _keepWallOrientation = handleType == DragHandleType.mid &&
+        (_ctrlHeld || _shiftHeld);
+
     _rectReshapeMode = false;
     if (_ctrlHeld &&
         (handleType == DragHandleType.start ||
@@ -996,9 +1045,13 @@ class SelectTool extends CanvasTool {
 
     switch (_dragHandle!) {
       case DragHandleType.mid:
-        // Wall-body translate: snapping is handled inside _applyMidDrag
-        // relative to the grab anchor, so pass the raw cursor.
-        _applyMidDrag(worldPoint);
+        // Wall-body translate: snapping is handled inside the apply
+        // helpers relative to the grab anchor, so pass the raw cursor.
+        if (_keepWallOrientation) {
+          _applyMidDragKeepOrientation(worldPoint);
+        } else {
+          _applyMidDrag(worldPoint);
+        }
       case DragHandleType.start:
         _applyEndpointDrag(snap.point, isStart: true);
       case DragHandleType.end:
@@ -1472,7 +1525,9 @@ class SelectTool extends CanvasTool {
       selectedWalls: _selectedWall != null
           ? [_currentWallState(_selectedWall!)]
           : const [],
-      selectedRoom: _selectedRoom,
+      selectedRoom: _selectedRoom != null
+          ? _currentRoomState(_selectedRoom!)
+          : null,
       handles: handles,
       activeHandleIndex: activeIdx,
     );
@@ -2388,6 +2443,123 @@ class SelectTool extends CanvasTool {
   }
 
   // ================================================================
+  // Mid-handle drag, keep-orientation (ADR-027)
+  // ================================================================
+
+  /// Wall-body translate that preserves the orientation of every wall.
+  ///
+  /// With Shift or Ctrl held, the dragged wall slides **parallel to
+  /// itself** (only the perpendicular component of the pointer motion is
+  /// applied), and each connected wall's shared corner is recomputed as
+  /// the intersection of that connected wall's own (fixed) line with the
+  /// dragged wall's new line. Connected walls therefore keep their
+  /// direction and only change length — a rectangular room stays
+  /// rectangular for the whole drag.
+  void _applyMidDragKeepOrientation(Point2D worldPoint) {
+    final orig = _dragStartWall!;
+    final dirX = orig.endPoint.x - orig.startPoint.x;
+    final dirY = orig.endPoint.y - orig.startPoint.y;
+    final len = math.sqrt(dirX * dirX + dirY * dirY);
+    if (len < 1e-6) {
+      // Degenerate wall — fall back to the plain translate.
+      _applyMidDrag(worldPoint);
+      return;
+    }
+
+    // Unit normal (perpendicular) of the dragged wall.
+    final nx = -dirY / len;
+    final ny = dirX / len;
+
+    final anchor = _wallDragAnchor ??
+        Point2D(
+          x: (orig.startPoint.x + orig.endPoint.x) / 2,
+          y: (orig.startPoint.y + orig.endPoint.y) / 2,
+        );
+
+    // Perpendicular component of the raw pointer delta — the parallel
+    // component is ignored so the wall never slides along its own axis.
+    var perp =
+        (worldPoint.x - anchor.x) * nx + (worldPoint.y - anchor.y) * ny;
+
+    // Grid-snap the offset along the normal: snap the perpendicularly
+    // translated start point, then keep only its perpendicular component
+    // so the wall stays exactly parallel to its original line. Alt
+    // (free placement) skips the snap, consistent with the other tools.
+    if (!_altHeld) {
+      final movedStart = Point2D(
+        x: orig.startPoint.x + perp * nx,
+        y: orig.startPoint.y + perp * ny,
+      );
+      final snapped = SnapService.snapToGrid(
+        movedStart,
+        callbacks.currentGridSpacingMm,
+      );
+      perp = (snapped.x - orig.startPoint.x) * nx +
+          (snapped.y - orig.startPoint.y) * ny;
+    }
+
+    // Two points defining the dragged wall's new (infinite) line: the
+    // original endpoints translated perpendicularly by `perp`.
+    final lineStart = Point2D(
+      x: orig.startPoint.x + perp * nx,
+      y: orig.startPoint.y + perp * ny,
+    );
+    final lineEnd = Point2D(
+      x: orig.endPoint.x + perp * nx,
+      y: orig.endPoint.y + perp * ny,
+    );
+
+    // Recompute each corner as the intersection of the connected wall's
+    // fixed line with the dragged wall's new line. Falls back to the
+    // purely translated endpoint when no non-parallel connected wall is
+    // found (free end, or a collinear continuation).
+    final newStart =
+        _keepOrientationCorner(orig.startPoint, lineStart, lineEnd) ??
+            lineStart;
+    final newEnd =
+        _keepOrientationCorner(orig.endPoint, lineStart, lineEnd) ?? lineEnd;
+
+    callbacks.updateWallTransient(
+      orig.copyWith(startPoint: newStart, endPoint: newEnd),
+    );
+    _adjustConnectedWalls(orig, newStart: newStart, newEnd: newEnd);
+    _updateRoomPolygon();
+  }
+
+  /// New position of the dragged wall's [origEndpoint] under
+  /// keep-orientation: the intersection of a connected wall's fixed line
+  /// (through its far endpoint and [origEndpoint]) with the dragged
+  /// wall's new line ([lineStart]–[lineEnd]). Returns null when no usable
+  /// (non-parallel) connected wall is attached at that endpoint.
+  Point2D? _keepOrientationCorner(
+    Point2D origEndpoint,
+    Point2D lineStart,
+    Point2D lineEnd,
+  ) {
+    for (final conn in _dragStartConnected) {
+      // Skip the ADR-011 mirror partner: it is collinear with the dragged
+      // wall (parallel line, no useful intersection) and is synced
+      // separately by updateWall.
+      if (conn.mirrorId == _dragStartWall!.id) continue;
+      Point2D? farPoint;
+      if (_pointsEqual(conn.startPoint, origEndpoint)) {
+        farPoint = conn.endPoint;
+      } else if (_pointsEqual(conn.endPoint, origEndpoint)) {
+        farPoint = conn.startPoint;
+      }
+      if (farPoint == null) continue;
+      final hit = GeometryEngine.lineIntersection(
+        farPoint,
+        origEndpoint,
+        lineStart,
+        lineEnd,
+      );
+      if (hit != null) return hit;
+    }
+    return null;
+  }
+
+  // ================================================================
   // Endpoint handle drag (resize/pivot)
   // ================================================================
 
@@ -2813,6 +2985,7 @@ class SelectTool extends CanvasTool {
     _dragStartConnected = const [];
     _dragStartRoom = null;
     _dragStartMirrorRoom = null;
+    _keepWallOrientation = false;
     _clearRectReshapeState();
   }
 
@@ -3269,6 +3442,18 @@ class SelectTool extends CanvasTool {
             .where((w) => w.id == wall.id)
             .firstOrNull ??
         wall;
+  }
+
+  /// Returns the live state of [room] from [EditorCallbacks.currentRooms],
+  /// falling back to the cached snapshot when the room is gone. Mirrors
+  /// [_currentWallState] so the selection highlight (the blue room fill)
+  /// tracks polygon edits made outside this tool — e.g. a Width/Height
+  /// change committed from the room properties panel (ADR-015).
+  Room _currentRoomState(Room room) {
+    return callbacks.currentRooms
+            .where((r) => r.id == room.id)
+            .firstOrNull ??
+        room;
   }
 
   // ================================================================

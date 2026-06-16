@@ -980,9 +980,11 @@ class _FloorPlanCanvasState
       final st = _tools[DrawingTool.select];
       if (st is SelectTool) {
         // Alt is forwarded so ADR-016 room-move can disable grid snap
-        // (free placement, consistent with the other tools).
+        // (free placement, consistent with the other tools). Shift is
+        // forwarded for the ADR-027 keep-orientation wall-body drag.
         st.updateModifiers(
           ctrl: mods.rectMode,
+          shift: mods.orthoSnap,
           alt: mods.freePlacement,
         );
       }

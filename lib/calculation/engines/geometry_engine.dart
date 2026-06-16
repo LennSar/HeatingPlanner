@@ -428,6 +428,20 @@ class GeometryEngine {
     Point2D b,
     Point2D c,
     Point2D d,
+  ) =>
+      lineIntersection(a, b, c, d);
+
+  /// Intersection point of the two **infinite** lines through `a`–`b`
+  /// and `c`–`d`.
+  ///
+  /// Returns `null` when the lines are parallel or (near-)collinear
+  /// (determinant below `1e-9`). The result is unconstrained — it may
+  /// lie outside either segment.
+  static Point2D? lineIntersection(
+    Point2D a,
+    Point2D b,
+    Point2D c,
+    Point2D d,
   ) {
     final dx1 = b.x - a.x;
     final dy1 = b.y - a.y;

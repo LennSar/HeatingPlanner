@@ -1018,6 +1018,110 @@ void main() {
   });
 
   // ────────────────────────────────────────────────────────────────────────────
+  // ADR-027 — Keep-orientation wall-body translate (Shift / Ctrl + mid drag)
+  // ────────────────────────────────────────────────────────────────────────────
+
+  group('ADR-027 keep-orientation wall-body drag (stub callbacks)', () {
+    // Standard 3000 × 2000 rectangle (same layout as the ADR-012 group).
+    const tl = Point2D(x: 0, y: 0);
+    const tr = Point2D(x: 3000, y: 0);
+    const br = Point2D(x: 3000, y: 2000);
+    const bl = Point2D(x: 0, y: 2000);
+
+    List<WallSegment> buildRectWalls(String roomId) => [
+          WallSegment(
+              id: 'w-top', roomId: roomId, startPoint: tl, endPoint: tr),
+          WallSegment(
+              id: 'w-right', roomId: roomId, startPoint: tr, endPoint: br),
+          WallSegment(
+              id: 'w-bottom', roomId: roomId, startPoint: br, endPoint: bl),
+          WallSegment(
+              id: 'w-left', roomId: roomId, startPoint: bl, endPoint: tl),
+        ];
+
+    Room buildRoom(String id) => const Room(
+          id: 'room-1',
+          floorId: 'floor-1',
+          name: 'R',
+          polygon: [tl, tr, br, bl],
+        );
+
+    Set<Point2D> cornersOf(List<WallSegment> walls) {
+      final pts = <Point2D>{};
+      for (final w in walls) {
+        pts..add(w.startPoint)..add(w.endPoint);
+      }
+      return pts;
+    }
+
+    test(
+        'ADR-027-1: Ctrl + mid drag of the top wall keeps the room rectangular',
+        () {
+      final cb = _ReshapeStubCallbacks(
+        walls: buildRectWalls('room-1'),
+        rooms: [buildRoom('room-1')],
+      );
+      final tool = _makeTool(cb);
+
+      // Select the top wall, then grab its mid handle (its midpoint).
+      tool.onTap(const Point2D(x: 1500, y: 0), PointerDeviceKind.mouse);
+      tool.debugCtrlHeldOverride = true;
+      tool.onPointerDown(const Point2D(x: 1500, y: 0), 1);
+
+      // Drag diagonally: a 500 mm sideways component that MUST be ignored
+      // and a 500 mm upward (perpendicular) component that moves the wall.
+      tool.onDragUpdate(const Point2D(x: 2000, y: -500));
+      tool.onDragEnd(const Point2D(x: 2000, y: -500));
+
+      // Still an axis-aligned rectangle: only the top edge's y moved.
+      final corners = cornersOf(cb._walls);
+      expect(corners, hasLength(4));
+      expect(corners.map((p) => p.x).toSet(), {0.0, 3000.0},
+          reason: 'the sideways drag component must not slant the sides');
+      expect(corners.map((p) => p.y).toSet(), {-500.0, 2000.0});
+    });
+
+    test('ADR-027-2: Shift alone also engages keep-orientation', () {
+      final cb = _ReshapeStubCallbacks(
+        walls: buildRectWalls('room-1'),
+        rooms: [buildRoom('room-1')],
+      );
+      final tool = _makeTool(cb);
+
+      tool.onTap(const Point2D(x: 1500, y: 0), PointerDeviceKind.mouse);
+      tool.debugShiftHeldOverride = true;
+      tool.onPointerDown(const Point2D(x: 1500, y: 0), 1);
+      tool.onDragUpdate(const Point2D(x: 2000, y: -500));
+      tool.onDragEnd(const Point2D(x: 2000, y: -500));
+
+      final corners = cornersOf(cb._walls);
+      expect(corners.map((p) => p.x).toSet(), {0.0, 3000.0});
+      expect(corners.map((p) => p.y).toSet(), {-500.0, 2000.0});
+    });
+
+    test(
+        'ADR-027-3: without a modifier the same drag slants the side walls',
+        () {
+      final cb = _ReshapeStubCallbacks(
+        walls: buildRectWalls('room-1'),
+        rooms: [buildRoom('room-1')],
+      );
+      final tool = _makeTool(cb);
+
+      // No Ctrl / Shift override → plain translate (both axes applied).
+      tool.onTap(const Point2D(x: 1500, y: 0), PointerDeviceKind.mouse);
+      tool.onPointerDown(const Point2D(x: 1500, y: 0), 1);
+      tool.onDragUpdate(const Point2D(x: 2000, y: -500));
+      tool.onDragEnd(const Point2D(x: 2000, y: -500));
+
+      // The left wall is no longer vertical — the room is non-rectangular.
+      final left = cb._walls.firstWhere((w) => w.id == 'w-left');
+      expect((left.startPoint.x - left.endPoint.x).abs(), greaterThan(1.0),
+          reason: 'default mid drag translates both axes, slanting the side');
+    });
+  });
+
+  // ────────────────────────────────────────────────────────────────────────────
   // ADR-018 — Split zone via right-click context menu
   // ────────────────────────────────────────────────────────────────────────────
 
