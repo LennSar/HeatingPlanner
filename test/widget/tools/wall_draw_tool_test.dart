@@ -1249,4 +1249,57 @@ void main() {
       );
     },
   );
+
+  // WDT-16 ───────────────────────────────────────────────────────────────────
+  //
+  // Press-hold-drag (no Ctrl): pressing, holding for a typical duration,
+  // dragging to the endpoint, and releasing commits a single wall — the
+  // press-hold alternative to click-click. No modifier is active, so this
+  // is the plain free-wall case (also covers Shift via applyOrtho).
+
+  test(
+    'WDT-16: press-hold-drag commits a single wall on release',
+    () async {
+      final cb = _StubCallbacks();
+      final tool = _makeTool(cb);
+
+      const start = Point2D(x: 0, y: 0);
+      const end = Point2D(x: 3000, y: 0);
+
+      tool.onPointerDown(start, 1);
+      // Hold past the deliberate-hold threshold (200 ms) before releasing.
+      await Future<void>.delayed(const Duration(milliseconds: 220));
+      tool.onDragUpdate(end);
+      tool.onDragEnd(end);
+
+      expect(cb.currentWalls, hasLength(1));
+      final wall = cb.currentWalls.single;
+      expect(wall.startPoint.x, closeTo(0, 0.5));
+      expect(wall.startPoint.y, closeTo(0, 0.5));
+      expect(wall.endPoint.x, closeTo(3000, 0.5));
+      expect(wall.endPoint.y, closeTo(0, 0.5));
+    },
+  );
+
+  // WDT-17 ───────────────────────────────────────────────────────────────────
+  //
+  // A quick press-drag-release that does NOT dwell past the hold threshold
+  // is treated as a click (handled by onTap in the real canvas), not a
+  // hold-drag, so onDragEnd commits nothing. This protects click-click from
+  // a stray micro-jitter committing an accidental wall.
+
+  test(
+    'WDT-17: quick press-drag without holding commits no wall via onDragEnd',
+    () {
+      final cb = _StubCallbacks();
+      final tool = _makeTool(cb);
+
+      tool.onPointerDown(const Point2D(x: 0, y: 0), 1);
+      tool.onDragUpdate(const Point2D(x: 3000, y: 0));
+      // Released immediately — well under the 200 ms hold threshold.
+      tool.onDragEnd(const Point2D(x: 3000, y: 0));
+
+      expect(cb.currentWalls, isEmpty);
+    },
+  );
 }

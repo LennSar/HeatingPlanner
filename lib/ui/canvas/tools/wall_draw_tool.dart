@@ -17,7 +17,9 @@ import 'undo_redo_service.dart';
 ///
 /// First click sets the start point, second click commits
 /// the wall. The endpoint becomes the next start (chaining).
-/// Escape cancels the current segment.
+/// Alternatively, press and hold, drag to the endpoint, and
+/// release: a wall held a typical duration commits on release
+/// (no chaining). Escape cancels the current segment.
 ///
 /// Modifier key behaviour (shared [ModifierDrawTool] flags):
 /// - **Shift** ([orthoSnap]): constrain endpoint to H or V axis
@@ -95,8 +97,8 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
   void onPointerDown(Point2D worldPoint, int buttons) {
     if (!rectMode) {
       // Non-rect: record the press so a press-hold-drag can commit a
-      // wall on release. The actual commit/click decision is made in
-      // onDragEnd (moved while pressed) or onPointerUp (pure click).
+      // wall on release (handled in onDragEnd). A pure click without a
+      // drag is still handled by onTap (click-click), unchanged.
       _pressTime = DateTime.now();
       _pressSnapped = applyOrtho(_startPoint ?? worldPoint, _snap(worldPoint));
       _currentSnapped = _pressSnapped;
@@ -138,7 +140,39 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
   @override
   void onDragEnd(Point2D worldPoint) {
     if (!rectMode) {
-      _endNonRectGesture(worldPoint, moved: true);
+      // Non-rect press-hold-drag: commit a single wall on release.
+      // The anchor is the existing start point (mid-chain) or the
+      // press point captured on pointer-down for a fresh wall. onTap
+      // may already have set _startPoint to the press point (it fires
+      // ~100 ms into a slow press); either way the anchor is the same.
+      final anchor = _startPoint ?? _pressSnapped;
+      final pressTime = _pressTime;
+      _pressSnapped = null;
+      _pressTime = null;
+      if (anchor == null) return;
+
+      final end = applyOrtho(anchor, _snap(worldPoint));
+      final lengthMm = GeometryEngine.distanceMm(anchor, end);
+      final heldLongEnough = pressTime != null &&
+          DateTime.now().difference(pressTime).inMilliseconds >=
+              _holdThresholdMs;
+
+      // Only a deliberate hold-drag (held a typical duration and long
+      // enough to be intentional) commits. Otherwise the gesture was a
+      // click with a stray micro-jitter — leave click-click state, which
+      // onTap has already established, untouched.
+      if (!heldLongEnough || lengthMm < _minLengthMm) {
+        _currentSnapped = _startPoint;
+        onStateChanged();
+        return;
+      }
+
+      _commitWall(anchor, end);
+      // A hold-drag finishes the wall on release (no chaining).
+      _startPoint = null;
+      _currentSnapped = null;
+      _currentSnapType = null;
+      onStateChanged();
       return;
     }
     final start = _dragStart;
@@ -264,75 +298,28 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
     Point2D worldPoint,
     PointerDeviceKind deviceKind,
   ) {
-    // Non-rect wall drawing is driven by the raw pointer events
-    // (onPointerDown / onDragUpdate / onDragEnd / onPointerUp) so a
-    // single press-hold-drag can commit a wall on release as well as
-    // the click-click flow. The GestureDetector tap path fires on
-    // press (before a drag is known) and is intentionally unused here.
-  }
+    if (rectMode) return; // rect mode uses drag, not tap
 
-  @override
-  void onPointerUp(Point2D worldPoint) {
-    // Pure click (no drag occurred): click-click flow.
-    if (rectMode) return;
-    _endNonRectGesture(worldPoint, moved: false);
-  }
+    final snapped = applyOrtho(
+      _startPoint ?? worldPoint,
+      _snap(worldPoint),
+    );
 
-  /// Resolve a finished non-rect pointer gesture into either a
-  /// click-click step or a press-hold-drag commit.
-  ///
-  /// [moved] is true when the pointer dragged while pressed (the
-  /// canvas fired onDragEnd), false for a pure click (onPointerUp).
-  void _endNonRectGesture(Point2D worldPoint, {required bool moved}) {
-    final pressTime = _pressTime;
-    _pressTime = null;
-    final pressSnapped = _pressSnapped;
-    _pressSnapped = null;
-
-    final anchor = _startPoint ?? pressSnapped ?? _snap(worldPoint);
-    final end = applyOrtho(anchor, _snap(worldPoint));
-    final lengthMm = GeometryEngine.distanceMm(anchor, end);
-
-    final heldLongEnough = pressTime != null &&
-        DateTime.now().difference(pressTime).inMilliseconds >= _holdThresholdMs;
-
-    // A deliberate press-hold-drag commits the wall and finishes the
-    // chain on release. We treat the gesture as a hold-drag when the
-    // pointer moved and either the press was held a typical duration
-    // or the resulting wall is long enough to be intentional.
-    final isHoldDrag = moved && (heldLongEnough || lengthMm >= _minLengthMm);
-
-    if (isHoldDrag) {
-      if (lengthMm < _minLengthMm) {
-        // Held long but barely moved — nothing to commit.
-        _currentSnapped = _startPoint;
-        onStateChanged();
-        return;
-      }
-      _commitWall(anchor, end);
-      // Press-hold-drag finishes the wall on release (no chaining).
-      _startPoint = null;
-      _currentSnapped = null;
-      _currentSnapType = null;
-      onStateChanged();
-      return;
-    }
-
-    // Click-click flow (also catches a stray micro-jitter during a
-    // click, which is treated as a plain click rather than a drag).
     if (_startPoint == null) {
       // First click: set start point.
-      _startPoint = anchor;
-      _currentSnapped = anchor;
+      _startPoint = snapped;
       onStateChanged();
       return;
     }
 
-    // Second click: validate and commit wall, then chain.
+    // Second click: validate and commit wall.
+    final lengthMm = GeometryEngine.distanceMm(_startPoint!, snapped);
     if (lengthMm < _minLengthMm) return;
-    _commitWall(_startPoint!, end);
-    _startPoint = end;
-    _currentSnapped = end;
+
+    _commitWall(_startPoint!, snapped);
+
+    // Chain: use endpoint as next start.
+    _startPoint = snapped;
     onStateChanged();
   }
 
