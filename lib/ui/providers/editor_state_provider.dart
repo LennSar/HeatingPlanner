@@ -896,11 +896,10 @@ class EditorStateNotifier extends Notifier<EditorState>
   /// Replace walls, rooms, zones, windows, and doors atomically — the
   /// inverse of [destroyRoomCascade] (ADR-019 Rule 4 snapshot restore).
   ///
-  /// Used by the "Delete room" undo / redo command. Memory only; DAO
-  /// sync is handled by the initial [destroyRoomCascade] call and is
-  /// not re-applied on undo (the existing snapshot-restore pattern for
-  /// `_MoveRoomCommand` / `_RectDrawCommand` follows the same
-  /// convention).
+  /// Used by the "Delete room" undo / redo command. The in-memory tuple
+  /// is replaced and SQLite is reconciled to match (see
+  /// [_reconcileDb]) so an undone delete (or redone restore) survives a
+  /// reload rather than re-materialising on the next [initFromFloor].
   void replaceAllForRoomCascade(
     List<WallSegment> walls,
     List<Room> rooms,
@@ -908,6 +907,11 @@ class EditorStateNotifier extends Notifier<EditorState>
     List<WindowElement> windows,
     List<Door> doors,
   ) {
+    final wallsBefore = state.walls;
+    final roomsBefore = state.rooms;
+    final zonesBefore = state.zones;
+    final windowsBefore = state.windows;
+    final doorsBefore = state.doors;
     state = state.copyWith(
       walls: walls,
       rooms: rooms,
@@ -915,55 +919,236 @@ class EditorStateNotifier extends Notifier<EditorState>
       windows: windows,
       doors: doors,
     );
+    if (!_isDatabaseAvailable()) return;
+    // Parents (rooms) before children (walls → windows/doors, zones).
+    var wrote = _reconcileRoomsDb(roomsBefore, rooms);
+    wrote = _reconcileWallsDb(wallsBefore, walls) || wrote;
+    wrote = _reconcileZonesDb(zonesBefore, zones) || wrote;
+    wrote = _reconcileWindowsDb(windowsBefore, windows) || wrote;
+    wrote = _reconcileDoorsDb(doorsBefore, doors) || wrote;
+    if (wrote) markProjectDirty();
   }
 
   // ---- Walls batch operations ----
 
   /// Replace the entire wall list in one state update.
   ///
-  /// Used by undo/redo commands to restore a prior snapshot.
+  /// Used by undo/redo commands to restore a prior snapshot. SQLite is
+  /// reconciled to the restored list so walls removed by an undo are
+  /// also deleted from disk (and re-created walls re-persisted),
+  /// preventing them from reappearing after a reload.
   void replaceAllWalls(List<WallSegment> walls) {
+    final before = state.walls;
     state = state.copyWith(walls: walls);
+    if (!_isDatabaseAvailable()) return;
+    if (_reconcileWallsDb(before, walls)) markProjectDirty();
   }
 
   /// Replace walls, constructions, and material layers in one atomic
   /// state update (ADR-020 Rule 6/7 undo snapshot — "Update project
-  /// defaults" command). DAO sync is handled by the originating
-  /// mutation; undo/redo restores the in-memory tuple only.
+  /// defaults" command). SQLite is reconciled to the restored tuple.
   void replaceAllWallsConstructionsLayers(
     List<WallSegment> walls,
     List<WallConstruction> constructions,
     List<MaterialLayer> layers,
   ) {
+    final wallsBefore = state.walls;
+    final constructionsBefore = state.constructions;
+    final layersBefore = state.materialLayers;
     state = state.copyWith(
       walls: walls,
       constructions: constructions,
       materialLayers: layers,
     );
+    if (!_isDatabaseAvailable()) return;
+    // Constructions before walls (FK setNull) and layers (FK cascade).
+    var wrote = _reconcileConstructionsDb(constructionsBefore, constructions);
+    wrote = _reconcileWallsDb(wallsBefore, walls) || wrote;
+    wrote = _reconcileLayersDb(layersBefore, layers) || wrote;
+    if (wrote) markProjectDirty();
   }
 
   /// Replace walls and rooms in one atomic state update.
   ///
   /// Used by undo/redo commands that affect both walls
-  /// and room membership simultaneously.
+  /// and room membership simultaneously. SQLite is reconciled to the
+  /// restored tuple.
   void replaceAllWallsAndRooms(
     List<WallSegment> walls,
     List<Room> rooms,
   ) {
+    final wallsBefore = state.walls;
+    final roomsBefore = state.rooms;
     state = state.copyWith(walls: walls, rooms: rooms);
+    if (!_isDatabaseAvailable()) return;
+    // Parents (rooms) before children (walls, FK to rooms).
+    var wrote = _reconcileRoomsDb(roomsBefore, rooms);
+    wrote = _reconcileWallsDb(wallsBefore, walls) || wrote;
+    if (wrote) markProjectDirty();
   }
 
   /// Replace walls, rooms, and zones in one atomic state update.
   ///
   /// Used by the ADR-016 "Move room" undo command so a single Ctrl+Z
   /// reverts every wall, room, and zone change made during the move,
-  /// including regenerated/severed shared walls.
+  /// including regenerated/severed shared walls. SQLite is reconciled
+  /// to the restored tuple.
   void replaceAllWallsRoomsZones(
     List<WallSegment> walls,
     List<Room> rooms,
     List<HeatingZone> zones,
   ) {
+    final wallsBefore = state.walls;
+    final roomsBefore = state.rooms;
+    final zonesBefore = state.zones;
     state = state.copyWith(walls: walls, rooms: rooms, zones: zones);
+    if (!_isDatabaseAvailable()) return;
+    // Parents (rooms) before children (walls, zones).
+    var wrote = _reconcileRoomsDb(roomsBefore, rooms);
+    wrote = _reconcileWallsDb(wallsBefore, walls) || wrote;
+    wrote = _reconcileZonesDb(zonesBefore, zones) || wrote;
+    if (wrote) markProjectDirty();
+  }
+
+  // ---- Undo/redo SQLite reconciliation ──────────────────────────────────
+
+  /// Reconciles a persisted entity collection so SQLite matches [after]
+  /// after an undo/redo snapshot restore.
+  ///
+  /// The editor persists every mutation eagerly, but the snapshot-restore
+  /// helpers above only swap the in-memory tuple. Without reconciliation a
+  /// create that was undone (or a delete that was redone) lingers in the
+  /// database and the element reappears on the next [initFromFloor] reload.
+  ///
+  /// Deletes rows whose id disappeared from [after] (or became
+  /// non-persistable), and upserts rows in [after] that are new or
+  /// value-changed versus [before]. Entities that were never persistable
+  /// (e.g. a bare wall with an empty `roomId`) are skipped on both sides.
+  /// Returns true when at least one DAO write was issued.
+  static bool _reconcileDb<T>(
+    Iterable<T> before,
+    Iterable<T> after, {
+    required String Function(T) idOf,
+    required void Function(T) upsert,
+    required void Function(String) delete,
+    bool Function(T)? isPersistable,
+  }) {
+    var wrote = false;
+    final afterById = {for (final e in after) idOf(e): e};
+    for (final e in before) {
+      if (isPersistable != null && !isPersistable(e)) continue;
+      final id = idOf(e);
+      final now = afterById[id];
+      if (now == null || (isPersistable != null && !isPersistable(now))) {
+        delete(id);
+        wrote = true;
+      }
+    }
+    final beforeById = {for (final e in before) idOf(e): e};
+    for (final e in after) {
+      if (isPersistable != null && !isPersistable(e)) continue;
+      final prev = beforeById[idOf(e)];
+      if (prev == null || prev != e) {
+        upsert(e);
+        wrote = true;
+      }
+    }
+    return wrote;
+  }
+
+  bool _reconcileWallsDb(
+    List<WallSegment> before,
+    List<WallSegment> after,
+  ) {
+    final dao = ref.read(buildingDaoProvider);
+    return _reconcileDb<WallSegment>(
+      before,
+      after,
+      idOf: (w) => w.id,
+      upsert: (w) => unawaited(upsertWallSegment(dao, w)),
+      delete: (id) => unawaited(deleteWallSegment(dao, id)),
+      // Bare walls (no room) are never written to SQLite; the startup
+      // query inner-joins on rooms so they would not reload anyway.
+      isPersistable: (w) => w.roomId.isNotEmpty,
+    );
+  }
+
+  bool _reconcileRoomsDb(List<Room> before, List<Room> after) {
+    final dao = ref.read(buildingDaoProvider);
+    return _reconcileDb<Room>(
+      before,
+      after,
+      idOf: (r) => r.id,
+      upsert: (r) => unawaited(upsertRoom(dao, r)),
+      delete: (id) => unawaited(deleteRoom(dao, id)),
+    );
+  }
+
+  bool _reconcileZonesDb(
+    List<HeatingZone> before,
+    List<HeatingZone> after,
+  ) {
+    final dao = ref.read(heatingDaoProvider);
+    return _reconcileDb<HeatingZone>(
+      before,
+      after,
+      idOf: (z) => z.id,
+      upsert: (z) => unawaited(upsertHeatingZone(dao, z)),
+      delete: (id) => unawaited(deleteHeatingZone(dao, id)),
+    );
+  }
+
+  bool _reconcileWindowsDb(
+    List<WindowElement> before,
+    List<WindowElement> after,
+  ) {
+    final dao = ref.read(buildingDaoProvider);
+    return _reconcileDb<WindowElement>(
+      before,
+      after,
+      idOf: (w) => w.id,
+      upsert: (w) => unawaited(upsertWindow(dao, w)),
+      delete: (id) => unawaited(deleteWindow(dao, id)),
+    );
+  }
+
+  bool _reconcileDoorsDb(List<Door> before, List<Door> after) {
+    final dao = ref.read(buildingDaoProvider);
+    return _reconcileDb<Door>(
+      before,
+      after,
+      idOf: (d) => d.id,
+      upsert: (d) => unawaited(upsertDoor(dao, d)),
+      delete: (id) => unawaited(deleteDoor(dao, id)),
+    );
+  }
+
+  bool _reconcileConstructionsDb(
+    List<WallConstruction> before,
+    List<WallConstruction> after,
+  ) {
+    final dao = ref.read(constructionDaoProvider);
+    return _reconcileDb<WallConstruction>(
+      before,
+      after,
+      idOf: (c) => c.id,
+      upsert: (c) => unawaited(upsertConstruction(dao, c)),
+      delete: (id) => unawaited(deleteConstruction(dao, id)),
+    );
+  }
+
+  bool _reconcileLayersDb(
+    List<MaterialLayer> before,
+    List<MaterialLayer> after,
+  ) {
+    final dao = ref.read(constructionDaoProvider);
+    return _reconcileDb<MaterialLayer>(
+      before,
+      after,
+      idOf: (l) => l.id,
+      upsert: (l) => unawaited(upsertLayer(dao, l)),
+      delete: (id) => unawaited(deleteLayer(dao, id)),
+    );
   }
 
   // ---- Windows ----
