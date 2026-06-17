@@ -25,8 +25,8 @@ class CanvasState {
   /// Current pan offset in screen pixels.
   final Offset panOffset;
 
-  /// Minimum allowed zoom (10%).
-  static const double minZoom = 0.1;
+  /// Minimum allowed zoom (2.5%).
+  static const double minZoom = 0.025;
 
   /// Maximum allowed zoom (500%).
   static const double maxZoom = 5.0;
