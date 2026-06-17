@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vector_math/vector_math_64.dart'
     show Vector3;
 
+import '../../calculation/engines/geometry_engine.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/id_generator.dart';
 import '../../data/models/distributor.dart';
@@ -30,6 +31,7 @@ import '../../data/models/heating_zone.dart';
 import 'tools/editor_callbacks.dart';
 import 'tools/distributor_place_tool.dart';
 import 'tools/door_place_tool.dart';
+import 'tools/measure_tool.dart';
 import 'tools/route_draw_tool.dart';
 import 'tools/select_tool.dart';
 import 'tools/tool_base.dart';
@@ -338,6 +340,10 @@ class _FloorPlanCanvasState
       undoRedo: undoRedo,
     );
     _tools[DrawingTool.routePipe] = RouteDrawTool(
+      callbacks: this,
+      onStateChanged: onChanged,
+    );
+    _tools[DrawingTool.measure] = MeasureTool(
       callbacks: this,
       onStateChanged: onChanged,
     );
@@ -988,6 +994,11 @@ class _FloorPlanCanvasState
           alt: mods.freePlacement,
         );
       }
+      final mt = _tools[DrawingTool.measure];
+      if (mt is MeasureTool) {
+        // Shift gates measure-tool snapping (off by default — ADR-031).
+        mt.updateSnapEnabled(mods.orthoSnap);
+      }
     });
 
     return LayoutBuilder(
@@ -1193,6 +1204,17 @@ class _FloorPlanCanvasState
                   hint =
                       'Pipe length: '
                       '${lenM.toStringAsFixed(1)} m';
+                } else if (idata is MeasureData) {
+                  final lenMm = GeometryEngine.distanceMm(
+                    idata.start,
+                    idata.end,
+                  );
+                  final base = 'Distance: '
+                      '${(lenMm / 1000.0).toStringAsFixed(3)} m '
+                      '(${lenMm.round()} mm)';
+                  hint = idata.snapEnabled
+                      ? base
+                      : '$base · hold Shift to snap';
                 } else {
                   hint = null;
                 }

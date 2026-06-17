@@ -2326,3 +2326,69 @@ stroke.
 (a stranded `rectMode` cache is cleared by the hardware sync at `onTap`, so
 click-click drawing recovers); existing WDT/ZDT modifier tests still pass with
 the sync disabled via the test seam.
+
+## ADR-030 — Measure tool is a stateless two-point dimension overlay
+
+**What.**
+`DrawingTool.measure` (toolbar icon `Icons.straighten`, already wired) is backed
+by a new `MeasureTool extends CanvasTool`, registered in
+`FloorPlanCanvas._ensureToolsInitialised`. First click sets the start point;
+the cursor then drives a live dimension line, and a second click freezes it. A
+further click starts a fresh measurement; Escape (`cancel()`) clears it. Both
+endpoints run through `SnapService.snap` (endpoint / wall-interior / grid), so
+corner-to-corner distances read exactly. The tool emits a new `MeasureData`
+interaction record (`start`, `end`, `finalized`, `snapIndicator`); the
+`InteractionPainter` draws a solid world-space line with perpendicular end caps,
+a midpoint length label (metres ≥ 1 m, else mm), endpoint dots, and an orange
+snap ring on the live endpoint. The canvas also surfaces the live distance to the
+status bar via `toolStatusHintProvider`, matching the `RouteDrawData` pattern.
+
+**Why.**
+The icon existed but the tool was an unimplemented stub, so selecting it left the
+canvas inert. A measure tool is read-only by nature: it never creates or edits
+geometry, so — unlike every other draw tool — it intentionally takes no
+`UndoRedoService` and issues no `EditorCallbacks` mutations, keeping it out of
+persistence and undo/redo entirely. Reusing the existing `SnapService` and the
+interaction-painter pipeline (rather than a bespoke overlay) keeps snapping
+behaviour and zoom-invariant label rendering consistent with the draw tools.
+
+**Verification.**
+`flutter analyze` clean. Unit: `test/widget/tools/measure_tool_test.dart` covers
+start placement, cursor tracking, finalize, the frozen end after finalize,
+restart-on-next-tap, and cancel. End-to-end:
+`test/integration/measure_tool_test.dart` drives the real `EditorScreen` —
+selects the Measure tool, taps the first point, hovers, and asserts the live
+distance surfaced to the status bar (and that no geometry is committed).
+Snapping behaviour is covered under ADR-031.
+
+## ADR-031 — Measure-tool snapping is opt-in behind Shift
+
+**What.**
+`MeasureTool` no longer snaps by default. `_resolve` returns the raw cursor
+position (snap type `none`) unless `_snapEnabled` is set, in which case it runs
+the full `SnapService.snap` (endpoint / wall-interior / grid). `_snapEnabled`
+is fed from `wallModifiersProvider`'s Shift flag via a new `updateSnapEnabled`
+(forwarded in `FloorPlanCanvas`'s `wallModifiersProvider` listener, alongside the
+draw/select tools) and re-synced from live hardware at the start of `onTap` /
+`onPointerMove` through `_syncSnapFromHardware` (the ADR-029 stranded-flag guard,
+with a `debugDisableHardwareSync` test seam). `MeasureData` carries `snapEnabled`
+so the status bar appends "· hold Shift to snap" while snapping is off.
+
+**Why.**
+Default snapping pulled measurements onto the nearest wall centre-line / grid
+point, which is helpful for corner-to-corner dimensions but actively wrong for
+ad-hoc "how far is this from that" measurements — the user could not place an
+endpoint where they aimed. Inverting to opt-in keeps free measurement the
+default and makes exact snapping a deliberate, discoverable action. Shift is the
+conventional snap/constrain modifier and was previously unused by the measure
+tool, so there is no collision (it carries no ortho meaning here — the measure
+tool has no ortho constraint).
+
+**Verification.**
+`flutter analyze` clean. Unit: `test/widget/tools/measure_tool_test.dart` MT-2
+(no Shift → raw cursor, no snap), MT-2b (Shift → grid snap), MT-7 (Shift →
+endpoint snap with indicator), MT-8 (no Shift → no endpoint snap near a wall
+corner). End-to-end: `test/integration/measure_tool_test.dart` measures the raw
+1230 mm by default (asserting the "hold Shift to snap" affordance), then holds
+Shift and confirms the endpoint snaps to the 1200 grid line through real
+keyboard + pointer events.

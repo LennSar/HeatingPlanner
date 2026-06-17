@@ -213,7 +213,104 @@ class InteractionPainter extends CustomPainter {
             currentPoint,
             hoveredZoneAlreadyConnected,
           );
+        case MeasureData(
+              :final start,
+              :final end,
+              :final finalized,
+              :final snapIndicator,
+            ):
+          _drawMeasure(
+            canvas,
+            Offset(start.x, start.y),
+            Offset(end.x, end.y),
+            finalized,
+            snapIndicator != null
+                ? Offset(snapIndicator.x, snapIndicator.y)
+                : null,
+          );
       }
+    }
+  }
+
+  /// Draws a measure-tool dimension line (ADR-030): a solid line with a
+  /// perpendicular end cap at each endpoint and a length label centred
+  /// above the midpoint. While [finalized] is false an endpoint dot and
+  /// (when snapped) a snap ring track the cursor.
+  void _drawMeasure(
+    Canvas canvas,
+    Offset start,
+    Offset end,
+    bool finalized,
+    Offset? snapIndicator,
+  ) {
+    final color = selectionHighlightColor ?? Colors.blue;
+    final linePaint = Paint()
+      ..color = color
+      ..strokeWidth = 20.0 // world-space; ~2 px at default zoom
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(start, end, linePaint);
+
+    final dx = end.dx - start.dx;
+    final dy = end.dy - start.dy;
+    final length = sqrt(dx * dx + dy * dy);
+    if (length >= 1) {
+      // Perpendicular end caps so the dimension reads like a ruler.
+      final px = -dy / length * 90.0;
+      final py = dx / length * 90.0;
+      final capPaint = Paint()
+        ..color = color
+        ..strokeWidth = 20.0
+        ..style = PaintingStyle.stroke;
+      canvas.drawLine(
+        Offset(start.dx + px, start.dy + py),
+        Offset(start.dx - px, start.dy - py),
+        capPaint,
+      );
+      canvas.drawLine(
+        Offset(end.dx + px, end.dy + py),
+        Offset(end.dx - px, end.dy - py),
+        capPaint,
+      );
+    }
+
+    // Length label centred above the midpoint.
+    final lengthMm = length.round();
+    final text = lengthMm >= 1000
+        ? '${(lengthMm / 1000).toStringAsFixed(3)} m'
+        : '$lengthMm mm';
+    final builder = ui.ParagraphBuilder(
+      ui.ParagraphStyle(textAlign: TextAlign.center, fontSize: 80),
+    )
+      ..pushStyle(ui.TextStyle(color: color, fontSize: 80))
+      ..addText(text);
+    final paragraph = builder.build()
+      ..layout(const ui.ParagraphConstraints(width: 600));
+    canvas.drawParagraph(
+      paragraph,
+      Offset(
+        (start.dx + end.dx) / 2 - paragraph.width / 2,
+        (start.dy + end.dy) / 2 - paragraph.height - 30,
+      ),
+    );
+
+    // Endpoint dots.
+    final dotPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(start, 12.0, dotPaint);
+    canvas.drawCircle(end, 12.0, dotPaint);
+
+    // Snap ring on the live endpoint.
+    if (!finalized && snapIndicator != null) {
+      canvas.drawCircle(
+        snapIndicator,
+        30.0,
+        Paint()
+          ..color = Colors.orange
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 6.0,
+      );
     }
   }
 

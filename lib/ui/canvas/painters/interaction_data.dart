@@ -439,6 +439,45 @@ class RouteDrawData extends InteractionData {
   final double cumulativeLengthMm;
 }
 
+/// Dimension line produced by the measure tool (ADR-030).
+///
+/// Emitted by [MeasureTool] while the user is measuring a distance.
+/// Conveys the two endpoints (world mm) so [InteractionPainter] can
+/// draw a dimension line with perpendicular end caps and a length
+/// label at the midpoint. While [finalized] is false the second point
+/// tracks the cursor (live preview); once the user clicks the second
+/// point it is frozen until a new measurement begins.
+@immutable
+class MeasureData extends InteractionData {
+  /// Creates [MeasureData].
+  const MeasureData({
+    required this.start,
+    required this.end,
+    this.finalized = false,
+    this.snapEnabled = false,
+    this.snapIndicator,
+  });
+
+  /// First endpoint of the measurement (world mm).
+  final Point2D start;
+
+  /// Second endpoint of the measurement (world mm). Tracks the cursor
+  /// while [finalized] is false; frozen once the user commits it.
+  final Point2D end;
+
+  /// True once the second point has been clicked. Distinguishes a live
+  /// preview from a completed measurement (affects only styling).
+  final bool finalized;
+
+  /// Whether snapping is currently active (Shift held — ADR-031). Drives
+  /// the status-bar "hold Shift to snap" hint; the painter ignores it.
+  final bool snapEnabled;
+
+  /// Position of the endpoint snap indicator, if the cursor is snapped
+  /// to an existing wall endpoint or interior point. Null otherwise.
+  final Point2D? snapIndicator;
+}
+
 /// Highlight data for a selected window or door element.
 ///
 /// Produced by [SelectTool] when a window or door is
