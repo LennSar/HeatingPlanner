@@ -154,6 +154,16 @@ class CanvasController extends Notifier<CanvasState> {
     );
   }
 
+  /// Pan the view by [delta] screen pixels (ADR-032).
+  ///
+  /// Drives both the right-button drag-pan and the arrow-key nudges. The
+  /// drawing moves with [delta]: a positive `dx`/`dy` shifts content right /
+  /// down, matching a grab-and-pull drag.
+  void panBy(Offset delta) {
+    if (delta == Offset.zero) return;
+    state = state.copyWith(panOffset: state.panOffset + delta);
+  }
+
   /// Reset zoom to fit-all (identity transform).
   void zoomToFit() {
     state = CanvasState.initial;

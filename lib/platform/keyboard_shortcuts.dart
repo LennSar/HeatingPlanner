@@ -80,6 +80,15 @@ class ZoomToFitIntent extends Intent {
   const ZoomToFitIntent();
 }
 
+/// Pan the canvas view by a fixed screen-pixel step (arrow keys — ADR-032).
+class PanViewIntent extends Intent {
+  /// Creates a [PanViewIntent] that shifts the view by [delta] screen pixels.
+  const PanViewIntent(this.delta);
+
+  /// Screen-pixel offset added to the canvas pan; the drawing moves this way.
+  final Offset delta;
+}
+
 /// Rotate the selected distributor 90° clockwise; if no distributor is
 /// selected, switch to the route-pipe tool instead.
 class RotateOrRoutePipeIntent extends Intent {
@@ -124,6 +133,9 @@ class CloseProjectIntent extends Intent {
 // ----------------------------------------------------------
 // Shortcut map
 // ----------------------------------------------------------
+
+/// Screen-pixel step the arrow keys pan the canvas per press (ADR-032).
+const double _arrowPanStepPx = 60.0;
 
 /// All keyboard shortcuts for the editor screen.
 ///
@@ -184,6 +196,17 @@ final Map<ShortcutActivator, Intent> editorShortcuts = {
     LogicalKeyboardKey.digit0,
     control: true,
   ): const ZoomToFitIntent(),
+
+  // Pan (arrow keys always move the drawing — ADR-032). Each arrow moves the
+  // drawing in the direction the key points.
+  const SingleActivator(LogicalKeyboardKey.arrowUp):
+      const PanViewIntent(Offset(0, _arrowPanStepPx)),
+  const SingleActivator(LogicalKeyboardKey.arrowDown):
+      const PanViewIntent(Offset(0, -_arrowPanStepPx)),
+  const SingleActivator(LogicalKeyboardKey.arrowLeft):
+      const PanViewIntent(Offset(_arrowPanStepPx, 0)),
+  const SingleActivator(LogicalKeyboardKey.arrowRight):
+      const PanViewIntent(Offset(-_arrowPanStepPx, 0)),
 
   // File
   const SingleActivator(
@@ -304,6 +327,15 @@ class EditorShortcuts extends ConsumerWidget {
                     canvasControllerProvider.notifier,
                   )
                   .zoomToFit();
+              return null;
+            },
+          ),
+          PanViewIntent: CallbackAction<PanViewIntent>(
+            onInvoke: (intent) {
+              if (_isTextFieldFocused()) return null;
+              ref
+                  .read(canvasControllerProvider.notifier)
+                  .panBy(intent.delta);
               return null;
             },
           ),

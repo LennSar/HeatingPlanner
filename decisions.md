@@ -2392,3 +2392,39 @@ corner). End-to-end: `test/integration/measure_tool_test.dart` measures the raw
 1230 mm by default (asserting the "hold Shift to snap" affordance), then holds
 Shift and confirms the endpoint snaps to the 1200 grid line through real
 keyboard + pointer events.
+
+## ADR-032 — View panning via right-button drag and arrow keys
+
+**What.**
+The canvas can now be panned with a mouse and the keyboard, alongside the
+existing trackpad two-finger pan and scroll-wheel zoom. `CanvasController` gains
+`panBy(Offset delta)`, which adds a screen-pixel delta to `panOffset` (the
+drawing moves with the delta — a grab-and-pull model).
+
+Right-button drag: `FloorPlanCanvas`'s `Listener` no longer fires
+`onSecondaryTap` on pointer-down. A secondary-button press instead arms a
+pan (`_isPanningView`), and `onPointerMove` feeds per-event screen deltas to
+`panBy` while marking the press as moved. On pointer-up, a press that moved is
+treated purely as a pan; one that never moved falls back to the deferred
+`onSecondaryTap` so context menus (zone delete/split, distributor) still open
+on a stationary right-click. The `onScaleStart/Update` handlers stand down
+while `_isPanningView` is set so the scale recognizer cannot double-apply the
+pan.
+
+Arrow keys: a new `PanViewIntent(Offset delta)` is bound to the four arrow keys
+in `editorShortcuts` (step `_arrowPanStepPx = 60`); its action calls `panBy`
+unless a text field holds focus. Arrows always pan regardless of the active
+tool, and each arrow moves the drawing in the direction the key points
+(right arrow → drawing right, up arrow → drawing up).
+
+**Why.**
+A mouse had no way to pan — only the Mac trackpad (two-finger) and zoom worked,
+so mouse and Windows/Linux users were stuck. Right-drag was the requested
+binding; deferring the context menu to a non-moved release resolves the
+collision with the existing `onSecondaryTap` menus without a separate modifier.
+Arrow-key panning is the conventional always-available keyboard nudge and reuses
+the same `Shortcuts`/`Actions` plumbing as the other editor shortcuts, including
+the shared text-field-focus guard.
+
+**Verification.**
+`flutter analyze` clean.

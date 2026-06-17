@@ -274,6 +274,21 @@ class _FloorPlanCanvasState
   /// Whether a drag is in progress.
   bool _isDragging = false;
 
+  /// Whether a right-button view-pan is in progress (ADR-032).
+  ///
+  /// Set on a secondary-button pointer-down and held until pointer-up. While
+  /// true the right-drag pans the view and the scale-gesture handlers stand
+  /// down. A release that never moved ([_panMoved] false) falls back to the
+  /// deferred context-menu (`onSecondaryTap`) instead of panning.
+  bool _isPanningView = false;
+
+  /// Whether the active right-button press has moved (→ pan) or not
+  /// (→ context menu on release).
+  bool _panMoved = false;
+
+  /// Last screen position seen during a right-button pan, for per-event deltas.
+  Offset? _panLastScreen;
+
   /// Whether tools have been initialised (deferred to first
   /// build so ref is available).
   bool _toolsInitialised = false;
@@ -1047,6 +1062,16 @@ class _FloorPlanCanvasState
             }
           },
           onPointerDown: (event) {
+            // Right (secondary) button starts a potential view-pan (ADR-032).
+            // The context menu (onSecondaryTap) is deferred to pointer-up and
+            // only fires if the press never moved — a moved press pans.
+            if (event.buttons & kSecondaryButton != 0) {
+              _isPanningView = true;
+              _panMoved = false;
+              _panLastScreen = event.localPosition;
+              return;
+            }
+
             final worldOffset = _toWorld(
               canvasState,
               event.localPosition,
@@ -1056,12 +1081,6 @@ class _FloorPlanCanvasState
               y: worldOffset.dy,
             );
 
-            // Forward secondary (right) clicks.
-            if (event.buttons & kSecondaryButton != 0) {
-              _activeTool?.onSecondaryTap(worldPoint);
-              return;
-            }
-
             // Forward pointer-down for drag initiation.
             _activeTool?.onPointerDown(
               worldPoint,
@@ -1069,6 +1088,20 @@ class _FloorPlanCanvasState
             );
           },
           onPointerMove: (event) {
+            // ADR-032: right-button drag pans the view.
+            if (_isPanningView &&
+                event.buttons & kSecondaryButton != 0) {
+              final last = _panLastScreen ?? event.localPosition;
+              final delta = event.localPosition - last;
+              _panLastScreen = event.localPosition;
+              if (delta != Offset.zero) {
+                _panMoved = true;
+                ref
+                    .read(canvasControllerProvider.notifier)
+                    .panBy(delta);
+              }
+              return;
+            }
             if (event.down) {
               // Drag in progress.
               final worldOffset = _toWorld(
@@ -1093,6 +1126,21 @@ class _FloorPlanCanvasState
             }
           },
           onPointerUp: (event) {
+            // ADR-032: end of a right-button interaction — if it moved it was
+            // a pan; otherwise fall back to the deferred context-menu tap.
+            if (_isPanningView) {
+              _isPanningView = false;
+              _panLastScreen = null;
+              if (!_panMoved) {
+                final worldOffset =
+                    _toWorld(canvasState, event.localPosition);
+                _activeTool?.onSecondaryTap(
+                  Point2D(x: worldOffset.dx, y: worldOffset.dy),
+                );
+              }
+              return;
+            }
+
             final worldOffset = _toWorld(
               canvasState,
               event.localPosition,
@@ -1116,13 +1164,13 @@ class _FloorPlanCanvasState
           },
           child: GestureDetector(
             onScaleStart: (details) {
-              if (_isDragging) return;
+              if (_isDragging || _isPanningView) return;
               ref
                   .read(canvasControllerProvider.notifier)
                   .onScaleStart(details.localFocalPoint);
             },
             onScaleUpdate: (details) {
-              if (_isDragging) return;
+              if (_isDragging || _isPanningView) return;
               // Pass the cumulative gesture scale straight through; the
               // controller anchors it on the zoom captured at gesture start.
               // Deriving a per-event delta here from the build-time
