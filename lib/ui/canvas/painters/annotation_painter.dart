@@ -8,6 +8,85 @@ import '../../../data/models/point2d.dart';
 import '../../../data/models/room.dart';
 import '../../../data/models/wall_segment.dart';
 
+/// A single laid-out dimension label, positioned in world coordinates.
+///
+/// The expensive part of a label is the `ui.Paragraph` layout; once built it
+/// is invariant to pan/zoom because the world→screen transform is applied by
+/// the canvas, not baked into the paragraph. Drawing one is therefore cheap:
+/// translate to the world pivot, rotate, centre, and blit the paragraph.
+class _LabelEntry {
+  _LabelEntry({
+    required this.paragraph,
+    required this.pivotX,
+    required this.pivotY,
+    required this.angle,
+  });
+
+  /// Pre-laid-out paragraph (text + style baked in).
+  final ui.Paragraph paragraph;
+
+  /// World-space anchor the label is centred on.
+  final double pivotX;
+  final double pivotY;
+
+  /// Rotation in radians (0 for axis-centred room labels).
+  final double angle;
+
+  void draw(Canvas canvas) {
+    canvas.save();
+    canvas.translate(pivotX, pivotY);
+    if (angle != 0) canvas.rotate(angle);
+    canvas.translate(-paragraph.width / 2, -paragraph.height / 2);
+    canvas.drawParagraph(paragraph, Offset.zero);
+    canvas.restore();
+  }
+}
+
+/// Holds the laid-out dimension-label paragraphs across paints.
+///
+/// Owned by the canvas state and passed into [AnnotationPainter]. The per-wall
+/// / per-room inner-edge geometry and `ui.Paragraph` layout — the most
+/// expensive thing the world layers do — is recomputed only when the geometry,
+/// selection, colour or font size actually changes. On a pure pan/zoom frame
+/// only the world transform differs, so the cached entries are re-drawn as-is
+/// instead of being re-laid-out, which is what kept the view laggy.
+class AnnotationLabelCache {
+  /// Creates an empty cache.
+  AnnotationLabelCache();
+
+  List<_LabelEntry>? _entries;
+  List<WallSegment>? _walls;
+  List<Room>? _rooms;
+  String? _selectedWallId;
+  Color? _textColor;
+  double? _fontSizeWorldMm;
+  double? _secondaryFontSizeWorldMm;
+
+  /// Returns the laid-out entries for [painter], rebuilding only when one of
+  /// the layout inputs changed since the last call.
+  List<_LabelEntry> _resolve(AnnotationPainter painter) {
+    final cached = _entries;
+    if (cached != null &&
+        identical(_walls, painter.walls) &&
+        identical(_rooms, painter.rooms) &&
+        _selectedWallId == painter.selectedWallId &&
+        _textColor == painter.textColor &&
+        _fontSizeWorldMm == painter.fontSizeWorldMm &&
+        _secondaryFontSizeWorldMm == painter.secondaryFontSizeWorldMm) {
+      return cached;
+    }
+    final entries = painter._buildEntries();
+    _entries = entries;
+    _walls = painter.walls;
+    _rooms = painter.rooms;
+    _selectedWallId = painter.selectedWallId;
+    _textColor = painter.textColor;
+    _fontSizeWorldMm = painter.fontSizeWorldMm;
+    _secondaryFontSizeWorldMm = painter.secondaryFontSizeWorldMm;
+    return entries;
+  }
+}
+
 /// Draws dimension labels on the canvas:
 ///
 /// - Wall length labels at each wall's inner-edge midpoint, showing
@@ -26,6 +105,7 @@ class AnnotationPainter extends CustomPainter {
     this.selectedWallId,
     this.fontSizeWorldMm = 80.0,
     this.secondaryFontSizeWorldMm = 56.0,
+    this.cache,
   });
 
   /// Colour for annotation text.
@@ -47,9 +127,27 @@ class AnnotationPainter extends CustomPainter {
   /// Secondary (centerline) sub-label font size in world-mm units.
   final double secondaryFontSizeWorldMm;
 
+  /// Optional cross-paint cache of laid-out label paragraphs. When supplied,
+  /// the layout is reused across pan/zoom frames (transform-only changes).
+  final AnnotationLabelCache? cache;
+
   @override
   void paint(Canvas canvas, Size size) {
     if (walls.isEmpty && rooms.isEmpty) return;
+
+    final entries = cache?._resolve(this) ?? _buildEntries();
+    for (final entry in entries) {
+      entry.draw(canvas);
+    }
+  }
+
+  /// Lays out every dimension label once, returning world-positioned entries.
+  ///
+  /// This is the expensive path (room inner-edge geometry + a `ui.Paragraph`
+  /// per wall and room); [AnnotationLabelCache] keeps its result alive across
+  /// transform-only repaints.
+  List<_LabelEntry> _buildEntries() {
+    final entries = <_LabelEntry>[];
 
     // ADR-001: skip mirror duplicates so each shared wall labels once.
     final drawIds = <String>{};
@@ -89,14 +187,13 @@ class AnnotationPainter extends CustomPainter {
         labelEdge.start,
         labelEdge.end,
       );
-      _drawLengthLabel(
-        canvas,
+      entries.add(_buildLengthEntry(
         text: '${innerLen.round()}',
         edge: labelEdge,
         outwardSide: _outwardSide(wall, labelEdge),
         fontSize: fontSizeWorldMm,
         offsetMul: 1.0,
-      );
+      ));
 
       if (wall.id == selectedWallId) {
         // Secondary sub-label: centerline length, smaller, offset
@@ -105,14 +202,13 @@ class AnnotationPainter extends CustomPainter {
           wall.startPoint,
           wall.endPoint,
         );
-        _drawLengthLabel(
-          canvas,
+        entries.add(_buildLengthEntry(
           text: '${centerLen.round()} (CL)',
           edge: labelEdge,
           outwardSide: _outwardSide(wall, labelEdge),
           fontSize: secondaryFontSizeWorldMm,
           offsetMul: 2.4,
-        );
+        ));
       }
     }
 
@@ -162,14 +258,15 @@ class AnnotationPainter extends CustomPainter {
       final heightMm = (maxY - minY).round();
       final cx = (minX + maxX) / 2.0;
       final cy = (minY + maxY) / 2.0;
-      _drawCenteredLabel(
-        canvas,
+      entries.add(_buildCenteredEntry(
         text: '$widthMm × $heightMm mm',
         worldX: cx,
         worldY: cy,
         fontSize: fontSizeWorldMm,
-      );
+      ));
     }
+
+    return entries;
   }
 
   /// Returns the outward-normal direction of the wall relative to its
@@ -202,8 +299,7 @@ class AnnotationPainter extends CustomPainter {
     return (x: -windingSign * dy / len, y: windingSign * dx / len);
   }
 
-  void _drawLengthLabel(
-    Canvas canvas, {
+  _LabelEntry _buildLengthEntry({
     required String text,
     required ({Point2D start, Point2D end}) edge,
     required ({double x, double y}) outwardSide,
@@ -230,19 +326,15 @@ class AnnotationPainter extends CustomPainter {
     final keepUp = angle.abs() > pi / 2 ? angle + pi : angle;
 
     final off = fontSize * offsetMul;
-    canvas.save();
-    canvas.translate(
-      midX + outwardSide.x * off,
-      midY + outwardSide.y * off,
+    return _LabelEntry(
+      paragraph: paragraph,
+      pivotX: midX + outwardSide.x * off,
+      pivotY: midY + outwardSide.y * off,
+      angle: keepUp,
     );
-    canvas.rotate(keepUp);
-    canvas.translate(-paragraph.width / 2, -paragraph.height / 2);
-    canvas.drawParagraph(paragraph, Offset.zero);
-    canvas.restore();
   }
 
-  void _drawCenteredLabel(
-    Canvas canvas, {
+  _LabelEntry _buildCenteredEntry({
     required String text,
     required double worldX,
     required double worldY,
@@ -258,13 +350,12 @@ class AnnotationPainter extends CustomPainter {
       ..addText(text);
     final paragraph = builder.build()
       ..layout(ui.ParagraphConstraints(width: fontSize * 12));
-    canvas.save();
-    canvas.translate(
-      worldX - paragraph.width / 2,
-      worldY - paragraph.height / 2,
+    return _LabelEntry(
+      paragraph: paragraph,
+      pivotX: worldX,
+      pivotY: worldY,
+      angle: 0,
     );
-    canvas.drawParagraph(paragraph, Offset.zero);
-    canvas.restore();
   }
 
   bool _pointEq(Point2D a, Point2D b) =>

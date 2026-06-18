@@ -24,6 +24,7 @@ import '../providers/selection_provider.dart';
 import '../providers/zone_color_state_provider.dart';
 import '../screens/editor_screen.dart';
 import 'canvas_controller.dart';
+import 'painters/annotation_painter.dart';
 import 'painters/interaction_data.dart';
 import 'painters/interaction_painter.dart';
 import 'painters/world_layer_painters.dart';
@@ -270,6 +271,11 @@ class _FloorPlanCanvasState
 
   /// Cached tool instances.
   final Map<DrawingTool, CanvasTool> _tools = {};
+
+  /// Cross-paint cache for the dimension-label layer. Keeps the expensive
+  /// per-wall/room `ui.Paragraph` layout alive across pan/zoom frames (where
+  /// only the world transform changes), so panning and zooming stay smooth.
+  final AnnotationLabelCache _annotationLabelCache = AnnotationLabelCache();
 
   /// Whether a drag is in progress.
   bool _isDragging = false;
@@ -1344,6 +1350,7 @@ class _FloorPlanCanvasState
                             walls: annotationGeometry.walls,
                             rooms: annotationGeometry.rooms,
                             selectedWallId: selectedWallId,
+                            cache: _annotationLabelCache,
                           ),
                         ),
                       ),

@@ -58,16 +58,37 @@ class GridLayerPainter extends CustomPainter {
   /// Colour for grid dots (`HeatingPlannerColors.gridDot`).
   final Color dotColor;
 
+  /// Minimum on-screen spacing (px) between grid dots. Below this the grid
+  /// spacing is doubled so a zoomed-out view never tries to draw hundreds of
+  /// thousands of sub-pixel dots per frame (the dominant pan/zoom cost).
+  static const double _minDotScreenPx = 8.0;
+
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
     canvas.transform(transform.storage);
     GridPainter(
-      gridSpacingMm: gridSpacingMm,
+      gridSpacingMm: _effectiveSpacingMm,
       visibleRect: visibleRect,
       dotColor: dotColor,
     ).paint(canvas, size);
     canvas.restore();
+  }
+
+  /// Grid spacing actually drawn: [gridSpacingMm] scaled up by the smallest
+  /// power of two that keeps adjacent dots at least [_minDotScreenPx] apart on
+  /// screen at the current zoom. This bounds the visible dot count to roughly
+  /// (viewport / [_minDotScreenPx])², independent of how far the view is
+  /// zoomed out, instead of growing without limit as the zoom shrinks.
+  double get _effectiveSpacingMm {
+    final scale = transform.storage[0];
+    var spacing = gridSpacingMm;
+    if (scale > 0 && spacing > 0) {
+      while (spacing * scale < _minDotScreenPx) {
+        spacing *= 2;
+      }
+    }
+    return spacing;
   }
 
   @override
@@ -249,6 +270,7 @@ class AnnotationLayerPainter extends CustomPainter {
     required this.walls,
     required this.rooms,
     this.selectedWallId,
+    this.cache,
   });
 
   /// World → screen transform.
@@ -266,6 +288,11 @@ class AnnotationLayerPainter extends CustomPainter {
   /// Id of the currently selected wall, for the centerline sub-label.
   final String? selectedWallId;
 
+  /// Cross-paint cache of laid-out label paragraphs (ADR-026). Owned by the
+  /// canvas state so the per-wall/room text layout is reused across pan/zoom
+  /// frames, where only [transform] changes.
+  final AnnotationLabelCache? cache;
+
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
@@ -275,6 +302,7 @@ class AnnotationLayerPainter extends CustomPainter {
       walls: walls,
       rooms: rooms,
       selectedWallId: selectedWallId,
+      cache: cache,
     ).paint(canvas, size);
     canvas.restore();
   }
