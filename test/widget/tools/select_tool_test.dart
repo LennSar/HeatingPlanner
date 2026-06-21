@@ -1605,6 +1605,59 @@ void main() {
       );
     });
   });
+
+  // ────────────────────────────────────────────────────────────────────────────
+  // ST-STALE — a no-drag press on a selected wall must not leave wall-drag
+  // state armed, or a later click teleports the wall to the cursor.
+  // ────────────────────────────────────────────────────────────────────────────
+
+  test(
+    'ST-STALE-1: selecting a wall, clicking it again (no drag), then '
+    'clicking elsewhere does NOT move the wall',
+    () {
+      // Horizontal wall (0,0)→(5000,0); standalone (no room).
+      const wall = WallSegment(
+        id: 'w',
+        roomId: '',
+        startPoint: Point2D(x: 0, y: 0),
+        endPoint: Point2D(x: 5000, y: 0),
+      );
+      final cb = _ReshapeStubCallbacks(walls: [wall], rooms: const []);
+      final tool = SelectTool(
+        callbacks: cb,
+        onStateChanged: () {},
+        undoRedo: UndoRedoService(),
+      );
+
+      // Click 1 — select the wall (down → tap → up on the wall body).
+      tool.onPointerDown(const Point2D(x: 2500, y: 0), kPrimaryButton);
+      tool.onTap(const Point2D(x: 2500, y: 0), PointerDeviceKind.mouse);
+      tool.onPointerUp(const Point2D(x: 2500, y: 0));
+      expect(cb.lastSelectedType, 'wall');
+
+      // Click 2 — a second, separate click that also lands on the wall
+      // body, with NO drag. This arms a wall-body (mid) drag in
+      // onPointerDown that onPointerUp must clear.
+      tool.onPointerDown(const Point2D(x: 1000, y: 0), kPrimaryButton);
+      tool.onTap(const Point2D(x: 1000, y: 0), PointerDeviceKind.mouse);
+      tool.onPointerUp(const Point2D(x: 1000, y: 0));
+
+      // Click 3 — click far from the wall. A real pointer always reports a
+      // little movement, so the canvas treats it as a drag (onDragUpdate /
+      // onDragEnd). With stale wall-drag state this ran _applyMidDrag and
+      // teleported the wall to the cursor; it must now stay put.
+      tool.onPointerDown(const Point2D(x: 1000, y: 3000), kPrimaryButton);
+      tool.onTap(const Point2D(x: 1000, y: 3000), PointerDeviceKind.mouse);
+      tool.onDragUpdate(const Point2D(x: 1000, y: 3000));
+      tool.onDragEnd(const Point2D(x: 1000, y: 3000));
+
+      final moved = cb.currentWalls.firstWhere((w) => w.id == 'w');
+      expect(moved.startPoint, const Point2D(x: 0, y: 0),
+          reason: 'wall start must not move on a separate click');
+      expect(moved.endPoint, const Point2D(x: 5000, y: 0),
+          reason: 'wall end must not move on a separate click');
+    },
+  );
 }
 
 // ════════════════════════════════════════════════════════════════════════════

@@ -847,6 +847,10 @@ class SelectTool extends CanvasTool {
 
     final handleType = _hitTestHandle(worldPoint);
     if (handleType == null) {
+      // Not on a wall handle — drop any wall-drag state still armed from a
+      // prior press so it can't drive a stale-anchor translate on the next
+      // drag-update, then fall back to the room-move arming.
+      _clearDragState();
       _armRoomMoveIfApplicable(worldPoint);
       return;
     }
@@ -1297,6 +1301,15 @@ class SelectTool extends CanvasTool {
 
   @override
   void onPointerUp(Point2D worldPoint) {
+    // A pure click (no drag) that armed a wall / opening / wall-zone drag
+    // in onPointerDown lands here — a real drag routes through onDragEnd
+    // instead. Drop that armed-but-unused state so a stale handle + grab
+    // anchor cannot leak into the next gesture and teleport the element to
+    // the cursor on a later, separate click.
+    if (_dragHandle != null) _clearDragState();
+    if (_openingDragHandle != null) _clearOpeningDragState();
+    if (_wallZoneDragHandle != null) _clearWallZoneDragState();
+
     // Execute deferred distributor tap.
     if (_distributorDeferredTap != null) {
       final tap = _distributorDeferredTap!;
