@@ -142,14 +142,12 @@ void main() {
     AnnotationLayerPainter annotations({
       required List<WallSegment> walls,
       required List<Room> rooms,
-      String? selectedWallId,
     }) {
       return AnnotationLayerPainter(
         transform: transform,
         onSurface: onSurface,
         walls: walls,
         rooms: rooms,
-        selectedWallId: selectedWallId,
       );
     }
 
@@ -159,15 +157,6 @@ void main() {
       // A new sample from annotationGeometryProvider mints a fresh walls list.
       final before = annotations(walls: [createTestWall()], rooms: rooms);
       final after = annotations(walls: [createTestWall()], rooms: rooms);
-      expect(after.shouldRepaint(before), isTrue);
-    });
-
-    test('WLP-AN02: repaints when the selected wall changes', () {
-      final walls = [createTestWall()];
-      final rooms = [createTestRoom()];
-      final before = annotations(walls: walls, rooms: rooms);
-      final after =
-          annotations(walls: walls, rooms: rooms, selectedWallId: 'wall-1');
       expect(after.shouldRepaint(before), isTrue);
     });
 

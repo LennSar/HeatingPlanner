@@ -950,14 +950,6 @@ class _FloorPlanCanvasState
     // Watch selected tool to react to tool switches.
     ref.watch(selectedToolProvider);
 
-    // Watch the selected element so the wall painter can render the
-    // ADR-017 Rule 10 pinned-face glyph and the annotation painter can
-    // show the centerline-length sub-label.
-    final selectedElement = ref.watch(selectedElementProvider);
-    final selectedWallId = selectedElement?.type == 'wall'
-        ? selectedElement!.id
-        : null;
-
     // Discard any in-progress drawing when the user switches tools.
     // Tool instances are cached in [_tools], so a multi-point tool
     // (zone, route, wall) would otherwise retain its uncommitted
@@ -1349,7 +1341,6 @@ class _FloorPlanCanvasState
                             onSurface: onSurface,
                             walls: annotationGeometry.walls,
                             rooms: annotationGeometry.rooms,
-                            selectedWallId: selectedWallId,
                             cache: _annotationLabelCache,
                           ),
                         ),

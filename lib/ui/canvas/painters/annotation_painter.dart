@@ -47,7 +47,7 @@ class _LabelEntry {
 /// Owned by the canvas state and passed into [AnnotationPainter]. The per-wall
 /// / per-room inner-edge geometry and `ui.Paragraph` layout — the most
 /// expensive thing the world layers do — is recomputed only when the geometry,
-/// selection, colour or font size actually changes. On a pure pan/zoom frame
+/// colour or font size actually changes. On a pure pan/zoom frame
 /// only the world transform differs, so the cached entries are re-drawn as-is
 /// instead of being re-laid-out, which is what kept the view laggy.
 class AnnotationLabelCache {
@@ -57,7 +57,6 @@ class AnnotationLabelCache {
   List<_LabelEntry>? _entries;
   List<WallSegment>? _walls;
   List<Room>? _rooms;
-  String? _selectedWallId;
   Color? _textColor;
   double? _fontSizeWorldMm;
   double? _secondaryFontSizeWorldMm;
@@ -69,7 +68,6 @@ class AnnotationLabelCache {
     if (cached != null &&
         identical(_walls, painter.walls) &&
         identical(_rooms, painter.rooms) &&
-        _selectedWallId == painter.selectedWallId &&
         _textColor == painter.textColor &&
         _fontSizeWorldMm == painter.fontSizeWorldMm &&
         _secondaryFontSizeWorldMm == painter.secondaryFontSizeWorldMm) {
@@ -79,7 +77,6 @@ class AnnotationLabelCache {
     _entries = entries;
     _walls = painter.walls;
     _rooms = painter.rooms;
-    _selectedWallId = painter.selectedWallId;
     _textColor = painter.textColor;
     _fontSizeWorldMm = painter.fontSizeWorldMm;
     _secondaryFontSizeWorldMm = painter.secondaryFontSizeWorldMm;
@@ -90,10 +87,11 @@ class AnnotationLabelCache {
 /// Draws dimension labels on the canvas:
 ///
 /// - Wall length labels at each wall's inner-edge midpoint, showing
-///   the EN 12831 *Lichtmaß* length (ADR-017 Rule 5). When a wall is
-///   the current selection a small secondary centerline-length
-///   sub-label is drawn just outside the primary label per
-///   `agent-ui-ux.md §7.3`.
+///   the EN 12831 *Lichtmaß* length (ADR-017 Rule 5). A small secondary
+///   centerline-length sub-label is drawn just outside the primary label
+///   for every wall whose centerline differs from its inner edge, so the
+///   length the user saw while drawing stays visible after completion
+///   (per `agent-ui-ux.md §7.3`).
 /// - Room width / height labels for rectangle-eligible rooms
 ///   (ADR-015), derived from the inner clear polygon.
 class AnnotationPainter extends CustomPainter {
@@ -102,7 +100,6 @@ class AnnotationPainter extends CustomPainter {
     required this.textColor,
     required this.walls,
     required this.rooms,
-    this.selectedWallId,
     this.fontSizeWorldMm = 80.0,
     this.secondaryFontSizeWorldMm = 56.0,
     this.cache,
@@ -116,10 +113,6 @@ class AnnotationPainter extends CustomPainter {
 
   /// All rooms on the floor.
   final List<Room> rooms;
-
-  /// Id of the currently selected wall, or `null`. When set, that
-  /// wall's centerline-length sub-label is also drawn.
-  final String? selectedWallId;
 
   /// Primary label font size in world-mm units.
   final double fontSizeWorldMm;
@@ -195,20 +188,28 @@ class AnnotationPainter extends CustomPainter {
         offsetMul: 1.0,
       ));
 
-      if (wall.id == selectedWallId) {
-        // Secondary sub-label: centerline length, smaller, offset
-        // further outward so it never overlaps the primary label.
+      // Secondary sub-label: centerline length, smaller, offset further
+      // outward so it never overlaps the primary label. Drawn for every
+      // wall that has a distinct inner edge so the centerline number the
+      // user saw while drawing stays visible after completion — the
+      // primary switches to the inner *Lichtmaß* length, but the change is
+      // explicit rather than a silent jump. Skipped when the wall has no
+      // inner edge (the primary is already the centerline) or when the two
+      // lengths coincide (nothing to disambiguate).
+      if (inner != null) {
         final centerLen = GeometryEngine.distanceMm(
           wall.startPoint,
           wall.endPoint,
         );
-        entries.add(_buildLengthEntry(
-          text: '${centerLen.round()} (CL)',
-          edge: labelEdge,
-          outwardSide: _outwardSide(wall, labelEdge),
-          fontSize: secondaryFontSizeWorldMm,
-          offsetMul: 2.4,
-        ));
+        if ((centerLen - innerLen).abs() >= 1.0) {
+          entries.add(_buildLengthEntry(
+            text: '${centerLen.round()} (CL)',
+            edge: labelEdge,
+            outwardSide: _outwardSide(wall, labelEdge),
+            fontSize: secondaryFontSizeWorldMm,
+            offsetMul: 2.4,
+          ));
+        }
       }
     }
 
@@ -378,7 +379,6 @@ class AnnotationPainter extends CustomPainter {
   @override
   bool shouldRepaint(AnnotationPainter oldDelegate) {
     if (oldDelegate.textColor != textColor) return true;
-    if (oldDelegate.selectedWallId != selectedWallId) return true;
     if (oldDelegate.fontSizeWorldMm != fontSizeWorldMm) return true;
     if (oldDelegate.secondaryFontSizeWorldMm !=
         secondaryFontSizeWorldMm) {

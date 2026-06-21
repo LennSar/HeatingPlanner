@@ -739,6 +739,33 @@ void main() {
       expectPointCloseTo(inner[5], const Point2D(x: 120, y: 3880));
     });
 
+    test('GE-OFFSET-COLLINEAR: a 180° vertex falls back to the vertex offset',
+        () {
+      // A 5×4 m rectangle whose bottom edge is split into two collinear
+      // segments by an extra vertex at (2500, 0) — a 180° corner, exactly
+      // what a hand-drawn room gets when a straight side is two wall
+      // segments or a wall was split. The two offset lines there are
+      // parallel; rather than bailing on the whole polygon, the corner
+      // resolves to the offset of the original vertex.
+      final inner = GeometryEngine.offsetPolygonPerEdge(
+        centerline: const [
+          Point2D(x: 0, y: 0),
+          Point2D(x: 2500, y: 0),
+          Point2D(x: 5000, y: 0),
+          Point2D(x: 5000, y: 4000),
+          Point2D(x: 0, y: 4000),
+        ],
+        edgeOffsetsMm: const [-120.0, -120.0, -120.0, -120.0, -120.0],
+      );
+      expect(inner, hasLength(5));
+      expectPointCloseTo(inner[0], const Point2D(x: 120, y: 120));
+      // The collinear midpoint offsets straight inward by 120.
+      expectPointCloseTo(inner[1], const Point2D(x: 2500, y: 120));
+      expectPointCloseTo(inner[2], const Point2D(x: 4880, y: 120));
+      expectPointCloseTo(inner[3], const Point2D(x: 4880, y: 3880));
+      expectPointCloseTo(inner[4], const Point2D(x: 120, y: 3880));
+    });
+
     test('GE-OFFSET-DEGENERATE: 200×200 with 240 mm walls returns []', () {
       // Inner offset of 120 on each side of a 200×200 room would push
       // every face past its opposite face → degenerate; expect [].
@@ -870,18 +897,52 @@ void main() {
           edges['w2']!.start, const Point2D(x: 5120, y: 4120));
     });
 
-    test('unmatched polygon edge returns empty map', () {
+    test('unmatched polygon edge degrades per-edge (matched walls kept)', () {
+      // Graceful degrade: one polygon edge has no wall (e.g. a shared /
+      // split boundary). The remaining matched walls must still receive
+      // their mitered faces instead of the whole room collapsing.
       const corners = [
         Point2D(x: 0, y: 0),
         Point2D(x: 5000, y: 0),
         Point2D(x: 5000, y: 4000),
         Point2D(x: 0, y: 4000),
       ];
-      // Only three walls — one polygon edge has no match.
+      // Only three walls — the left edge (corners[3]→corners[0]) is unmatched.
       final walls = [
         wall(id: 'w0', start: corners[0], end: corners[1], thicknessMm: 240),
         wall(id: 'w1', start: corners[1], end: corners[2], thicknessMm: 240),
         wall(id: 'w2', start: corners[2], end: corners[3], thicknessMm: 240),
+      ];
+      final edges = GeometryEngine.roomFaceEdges(
+        walls: walls,
+        roomPolygon: corners,
+        side: RoomFaceSide.inner,
+      );
+      // The three matched walls get faces; the unmatched edge is omitted.
+      expect(edges.keys, containsAll(['w0', 'w1', 'w2']));
+      expect(edges, hasLength(3));
+      // The unmatched left edge is held at the centerline (x = 0), so w0's
+      // start corner sits on it: (0, 120) rather than the (120, 120) it
+      // would take if the left wall had thickness.
+      expectPointCloseTo(edges['w0']!.start, const Point2D(x: 0, y: 120));
+      expectPointCloseTo(edges['w0']!.end, const Point2D(x: 4880, y: 120));
+    });
+
+    test('no polygon edge matches any wall returns empty map', () {
+      const corners = [
+        Point2D(x: 0, y: 0),
+        Point2D(x: 5000, y: 0),
+        Point2D(x: 5000, y: 4000),
+        Point2D(x: 0, y: 4000),
+      ];
+      // A wall that matches none of the polygon edges.
+      final walls = [
+        wall(
+          id: 'stray',
+          start: const Point2D(x: 9000, y: 9000),
+          end: const Point2D(x: 9000, y: 12000),
+          thicknessMm: 240,
+        ),
       ];
       final edges = GeometryEngine.roomFaceEdges(
         walls: walls,

@@ -256,7 +256,7 @@ class PipeLayerPainter extends CustomPainter {
 /// [AnnotationPainter] lays out a fresh `ui.Paragraph` for every wall and
 /// every room on each paint — the most expensive thing the world layers draw.
 /// Isolating it behind its own `RepaintBoundary` and keying `shouldRepaint`
-/// solely on [walls] / [rooms] / [selectedWallId] means the text layout runs
+/// solely on [walls] / [rooms] means the text layout runs
 /// only when that geometry's list identity actually changes. The canvas feeds
 /// this layer from [annotationGeometryProvider], which throttles that identity
 /// to ~10 fps during a drag (ADR-026): the wall outline moves live every frame,
@@ -269,7 +269,6 @@ class AnnotationLayerPainter extends CustomPainter {
     required this.onSurface,
     required this.walls,
     required this.rooms,
-    this.selectedWallId,
     this.cache,
   });
 
@@ -285,9 +284,6 @@ class AnnotationLayerPainter extends CustomPainter {
   /// All rooms — read by the annotation painter.
   final List<Room> rooms;
 
-  /// Id of the currently selected wall, for the centerline sub-label.
-  final String? selectedWallId;
-
   /// Cross-paint cache of laid-out label paragraphs (ADR-026). Owned by the
   /// canvas state so the per-wall/room text layout is reused across pan/zoom
   /// frames, where only [transform] changes.
@@ -301,7 +297,6 @@ class AnnotationLayerPainter extends CustomPainter {
       textColor: onSurface,
       walls: walls,
       rooms: rooms,
-      selectedWallId: selectedWallId,
       cache: cache,
     ).paint(canvas, size);
     canvas.restore();
@@ -312,7 +307,6 @@ class AnnotationLayerPainter extends CustomPainter {
     return transform != oldDelegate.transform ||
         onSurface != oldDelegate.onSurface ||
         !identical(walls, oldDelegate.walls) ||
-        !identical(rooms, oldDelegate.rooms) ||
-        selectedWallId != oldDelegate.selectedWallId;
+        !identical(rooms, oldDelegate.rooms);
   }
 }

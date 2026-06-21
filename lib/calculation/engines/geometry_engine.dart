@@ -315,7 +315,13 @@ class GeometryEngine {
     }
 
     // Miter each corner = intersection of the previous and current offset
-    // lines (extended infinitely). Parallel lines → no miter → return [].
+    // lines (extended infinitely). When the two offset lines are parallel
+    // (a collinear ~180° vertex — e.g. a straight side split into two wall
+    // segments, very common in hand-drawn rooms) there is no intersection;
+    // the miter point is simply the offset of the original vertex along the
+    // current edge's normal (`offsetStarts[i]`). Falling back to that
+    // instead of bailing keeps the whole room from collapsing to its
+    // un-mitered fallback over a single straight join.
     final offsetVertices = <Point2D>[];
     for (var i = 0; i < n; i++) {
       final prev = (i + n - 1) % n;
@@ -325,8 +331,7 @@ class GeometryEngine {
         offsetStarts[i],
         offsetEnds[i],
       );
-      if (p == null) return const [];
-      offsetVertices.add(p);
+      offsetVertices.add(p ?? offsetStarts[i]);
     }
 
     // Validate per-edge: each offset edge must keep the original edge's
@@ -366,9 +371,16 @@ class GeometryEngine {
   /// values are the corresponding offset edge as a
   /// `(start: Point2D, end: Point2D)` pair.
   ///
+  /// A polygon edge with no matching wall (e.g. a shared/split boundary
+  /// where the wall spans only part of the edge — ADR-001 mirror / ADR-003
+  /// split) is *skipped*: it is held at the centerline (offset 0) so the
+  /// miter geometry of its neighbours still resolves, and it is simply
+  /// omitted from the result. The matched edges therefore keep their
+  /// mitered faces instead of the whole room collapsing to a fallback.
+  ///
   /// Returns an empty map when [roomPolygon] has fewer than 3 vertices,
-  /// when any polygon edge has no matching wall, or when
-  /// [offsetPolygonPerEdge] reports a degenerate offset.
+  /// when no polygon edge matches any wall, or when [offsetPolygonPerEdge]
+  /// reports a degenerate offset.
   static Map<String, ({Point2D start, Point2D end})> roomFaceEdges({
     required List<WallSegment> walls,
     required List<Point2D> roomPolygon,
@@ -377,11 +389,15 @@ class GeometryEngine {
     final n = roomPolygon.length;
     if (n < 3 || walls.isEmpty) return const {};
 
+    // wallIds[i] stays empty for an unmatched edge; offsets[i] stays 0 so
+    // the offset polygon still resolves around it (the neighbours miter
+    // against the centerline there).
     final wallIds = List<String>.filled(n, '');
     final reversed = List<bool>.filled(n, false);
     final offsets = List<double>.filled(n, 0.0);
     final sideSign = side == RoomFaceSide.inner ? -1.0 : 1.0;
 
+    var matchedCount = 0;
     for (var i = 0; i < n; i++) {
       final pa = roomPolygon[i];
       final pb = roomPolygon[(i + 1) % n];
@@ -401,11 +417,14 @@ class GeometryEngine {
           break;
         }
       }
-      if (match == null) return const {};
+      if (match == null) continue; // unmatched edge — degrade, don't bail
       wallIds[i] = match.id;
       reversed[i] = rev;
       offsets[i] = match.thicknessMm / 2.0 * sideSign;
+      matchedCount++;
     }
+
+    if (matchedCount == 0) return const {};
 
     final offsetPoly = offsetPolygonPerEdge(
       centerline: roomPolygon,
@@ -415,6 +434,7 @@ class GeometryEngine {
 
     final result = <String, ({Point2D start, Point2D end})>{};
     for (var i = 0; i < n; i++) {
+      if (wallIds[i].isEmpty) continue; // unmatched edge — no face emitted
       final a = offsetPoly[i];
       final b = offsetPoly[(i + 1) % n];
       result[wallIds[i]] =
