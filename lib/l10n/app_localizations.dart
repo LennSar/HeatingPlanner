@@ -458,6 +458,12 @@ abstract class AppLocalizations {
   /// **'Close Project'**
   String get closeProject;
 
+  /// File > Quit menu item — closes the entire application
+  ///
+  /// In en, this message translates to:
+  /// **'Quit HeatingPlanner'**
+  String get menuQuit;
+
   /// Top-level Edit menu label
   ///
   /// In en, this message translates to:

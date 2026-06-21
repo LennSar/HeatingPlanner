@@ -1,3 +1,5 @@
+import 'dart:ui' show AppExitType;
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,6 +8,17 @@ import '../data/models/enums.dart';
 import '../l10n/app_localizations.dart';
 import '../ui/dialogs/project_settings_dialog.dart';
 import 'keyboard_shortcuts.dart';
+
+/// Requests application exit through the *cancelable* exit pipeline.
+///
+/// This goes through [ServicesBinding.exitApplication] with
+/// [AppExitType.cancelable], which invokes the `onExitRequested` handler
+/// registered by [HeatingPlannerApp] — so the unsaved-`.hsp`-export prompt
+/// (§12.5) is shown when there are pending export changes, and the user can
+/// still cancel. When nothing needs saving the app quits immediately.
+void quitApplication() {
+  ServicesBinding.instance.exitApplication(AppExitType.cancelable);
+}
 
 /// Wraps [child] with a native desktop menu bar on macOS, Windows,
 /// and Linux (agent-frontend.md §6.1).
@@ -42,10 +55,7 @@ class DesktopMenuBar extends ConsumerWidget {
 
   // ── File ────────────────────────────────────────────────────
 
-  PlatformMenu _fileMenu(
-    BuildContext context,
-    AppLocalizations l10n,
-  ) {
+  PlatformMenu _fileMenu(BuildContext context, AppLocalizations l10n) {
     return PlatformMenu(
       label: l10n.menuFile,
       menus: [
@@ -67,10 +77,7 @@ class DesktopMenuBar extends ConsumerWidget {
                 LogicalKeyboardKey.keyO,
                 control: true,
               ),
-              onSelected: () => Actions.invoke(
-                context,
-                const OpenIntent(),
-              ),
+              onSelected: () => Actions.invoke(context, const OpenIntent()),
             ),
           ],
         ),
@@ -83,10 +90,7 @@ class DesktopMenuBar extends ConsumerWidget {
                 LogicalKeyboardKey.keyS,
                 control: true,
               ),
-              onSelected: () => Actions.invoke(
-                context,
-                const SaveIntent(),
-              ),
+              onSelected: () => Actions.invoke(context, const SaveIntent()),
             ),
             // Save As (Ctrl/Cmd+Shift+S)
             PlatformMenuItem(
@@ -96,25 +100,16 @@ class DesktopMenuBar extends ConsumerWidget {
                 control: true,
                 shift: true,
               ),
-              onSelected: () => Actions.invoke(
-                context,
-                const SaveAsIntent(),
-              ),
+              onSelected: () => Actions.invoke(context, const SaveAsIntent()),
             ),
           ],
         ),
         PlatformMenuItemGroup(
           members: [
             // Export PDF — not yet implemented.
-            PlatformMenuItem(
-              label: l10n.menuExportPdf,
-              onSelected: null,
-            ),
+            PlatformMenuItem(label: l10n.menuExportPdf, onSelected: null),
             // Export CSV — not yet implemented.
-            PlatformMenuItem(
-              label: l10n.menuExportCsv,
-              onSelected: null,
-            ),
+            PlatformMenuItem(label: l10n.menuExportCsv, onSelected: null),
           ],
         ),
         PlatformMenuItemGroup(
@@ -123,10 +118,19 @@ class DesktopMenuBar extends ConsumerWidget {
             // (honours the unsaved-`.hsp` prompt).
             PlatformMenuItem(
               label: l10n.closeProject,
-              onSelected: () => Actions.invoke(
-                context,
-                const CloseProjectIntent(),
+              onSelected: () =>
+                  Actions.invoke(context, const CloseProjectIntent()),
+            ),
+            // Quit — closes the whole application. Routed through the
+            // cancelable exit flow so the unsaved-`.hsp` prompt in
+            // [HeatingPlannerApp] (§12.5) still fires.
+            PlatformMenuItem(
+              label: l10n.menuQuit,
+              shortcut: const SingleActivator(
+                LogicalKeyboardKey.keyQ,
+                control: true,
               ),
+              onSelected: quitApplication,
             ),
           ],
         ),
@@ -136,10 +140,7 @@ class DesktopMenuBar extends ConsumerWidget {
 
   // ── Edit ────────────────────────────────────────────────────
 
-  PlatformMenu _editMenu(
-    BuildContext context,
-    AppLocalizations l10n,
-  ) {
+  PlatformMenu _editMenu(BuildContext context, AppLocalizations l10n) {
     return PlatformMenu(
       label: l10n.menuEdit,
       menus: [
@@ -149,10 +150,7 @@ class DesktopMenuBar extends ConsumerWidget {
             LogicalKeyboardKey.keyZ,
             control: true,
           ),
-          onSelected: () => Actions.invoke(
-            context,
-            const UndoIntent(),
-          ),
+          onSelected: () => Actions.invoke(context, const UndoIntent()),
         ),
         PlatformMenuItem(
           label: l10n.menuRedo,
@@ -161,22 +159,14 @@ class DesktopMenuBar extends ConsumerWidget {
             control: true,
             shift: true,
           ),
-          onSelected: () => Actions.invoke(
-            context,
-            const RedoIntent(),
-          ),
+          onSelected: () => Actions.invoke(context, const RedoIntent()),
         ),
         PlatformMenuItemGroup(
           members: [
             PlatformMenuItem(
               label: l10n.menuDelete,
-              shortcut: const SingleActivator(
-                LogicalKeyboardKey.delete,
-              ),
-              onSelected: () => Actions.invoke(
-                context,
-                const DeleteIntent(),
-              ),
+              shortcut: const SingleActivator(LogicalKeyboardKey.delete),
+              onSelected: () => Actions.invoke(context, const DeleteIntent()),
             ),
             // Select All — not yet implemented.
             PlatformMenuItem(
@@ -197,8 +187,7 @@ class DesktopMenuBar extends ConsumerWidget {
                 LogicalKeyboardKey.comma,
                 control: true,
               ),
-              onSelected: () =>
-                  showProjectSettingsDialog(context),
+              onSelected: () => showProjectSettingsDialog(context),
             ),
           ],
         ),
@@ -208,10 +197,7 @@ class DesktopMenuBar extends ConsumerWidget {
 
   // ── View ────────────────────────────────────────────────────
 
-  PlatformMenu _viewMenu(
-    BuildContext context,
-    AppLocalizations l10n,
-  ) {
+  PlatformMenu _viewMenu(BuildContext context, AppLocalizations l10n) {
     return PlatformMenu(
       label: l10n.menuView,
       menus: [
@@ -221,10 +207,7 @@ class DesktopMenuBar extends ConsumerWidget {
             LogicalKeyboardKey.equal,
             control: true,
           ),
-          onSelected: () => Actions.invoke(
-            context,
-            const ZoomInIntent(),
-          ),
+          onSelected: () => Actions.invoke(context, const ZoomInIntent()),
         ),
         PlatformMenuItem(
           label: l10n.menuZoomOut,
@@ -232,10 +215,7 @@ class DesktopMenuBar extends ConsumerWidget {
             LogicalKeyboardKey.minus,
             control: true,
           ),
-          onSelected: () => Actions.invoke(
-            context,
-            const ZoomOutIntent(),
-          ),
+          onSelected: () => Actions.invoke(context, const ZoomOutIntent()),
         ),
         PlatformMenuItem(
           label: l10n.menuZoomToFit,
@@ -243,10 +223,7 @@ class DesktopMenuBar extends ConsumerWidget {
             LogicalKeyboardKey.digit0,
             control: true,
           ),
-          onSelected: () => Actions.invoke(
-            context,
-            const ZoomToFitIntent(),
-          ),
+          onSelected: () => Actions.invoke(context, const ZoomToFitIntent()),
         ),
         PlatformMenuItemGroup(
           members: [
@@ -256,10 +233,7 @@ class DesktopMenuBar extends ConsumerWidget {
               label: l10n.menuTogglePropertiesPanel,
               onSelected: null,
             ),
-            PlatformMenuItem(
-              label: l10n.menuToggleDashboard,
-              onSelected: null,
-            ),
+            PlatformMenuItem(label: l10n.menuToggleDashboard, onSelected: null),
           ],
         ),
       ],
@@ -268,18 +242,13 @@ class DesktopMenuBar extends ConsumerWidget {
 
   // ── Tools ───────────────────────────────────────────────────
 
-  PlatformMenu _toolsMenu(
-    BuildContext context,
-    AppLocalizations l10n,
-  ) {
+  PlatformMenu _toolsMenu(BuildContext context, AppLocalizations l10n) {
     return PlatformMenu(
       label: l10n.menuTools,
       menus: [
         PlatformMenuItem(
           label: l10n.toolSelect,
-          shortcut: const SingleActivator(
-            LogicalKeyboardKey.keyV,
-          ),
+          shortcut: const SingleActivator(LogicalKeyboardKey.keyV),
           onSelected: () => Actions.invoke(
             context,
             const SwitchToolIntent(DrawingTool.select),
@@ -287,9 +256,7 @@ class DesktopMenuBar extends ConsumerWidget {
         ),
         PlatformMenuItem(
           label: l10n.menuDrawWall,
-          shortcut: const SingleActivator(
-            LogicalKeyboardKey.keyW,
-          ),
+          shortcut: const SingleActivator(LogicalKeyboardKey.keyW),
           onSelected: () => Actions.invoke(
             context,
             const SwitchToolIntent(DrawingTool.drawWall),
@@ -297,33 +264,23 @@ class DesktopMenuBar extends ConsumerWidget {
         ),
         PlatformMenuItem(
           label: l10n.menuPlaceWindow,
-          shortcut: const SingleActivator(
-            LogicalKeyboardKey.keyN,
-          ),
+          shortcut: const SingleActivator(LogicalKeyboardKey.keyN),
           onSelected: () => Actions.invoke(
             context,
-            const SwitchToolIntent(
-              DrawingTool.placeWindow,
-            ),
+            const SwitchToolIntent(DrawingTool.placeWindow),
           ),
         ),
         PlatformMenuItem(
           label: l10n.menuPlaceDoor,
-          shortcut: const SingleActivator(
-            LogicalKeyboardKey.keyD,
-          ),
+          shortcut: const SingleActivator(LogicalKeyboardKey.keyD),
           onSelected: () => Actions.invoke(
             context,
-            const SwitchToolIntent(
-              DrawingTool.placeDoor,
-            ),
+            const SwitchToolIntent(DrawingTool.placeDoor),
           ),
         ),
         PlatformMenuItem(
           label: l10n.menuDrawFloorZone,
-          shortcut: const SingleActivator(
-            LogicalKeyboardKey.keyH,
-          ),
+          shortcut: const SingleActivator(LogicalKeyboardKey.keyH),
           onSelected: () => Actions.invoke(
             context,
             const SwitchToolIntent(DrawingTool.drawZone),
@@ -331,31 +288,21 @@ class DesktopMenuBar extends ConsumerWidget {
         ),
         PlatformMenuItem(
           label: l10n.menuPlaceDistributor,
-          shortcut: const SingleActivator(
-            LogicalKeyboardKey.keyG,
-          ),
+          shortcut: const SingleActivator(LogicalKeyboardKey.keyG),
           onSelected: () => Actions.invoke(
             context,
-            const SwitchToolIntent(
-              DrawingTool.placeDistributor,
-            ),
+            const SwitchToolIntent(DrawingTool.placeDistributor),
           ),
         ),
         PlatformMenuItem(
           label: l10n.menuRoutePipe,
-          shortcut: const SingleActivator(
-            LogicalKeyboardKey.keyR,
-          ),
-          onSelected: () => Actions.invoke(
-            context,
-            const RotateOrRoutePipeIntent(),
-          ),
+          shortcut: const SingleActivator(LogicalKeyboardKey.keyR),
+          onSelected: () =>
+              Actions.invoke(context, const RotateOrRoutePipeIntent()),
         ),
         PlatformMenuItem(
           label: l10n.toolMeasure,
-          shortcut: const SingleActivator(
-            LogicalKeyboardKey.keyM,
-          ),
+          shortcut: const SingleActivator(LogicalKeyboardKey.keyM),
           onSelected: () => Actions.invoke(
             context,
             const SwitchToolIntent(DrawingTool.measure),
@@ -371,14 +318,8 @@ class DesktopMenuBar extends ConsumerWidget {
     return PlatformMenu(
       label: l10n.menuHelp,
       menus: [
-        PlatformMenuItem(
-          label: l10n.menuAbout,
-          onSelected: null,
-        ),
-        PlatformMenuItem(
-          label: l10n.menuDocumentation,
-          onSelected: null,
-        ),
+        PlatformMenuItem(label: l10n.menuAbout, onSelected: null),
+        PlatformMenuItem(label: l10n.menuDocumentation, onSelected: null),
       ],
     );
   }

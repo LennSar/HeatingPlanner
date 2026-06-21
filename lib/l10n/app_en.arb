@@ -281,6 +281,10 @@
   "@closeProject": {
     "description": "File > Close Project menu item — returns to the Project List screen"
   },
+  "menuQuit": "Quit HeatingPlanner",
+  "@menuQuit": {
+    "description": "File > Quit menu item — closes the entire application"
+  },
   "menuEdit": "Edit",
   "@menuEdit": {
     "description": "Top-level Edit menu label"

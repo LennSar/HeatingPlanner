@@ -64,6 +64,7 @@
   "menuExportPdf": "PDF exportieren…",
   "menuExportCsv": "CSV exportieren…",
   "closeProject": "Projekt schließen",
+  "menuQuit": "HeatingPlanner beenden",
   "menuEdit": "Bearbeiten",
   "menuUndo": "Rückgängig",
   "menuRedo": "Wiederholen",

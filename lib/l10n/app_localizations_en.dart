@@ -244,6 +244,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get closeProject => 'Close Project';
 
   @override
+  String get menuQuit => 'Quit HeatingPlanner';
+
+  @override
   String get menuEdit => 'Edit';
 
   @override
