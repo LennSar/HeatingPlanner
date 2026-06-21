@@ -220,6 +220,165 @@ void main() {
     });
   });
 
+  // ── Group 1b: detectRoom — overlap verification (screenshot bug) ──────────
+  //
+  // Regression for the bug where attaching a new room to an existing one
+  // produced a constellation that *enclosed* the first room instead of the
+  // small adjacent room. detectRoom must:
+  //   • return the small adjacent room when one exists (RD-1),
+  //   • skip a candidate constellation that overlaps an existing room and
+  //     return the other one (RD-2 — "try another wall constellation"),
+  //   • error when every constellation overlaps an existing room (RD-3),
+  //   • report `none` when no cycle exists yet (RD-4).
+
+  group('RoomDetection.detectRoom — overlap verification', () {
+    test(
+        'RD-1: adjacent Room 2 is detected and does NOT enclose Room 1', () {
+      final result = RoomDetection.detectRoom(
+        _allWallsForRoom2Detection,
+        _wallFe,
+        existingRooms: const [
+          Room(
+            id: 'room-1',
+            floorId: 'floor-1',
+            name: 'Living Room',
+            polygon: [_ptA, _ptB, _ptE, _ptD],
+          ),
+        ],
+      );
+
+      expect(result.outcome, equals(RoomDetectionOutcome.detected));
+      // The detected polygon is the small right-hand square [F,E,B,C] —
+      // it must NOT contain corner A or D of Room 1.
+      expect(result.room!.polygon, isNot(contains(_ptA)));
+      expect(result.room!.polygon, isNot(contains(_ptD)));
+      expect(
+        result.room!.wallIds,
+        containsAll(['wall-fe', 'wall-be', 'wall-bc', 'wall-cf']),
+      );
+    });
+
+    // Two squares share the divider wall BE. The face on BE's left is the
+    // left square (== existing Room 1, an overlap); the face on its right
+    // is the clean Room 2. detectRoom must skip the overlapping side and
+    // return the clean side.
+    const dividerBe = WallSegment(
+      id: 'wall-be',
+      roomId: 'room-1',
+      startPoint: _ptB,
+      endPoint: _ptE,
+    );
+    final twoSquareWalls = [
+      _wallAb, // A→B
+      dividerBe, // B→E (shared divider / new wall)
+      _wallEd, // E→D
+      _wallDa, // D→A
+      _wallBc, // B→C
+      _wallCf, // C→F
+      _wallFe, // F→E
+    ];
+
+    test(
+        'RD-2: when one constellation overlaps Room 1, the other '
+        '(clean) constellation is returned', () {
+      // Room 1 sits inside the left square; the left face of BE would
+      // re-enclose it. The right face (B,C,F,E) is clean.
+      final result = RoomDetection.detectRoom(
+        twoSquareWalls,
+        dividerBe,
+        existingRooms: const [
+          Room(
+            id: 'room-1',
+            floorId: 'floor-1',
+            name: 'Living Room',
+            polygon: [_ptA, _ptB, _ptE, _ptD],
+          ),
+        ],
+      );
+
+      expect(result.outcome, equals(RoomDetectionOutcome.detected));
+      // Must be the right square — contains C and F, not A or D.
+      expect(result.room!.polygon, contains(_ptC));
+      expect(result.room!.polygon, contains(_ptF));
+      expect(result.room!.polygon, isNot(contains(_ptA)));
+    });
+
+    test(
+        'RD-3: a loop that encloses a floating existing room yields '
+        'overlapsExistingRoom (error, no dialog)', () {
+      // Outer square A,B',F',D closing with newWall; a small Room 1 floats
+      // inside with no shared walls. The only bounded face encloses it.
+      const p0 = Point2D(x: 0, y: 0);
+      const p1 = Point2D(x: 6000, y: 0);
+      const p2 = Point2D(x: 6000, y: 6000);
+      const p3 = Point2D(x: 0, y: 6000);
+
+      const wTop = WallSegment(
+        id: 'w-top',
+        roomId: '',
+        startPoint: p0,
+        endPoint: p1,
+      );
+      const wRight = WallSegment(
+        id: 'w-right',
+        roomId: '',
+        startPoint: p1,
+        endPoint: p2,
+      );
+      const wBottom = WallSegment(
+        id: 'w-bottom',
+        roomId: '',
+        startPoint: p2,
+        endPoint: p3,
+      );
+      const wClose = WallSegment(
+        id: 'w-close',
+        roomId: '',
+        startPoint: p3,
+        endPoint: p0,
+      );
+
+      final result = RoomDetection.detectRoom(
+        [wTop, wRight, wBottom, wClose],
+        wClose,
+        existingRooms: const [
+          Room(
+            id: 'room-1',
+            floorId: 'floor-1',
+            name: 'Floating',
+            polygon: [
+              Point2D(x: 1000, y: 1000),
+              Point2D(x: 2000, y: 1000),
+              Point2D(x: 2000, y: 2000),
+              Point2D(x: 1000, y: 2000),
+            ],
+          ),
+        ],
+      );
+
+      expect(
+        result.outcome,
+        equals(RoomDetectionOutcome.overlapsExistingRoom),
+      );
+      expect(result.room, isNull);
+    });
+
+    test('RD-4: a non-closing wall yields outcome none', () {
+      const a = Point2D(x: 0, y: 0);
+      const b = Point2D(x: 1000, y: 0);
+      const wall = WallSegment(
+        id: 'lonely',
+        roomId: '',
+        startPoint: a,
+        endPoint: b,
+      );
+
+      final result = RoomDetection.detectRoom([wall], wall);
+      expect(result.outcome, equals(RoomDetectionOutcome.none));
+      expect(result.room, isNull);
+    });
+  });
+
   // ── Group 2: EditorStateNotifier.addRoomFromDetection ───────────────────
 
   group('EditorStateNotifier.addRoomFromDetection — shared wall handling', () {

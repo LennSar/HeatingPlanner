@@ -335,18 +335,27 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
     // paths have the same hop-count (see comment above).
     final detectionWall = firstNewWall ?? lastEffectiveWall;
     final allWalls = callbacks.currentWalls;
-    final detected = RoomDetection.detectClosedRoom(allWalls, detectionWall);
-    if (detected != null) {
-      callbacks.requestRoomDialog(
-        detected.polygon,
-        detected.wallIds,
-        onCreated: (walls, rooms) {
-          // Update the undo command so a single Ctrl+Z reverts both
-          // the rect walls and the newly created room.
-          cmd.newWalls = walls;
-          cmd.newRooms = rooms;
-        },
-      );
+    final result = RoomDetection.detectRoom(
+      allWalls,
+      detectionWall,
+      existingRooms: callbacks.currentRooms,
+    );
+    switch (result.outcome) {
+      case RoomDetectionOutcome.detected:
+        callbacks.requestRoomDialog(
+          result.room!.polygon,
+          result.room!.wallIds,
+          onCreated: (walls, rooms) {
+            // Update the undo command so a single Ctrl+Z reverts both
+            // the rect walls and the newly created room.
+            cmd.newWalls = walls;
+            cmd.newRooms = rooms;
+          },
+        );
+      case RoomDetectionOutcome.overlapsExistingRoom:
+        callbacks.showToast(_overlapErrorMessage);
+      case RoomDetectionOutcome.none:
+        break;
     }
 
     _currentSnapped = null;
@@ -406,12 +415,29 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
     ));
 
     // Check for room detection.
-    final detected =
-        RoomDetection.detectClosedRoom(callbacks.currentWalls, wall);
-    if (detected != null) {
-      callbacks.requestRoomDialog(detected.polygon, detected.wallIds);
+    final result = RoomDetection.detectRoom(
+      callbacks.currentWalls,
+      wall,
+      existingRooms: callbacks.currentRooms,
+    );
+    switch (result.outcome) {
+      case RoomDetectionOutcome.detected:
+        callbacks.requestRoomDialog(
+          result.room!.polygon,
+          result.room!.wallIds,
+        );
+      case RoomDetectionOutcome.overlapsExistingRoom:
+        callbacks.showToast(_overlapErrorMessage);
+      case RoomDetectionOutcome.none:
+        break;
     }
   }
+
+  /// Toast shown when a drawn wall loop cannot form a unique room
+  /// because every candidate constellation overlaps an existing room.
+  static const String _overlapErrorMessage =
+      'Cannot create room — these walls overlap an existing room. '
+      'Adjust the walls so the new room does not enclose another.';
 
   @override
   void onPointerMove(Point2D worldPoint) {
