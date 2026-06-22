@@ -36,18 +36,23 @@ enum RoomDetectionOutcome {
   overlapsExistingRoom,
 }
 
-/// Outcome plus the detected room (non-null only for
+/// Outcome plus the detected room(s) (empty unless [outcome] is
 /// [RoomDetectionOutcome.detected]).
 class RoomDetectionResult {
   /// Creates a [RoomDetectionResult].
-  const RoomDetectionResult(this.outcome, this.room);
+  const RoomDetectionResult(this.outcome, this.rooms);
 
   /// What happened during detection.
   final RoomDetectionOutcome outcome;
 
-  /// The detected room, or null when [outcome] is not
-  /// [RoomDetectionOutcome.detected].
-  final DetectedRoom? room;
+  /// The detected rooms. Empty unless [outcome] is
+  /// [RoomDetectionOutcome.detected]. A single wall can close a room on
+  /// each of its two sides at once, so this may hold up to two entries.
+  final List<DetectedRoom> rooms;
+
+  /// The first detected room, or null. Convenience for single-room
+  /// callers and tests.
+  DetectedRoom? get room => rooms.isEmpty ? null : rooms.first;
 }
 
 /// Detects closed rooms from a wall graph.
@@ -119,23 +124,27 @@ abstract final class RoomDetection {
   }) {
     final candidates = _candidateFaces(allWalls, newWall);
     if (candidates.isEmpty) {
-      return const RoomDetectionResult(RoomDetectionOutcome.none, null);
+      return const RoomDetectionResult(RoomDetectionOutcome.none, []);
     }
 
-    for (final candidate in candidates) {
-      if (!_overlapsAnyRoom(candidate.polygon, existingRooms)) {
-        return RoomDetectionResult(
-          RoomDetectionOutcome.detected,
-          candidate,
-        );
-      }
+    // Each bounded face whose floor area is not shared with an existing
+    // room is a unique new room. The two faces of [newWall] are
+    // interior-disjoint, so both may be returned — a single wall draw can
+    // create two rooms at once.
+    final unique = [
+      for (final candidate in candidates)
+        if (!_overlapsAnyRoom(candidate.polygon, existingRooms)) candidate,
+    ];
+
+    if (unique.isEmpty) {
+      // A closed cycle exists, but no constellation yields a unique room.
+      return const RoomDetectionResult(
+        RoomDetectionOutcome.overlapsExistingRoom,
+        [],
+      );
     }
 
-    // A closed cycle exists, but no constellation yields a unique room.
-    return const RoomDetectionResult(
-      RoomDetectionOutcome.overlapsExistingRoom,
-      null,
-    );
+    return RoomDetectionResult(RoomDetectionOutcome.detected, unique);
   }
 
   /// Build the list of bounded faces adjacent to [newWall], sorted by

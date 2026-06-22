@@ -363,6 +363,31 @@ void main() {
       expect(result.room, isNull);
     });
 
+    test(
+        'RD-5: one wall closing a room on each side detects TWO rooms', () {
+      // No existing rooms: the divider BE bounds a clean square on each
+      // side, so both must be returned for sequential naming.
+      final result = RoomDetection.detectRoom(
+        twoSquareWalls,
+        dividerBe,
+        existingRooms: const [],
+      );
+
+      expect(result.outcome, equals(RoomDetectionOutcome.detected));
+      expect(result.rooms, hasLength(2));
+
+      // The two rooms are the left and right squares — disjoint wall sets
+      // apart from the shared divider BE.
+      final leftWalls = result.rooms
+          .firstWhere((r) => r.wallIds.contains('wall-da'))
+          .wallIds;
+      final rightWalls = result.rooms
+          .firstWhere((r) => r.wallIds.contains('wall-bc'))
+          .wallIds;
+      expect(leftWalls, containsAll(['wall-be', 'wall-ab', 'wall-ed', 'wall-da']));
+      expect(rightWalls, containsAll(['wall-be', 'wall-bc', 'wall-cf', 'wall-fe']));
+    });
+
     test('RD-4: a non-closing wall yields outcome none', () {
       const a = Point2D(x: 0, y: 0);
       const b = Point2D(x: 1000, y: 0);
@@ -583,6 +608,87 @@ void main() {
 
       final walls = container.read(editorStateProvider).walls;
       expect(walls, hasLength(8));
+    });
+  });
+
+  // ── Group 2b: two rooms created from a single wall (sequential) ───────────
+  //
+  // The dialog queue creates the two detected rooms one after another via
+  // addRoomFromDetection. This verifies the second creation correctly
+  // promotes the shared divider BE to an interior wall with a mirror — the
+  // same shared-wall outcome as drawing the rooms separately.
+
+  group('Two rooms from one wall — sequential addRoomFromDetection', () {
+    const dividerBe = WallSegment(
+      id: 'wall-be',
+      roomId: '',
+      startPoint: _ptB,
+      endPoint: _ptE,
+    );
+
+    (ProviderContainer, EditorStateNotifier) makeContainer() {
+      final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
+      final container = ProviderContainer(
+        overrides: [$db.appDatabaseProvider.overrideWithValue(db)],
+      );
+      addTearDown(db.close);
+      final notifier = container.read(editorStateProvider.notifier);
+
+      // All seven walls of the two squares exist, none assigned to a room.
+      for (final w in [
+        _wallAb,
+        dividerBe,
+        _wallEd,
+        _wallDa,
+        _wallBc,
+        _wallCf,
+        _wallFe,
+      ]) {
+        notifier.addWall(w.copyWith(roomId: ''));
+      }
+      return (container, notifier);
+    }
+
+    void createBoth(EditorStateNotifier notifier) {
+      notifier.addRoomFromDetection(
+        room: const Room(id: 'left', floorId: 'floor-1', name: 'Left'),
+        wallIds: ['wall-be', 'wall-ab', 'wall-ed', 'wall-da'],
+      );
+      notifier.addRoomFromDetection(
+        room: const Room(id: 'right', floorId: 'floor-1', name: 'Right'),
+        wallIds: ['wall-be', 'wall-bc', 'wall-cf', 'wall-fe'],
+      );
+    }
+
+    test('TR-1: both rooms exist after sequential creation', () {
+      final (container, notifier) = makeContainer();
+      addTearDown(container.dispose);
+
+      createBoth(notifier);
+
+      final rooms = container.read(editorStateProvider).rooms;
+      expect(rooms, hasLength(2));
+      expect(rooms.map((r) => r.id), containsAll(['left', 'right']));
+    });
+
+    test('TR-2: divider BE becomes interior with a mirror (8 walls)', () {
+      final (container, notifier) = makeContainer();
+      addTearDown(container.dispose);
+
+      createBoth(notifier);
+
+      final walls = container.read(editorStateProvider).walls;
+      // 7 original + 1 mirror of the shared divider.
+      expect(walls, hasLength(8));
+
+      final be = walls.firstWhere((w) => w.id == 'wall-be');
+      expect(be.wallType, equals(WallType.interior));
+      expect(be.adjacentRoomId, equals('right'));
+
+      final mirror = walls.firstWhere(
+        (w) => w.roomId == 'right' && w.wallType == WallType.interior,
+      );
+      expect(mirror.adjacentRoomId, equals('left'));
     });
   });
 

@@ -342,16 +342,20 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
     );
     switch (result.outcome) {
       case RoomDetectionOutcome.detected:
-        callbacks.requestRoomDialog(
-          result.room!.polygon,
-          result.room!.wallIds,
-          onCreated: (walls, rooms) {
-            // Update the undo command so a single Ctrl+Z reverts both
-            // the rect walls and the newly created room.
-            cmd.newWalls = walls;
-            cmd.newRooms = rooms;
-          },
-        );
+        // One drawn rectangle can close two rooms at once; the canvas
+        // queues the dialogs and highlights each room in turn.
+        for (final room in result.rooms) {
+          callbacks.requestRoomDialog(
+            room.polygon,
+            room.wallIds,
+            onCreated: (walls, rooms) {
+              // Update the undo command so a single Ctrl+Z reverts both
+              // the rect walls and every newly created room.
+              cmd.newWalls = walls;
+              cmd.newRooms = rooms;
+            },
+          );
+        }
       case RoomDetectionOutcome.overlapsExistingRoom:
         callbacks.showToast(_overlapErrorMessage);
       case RoomDetectionOutcome.none:
@@ -422,10 +426,11 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
     );
     switch (result.outcome) {
       case RoomDetectionOutcome.detected:
-        callbacks.requestRoomDialog(
-          result.room!.polygon,
-          result.room!.wallIds,
-        );
+        // A single wall can close a room on each side; the canvas queues
+        // the dialogs and highlights each room in turn.
+        for (final room in result.rooms) {
+          callbacks.requestRoomDialog(room.polygon, room.wallIds);
+        }
       case RoomDetectionOutcome.overlapsExistingRoom:
         callbacks.showToast(_overlapErrorMessage);
       case RoomDetectionOutcome.none:

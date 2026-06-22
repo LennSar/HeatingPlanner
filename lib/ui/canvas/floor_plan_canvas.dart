@@ -299,9 +299,30 @@ class _FloorPlanCanvasState
   /// build so ref is available).
   bool _toolsInitialised = false;
 
+  /// Polygon of the room whose name dialog is currently open, drawn as a
+  /// highlight behind the dialog so the user sees which room they are
+  /// naming. Null when no room dialog is open. Mutating it repaints only
+  /// the pending-room highlight layer.
+  final ValueNotifier<List<Point2D>?> _pendingRoomHighlight =
+      ValueNotifier(null);
+
+  /// FIFO of room-name dialog requests awaiting display. A single wall
+  /// draw can detect two rooms; they are queued here and shown one at a
+  /// time so the highlight can track the room being named.
+  final List<
+      ({
+        List<Point2D> polygon,
+        List<String> wallIds,
+        void Function(List<WallSegment> walls, List<Room> rooms)? onCreated,
+      })> _roomDialogQueue = [];
+
+  /// True while a room-name dialog is on screen (queue is draining).
+  bool _roomDialogActive = false;
+
   @override
   void dispose() {
     _interactionState.dispose();
+    _pendingRoomHighlight.dispose();
     super.dispose();
   }
 
@@ -631,11 +652,45 @@ class _FloorPlanCanvasState
     List<String> wallIds, {
     void Function(List<WallSegment> walls, List<Room> rooms)? onCreated,
   }) {
+    // Enqueue and start draining. When a wall draw detects two rooms the
+    // tool calls this twice back-to-back; the queue serialises the dialogs
+    // so each room is named (and highlighted) in turn rather than the two
+    // dialogs stacking on top of one another.
+    _roomDialogQueue.add((
+      polygon: polygon,
+      wallIds: wallIds,
+      onCreated: onCreated,
+    ));
+    _pumpRoomDialogQueue();
+  }
+
+  /// Show the next queued room dialog, if any, highlighting its room while
+  /// open. Clears the highlight once the queue drains.
+  void _pumpRoomDialogQueue() {
+    if (_roomDialogActive) return;
+    if (_roomDialogQueue.isEmpty) {
+      _pendingRoomHighlight.value = null;
+      return;
+    }
+    _roomDialogActive = true;
+    final req = _roomDialogQueue.removeAt(0);
+    _pendingRoomHighlight.value = req.polygon;
+    _showRoomDialog(req.polygon, req.wallIds, req.onCreated).whenComplete(() {
+      _roomDialogActive = false;
+      _pumpRoomDialogQueue();
+    });
+  }
+
+  Future<void> _showRoomDialog(
+    List<Point2D> polygon,
+    List<String> wallIds,
+    void Function(List<WallSegment> walls, List<Room> rooms)? onCreated,
+  ) {
     final roomNumber =
         ref.read(editorStateProvider.notifier).nextRoomNumber;
 
     final l10n = AppLocalizations.of(context)!;
-    showDialog<String>(
+    return showDialog<String>(
       context: context,
       builder: (ctx) {
         final controller = TextEditingController(
@@ -1361,6 +1416,16 @@ class _FloorPlanCanvasState
                       RepaintBoundary(
                         child: CustomPaint(
                           size: viewSize,
+                          painter: _PendingRoomHighlightLayerPainter(
+                            transform: canvasState.transform,
+                            highlight: _pendingRoomHighlight,
+                            color: colors.selectionHighlight,
+                          ),
+                        ),
+                      ),
+                      RepaintBoundary(
+                        child: CustomPaint(
+                          size: viewSize,
                           painter: _InteractionLayerPainter(
                             transform: canvasState.transform,
                             state: _interactionState,
@@ -1439,6 +1504,65 @@ class _FloorPlanCanvasState
       Vector3(point.dx, point.dy, 0),
     );
     return Offset(result.x, result.y);
+  }
+}
+
+/// Paints the highlight for the room whose name dialog is currently open.
+///
+/// Subscribes to a [ValueListenable] of the pending room polygon and
+/// forwards it to [CustomPainter.repaint], so the highlight appears,
+/// moves to the next room, and clears as the room-dialog queue drains —
+/// without rebuilding the canvas widget tree.
+class _PendingRoomHighlightLayerPainter extends CustomPainter {
+  _PendingRoomHighlightLayerPainter({
+    required this.transform,
+    required this.highlight,
+    required this.color,
+  }) : super(repaint: highlight);
+
+  final Matrix4 transform;
+  final ValueListenable<List<Point2D>?> highlight;
+  final Color color;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final polygon = highlight.value;
+    if (polygon == null || polygon.length < 3) return;
+
+    canvas.save();
+    canvas.transform(transform.storage);
+
+    final path = Path()..moveTo(polygon.first.x, polygon.first.y);
+    for (var i = 1; i < polygon.length; i++) {
+      path.lineTo(polygon[i].x, polygon[i].y);
+    }
+    path.close();
+
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color.withValues(alpha: 0.20)
+        ..style = PaintingStyle.fill,
+    );
+
+    // World-space stroke tuned to ~6 screen px regardless of zoom.
+    final scale = transform.storage[0];
+    final strokeWidthMm = scale > 0.0 ? 6.0 / scale : 60.0;
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = strokeWidthMm
+        ..strokeJoin = StrokeJoin.round,
+    );
+
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_PendingRoomHighlightLayerPainter oldDelegate) {
+    return transform != oldDelegate.transform || color != oldDelegate.color;
   }
 }
 
