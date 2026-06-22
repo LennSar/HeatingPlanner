@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
 import 'l10n/app_localizations.dart';
+import 'platform/menu_bar_host.dart';
 import 'repositories/app_preferences.dart';
 import 'repositories/custom_material_library_service.dart';
 import 'repositories/material_repository.dart';
@@ -136,6 +137,11 @@ class _HeatingPlannerAppState
           AppLocalizations.localizationsDelegates,
       supportedLocales: const [Locale('en'), Locale('de')],
       navigatorKey: _navigatorKey,
+      // Single application-wide native menu bar, mounted above the Navigator so
+      // it persists across route changes. Screens contribute their menus via
+      // MenuBarScope (Flutter forbids more than one live PlatformMenuBar).
+      builder: (context, child) =>
+          AppMenuBar(child: child ?? const SizedBox.shrink()),
       home: const _StartupRouter(),
       debugShowCheckedModeBanner: false,
     );

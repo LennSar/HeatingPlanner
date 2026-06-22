@@ -8,6 +8,7 @@ import '../data/models/enums.dart';
 import '../l10n/app_localizations.dart';
 import '../ui/dialogs/project_settings_dialog.dart';
 import 'keyboard_shortcuts.dart';
+import 'menu_bar_host.dart';
 
 /// Requests application exit through the *cancelable* exit pipeline.
 ///
@@ -41,7 +42,7 @@ class DesktopMenuBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = AppLocalizations.of(context)!;
-    return PlatformMenuBar(
+    return MenuBarScope(
       menus: [
         _fileMenu(context, l10n),
         _editMenu(context, l10n),

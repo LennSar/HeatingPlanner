@@ -10,6 +10,7 @@ import '../../data/models/floor.dart';
 import '../../data/models/project.dart';
 import '../../l10n/app_localizations.dart';
 import '../../platform/desktop_menu.dart' show quitApplication;
+import '../../platform/menu_bar_host.dart';
 import '../../repositories/app_preferences.dart';
 import '../../repositories/building_repository.dart';
 import '../../repositories/project_repository.dart';
@@ -31,7 +32,7 @@ class ProjectListScreen extends ConsumerWidget {
     // Native desktop menu bar so the application can be quit from the
     // project-selection screen too (no project is open here, so quitting
     // never needs an unsaved-export prompt). Renders nothing on mobile.
-    return PlatformMenuBar(
+    return MenuBarScope(
       menus: [
         PlatformMenu(
           label: l10n.menuFile,
