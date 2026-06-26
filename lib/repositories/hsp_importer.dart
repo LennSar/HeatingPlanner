@@ -32,22 +32,44 @@ class HspImporter {
 
   // ── Public API ──────────────────────────────────────────────────────────────
 
-  /// Imports [snapshot] (a decoded `.hsp` JSON map) into the database and
-  /// returns the UUID of the newly created project.
+  /// Imports a `.hsp` snapshot **preserving the original entity UUIDs**, so a
+  /// document re-opened from the same file maps back to the same project rather
+  /// than creating a duplicate.
   ///
-  /// All project-hierarchy entity UUIDs (project, floors, rooms, walls,
-  /// openings, zones, distributors, circuits, constructions, layers, custom
-  /// materials) are replaced with freshly generated v4 UUIDs. Cross-entity
-  /// references are updated using the same remap table.
+  /// The caller is responsible for clearing any prior working copy first
+  /// (see [ProjectRepository.clearWorkingCopy]). This is the open-document
+  /// path of the document-based storage model.
+  Future<String> importSnapshotPreservingIds(
+    Map<String, dynamic> snapshot,
+  ) =>
+      importSnapshot(snapshot, remapIds: false);
+
+  /// Imports [snapshot] (a decoded `.hsp` JSON map) into the database and
+  /// returns the UUID of the imported project.
+  ///
+  /// When [remapIds] is `true` (the default) all project-hierarchy entity
+  /// UUIDs (project, floors, rooms, walls, openings, zones, distributors,
+  /// circuits, constructions, layers, custom materials) are replaced with
+  /// freshly generated v4 UUIDs, and cross-entity references are updated using
+  /// the same remap table — used by "Open as copy" / Duplicate so the import
+  /// coexists with existing projects.
+  ///
+  /// When [remapIds] is `false` the original UUIDs are kept verbatim (see
+  /// [importSnapshotPreservingIds]).
   ///
   /// Tube types and flooring materials are upserted with their original IDs
   /// because they are shared across all projects.
-  Future<String> importSnapshot(Map<String, dynamic> snapshot) async {
-    // UUID remap: oldId → newId (project-specific entities only).
+  Future<String> importSnapshot(
+    Map<String, dynamic> snapshot, {
+    bool remapIds = true,
+  }) async {
+    // UUID remap: oldId → newId (project-specific entities only). When
+    // [remapIds] is false, `fresh` is the identity function so every entity
+    // keeps its original UUID.
     final idMap = <String, String>{};
-    // Returns the pre-generated new ID for [old], creating one on first call.
-    String fresh(String old) =>
-        idMap.putIfAbsent(old, () => _uuid.v4());
+    String fresh(String old) => remapIds
+        ? idMap.putIfAbsent(old, () => _uuid.v4())
+        : old;
 
     // ── Pre-scan ─────────────────────────────────────────────────────────────
     // Generate new IDs for every entity before inserting anything. This
@@ -89,24 +111,29 @@ class HspImporter {
     // ── Project-specific entities in topological (FK-dependency) order ────
 
     // Wall constructions — no FK dependencies inside the project hierarchy.
+    // Upsert: in the preserve-ids (open-document) path the snapshot re-supplies
+    // shared preset constructions that [ProjectRepository.clearWorkingCopy]
+    // intentionally keeps, so a plain insert would collide on the primary key.
     for (final c in _list(snapshot, 'wallConstructions')) {
       await _db
           .into(_db.wallConstructions)
-          .insert(_constructionCompanion(c, fresh));
+          .insertOnConflictUpdate(_constructionCompanion(c, fresh));
     }
 
     // Material layers — depend on wallConstructions.
     for (final l in _list(snapshot, 'materialLayers')) {
       await _db
           .into(_db.materialLayers)
-          .insert(_layerCompanion(l, fresh, idMap));
+          .insertOnConflictUpdate(_layerCompanion(l, fresh, idMap));
     }
 
-    // Custom materials — no FK dependencies.
+    // Custom materials — no FK dependencies. Upsert so the preserve-ids path
+    // merges with the existing file-synced custom-material library instead of
+    // colliding on the primary key.
     for (final m in _list(snapshot, 'customMaterials')) {
       await _db
           .into(_db.materialEntries)
-          .insert(_customMaterialCompanion(m, fresh));
+          .insertOnConflictUpdate(_customMaterialCompanion(m, fresh));
     }
 
     // Project.

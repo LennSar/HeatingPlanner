@@ -11,6 +11,7 @@ import 'package:logging/logging.dart';
 import '../data/database/app_database.dart' as $db;
 import 'app_preferences.dart';
 import 'hsp_exporter.dart';
+import 'project_repository.dart' show currentProjectIdProvider;
 
 part 'save_state_notifier.freezed.dart';
 
@@ -47,21 +48,17 @@ abstract class SaveState with _$SaveState {
 
 /// Manages [SaveState] for the currently open project.
 ///
-/// Repositories call [markDirty] after every successful write, which
-/// sets [SaveState.isDirty] and schedules a debounced [exportNow] (3 s)
-/// whenever [SaveState.lastExportPath] is non-null.
-///
-/// [exportNow] and [saveAs] drive the `.hsp` write directly and can also be
-/// invoked from keyboard shortcuts or the File menu without waiting for the
-/// debounce to fire.
+/// Document storage model: the `.hsp` file is written **only on explicit
+/// save**. Repositories call [markDirty] after every successful database
+/// write, which flags the in-memory working copy as ahead of its file; the
+/// file itself is not touched until the user invokes [exportNow] (Save) or
+/// [saveAs] (Save As). This keeps edits from silently rewriting the on-disk
+/// snapshot — e.g. undoing a change must not overwrite the saved file.
 class SaveStateNotifier extends Notifier<SaveState> {
   static final _log = Logger('SaveStateNotifier');
 
-  Timer? _debounce;
-
   @override
   SaveState build() {
-    ref.onDispose(() => _debounce?.cancel());
     return const SaveState(
       isDirty: false,
       lastExportedAt: null,
@@ -70,53 +67,39 @@ class SaveStateNotifier extends Notifier<SaveState> {
     );
   }
 
-  /// Marks the project as dirty — in-database state has changed since the
-  /// last `.hsp` export.
-  ///
-  /// If [SaveState.lastExportPath] is set, schedules a debounced [exportNow]
-  /// 3 seconds after the last [markDirty] call (cancels any pending timer).
+  /// Marks the project as dirty — the in-database working copy has changed
+  /// since the last `.hsp` save. Does **not** write the file; the dirty flag
+  /// surfaces in the title bar and drives the save prompt on close/quit.
   void markDirty() {
     if (!state.isDirty) {
       state = state.copyWith(isDirty: true);
     }
-    if (state.lastExportPath != null) {
-      _debounce?.cancel();
-      _debounce = Timer(
-        const Duration(seconds: 3),
-        () => unawaited(exportNow()),
-      );
-    }
   }
 
-  /// Clears the dirty flag and cancels any pending debounce timer.
+  /// Clears the dirty flag.
   void clearDirty() {
-    _debounce?.cancel();
-    _debounce = null;
     state = state.copyWith(isDirty: false);
   }
 
   /// Writes the current project state to [SaveState.lastExportPath].
   ///
-  /// - Cancels any pending debounce timer.
   /// - Sets [SaveState.isAutoExporting] to `true` during the write.
   /// - On success: clears [SaveState.isDirty] and updates
   ///   [SaveState.lastExportedAt].
   /// - On failure: logs the error and leaves [SaveState.isDirty] `true`.
   ///
-  /// Does nothing if [SaveState.lastExportPath] is `null`.
+  /// Does nothing if [SaveState.lastExportPath] is `null` or no project is
+  /// currently open.
   Future<void> exportNow() async {
     final path = state.lastExportPath;
     if (path == null) return;
 
-    _debounce?.cancel();
-    _debounce = null;
-
     state = state.copyWith(isAutoExporting: true);
 
     try {
-      final projectId =
-          ref.read(lastOpenedProjectIdProvider).asData?.value;
-      if (projectId == null) {
+      // Export the project currently open in the editor.
+      final projectId = ref.read(currentProjectIdProvider);
+      if (projectId.isEmpty) {
         state = state.copyWith(isAutoExporting: false);
         return;
       }
@@ -129,11 +112,19 @@ class SaveStateNotifier extends Notifier<SaveState> {
 
       await File(path).writeAsBytes(Uint8List.fromList(compressed));
 
+      final now = DateTime.now();
       state = state.copyWith(
         isDirty: false,
-        lastExportedAt: DateTime.now(),
+        lastExportedAt: now,
         isAutoExporting: false,
       );
+
+      // Document model: keep the project-list (recent-documents) metadata in
+      // sync so the card shows the latest name and save time. Best-effort —
+      // a failure here must never fail the save itself.
+      final name =
+          (snapshot['project'] as Map<String, dynamic>)['name'] as String;
+      unawaited(_touchRecentDocument(path, name, now));
     } catch (e, st) {
       _log.severe('HSP export to "$path" failed', e, st);
       state = state.copyWith(isAutoExporting: false);
@@ -148,6 +139,51 @@ class SaveStateNotifier extends Notifier<SaveState> {
   Future<void> saveAs(String path) async {
     state = state.copyWith(lastExportPath: path);
     await exportNow();
+  }
+
+  /// Refreshes the recent-documents entry for [path], swallowing any error so
+  /// a failure to update list metadata never fails the underlying save.
+  Future<void> _touchRecentDocument(
+    String path,
+    String name,
+    DateTime when,
+  ) async {
+    try {
+      await ref.read(recentDocumentsProvider.notifier).touch(
+            path: path,
+            name: name,
+            modifiedAt: when,
+          );
+    } catch (e, st) {
+      _log.warning('Failed to refresh recent-documents entry for "$path"', e, st);
+    }
+  }
+
+  /// Records that the open project was just loaded from [path].
+  ///
+  /// Sets [SaveState.lastExportPath] and marks the state clean **without**
+  /// writing the file — the in-database working copy already matches the file
+  /// on disk. Used by the open-document flow of the document storage model.
+  void markOpenedFrom(String path) {
+    state = state.copyWith(
+      lastExportPath: path,
+      lastExportedAt: DateTime.now(),
+      isDirty: false,
+      isAutoExporting: false,
+    );
+  }
+
+  /// Resets save-state to its initial empty value.
+  ///
+  /// Called when a project is closed and its working copy is cleared, so the
+  /// next opened project starts from a clean slate.
+  void reset() {
+    state = const SaveState(
+      isDirty: false,
+      lastExportedAt: null,
+      lastExportPath: null,
+      isAutoExporting: false,
+    );
   }
 }
 

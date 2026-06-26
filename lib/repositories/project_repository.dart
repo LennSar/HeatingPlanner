@@ -107,6 +107,53 @@ class ProjectRepository with SaveStateMixin {
     await _dao.deleteById(id);
     markProjectDirty();
   }
+
+  /// Removes the in-database working copy of the open project.
+  ///
+  /// In the document-based storage model the database holds at most one
+  /// project at a time (the one open in the editor). When that project is
+  /// closed — after it has been saved to / discarded from its `.hsp` file —
+  /// this clears its rows so the database never accumulates every project
+  /// ever created.
+  ///
+  /// Deletes, in reverse foreign-key order: heating circuits, heating zones,
+  /// distributors, doors, windows, wall segments, rooms, floors, the project
+  /// row, and the project-owned (non-preset) wall constructions plus their
+  /// material layers. Runtime foreign-key cascade is **not** enabled
+  /// (`app_database.dart` only toggles `PRAGMA foreign_keys` inside
+  /// migrations), so the order here is explicit.
+  ///
+  /// Deliberately **preserves** the user's shared library: preset wall
+  /// constructions (`isPreset = 1`), custom materials (`isBuiltIn = 0`, synced
+  /// from the JSON library file), and the seeded tube-type / flooring lookups.
+  Future<void> clearWorkingCopy() async {
+    final db = ref.read($db.appDatabaseProvider);
+    await db.transaction(() async {
+      await db.delete(db.heatingCircuits).go();
+      await db.delete(db.heatingZones).go();
+      await db.delete(db.distributors).go();
+      await db.delete(db.doors).go();
+      await db.delete(db.windows).go();
+      await db.delete(db.wallSegments).go();
+      await db.delete(db.rooms).go();
+      await db.delete(db.floors).go();
+      await db.delete(db.projects).go();
+
+      // Project-owned wall constructions (presets are a shared library — keep).
+      final projectConstructions = await (db.select(db.wallConstructions)
+            ..where((t) => t.isPreset.equals(0)))
+          .get();
+      final ids = projectConstructions.map((c) => c.id).toList();
+      if (ids.isNotEmpty) {
+        await (db.delete(db.materialLayers)
+              ..where((t) => t.constructionId.isIn(ids)))
+            .go();
+        await (db.delete(db.wallConstructions)
+              ..where((t) => t.isPreset.equals(0)))
+            .go();
+      }
+    });
+  }
 }
 
 /// Provides the singleton [ProjectRepository].

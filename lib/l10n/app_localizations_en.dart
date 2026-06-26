@@ -731,11 +731,43 @@ class AppLocalizationsEn extends AppLocalizations {
   String get flowRateDistribution => 'Flow Rate Distribution';
 
   @override
-  String get unsavedExportFile => 'Unsaved export file';
+  String get unsavedExportFile => 'Unsaved changes';
 
   @override
   String unsavedExportContent(String name) {
-    return '\"$name\" has changes that have not been saved to the .hsp file.\n\nYour project data is safely stored in the app — only the portable export file is out of date.';
+    return '\"$name\" has changes that have not been saved to its .hsp file.\n\nSave them before closing?';
+  }
+
+  @override
+  String unsavedNeverSavedContent(String name) {
+    return '\"$name\" has not been saved yet. The project file (.hsp) is the only permanent copy — if you close without saving, it will be discarded.\n\nSave it now?';
+  }
+
+  @override
+  String get removeFromList => 'Remove from list';
+
+  @override
+  String get deleteFile => 'Delete file…';
+
+  @override
+  String get deleteFileTitle => 'Delete project file?';
+
+  @override
+  String deleteFileContent(String name) {
+    return 'Permanently delete the file for \"$name\"? This cannot be undone.';
+  }
+
+  @override
+  String get fileMissing => 'File missing';
+
+  @override
+  String fileMissingMessage(String path) {
+    return 'The file could not be found:\n$path';
+  }
+
+  @override
+  String fileOpenFailed(String error) {
+    return 'Could not open the project: $error';
   }
 
   @override

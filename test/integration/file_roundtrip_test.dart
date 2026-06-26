@@ -18,15 +18,21 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:archive/archive.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:path_provider_platform_interface/path_provider_platform_interface.dart';
+import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/app.dart';
 import 'package:heating_planner/data/database/app_database.dart' as $db;
 import 'package:heating_planner/repositories/app_preferences.dart';
+import 'package:heating_planner/repositories/hsp_exporter.dart';
 import 'package:heating_planner/repositories/hsp_importer.dart';
 import 'package:heating_planner/repositories/material_repository.dart';
+import 'package:heating_planner/repositories/project_repository.dart'
+    show currentProjectIdProvider;
 import 'package:heating_planner/repositories/save_state_notifier.dart';
 import 'package:heating_planner/ui/screens/editor_screen.dart';
 import 'package:heating_planner/ui/screens/project_list_screen.dart';
@@ -37,13 +43,38 @@ import '../helpers/test_factories.dart';
 
 // ── Stub notifiers ────────────────────────────────────────────────────────────
 
-/// Resolves [LastOpenedProjectIdNotifier] immediately to [_value].
-class _FixedProjectIdNotifier extends LastOpenedProjectIdNotifier {
-  _FixedProjectIdNotifier(this._value);
-  final String? _value;
+/// Test fake that resolves every path_provider directory to [dir] so the
+/// startup chain (custom-material library file, migration export folder) works
+/// without the real plugin.
+class _FakePathProvider extends PathProviderPlatform
+    with MockPlatformInterfaceMixin {
+  _FakePathProvider(this.dir);
+  final String dir;
 
   @override
-  Future<String?> build() async => _value;
+  Future<String?> getApplicationDocumentsPath() async => dir;
+  @override
+  Future<String?> getApplicationSupportPath() async => dir;
+  @override
+  Future<String?> getTemporaryPath() async => dir;
+}
+
+/// Inserts one built-in material so `MaterialRepository.ensureMaterialsSeeded`
+/// short-circuits (it requires both a matching version **and** a non-empty
+/// material table) instead of loading `assets/materials.json` via `rootBundle`,
+/// which does not resolve under the fake test clock.
+Future<void> _seedMaterialNoOp($db.AppDatabase db) async {
+  await db.into(db.materialEntries).insert(
+        $db.MaterialEntriesCompanion.insert(
+          id: 'builtin-stub',
+          name: 'Stub',
+          categoryPath: '["x"]',
+          lambdaDefault: 1,
+          densityDefault: 1,
+          specificHeatDefault: 1,
+          isBuiltIn: const Value(true),
+        ),
+      );
 }
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -67,15 +98,10 @@ void main() {
       tempPath = '${tempDir.path}/export.hsp';
 
       container = ProviderContainer(
-        overrides: [
-          $db.appDatabaseProvider.overrideWithValue(db),
-          lastOpenedProjectIdProvider.overrideWith(
-            () => _FixedProjectIdNotifier(seed.projectId),
-          ),
-        ],
+        overrides: [$db.appDatabaseProvider.overrideWithValue(db)],
       );
-      // Resolve the async project-ID provider before the export.
-      await container.read(lastOpenedProjectIdProvider.future);
+      // The exporter targets the project open in the editor.
+      container.read(currentProjectIdProvider.notifier).set(seed.projectId);
     });
 
     tearDown(() async {
@@ -188,38 +214,56 @@ void main() {
 
   // ── Session restore ─────────────────────────────────────────────────────────
   //
-  // Each test overrides [lastOpenedProjectIdProvider] directly rather than
-  // seeding [InMemorySharedPreferencesAsync]. This avoids the platform-channel
-  // async chain that can cause [pumpAndSettle] to loop indefinitely when Drift
-  // StreamProviders keep the event loop busy.  The routing logic under test
-  // is [_startupProjectIdProvider]: it reads the stored ID and calls
-  // [projectRepositoryProvider.findById], whose result controls which screen
-  // the [_StartupRouter] renders.
+  // Document storage model: the startup router restores by the last-opened
+  // `.hsp` file path (`lastOpenedDocumentPath`), loading it into the database
+  // working copy. It shows EditorScreen for a valid, existing file and
+  // ProjectListScreen when no path is stored or the file is missing.
   //
-  // We use explicit [pump] calls (not [pumpAndSettle]) for the same reason.
-  // After assertions, [pumpWidget(SizedBox())] + a timed [pump] disposes the
-  // ProviderScope and advances fake-time past any Riverpod autoDispose timers.
+  // `documentMigrationDone` is pre-set so the one-time legacy migration is a
+  // no-op (it would otherwise call path_provider, unavailable in tests).
 
   group('Session restore', () {
-    setUp(() {
-      // Provide an in-memory SharedPreferences with the material DB version
-      // pre-set so _startupProjectIdProvider's ensureMaterialsSeeded() is a
-      // no-op (avoids rootBundle.loadString inside FakeAsync).
+    late Directory tempDir;
+
+    setUp(() async {
+      tempDir =
+          await Directory.systemTemp.createTemp('session_restore_test_');
+      PathProviderPlatform.instance = _FakePathProvider(tempDir.path);
       SharedPreferencesAsyncPlatform.instance =
           InMemorySharedPreferencesAsync.withData({
         'materialDbVersion': materialDbVersion,
       });
     });
 
-    /// Pumps enough frames to let [_startupProjectIdProvider] resolve and the
-    /// router rebuild.  Does NOT use pumpAndSettle to avoid infinite looping
-    /// on Drift stream providers.  The startup provider seeds the material
-    /// database and queries the project, which needs more than a handful of
-    /// frames to complete.
-    Future<void> settle(WidgetTester tester) async {
-      for (var i = 0; i < 20; i++) {
-        await tester.pump(const Duration(milliseconds: 100));
-      }
+    tearDown(() async {
+      await tempDir.delete(recursive: true);
+    });
+
+    /// Boots [HeatingPlannerApp] and lets the startup [FutureProvider] finish.
+    ///
+    /// The startup chain does real I/O (SharedPreferences, the custom-material
+    /// library file, `.hsp` files) that only progresses on the real event loop,
+    /// so the widget pump **and** any [beforePump] fixture setup run inside
+    /// [WidgetTester.runAsync]; the fake-clock pumps afterwards render the
+    /// resolved router. Avoids pumpAndSettle (loops on the editor's Drift
+    /// stream providers).
+    Future<void> bootApp(
+      WidgetTester tester,
+      $db.AppDatabase db, {
+      Future<void> Function()? beforePump,
+    }) async {
+      await tester.runAsync(() async {
+        if (beforePump != null) await beforePump();
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [$db.appDatabaseProvider.overrideWithValue(db)],
+            child: const HeatingPlannerApp(),
+          ),
+        );
+        await Future<void>.delayed(const Duration(milliseconds: 500));
+      });
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 200));
     }
 
     /// Disposes the widget tree and advances fake time to drain Riverpod's
@@ -229,11 +273,10 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
     }
 
-    testWidgets('routes to EditorScreen when a valid project ID is stored',
+    testWidgets('routes to EditorScreen when a valid document path is stored',
         (tester) async {
       // Intercept Flutter layout errors so that PropertiesPanel overflow does
-      // not fail this routing test.  We only care that the router chose
-      // EditorScreen, not that the panel renders without overflows.
+      // not fail this routing test.
       final capturedErrors = <FlutterErrorDetails>[];
       final originalOnError = FlutterError.onError;
       FlutterError.onError = capturedErrors.add;
@@ -241,91 +284,79 @@ void main() {
       final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
 
-      // Insert a project so projectRepositoryProvider.findById() succeeds.
-      final seed = await createFullTestProject(db);
-
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            $db.appDatabaseProvider.overrideWithValue(db),
-            lastOpenedProjectIdProvider.overrideWith(
-              () => _FixedProjectIdNotifier(seed.projectId),
-            ),
-          ],
-          child: const HeatingPlannerApp(),
-        ),
+      await bootApp(
+        tester,
+        db,
+        beforePump: () async {
+          await _seedMaterialNoOp(db);
+          // Write a real .hsp file and point the session at it.
+          final seed = await createFullTestProject(db);
+          final path = '${tempDir.path}/restore.hsp';
+          final snapshot = await HspExporter(db).buildSnapshot(seed.projectId);
+          await File(path).writeAsBytes(
+            const GZipEncoder().encode(utf8.encode(jsonEncode(snapshot))),
+          );
+          await AppPreferences().setLastOpenedDocumentPath(path);
+        },
       );
-      await settle(tester);
 
-      // Restore FlutterError.onError before any expect() call — the test
-      // framework asserts it is restored before the test body returns.
+      // Restore FlutterError.onError before any expect() — the framework
+      // asserts it is restored before the test body returns.
       FlutterError.onError = originalOnError;
 
       expect(
         find.byType(EditorScreen),
         findsOneWidget,
-        reason: 'EditorScreen must be shown when a valid project ID is stored',
+        reason:
+            'EditorScreen must be shown when a valid document path is stored',
       );
 
       await cleanup(tester);
     });
 
-    testWidgets(
-        'routes to ProjectListScreen when no project ID is stored',
+    testWidgets('routes to ProjectListScreen when no document path is stored',
         (tester) async {
       final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            $db.appDatabaseProvider.overrideWithValue(db),
-            // null → _startupProjectIdProvider returns null → ProjectListScreen
-            lastOpenedProjectIdProvider.overrideWith(
-              () => _FixedProjectIdNotifier(null),
-            ),
-          ],
-          child: const HeatingPlannerApp(),
-        ),
+      await bootApp(
+        tester,
+        db,
+        beforePump: () => _seedMaterialNoOp(db),
       );
-      await settle(tester);
 
       expect(
         find.byType(ProjectListScreen),
         findsOneWidget,
         reason:
-            'ProjectListScreen must be shown when no project ID is stored',
+            'ProjectListScreen must be shown when no document path is stored',
       );
 
       await cleanup(tester);
     });
 
     testWidgets(
-        'routes to ProjectListScreen when stored project ID no longer exists',
+        'routes to ProjectListScreen when the stored document file is missing',
         (tester) async {
-      // Empty DB — no project row for the stored ID.
       final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            $db.appDatabaseProvider.overrideWithValue(db),
-            // Non-existent ID → findById returns null → ProjectListScreen
-            lastOpenedProjectIdProvider.overrideWith(
-              () => _FixedProjectIdNotifier('deleted-project-999'),
-            ),
-          ],
-          child: const HeatingPlannerApp(),
-        ),
+      await bootApp(
+        tester,
+        db,
+        beforePump: () async {
+          await _seedMaterialNoOp(db);
+          // Path points at a file that does not exist.
+          await AppPreferences()
+              .setLastOpenedDocumentPath('${tempDir.path}/gone.hsp');
+        },
       );
-      await settle(tester);
 
       expect(
         find.byType(ProjectListScreen),
         findsOneWidget,
-        reason: 'ProjectListScreen must be shown when the stored project '
-            'no longer exists in the database',
+        reason: 'ProjectListScreen must be shown when the stored document '
+            'file no longer exists',
       );
 
       await cleanup(tester);

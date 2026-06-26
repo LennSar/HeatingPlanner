@@ -1,18 +1,14 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
 
-import 'package:archive/archive.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../data/database/app_database.dart' as $db;
 import '../data/models/enums.dart';
 import '../l10n/app_localizations.dart';
-import '../repositories/app_preferences.dart';
-import '../repositories/hsp_importer.dart';
+import '../repositories/document_service.dart';
+import '../repositories/project_repository.dart' show currentProjectIdProvider;
 import '../repositories/save_state_notifier.dart';
 import '../ui/canvas/canvas_controller.dart';
 import '../ui/canvas/floor_plan_canvas.dart';
@@ -483,14 +479,19 @@ Future<void> _performSaveAs(
   ref.read(saveFlashProvider.notifier).trigger();
 }
 
-/// Opens a file picker, imports the chosen `.hsp` file with fresh UUIDs,
-/// persists `lastOpenedProjectId`, and navigates to the new project.
+/// Opens a file picker and loads the chosen `.hsp` file as the working copy
+/// (preserving its project UUID), then navigates to it.
 ///
-/// On cancel (null path) does nothing.
+/// Prompts to save the currently open project first (document model — the open
+/// project's working copy is replaced). On cancel (null path) does nothing.
 Future<void> _performOpen(
   BuildContext context,
   WidgetRef ref,
 ) async {
+  // Replacing the working copy — make sure the current project is committed.
+  final resolved = await ensureSavedBeforeLeaving(context, ref);
+  if (!resolved) return;
+
   final result = await FilePicker.platform.pickFiles(
     type: FileType.custom,
     allowedExtensions: ['hsp'],
@@ -500,24 +501,13 @@ Future<void> _performOpen(
   final path = result.files.first.path;
   if (path == null) return;
 
-  final bytes = await File(path).readAsBytes();
-  final jsonStr =
-      utf8.decode(const GZipDecoder().decodeBytes(bytes));
-  final snapshot =
-      jsonDecode(jsonStr) as Map<String, dynamic>;
-
-  final newId = await HspImporter(
-    ref.read($db.appDatabaseProvider),
-  ).importSnapshot(snapshot);
-
-  await ref
-      .read(lastOpenedProjectIdProvider.notifier)
-      .set(newId);
+  final projectId =
+      await ref.read(documentServiceProvider).openDocument(path);
 
   if (!context.mounted) return;
   await Navigator.of(context).pushReplacement(
     MaterialPageRoute<void>(
-      builder: (_) => EditorScreen(projectId: newId),
+      builder: (_) => EditorScreen(projectId: projectId),
     ),
   );
 }
@@ -537,29 +527,12 @@ Future<void> _performCloseProject(
   BuildContext context,
   WidgetRef ref,
 ) async {
-  final saveState = ref.read(saveStateProvider);
-  if (saveState.isDirty && saveState.lastExportPath != null) {
-    final choice = await showDialog<_CloseChoice>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => _CloseProjectUnsavedDialog(
-        projectName: ref.read(currentProjectNameProvider),
-      ),
-    );
-    switch (choice) {
-      case _CloseChoice.saveAndClose:
-        await ref.read(saveStateProvider.notifier).exportNow();
-      case _CloseChoice.closeAnyway:
-        break;
-      case null:
-      case _CloseChoice.cancel:
-        return;
-    }
-  }
+  final resolved = await ensureSavedBeforeLeaving(context, ref);
+  if (!resolved) return; // User cancelled.
 
-  await ref
-      .read(lastOpenedProjectIdProvider.notifier)
-      .set(null);
+  // Document model: tear down the in-database working copy so the database
+  // never accumulates closed projects.
+  await ref.read(documentServiceProvider).closeWorkingCopy();
 
   if (!context.mounted) return;
   await Navigator.of(context).pushAndRemoveUntil(
@@ -570,23 +543,97 @@ Future<void> _performCloseProject(
   );
 }
 
+/// Ensures the open project is committed to an `.hsp` file before the editor is
+/// left (close or quit), prompting the user when there are unsaved changes
+/// **or** the project has never been saved.
+///
+/// Returns `true` when it is safe to proceed (saved, or the user chose to
+/// discard), and `false` when the user cancelled — in which case the caller
+/// must abort the close/quit.
+///
+/// Shared by [_performCloseProject] and the app-exit handler in `app.dart`.
+Future<bool> ensureSavedBeforeLeaving(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  // No project open (e.g. quitting from the project list) — nothing to save.
+  if (ref.read(currentProjectIdProvider).isEmpty) return true;
+
+  final saveState = ref.read(saveStateProvider);
+  final neverSaved = saveState.lastExportPath == null;
+  if (!saveState.isDirty && !neverSaved) return true; // Already up to date.
+
+  final choice = await showDialog<_CloseChoice>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => _CloseProjectUnsavedDialog(
+      projectName: ref.read(currentProjectNameProvider),
+      neverSaved: neverSaved,
+    ),
+  );
+
+  switch (choice) {
+    case _CloseChoice.saveAndClose:
+      if (neverSaved) {
+        // No path yet — run Save As; abort the close if the user cancels it.
+        if (!context.mounted) return false;
+        final saved = await _performSaveAsReturning(context, ref);
+        return saved;
+      }
+      await ref.read(saveStateProvider.notifier).exportNow();
+      return true;
+    case _CloseChoice.closeAnyway:
+      return true;
+    case null:
+    case _CloseChoice.cancel:
+      return false;
+  }
+}
+
+/// Runs the Save As picker and reports whether a file was written.
+Future<bool> _performSaveAsReturning(
+  BuildContext context,
+  WidgetRef ref,
+) async {
+  final l10n = AppLocalizations.of(context)!;
+  final projectName = ref.read(currentProjectNameProvider);
+  final path = await FilePicker.platform.saveFile(
+    dialogTitle: l10n.dialogSaveProjectAs,
+    fileName: '$projectName.hsp',
+    allowedExtensions: ['hsp'],
+    type: FileType.custom,
+  );
+  if (path == null) return false;
+  await ref.read(saveStateProvider.notifier).saveAs(path);
+  ref.read(saveFlashProvider.notifier).trigger();
+  return true;
+}
+
 /// User's choice in [_CloseProjectUnsavedDialog].
 enum _CloseChoice { saveAndClose, closeAnyway, cancel }
 
-/// Shown when the user closes a project while the `.hsp` export is out of
-/// date. Mirrors the window-close dialog (§12.5) wording — the project data
-/// is safe in the app; only the portable export file is at risk.
+/// Shown when the user leaves a project that has unsaved `.hsp` changes or has
+/// never been saved. In the document storage model the `.hsp` file is the only
+/// permanent copy, so closing without saving a never-saved project discards it.
 class _CloseProjectUnsavedDialog extends StatelessWidget {
-  const _CloseProjectUnsavedDialog({required this.projectName});
+  const _CloseProjectUnsavedDialog({
+    required this.projectName,
+    required this.neverSaved,
+  });
 
   final String projectName;
+  final bool neverSaved;
 
   @override
   Widget build(BuildContext context) {
     final l10n = AppLocalizations.of(context)!;
     return AlertDialog(
       title: Text(l10n.unsavedExportFile),
-      content: Text(l10n.unsavedExportContent(projectName)),
+      content: Text(
+        neverSaved
+            ? l10n.unsavedNeverSavedContent(projectName)
+            : l10n.unsavedExportContent(projectName),
+      ),
       actions: [
         TextButton(
           onPressed: () =>

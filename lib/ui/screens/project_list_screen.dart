@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,11 +9,13 @@ import '../../core/theme/app_theme.dart';
 import '../../core/utils/id_generator.dart';
 import '../../data/models/floor.dart';
 import '../../data/models/project.dart';
+import '../../data/models/recent_document.dart';
 import '../../l10n/app_localizations.dart';
 import '../../platform/desktop_menu.dart' show quitApplication;
 import '../../platform/menu_bar_host.dart';
 import '../../repositories/app_preferences.dart';
 import '../../repositories/building_repository.dart';
+import '../../repositories/document_service.dart';
 import '../../repositories/project_repository.dart';
 import 'editor_screen.dart';
 
@@ -26,7 +29,7 @@ class ProjectListScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final projectsAsync = ref.watch(projectsProvider);
+    final recentAsync = ref.watch(recentDocumentsProvider);
     final l10n = AppLocalizations.of(context)!;
 
     // Native desktop menu bar so the application can be quit from the
@@ -74,15 +77,15 @@ class ProjectListScreen extends ConsumerWidget {
             ),
           ],
         ),
-        body: projectsAsync.when(
+        body: recentAsync.when(
           loading: () => const Center(child: CircularProgressIndicator()),
           error: (e, _) =>
               Center(child: Text(l10n.errorLoadingProjects(e.toString()))),
-          data: (projects) => projects.isEmpty
+          data: (documents) => documents.isEmpty
               ? _EmptyState(
                   onNewProject: () => _showNewProjectDialog(context, ref),
                 )
-              : _ProjectGrid(projects: projects),
+              : _ProjectGrid(documents: documents),
         ),
       ),
     );
@@ -103,7 +106,9 @@ class ProjectListScreen extends ConsumerWidget {
     final buildingDao = ref.read(buildingDaoProvider);
     final floor = Floor(id: IdGenerator.newId(), name: l10n.defaultFloorName);
     await upsertFloor(buildingDao, floor, result.id);
-    unawaited(ref.read(lastOpenedProjectIdProvider.notifier).set(result.id));
+    // Document model: a new project is an unsaved draft living only in the
+    // database working copy until its first save. No `.hsp` path yet — closing
+    // it will prompt for one (or discard).
     if (!context.mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute<void>(
@@ -116,9 +121,9 @@ class ProjectListScreen extends ConsumerWidget {
 // ── Grid ──────────────────────────────────────────────────────────────────────
 
 class _ProjectGrid extends StatelessWidget {
-  const _ProjectGrid({required this.projects});
+  const _ProjectGrid({required this.documents});
 
-  final List<Project> projects;
+  final List<RecentDocument> documents;
 
   @override
   Widget build(BuildContext context) {
@@ -139,8 +144,8 @@ class _ProjectGrid extends StatelessWidget {
           crossAxisSpacing: Spacing.md,
           childAspectRatio: 1.1,
         ),
-        itemCount: projects.length,
-        itemBuilder: (ctx, i) => _ProjectCard(project: projects[i]),
+        itemCount: documents.length,
+        itemBuilder: (ctx, i) => _ProjectCard(document: documents[i]),
       ),
     );
   }
@@ -149,81 +154,109 @@ class _ProjectGrid extends StatelessWidget {
 // ── Card ──────────────────────────────────────────────────────────────────────
 
 class _ProjectCard extends ConsumerWidget {
-  const _ProjectCard({required this.project});
+  const _ProjectCard({required this.document});
 
-  final Project project;
+  final RecentDocument document;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colors = Theme.of(context).extension<HeatingPlannerColors>()!;
     final theme = Theme.of(context);
     final l10n = AppLocalizations.of(context)!;
+    final missing = !File(document.path).existsSync();
 
-    return GestureDetector(
-      onTap: () => _openProject(context, ref),
-      child: Card(
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          onTap: () => _openProject(context, ref),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Thumbnail placeholder
-              Expanded(
-                child: Container(
-                  color: colors.gridLine,
-                  child: Icon(
-                    Icons.home_work_outlined,
-                    size: 48,
-                    color: colors.wallFill,
+    return Opacity(
+      opacity: missing ? 0.5 : 1.0,
+      child: GestureDetector(
+        onTap: () => _openDocument(context, ref, missing),
+        child: Card(
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: () => _openDocument(context, ref, missing),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Thumbnail placeholder
+                Expanded(
+                  child: Container(
+                    color: colors.gridLine,
+                    child: Icon(
+                      missing
+                          ? Icons.broken_image_outlined
+                          : Icons.home_work_outlined,
+                      size: 48,
+                      color: colors.wallFill,
+                    ),
                   ),
                 ),
-              ),
-              // Footer with name + date + context menu
-              Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: Spacing.sm,
-                  vertical: Spacing.xs,
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            project.name,
-                            style: theme.textTheme.titleSmall,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _relativeDate(project.modifiedAt, l10n),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: theme.colorScheme.onSurfaceVariant,
+                // Footer with name + date + context menu
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: Spacing.sm,
+                    vertical: Spacing.xs,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              document.name,
+                              style: theme.textTheme.titleSmall,
+                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 2),
+                            Text(
+                              missing
+                                  ? l10n.fileMissing
+                                  : _relativeDate(document.modifiedAt, l10n),
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: theme.colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
-                    _ContextMenuButton(project: project),
-                  ],
+                      _ContextMenuButton(document: document, missing: missing),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
     );
   }
 
-  void _openProject(BuildContext context, WidgetRef ref) {
-    unawaited(ref.read(lastOpenedProjectIdProvider.notifier).set(project.id));
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => EditorScreen(projectId: project.id),
-      ),
-    );
+  Future<void> _openDocument(
+    BuildContext context,
+    WidgetRef ref,
+    bool missing,
+  ) async {
+    final l10n = AppLocalizations.of(context)!;
+    if (missing) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.fileMissingMessage(document.path))),
+      );
+      return;
+    }
+    try {
+      final projectId =
+          await ref.read(documentServiceProvider).openDocument(document.path);
+      if (!context.mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => EditorScreen(projectId: projectId),
+        ),
+      );
+    } catch (e) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.fileOpenFailed(e.toString()))),
+      );
+    }
   }
 
   static String _relativeDate(DateTime dt, AppLocalizations l10n) {
@@ -252,9 +285,10 @@ class _ProjectCard extends ConsumerWidget {
 // ── Context menu ──────────────────────────────────────────────────────────────
 
 class _ContextMenuButton extends ConsumerWidget {
-  const _ContextMenuButton({required this.project});
+  const _ContextMenuButton({required this.document, required this.missing});
 
-  final Project project;
+  final RecentDocument document;
+  final bool missing;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -263,11 +297,19 @@ class _ContextMenuButton extends ConsumerWidget {
       icon: const Icon(Icons.more_vert, size: 18),
       onSelected: (action) => _handleAction(context, ref, action),
       itemBuilder: (_) => [
+        if (!missing)
+          PopupMenuItem(
+            value: _CardAction.duplicate,
+            child: Text(l10n.duplicateAction),
+          ),
         PopupMenuItem(
-          value: _CardAction.duplicate,
-          child: Text(l10n.duplicateAction),
+          value: _CardAction.removeFromList,
+          child: Text(l10n.removeFromList),
         ),
-        PopupMenuItem(value: _CardAction.delete, child: Text(l10n.delete)),
+        PopupMenuItem(
+          value: _CardAction.deleteFile,
+          child: Text(l10n.deleteFile),
+        ),
       ],
     );
   }
@@ -280,31 +322,28 @@ class _ContextMenuButton extends ConsumerWidget {
     switch (action) {
       case _CardAction.duplicate:
         await _duplicate(context, ref);
-      case _CardAction.delete:
-        await _confirmDelete(context, ref);
+      case _CardAction.removeFromList:
+        await ref.read(recentDocumentsProvider.notifier).forget(document.path);
+      case _CardAction.deleteFile:
+        await _confirmDeleteFile(context, ref);
     }
   }
 
   Future<void> _duplicate(BuildContext context, WidgetRef ref) async {
     final l10n = AppLocalizations.of(context)!;
-    final now = DateTime.now();
-    final copy = project.copyWith(
-      id: IdGenerator.newId(),
-      name: l10n.projectCopyName(project.name),
-      createdAt: now,
-      modifiedAt: now,
-    );
-    final dao = ref.read(projectDaoProvider);
-    await upsertProject(dao, copy);
+    await ref.read(documentServiceProvider).duplicateDocument(
+          document.path,
+          l10n.projectCopyName(document.name),
+        );
   }
 
-  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+  Future<void> _confirmDeleteFile(BuildContext context, WidgetRef ref) async {
     final l10n = AppLocalizations.of(context)!;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: Text(l10n.deleteProjectTitle),
-        content: Text(l10n.deleteProjectContent(project.name)),
+        title: Text(l10n.deleteFileTitle),
+        content: Text(l10n.deleteFileContent(document.name)),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -321,12 +360,11 @@ class _ContextMenuButton extends ConsumerWidget {
       ),
     );
     if (confirmed != true) return;
-    final dao = ref.read(projectDaoProvider);
-    await deleteProject(dao, project.id);
+    await ref.read(documentServiceProvider).deleteDocumentFile(document.path);
   }
 }
 
-enum _CardAction { duplicate, delete }
+enum _CardAction { duplicate, removeFromList, deleteFile }
 
 // ── Empty state ───────────────────────────────────────────────────────────────
 

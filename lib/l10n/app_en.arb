@@ -677,12 +677,40 @@
   "flowRateDistribution": "Flow Rate Distribution",
   "@flowRateDistribution": { "description": "Chart title for flow distribution" },
 
-  "unsavedExportFile": "Unsaved export file",
+  "unsavedExportFile": "Unsaved changes",
   "@unsavedExportFile": { "description": "Title of unsaved changes dialog" },
-  "unsavedExportContent": "\"{name}\" has changes that have not been saved to the .hsp file.\n\nYour project data is safely stored in the app — only the portable export file is out of date.",
+  "unsavedExportContent": "\"{name}\" has changes that have not been saved to its .hsp file.\n\nSave them before closing?",
   "@unsavedExportContent": {
-    "description": "Body of unsaved changes dialog",
+    "description": "Body of unsaved changes dialog (project already has a file)",
     "placeholders": { "name": { "type": "String" } }
+  },
+  "unsavedNeverSavedContent": "\"{name}\" has not been saved yet. The project file (.hsp) is the only permanent copy — if you close without saving, it will be discarded.\n\nSave it now?",
+  "@unsavedNeverSavedContent": {
+    "description": "Body of unsaved changes dialog for a never-saved project",
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "removeFromList": "Remove from list",
+  "@removeFromList": { "description": "Card menu: remove the project from the recent list without deleting its file" },
+  "deleteFile": "Delete file…",
+  "@deleteFile": { "description": "Card menu: delete the project's .hsp file from disk" },
+  "deleteFileTitle": "Delete project file?",
+  "@deleteFileTitle": { "description": "Title of the delete-file confirmation dialog" },
+  "deleteFileContent": "Permanently delete the file for \"{name}\"? This cannot be undone.",
+  "@deleteFileContent": {
+    "description": "Body of the delete-file confirmation dialog",
+    "placeholders": { "name": { "type": "String" } }
+  },
+  "fileMissing": "File missing",
+  "@fileMissing": { "description": "Card subtitle shown when the project's .hsp file no longer exists" },
+  "fileMissingMessage": "The file could not be found:\n{path}",
+  "@fileMissingMessage": {
+    "description": "Snackbar shown when opening a project whose file is missing",
+    "placeholders": { "path": { "type": "String" } }
+  },
+  "fileOpenFailed": "Could not open the project: {error}",
+  "@fileOpenFailed": {
+    "description": "Snackbar shown when a project file fails to load",
+    "placeholders": { "error": { "type": "String" } }
   },
   "quitAnyway": "Quit Anyway",
   "@quitAnyway": { "description": "Button to close without saving" },

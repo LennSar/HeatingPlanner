@@ -1,11 +1,17 @@
+import 'dart:convert';
 import 'dart:ui' show Locale;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../data/models/recent_document.dart';
+
 // ── Keys ──────────────────────────────────────────────────────────────────────
 
 const _kLastOpenedProjectId = 'lastOpenedProjectId';
+const _kLastOpenedDocumentPath = 'lastOpenedDocumentPath';
+const _kRecentDocuments = 'recentDocuments';
+const _kDocumentMigrationDone = 'documentMigrationDone';
 const _kLastOpenedFloorId = 'lastOpenedFloorId';
 const _kCanvasZoom = 'canvasZoom';
 const _kCanvasPanX = 'canvasPanX';
@@ -15,6 +21,9 @@ const _kLanguageCode = 'languageCode';
 const _kMaterialDbVersion = 'materialDbVersion';
 const _kCustomMaterialLibraryPath = 'customMaterialLibraryPath';
 const _kDefaultGridSpacingMm = 100;
+
+/// Maximum number of entries retained in the recent-documents list.
+const _kMaxRecentDocuments = 30;
 
 // ── AppPreferences ────────────────────────────────────────────────────────────
 
@@ -45,6 +54,82 @@ class AppPreferences {
       await _prefs.setString(_kLastOpenedProjectId, id);
     }
   }
+
+  // ── lastOpenedDocumentPath ───────────────────────────────────────────────
+
+  /// Absolute path of the `.hsp` document that was open when the app was last
+  /// closed, or `null` if no document was open. Drives session restore in the
+  /// document-based storage model.
+  Future<String?> getLastOpenedDocumentPath() =>
+      _prefs.getString(_kLastOpenedDocumentPath);
+
+  /// Persists [path] as the last-opened document. Pass `null` to clear.
+  Future<void> setLastOpenedDocumentPath(String? path) async {
+    if (path == null) {
+      await _prefs.remove(_kLastOpenedDocumentPath);
+    } else {
+      await _prefs.setString(_kLastOpenedDocumentPath, path);
+    }
+  }
+
+  // ── recentDocuments ──────────────────────────────────────────────────────
+
+  /// The recent-documents list, most-recent first.
+  ///
+  /// Returns an empty list when nothing has been opened yet, or when the
+  /// stored value cannot be decoded.
+  Future<List<RecentDocument>> getRecentDocuments() async {
+    final raw = await _prefs.getString(_kRecentDocuments);
+    if (raw == null || raw.isEmpty) return const [];
+    try {
+      final list = jsonDecode(raw) as List<dynamic>;
+      return list
+          .cast<Map<String, dynamic>>()
+          .map(RecentDocument.fromJson)
+          .toList();
+    } catch (_) {
+      return const [];
+    }
+  }
+
+  /// Inserts or refreshes the entry for [doc], moving it to the front and
+  /// de-duplicating by path. Trims the list to [_kMaxRecentDocuments].
+  Future<List<RecentDocument>> touchRecentDocument(
+    RecentDocument doc,
+  ) async {
+    final current = await getRecentDocuments();
+    final next = <RecentDocument>[
+      doc,
+      ...current.where((d) => d.path != doc.path),
+    ].take(_kMaxRecentDocuments).toList();
+    await _writeRecentDocuments(next);
+    return next;
+  }
+
+  /// Removes the entry for [path] from the recent-documents list.
+  Future<List<RecentDocument>> removeRecentDocument(String path) async {
+    final current = await getRecentDocuments();
+    final next = current.where((d) => d.path != path).toList();
+    await _writeRecentDocuments(next);
+    return next;
+  }
+
+  Future<void> _writeRecentDocuments(List<RecentDocument> docs) =>
+      _prefs.setString(
+        _kRecentDocuments,
+        jsonEncode(docs.map((d) => d.toJson()).toList()),
+      );
+
+  // ── documentMigrationDone ────────────────────────────────────────────────
+
+  /// Whether the one-time migration of legacy DB-resident projects to `.hsp`
+  /// files has already run. Defaults to `false`.
+  Future<bool> getDocumentMigrationDone() async =>
+      (await _prefs.getBool(_kDocumentMigrationDone)) ?? false;
+
+  /// Records that the legacy-project migration has completed.
+  Future<void> setDocumentMigrationDone(bool done) =>
+      _prefs.setBool(_kDocumentMigrationDone, done);
 
   // ── lastOpenedFloorId ────────────────────────────────────────────────────
 
@@ -201,6 +286,45 @@ class LastOpenedProjectIdNotifier extends AsyncNotifier<String?> {
 final lastOpenedProjectIdProvider =
     AsyncNotifierProvider<LastOpenedProjectIdNotifier, String?>(
   LastOpenedProjectIdNotifier.new,
+);
+
+// ── recentDocumentsProvider ───────────────────────────────────────────────────
+
+/// Notifier that exposes the recent-documents list and persists changes.
+///
+/// In the document-based storage model this is the source of truth for the
+/// project-selection screen (replacing the SQLite `projectsProvider` stream).
+class RecentDocumentsNotifier extends AsyncNotifier<List<RecentDocument>> {
+  @override
+  Future<List<RecentDocument>> build() {
+    return ref.read(appPreferencesProvider).getRecentDocuments();
+  }
+
+  /// Inserts or refreshes the entry for ([path], [name], [modifiedAt]),
+  /// moving it to the front of the list.
+  Future<void> touch({
+    required String path,
+    required String name,
+    required DateTime modifiedAt,
+  }) async {
+    final next = await ref.read(appPreferencesProvider).touchRecentDocument(
+          RecentDocument(path: path, name: name, modifiedAt: modifiedAt),
+        );
+    state = AsyncValue.data(next);
+  }
+
+  /// Removes the entry for [path] from the list (the file on disk is untouched).
+  Future<void> forget(String path) async {
+    final next =
+        await ref.read(appPreferencesProvider).removeRecentDocument(path);
+    state = AsyncValue.data(next);
+  }
+}
+
+/// Persisted list of recently opened/saved `.hsp` documents, most-recent first.
+final recentDocumentsProvider =
+    AsyncNotifierProvider<RecentDocumentsNotifier, List<RecentDocument>>(
+  RecentDocumentsNotifier.new,
 );
 
 // ── gridSpacingMmProvider ─────────────────────────────────────────────────────

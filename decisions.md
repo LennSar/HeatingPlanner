@@ -2428,3 +2428,62 @@ the shared text-field-focus guard.
 
 **Verification.**
 `flutter analyze` clean.
+
+## ADR-033 — Document-based storage: `.hsp` files own project data
+
+**What.**
+Inverts the storage model. Previously SQLite was the source of truth, every
+project lived in the database forever, the project list was a DB stream
+(`projectsProvider`), and `.hsp` was an optional export (ADR-021's "library is
+the sharing channel; `.hsp` is the per-project envelope"). Now `.hsp` files are
+the **canonical store** and the database is only a **working copy of the single
+project currently open** in the editor.
+
+Lifecycle (all routed through the new `DocumentService`,
+`lib/repositories/document_service.dart`):
+- **Open** (`openDocument`): clears the working copy, then imports preserving the
+  original UUIDs via `HspImporter.importSnapshotPreservingIds`
+  (`importSnapshot(remapIds: false)`) so reopening a file maps back to the same
+  project instead of duplicating it; sets `lastExportPath`, refreshes the
+  recent-documents list, and stores `lastOpenedDocumentPath`.
+- **Save**: `SaveStateNotifier.exportNow`/`saveAs` write the file **only on
+  explicit save** — the debounced auto-export was removed so that editing (or
+  undoing) never silently rewrites the on-disk `.hsp`. `markDirty` just flags the
+  working copy; the dirty flag drives the title-bar indicator and the close/quit
+  save prompt. `exportNow` exports the project named by `currentProjectIdProvider`
+  (the open project), not the legacy `lastOpenedProjectIdProvider`. On success it
+  also refreshes the recent-documents metadata (best-effort).
+- **Close / quit / window-close**: `ensureSavedBeforeLeaving` prompts when the
+  project is dirty **or** has never been saved (a never-saved draft would be lost
+  — the `.hsp` is the only permanent copy), then
+  `ProjectRepository.clearWorkingCopy` deletes the project subtree from the DB.
+- **Startup**: restores by `lastOpenedDocumentPath` (loads the file) rather than a
+  DB id; a missing/unloadable file falls back to the project list.
+- **Migration** (`migrateLegacyProjectsIfNeeded`, one-time, flag-guarded): exports
+  every pre-existing DB project to `~/Documents/HeatingPlanner/<name>.hsp`,
+  registers them in the recent list, then clears the DB and `VACUUM`s.
+
+`clearWorkingCopy` deletes the geometry/project tables explicitly in reverse-FK
+order — runtime `PRAGMA foreign_keys` is **off** outside migrations, so the
+declared cascades do not fire — plus the project-owned (non-preset) wall
+constructions and their layers. It deliberately **preserves** the shared library:
+preset constructions (`isPreset = 1`), custom materials (`isBuiltIn = 0`, synced
+from the JSON library file per ADR-021), and the seeded tube/flooring lookups.
+The project list (`ProjectListScreen`) is now sourced from a persisted
+`recentDocuments` list (`RecentDocument` model + `recentDocumentsProvider`); cards
+open files, with Duplicate (file copy), Remove-from-list, and Delete-file actions.
+
+**Why.**
+The library model meant the DB silently retained every project ever created, and
+backups/portability required manually creating an `.hsp`. The user wanted files on
+disk to own the data (document model, like most desktop apps) and the DB to never
+accumulate closed projects. Identity-preserving open is required so a file is a
+stable document; explicit subtree deletion (over enabling global
+`foreign_keys = ON`) avoids surfacing latent insert-order FK failures in the
+importer. Auto-migration converts the existing library to files with no data loss.
+
+**Verification.**
+`flutter analyze` clean; `test/unit/repositories/document_storage_test.dart`
+(orphan-free clear, shared-library preservation, preserve-ids round-trip with no
+duplicate on reopen) and the updated `Session restore` group in
+`test/integration/file_roundtrip_test.dart` (path-based routing) pass.

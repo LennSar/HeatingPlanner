@@ -7,13 +7,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
 import 'l10n/app_localizations.dart';
+import 'platform/keyboard_shortcuts.dart' show ensureSavedBeforeLeaving;
 import 'platform/menu_bar_host.dart';
 import 'repositories/app_preferences.dart';
 import 'repositories/custom_material_library_service.dart';
+import 'repositories/document_service.dart';
 import 'repositories/material_repository.dart';
 import 'repositories/project_repository.dart';
 import 'repositories/save_state_notifier.dart';
-import 'ui/providers/editor_state_provider.dart';
 import 'ui/screens/editor_screen.dart';
 import 'ui/screens/project_list_screen.dart';
 
@@ -22,8 +23,9 @@ import 'ui/screens/project_list_screen.dart';
 /// Resolves to the project ID to open on startup, or `null` if the project
 /// list should be shown instead.
 ///
-/// Reads the persisted last-opened project ID and verifies the project still
-/// exists in SQLite before returning it.
+/// Document storage model: session restore is driven by the last-opened `.hsp`
+/// file path. The file is loaded into the database working copy on startup; if
+/// it is missing or fails to load, the project list is shown instead.
 final _startupProjectIdProvider =
     FutureProvider.autoDispose<String?>((ref) async {
   // Ensure the built-in material catalogue is seeded / up-to-date.
@@ -34,10 +36,25 @@ final _startupProjectIdProvider =
   await ref
       .read(customMaterialLibraryServiceProvider)
       .initializeOnStartup();
-  final id = await ref.read(lastOpenedProjectIdProvider.future);
-  if (id == null) return null;
-  final project = await ref.read(projectRepositoryProvider).findById(id);
-  return project != null ? id : null;
+
+  // One-time migration of legacy DB-resident projects into `.hsp` files.
+  await ref.read(documentServiceProvider).migrateLegacyProjectsIfNeeded();
+
+  final prefs = ref.read(appPreferencesProvider);
+  final path = await prefs.getLastOpenedDocumentPath();
+  if (path == null) return null;
+  if (!File(path).existsSync()) {
+    // File moved or deleted — forget it and fall back to the project list.
+    await ref.read(recentDocumentsProvider.notifier).forget(path);
+    await prefs.setLastOpenedDocumentPath(null);
+    return null;
+  }
+  try {
+    return await ref.read(documentServiceProvider).openDocument(path);
+  } catch (_) {
+    await prefs.setLastOpenedDocumentPath(null);
+    return null;
+  }
 });
 
 // ── Root widget ────────────────────────────────────────────────────────────────
@@ -80,35 +97,20 @@ class _HeatingPlannerAppState
 
   /// Intercepts the desktop window close button.
   ///
-  /// Returns [AppExitResponse.exit] immediately when there is nothing to save.
-  /// Otherwise shows [_UnsavedChangesDialog] and waits for the user's choice.
+  /// Prompts to save the open project (when it has unsaved changes or has never
+  /// been saved) via the shared [ensureSavedBeforeLeaving] flow, then clears the
+  /// in-database working copy so a discarded draft does not linger. The
+  /// last-opened-document path is preserved so the next launch restores the
+  /// session.
   Future<AppExitResponse> _handleExitRequested() async {
-    final saveState = ref.read(saveStateProvider);
-    if (!saveState.isDirty || saveState.lastExportPath == null) {
-      return AppExitResponse.exit;
-    }
-
     final context = _navigatorKey.currentContext;
     if (context == null) return AppExitResponse.exit;
 
-    final result = await showDialog<_ExitChoice>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => _UnsavedChangesDialog(
-        projectName: ref.read(currentProjectNameProvider),
-      ),
-    );
+    final proceed = await ensureSavedBeforeLeaving(context, ref);
+    if (!proceed) return AppExitResponse.cancel;
 
-    switch (result) {
-      case _ExitChoice.saveAndQuit:
-        await ref.read(saveStateProvider.notifier).exportNow();
-        return AppExitResponse.exit;
-      case _ExitChoice.quitAnyway:
-        return AppExitResponse.exit;
-      case null:
-      case _ExitChoice.cancel:
-        return AppExitResponse.cancel;
-    }
+    await ref.read(projectRepositoryProvider).clearWorkingCopy();
+    return AppExitResponse.exit;
   }
 
   /// Called when the app moves to inactive state.
@@ -174,44 +176,3 @@ class _StartupRouter extends ConsumerWidget {
   }
 }
 
-// ── Unsaved changes dialog (§12.5) ─────────────────────────────────────────────
-
-enum _ExitChoice { saveAndQuit, quitAnyway, cancel }
-
-/// Shown when the user tries to close the window while the `.hsp` export is
-/// out of date. Wording per agent-ui-ux.md §12.5.
-class _UnsavedChangesDialog extends StatelessWidget {
-  const _UnsavedChangesDialog({required this.projectName});
-
-  final String projectName;
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Unsaved export file'),
-      content: Text(
-        '"$projectName" has changes that have not been saved to the '
-        '.hsp file.\n\n'
-        'Your project data is safely stored in the app — only the '
-        'portable export file is out of date.',
-      ),
-      actions: [
-        TextButton(
-          onPressed: () =>
-              Navigator.of(context).pop(_ExitChoice.cancel),
-          child: const Text('Cancel'),
-        ),
-        TextButton(
-          onPressed: () =>
-              Navigator.of(context).pop(_ExitChoice.quitAnyway),
-          child: const Text('Quit Anyway'),
-        ),
-        FilledButton(
-          onPressed: () =>
-              Navigator.of(context).pop(_ExitChoice.saveAndQuit),
-          child: const Text('Save File and Quit'),
-        ),
-      ],
-    );
-  }
-}

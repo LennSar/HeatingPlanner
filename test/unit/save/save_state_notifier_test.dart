@@ -1,40 +1,24 @@
 // Tests for SaveStateNotifier, SaveState, SaveStateMixin, and AppPreferences.
 //
-// Per agent-test.md §3.1 and §12. Timer tests use package:fake_async to avoid
-// real 3-second waits.  AppPreferences tests use InMemorySharedPreferencesAsync
-// so that no real SharedPreferences platform channel is needed.
+// Per agent-test.md §3.1 and §12. Document storage model: the `.hsp` file is
+// written only on explicit save (no debounced auto-export), and [exportNow]
+// targets the project named by [currentProjectIdProvider]. AppPreferences tests
+// use InMemorySharedPreferencesAsync so no real platform channel is needed.
 
-import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/native.dart';
-import 'package:fake_async/fake_async.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/data/database/app_database.dart' as $db;
 import 'package:heating_planner/repositories/app_preferences.dart';
+import 'package:heating_planner/repositories/project_repository.dart'
+    show currentProjectIdProvider;
 import 'package:heating_planner/repositories/save_state_notifier.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
 
 // ── Test helpers ──────────────────────────────────────────────────────────────
-
-/// Overrides [LastOpenedProjectIdNotifier] to stay in the loading state
-/// forever.  [exportNow]'s `asData?.value` check returns null, so the export
-/// exits early without any database or file-system interaction.
-class _LoadingProjectIdNotifier extends LastOpenedProjectIdNotifier {
-  @override
-  Future<String?> build() => Completer<String?>().future; // never resolves
-}
-
-/// Overrides [LastOpenedProjectIdNotifier] to resolve immediately to [value].
-class _FixedProjectIdNotifier extends LastOpenedProjectIdNotifier {
-  _FixedProjectIdNotifier(this._value);
-  final String? _value;
-
-  @override
-  Future<String?> build() async => _value;
-}
 
 /// A notifier that mixes in [SaveStateMixin] for mixin-group tests.
 ///
@@ -124,85 +108,37 @@ void main() {
       expect(emitCount, equals(1));
     });
 
-    test('starts a debounce timer when lastExportPath is set', () {
-      fakeAsync((fake) {
-        final container = ProviderContainer(
-          overrides: [
-            lastOpenedProjectIdProvider
-                .overrideWith(_LoadingProjectIdNotifier.new),
-          ],
-        );
-
-        // saveAs sets lastExportPath and calls exportNow, which exits early
-        // because the project-id provider never resolves.
-        container.read(saveStateProvider.notifier).saveAs('/tmp/test.hsp');
-        fake.flushMicrotasks();
-
-        final states = <SaveState>[];
-        container.listen(
-          saveStateProvider,
-          (_, next) => states.add(next),
-          fireImmediately: false,
-        );
-
-        container.read(saveStateProvider.notifier).markDirty();
-
-        // Before the 3 s debounce window: no export attempt yet.
-        expect(states.every((s) => !s.isAutoExporting), isTrue);
-
-        // Advance past the debounce window — timer fires → exportNow called.
-        fake.elapse(const Duration(seconds: 4));
-        fake.flushMicrotasks();
-
-        // exportNow set isAutoExporting = true before the early-exit path.
-        expect(
-          states.any((s) => s.isAutoExporting),
-          isTrue,
-          reason: 'exportNow should have been triggered by the debounce timer',
-        );
-
-        container.dispose();
-      });
-    });
-
     test(
-        'calling markDirty() twice resets the timer — only one export fires',
-        () {
-      fakeAsync((fake) {
-        final container = ProviderContainer(
-          overrides: [
-            lastOpenedProjectIdProvider
-                .overrideWith(_LoadingProjectIdNotifier.new),
-          ],
-        );
+        'does NOT write the file even when lastExportPath is set '
+        '(explicit-save model)', () async {
+      final db = buildTestDatabase();
+      addTearDown(db.close);
+      await insertTestProject(db, id: 'proj-1');
 
-        container.read(saveStateProvider.notifier).saveAs('/tmp/test.hsp');
-        fake.flushMicrotasks();
+      final dir = await Directory.systemTemp.createTemp('hsp_test_');
+      addTearDown(() => dir.delete(recursive: true));
+      final path = '${dir.path}/test.hsp';
 
-        final states = <SaveState>[];
-        container.listen(
-          saveStateProvider,
-          (_, next) => states.add(next),
-          fireImmediately: false,
-        );
+      final container = ProviderContainer(
+        overrides: [$db.appDatabaseProvider.overrideWithValue(db)],
+      );
+      addTearDown(container.dispose);
+      container.read(currentProjectIdProvider.notifier).set('proj-1');
 
-        // t = 0: first markDirty → timer T1 (fires at t = 3 s).
-        container.read(saveStateProvider.notifier).markDirty();
-        fake.elapse(const Duration(seconds: 2));
-        // t = 2: second markDirty → T1 cancelled, timer T2 (fires at t = 5 s).
-        container.read(saveStateProvider.notifier).markDirty();
-        // t = 6: T2 has fired; T1 must NOT have fired.
-        fake.elapse(const Duration(seconds: 4));
-        fake.flushMicrotasks();
+      // Associate a file with the open project, then make an edit.
+      container.read(saveStateProvider.notifier).markOpenedFrom(path);
+      container.read(saveStateProvider.notifier).markDirty();
+      // Give any (now-removed) async auto-export a chance to misfire.
+      await Future<void>.delayed(const Duration(milliseconds: 50));
 
-        expect(
-          states.where((s) => s.isAutoExporting).length,
-          equals(1),
-          reason: 'exactly one export should have been triggered',
-        );
-
-        container.dispose();
-      });
+      final state = container.read(saveStateProvider);
+      expect(state.isDirty, isTrue);
+      expect(state.isAutoExporting, isFalse);
+      expect(
+        File(path).existsSync(),
+        isFalse,
+        reason: 'editing must not write the .hsp file until an explicit save',
+      );
     });
   });
 
@@ -217,43 +153,6 @@ void main() {
       container.read(saveStateProvider.notifier).clearDirty();
 
       expect(container.read(saveStateProvider).isDirty, isFalse);
-    });
-
-    test('cancels any pending debounce timer', () {
-      fakeAsync((fake) {
-        final container = ProviderContainer(
-          overrides: [
-            lastOpenedProjectIdProvider
-                .overrideWith(_LoadingProjectIdNotifier.new),
-          ],
-        );
-
-        container.read(saveStateProvider.notifier).saveAs('/tmp/test.hsp');
-        fake.flushMicrotasks();
-
-        final states = <SaveState>[];
-        container.listen(
-          saveStateProvider,
-          (_, next) => states.add(next),
-          fireImmediately: false,
-        );
-
-        container.read(saveStateProvider.notifier).markDirty();
-        // Cancel before the 3 s window elapses.
-        container.read(saveStateProvider.notifier).clearDirty();
-        fake.elapse(const Duration(seconds: 4));
-        fake.flushMicrotasks();
-
-        // exportNow must NOT have been called after clearDirty cancelled the
-        // timer.
-        expect(
-          states.every((s) => !s.isAutoExporting),
-          isTrue,
-          reason: 'clearDirty() should have cancelled the debounce timer',
-        );
-
-        container.dispose();
-      });
     });
   });
 
@@ -270,37 +169,37 @@ void main() {
       expect(container.read(saveStateProvider), equals(before));
     });
 
-    test('sets isAutoExporting = true while the export is in progress', () {
-      fakeAsync((fake) {
-        final container = ProviderContainer(
-          overrides: [
-            lastOpenedProjectIdProvider
-                .overrideWith(_LoadingProjectIdNotifier.new),
-          ],
-        );
+    test('passes through isAutoExporting = true during the export', () async {
+      final db = buildTestDatabase();
+      addTearDown(db.close);
+      await insertTestProject(db, id: 'proj-1');
 
-        container.read(saveStateProvider.notifier).saveAs('/tmp/test.hsp');
-        fake.flushMicrotasks();
+      final dir = await Directory.systemTemp.createTemp('hsp_test_');
+      addTearDown(() => dir.delete(recursive: true));
 
-        final states = <SaveState>[];
-        container.listen(
-          saveStateProvider,
-          (_, next) => states.add(next),
-          fireImmediately: false,
-        );
+      final container = ProviderContainer(
+        overrides: [$db.appDatabaseProvider.overrideWithValue(db)],
+      );
+      addTearDown(container.dispose);
+      container.read(currentProjectIdProvider.notifier).set('proj-1');
+      container.read(saveStateProvider.notifier)
+          .markOpenedFrom('${dir.path}/test.hsp');
 
-        // exportNow synchronously sets isAutoExporting = true then exits early
-        // (null projectId).  Both transitions happen before the first await.
-        container.read(saveStateProvider.notifier).exportNow();
-        fake.flushMicrotasks();
+      final states = <SaveState>[];
+      container.listen(
+        saveStateProvider,
+        (_, next) => states.add(next),
+        fireImmediately: false,
+      );
 
-        expect(
-          states.any((s) => s.isAutoExporting),
-          isTrue,
-        );
+      await container.read(saveStateProvider.notifier).exportNow();
 
-        container.dispose();
-      });
+      expect(
+        states.any((s) => s.isAutoExporting),
+        isTrue,
+        reason: 'the transient in-progress state should be observable',
+      );
+      expect(container.read(saveStateProvider).isAutoExporting, isFalse);
     });
 
     test('after successful export: isDirty = false, lastExportedAt is set',
@@ -314,17 +213,10 @@ void main() {
       final path = '${dir.path}/test.hsp';
 
       final container = ProviderContainer(
-        overrides: [
-          $db.appDatabaseProvider.overrideWithValue(db),
-          lastOpenedProjectIdProvider
-              .overrideWith(() => _FixedProjectIdNotifier('proj-1')),
-        ],
+        overrides: [$db.appDatabaseProvider.overrideWithValue(db)],
       );
       addTearDown(container.dispose);
-
-      // Warm up the async provider so asData resolves before exportNow reads it.
-      container.read(lastOpenedProjectIdProvider);
-      await Future<void>.delayed(Duration.zero);
+      container.read(currentProjectIdProvider.notifier).set('proj-1');
 
       // Set state: dirty with a known export path.
       // ignore: invalid_use_of_protected_member
@@ -340,25 +232,44 @@ void main() {
       expect(state.isDirty, isFalse);
       expect(state.lastExportedAt, isNotNull);
       expect(state.isAutoExporting, isFalse);
+      expect(File(path).existsSync(), isTrue);
     });
 
-    test('on write failure: isDirty stays true, isAutoExporting = false',
-        () async {
-      // Empty DB — no project with id 'missing' → buildSnapshot throws.
+    test('does nothing when no project is open', () async {
       final db = buildTestDatabase();
       addTearDown(db.close);
 
       final container = ProviderContainer(
-        overrides: [
-          $db.appDatabaseProvider.overrideWithValue(db),
-          lastOpenedProjectIdProvider
-              .overrideWith(() => _FixedProjectIdNotifier('missing')),
-        ],
+        overrides: [$db.appDatabaseProvider.overrideWithValue(db)],
       );
       addTearDown(container.dispose);
+      // currentProjectId stays '' (no project open).
 
-      container.read(lastOpenedProjectIdProvider);
-      await Future<void>.delayed(Duration.zero);
+      // ignore: invalid_use_of_protected_member
+      container.read(saveStateProvider.notifier).state =
+          container.read(saveStateProvider).copyWith(
+        isDirty: true,
+        lastExportPath: '/tmp/irrelevant.hsp',
+      );
+
+      await container.read(saveStateProvider.notifier).exportNow();
+
+      final state = container.read(saveStateProvider);
+      expect(state.isDirty, isTrue);
+      expect(state.isAutoExporting, isFalse);
+    });
+
+    test('on write failure: isDirty stays true, isAutoExporting = false',
+        () async {
+      // Project id set but no matching row → buildSnapshot throws.
+      final db = buildTestDatabase();
+      addTearDown(db.close);
+
+      final container = ProviderContainer(
+        overrides: [$db.appDatabaseProvider.overrideWithValue(db)],
+      );
+      addTearDown(container.dispose);
+      container.read(currentProjectIdProvider.notifier).set('missing');
 
       // ignore: invalid_use_of_protected_member
       container.read(saveStateProvider.notifier).state =

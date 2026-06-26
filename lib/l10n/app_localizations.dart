@@ -1373,14 +1373,62 @@ abstract class AppLocalizations {
   /// Title of unsaved changes dialog
   ///
   /// In en, this message translates to:
-  /// **'Unsaved export file'**
+  /// **'Unsaved changes'**
   String get unsavedExportFile;
 
-  /// Body of unsaved changes dialog
+  /// Body of unsaved changes dialog (project already has a file)
   ///
   /// In en, this message translates to:
-  /// **'\"{name}\" has changes that have not been saved to the .hsp file.\n\nYour project data is safely stored in the app — only the portable export file is out of date.'**
+  /// **'\"{name}\" has changes that have not been saved to its .hsp file.\n\nSave them before closing?'**
   String unsavedExportContent(String name);
+
+  /// Body of unsaved changes dialog for a never-saved project
+  ///
+  /// In en, this message translates to:
+  /// **'\"{name}\" has not been saved yet. The project file (.hsp) is the only permanent copy — if you close without saving, it will be discarded.\n\nSave it now?'**
+  String unsavedNeverSavedContent(String name);
+
+  /// Card menu: remove the project from the recent list without deleting its file
+  ///
+  /// In en, this message translates to:
+  /// **'Remove from list'**
+  String get removeFromList;
+
+  /// Card menu: delete the project's .hsp file from disk
+  ///
+  /// In en, this message translates to:
+  /// **'Delete file…'**
+  String get deleteFile;
+
+  /// Title of the delete-file confirmation dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Delete project file?'**
+  String get deleteFileTitle;
+
+  /// Body of the delete-file confirmation dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Permanently delete the file for \"{name}\"? This cannot be undone.'**
+  String deleteFileContent(String name);
+
+  /// Card subtitle shown when the project's .hsp file no longer exists
+  ///
+  /// In en, this message translates to:
+  /// **'File missing'**
+  String get fileMissing;
+
+  /// Snackbar shown when opening a project whose file is missing
+  ///
+  /// In en, this message translates to:
+  /// **'The file could not be found:\n{path}'**
+  String fileMissingMessage(String path);
+
+  /// Snackbar shown when a project file fails to load
+  ///
+  /// In en, this message translates to:
+  /// **'Could not open the project: {error}'**
+  String fileOpenFailed(String error);
 
   /// Button to close without saving
   ///
