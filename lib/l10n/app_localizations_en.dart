@@ -758,6 +758,16 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String deleteFileFailed(String path) {
+    return 'Removed from the list, but the file could not be deleted (it may be outside the app\'s access):\n$path';
+  }
+
+  @override
+  String basedOnFile(String fileName) {
+    return 'File: $fileName';
+  }
+
+  @override
   String get fileMissing => 'File missing';
 
   @override

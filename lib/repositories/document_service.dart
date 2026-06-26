@@ -110,12 +110,25 @@ class DocumentService {
 
   /// Deletes the `.hsp` file at [path] (if it still exists) and removes it from
   /// the recent-documents list.
-  Future<void> deleteDocumentFile(String path) async {
+  ///
+  /// The list entry is **always** removed, even when the file itself cannot be
+  /// deleted — e.g. a sandboxed macOS build loses access to files saved outside
+  /// its container once the session that picked them ends. Returns `true` when
+  /// the on-disk file was removed (or was already gone), `false` when the file
+  /// still exists but could not be deleted.
+  Future<bool> deleteDocumentFile(String path) async {
+    var fileRemoved = true;
     final file = File(path);
     if (file.existsSync()) {
-      await file.delete();
+      try {
+        await file.delete();
+      } catch (e, st) {
+        _log.warning('Could not delete .hsp file at "$path"', e, st);
+        fileRemoved = false;
+      }
     }
     await ref.read(recentDocumentsProvider.notifier).forget(path);
+    return fileRemoved;
   }
 
   // ── Migration ───────────────────────────────────────────────────────────────

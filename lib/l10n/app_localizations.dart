@@ -1412,6 +1412,18 @@ abstract class AppLocalizations {
   /// **'Permanently delete the file for \"{name}\"? This cannot be undone.'**
   String deleteFileContent(String name);
 
+  /// Snackbar shown when the .hsp file itself could not be deleted
+  ///
+  /// In en, this message translates to:
+  /// **'Removed from the list, but the file could not be deleted (it may be outside the app\'s access):\n{path}'**
+  String deleteFileFailed(String path);
+
+  /// Project card label showing the .hsp file name the project is stored in
+  ///
+  /// In en, this message translates to:
+  /// **'File: {fileName}'**
+  String basedOnFile(String fileName);
+
   /// Card subtitle shown when the project's .hsp file no longer exists
   ///
   /// In en, this message translates to:

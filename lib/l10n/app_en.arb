@@ -700,6 +700,16 @@
     "description": "Body of the delete-file confirmation dialog",
     "placeholders": { "name": { "type": "String" } }
   },
+  "deleteFileFailed": "Removed from the list, but the file could not be deleted (it may be outside the app's access):\n{path}",
+  "@deleteFileFailed": {
+    "description": "Snackbar shown when the .hsp file itself could not be deleted",
+    "placeholders": { "path": { "type": "String" } }
+  },
+  "basedOnFile": "File: {fileName}",
+  "@basedOnFile": {
+    "description": "Project card label showing the .hsp file name the project is stored in",
+    "placeholders": { "fileName": { "type": "String" } }
+  },
   "fileMissing": "File missing",
   "@fileMissing": { "description": "Card subtitle shown when the project's .hsp file no longer exists" },
   "fileMissingMessage": "The file could not be found:\n{path}",

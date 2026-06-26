@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path/path.dart' as p;
 
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/id_generator.dart';
@@ -207,6 +208,23 @@ class _ProjectCard extends ConsumerWidget {
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 2),
+                            // File name the project is stored in — disambiguates
+                            // multiple files exported from the same project.
+                            // Full path on hover.
+                            Tooltip(
+                              message: document.path,
+                              child: Text(
+                                l10n.basedOnFile(p.basename(document.path)),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: theme.colorScheme.onSurfaceVariant,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
                             Text(
                               missing
                                   ? l10n.fileMissing
@@ -360,7 +378,14 @@ class _ContextMenuButton extends ConsumerWidget {
       ),
     );
     if (confirmed != true) return;
-    await ref.read(documentServiceProvider).deleteDocumentFile(document.path);
+    final fileRemoved = await ref
+        .read(documentServiceProvider)
+        .deleteDocumentFile(document.path);
+    if (!fileRemoved && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(l10n.deleteFileFailed(document.path))),
+      );
+    }
   }
 }
 
