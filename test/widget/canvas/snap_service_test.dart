@@ -348,4 +348,73 @@ void main() {
       expect(r.yAnchor!.y, closeTo(500, 0.5));
     });
   });
+
+  // ── Corner square snap: snapCornerSquare (ADR-035) ────────────────────────
+
+  group('snapCornerSquare — 90° corner lock', () {
+    // A unit square room (0,0)-(4000,0)-(4000,3000)-(0,3000), dragging the
+    // (4000,3000) corner. Its right wall pivots about A=(4000,0) and should
+    // run vertical (dirA = (0,1)); its top wall pivots about B=(0,3000) and
+    // should run horizontal (dirB = (1,0)).
+    const anchorA = Point2D(x: 4000, y: 0);
+    const dirA = Point2D(x: 0, y: 1);
+    const anchorB = Point2D(x: 0, y: 3000);
+    const dirB = Point2D(x: 1, y: 0);
+
+    test('SS-RA01: both edges near square → snaps to guide intersection', () {
+      final r = SnapService.snapCornerSquare(
+        const Point2D(x: 4080, y: 2950),
+        anchorA: anchorA,
+        dirA: dirA,
+        anchorB: anchorB,
+        dirB: dirB,
+      );
+      expect(r, isNotNull);
+      expect(r!.x, closeTo(4000, 0.5)); // on the vertical guide x=4000
+      expect(r.y, closeTo(3000, 0.5)); // on the horizontal guide y=3000
+    });
+
+    test('SS-RA02: one edge aligned → projects onto that guide line', () {
+      // Cursor clearly off the horizontal guide but near the vertical one.
+      final r = SnapService.snapCornerSquare(
+        const Point2D(x: 4050, y: 4000),
+        anchorA: anchorA,
+        dirA: dirA,
+        anchorB: anchorB,
+        dirB: dirB,
+      );
+      expect(r, isNotNull);
+      expect(r!.x, closeTo(4000, 0.5)); // locked to vertical guide
+      expect(r.y, closeTo(4000, 0.5)); // free to follow the cursor along it
+    });
+
+    test('SS-RA03: an oblique corner is left alone (returns null)', () {
+      final r = SnapService.snapCornerSquare(
+        const Point2D(x: 6000, y: 6000), // ~45° off both guides
+        anchorA: anchorA,
+        dirA: dirA,
+        anchorB: anchorB,
+        dirB: dirB,
+      );
+      expect(r, isNull);
+    });
+
+    test('SS-RA04: reversed guide direction engages identically', () {
+      final r = SnapService.snapCornerSquare(
+        const Point2D(x: 4050, y: 2000),
+        anchorA: anchorA,
+        dirA: const Point2D(x: 0, y: -1), // pointing the other way
+      );
+      expect(r, isNotNull);
+      expect(r!.x, closeTo(4000, 0.5));
+      expect(r.y, closeTo(2000, 0.5));
+    });
+
+    test('SS-RA05: no guides → null', () {
+      expect(
+        SnapService.snapCornerSquare(const Point2D(x: 100, y: 100)),
+        isNull,
+      );
+    });
+  });
 }

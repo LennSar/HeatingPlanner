@@ -111,6 +111,17 @@ class SelectTool extends CanvasTool {
   DragHandleType? _dragHandle;
   WallSegment? _dragStartWall;
   List<WallSegment> _dragStartConnected = const [];
+
+  /// ADR-035: square-snap guides for a dragged room corner. Each incident
+  /// wall pivots about its fixed far end (`_squareAnchorA` / `_squareAnchorB`)
+  /// and snaps to run along the unit direction (`_squareDirA` / `_squareDirB`)
+  /// that is perpendicular to its adjacent wall. Set at drag-start for a plain
+  /// corner (endpoint) drag whose room neighbours are known; null otherwise
+  /// (so the snap stays off for free walls and rect-reshape).
+  Point2D? _squareAnchorA;
+  Point2D? _squareDirA;
+  Point2D? _squareAnchorB;
+  Point2D? _squareDirB;
   // World point where a wall-body (translate) drag was grabbed, so the
   // wall follows the pointer by that offset instead of snapping its
   // midpoint to the cursor (no jump when grabbed away from the middle).
@@ -977,6 +988,23 @@ class SelectTool extends CanvasTool {
         }
       }
     }
+
+    // ADR-035: capture the dragged corner's square-snap guides so a plain
+    // (non-rect-reshape) corner drag can lock to 90°. Skipped for the mid
+    // handle and whenever rect-reshape (ADR-012) owns the drag.
+    _squareAnchorA = null;
+    _squareDirA = null;
+    _squareAnchorB = null;
+    _squareDirB = null;
+    if (!_rectReshapeMode &&
+        (handleType == DragHandleType.start ||
+            handleType == DragHandleType.end)) {
+      final corner = handleType == DragHandleType.start
+          ? _selectedWall!.startPoint
+          : _selectedWall!.endPoint;
+      _captureCornerSquareGuides(corner);
+    }
+
     // ADR-011: snapshot the mirror wall's room so we can keep it in sync.
     final mirrorWallId = _selectedWall!.mirrorId;
     if (mirrorWallId != null) {
@@ -1147,9 +1175,9 @@ class SelectTool extends CanvasTool {
           _applyMidDrag(worldPoint);
         }
       case DragHandleType.start:
-        _applyEndpointDrag(snap.point, isStart: true);
+        _applyEndpointDrag(_cornerSnap(worldPoint, snap), isStart: true);
       case DragHandleType.end:
-        _applyEndpointDrag(snap.point, isStart: false);
+        _applyEndpointDrag(_cornerSnap(worldPoint, snap), isStart: false);
     }
 
     onStateChanged();
@@ -2763,6 +2791,88 @@ class SelectTool extends CanvasTool {
   // Endpoint handle drag (resize/pivot)
   // ================================================================
 
+  /// ADR-035: capture the dragged [corner]'s square-snap guides — for each of
+  /// the two walls meeting at the corner, the fixed far end it pivots about
+  /// and the unit direction perpendicular to that wall's adjacent (also fixed)
+  /// neighbour. Each side is set independently; sides without a usable
+  /// adjacent wall (or a corner with no room) are left null so the snap stays
+  /// off there.
+  void _captureCornerSquareGuides(Point2D corner) {
+    final room = _dragStartRoom;
+    if (room == null) return;
+    final dragged = _dragStartWall!;
+    final roomWalls = callbacks.currentWalls
+        .where((w) => w.roomId == room.id)
+        .toList();
+
+    // Edge 1 — the dragged wall, pivoting about its far end A.
+    final aFar = _otherEnd(dragged, corner);
+    final neighbourA =
+        _adjacentRoomWall(roomWalls, exclude: dragged, sharedPoint: aFar);
+    if (neighbourA != null) {
+      _squareAnchorA = aFar;
+      _squareDirA = _perpUnit(aFar, _otherEnd(neighbourA, aFar));
+    }
+
+    // Edge 2 — the connected wall (the other room wall meeting at the corner),
+    // pivoting about its far end B.
+    final connected =
+        _adjacentRoomWall(roomWalls, exclude: dragged, sharedPoint: corner);
+    if (connected != null) {
+      final bFar = _otherEnd(connected, corner);
+      final neighbourB =
+          _adjacentRoomWall(roomWalls, exclude: connected, sharedPoint: bFar);
+      if (neighbourB != null) {
+        _squareAnchorB = bFar;
+        _squareDirB = _perpUnit(bFar, _otherEnd(neighbourB, bFar));
+      }
+    }
+  }
+
+  /// First room wall (other than [exclude]) that touches [sharedPoint].
+  WallSegment? _adjacentRoomWall(
+    List<WallSegment> roomWalls, {
+    required WallSegment exclude,
+    required Point2D sharedPoint,
+  }) {
+    for (final w in roomWalls) {
+      if (w.id == exclude.id) continue;
+      if (_pointsEqual(w.startPoint, sharedPoint) ||
+          _pointsEqual(w.endPoint, sharedPoint)) {
+        return w;
+      }
+    }
+    return null;
+  }
+
+  /// The endpoint of [wall] that is not [end].
+  Point2D _otherEnd(WallSegment wall, Point2D end) =>
+      _pointsEqual(wall.startPoint, end) ? wall.endPoint : wall.startPoint;
+
+  /// Unit vector perpendicular to the direction [a] → [b].
+  Point2D _perpUnit(Point2D a, Point2D b) {
+    final len = GeometryEngine.distanceMm(a, b);
+    if (len < 1e-6) return const Point2D(x: 1, y: 0);
+    return Point2D(x: -(b.y - a.y) / len, y: (b.x - a.x) / len);
+  }
+
+  /// ADR-035: prefer the square-corner snap over the plain grid fallback
+  /// while dragging a room corner. Explicit endpoint / wall-interior joins
+  /// still win, and the snap is skipped unless drag-start found a guide.
+  Point2D _cornerSnap(Point2D cursor, SnapResult snap) {
+    if (snap.type == SnapType.endpoint || snap.type == SnapType.wallPoint) {
+      return snap.point;
+    }
+    return SnapService.snapCornerSquare(
+          cursor,
+          anchorA: _squareAnchorA,
+          dirA: _squareDirA,
+          anchorB: _squareAnchorB,
+          dirB: _squareDirB,
+        ) ??
+        snap.point;
+  }
+
   void _applyEndpointDrag(
     Point2D snappedPoint, {
     required bool isStart,
@@ -3183,6 +3293,10 @@ class SelectTool extends CanvasTool {
     _wallDragAnchor = null;
     _dragStartWall = null;
     _dragStartConnected = const [];
+    _squareAnchorA = null;
+    _squareDirA = null;
+    _squareAnchorB = null;
+    _squareDirB = null;
     _dragStartRoom = null;
     _dragStartMirrorRoom = null;
     _keepWallOrientation = false;

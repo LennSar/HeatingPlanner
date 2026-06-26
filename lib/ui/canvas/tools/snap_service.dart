@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:flutter/foundation.dart';
 
 import '../../../calculation/engines/geometry_engine.dart';
@@ -213,6 +215,78 @@ abstract final class SnapService {
 
     if (nearest != null && minDist <= radius) return nearest;
     return point;
+  }
+
+  /// Perpendicular-distance tolerance (mm) for the room-corner square snap
+  /// (ADR-035). Matches [alignThresholdMm] so the corner-square lock feels the
+  /// same as the draw-tool alignment guides: position-independent, so a long
+  /// wall is no stickier than a short one.
+  static const double squareCornerToleranceMm = alignThresholdMm;
+
+  /// Snap a dragged room corner [cursor] so its incident walls run square to
+  /// the room — each over a stable straight guide rather than a curve, so the
+  /// corner locks at 90° instead of sliding past it.
+  ///
+  /// Each incident edge is described by a fixed pivot ([anchorA] / [anchorB]
+  /// — the far end of that wall) and a unit direction ([dirA] / [dirB]) the
+  /// edge should follow to be perpendicular to its adjacent (fixed) wall. Pass
+  /// null for an edge that has no usable adjacent wall.
+  ///
+  /// When one edge's guide is within [toleranceMm] (perpendicular distance)
+  /// the cursor is projected onto that guide line. When both engage the corner
+  /// snaps to the guides' intersection (the square corner). Returns null when
+  /// neither engages, so the caller can fall back to its normal grid snap.
+  static Point2D? snapCornerSquare(
+    Point2D cursor, {
+    Point2D? anchorA,
+    Point2D? dirA,
+    Point2D? anchorB,
+    Point2D? dirB,
+    double toleranceMm = squareCornerToleranceMm,
+  }) {
+    final projA = (anchorA != null && dirA != null)
+        ? _projectIfNear(cursor, anchorA, dirA, toleranceMm)
+        : null;
+    final projB = (anchorB != null && dirB != null)
+        ? _projectIfNear(cursor, anchorB, dirB, toleranceMm)
+        : null;
+
+    if (projA != null && projB != null) {
+      final inter = GeometryEngine.lineIntersection(
+        anchorA!,
+        Point2D(x: anchorA.x + dirA!.x, y: anchorA.y + dirA.y),
+        anchorB!,
+        Point2D(x: anchorB.x + dirB!.x, y: anchorB.y + dirB.y),
+      );
+      if (inter != null) return inter;
+      // Parallel guides — keep whichever projection sits nearer the cursor.
+      return GeometryEngine.distanceMm(cursor, projA) <=
+              GeometryEngine.distanceMm(cursor, projB)
+          ? projA
+          : projB;
+    }
+    return projA ?? projB;
+  }
+
+  /// Foot of the perpendicular from [cursor] onto the line through [anchor]
+  /// with direction [dir], but only when the cursor lies within [toleranceMm]
+  /// perpendicular distance of that line. Returns null otherwise.
+  static Point2D? _projectIfNear(
+    Point2D cursor,
+    Point2D anchor,
+    Point2D dir,
+    double toleranceMm,
+  ) {
+    final dlen = sqrt(dir.x * dir.x + dir.y * dir.y);
+    if (dlen < 1e-6) return null;
+    final ux = dir.x / dlen;
+    final uy = dir.y / dlen;
+    final vx = cursor.x - anchor.x;
+    final vy = cursor.y - anchor.y;
+    final perpDist = (vx * uy - vy * ux).abs(); // |v × û|
+    if (perpDist > toleranceMm) return null;
+    final dot = vx * ux + vy * uy; // signed distance along the guide
+    return Point2D(x: anchor.x + dot * ux, y: anchor.y + dot * uy);
   }
 
   /// Tolerance for the room-draw edge-match used by rect-mode and the

@@ -2553,3 +2553,41 @@ Ctrl-drag on a member is unambiguously a group move. This supersedes the
 translate (members + connected divider follow), the divider staying
 axis-aligned, undo restoring the pre-move tuple, and a plain click collapsing to
 single selection.
+
+## ADR-035 — Room-corner drag snaps to a 90° angle
+
+**Decision.**
+Dragging a room corner (an endpoint handle) snaps it to a square corner using
+two straight *guide rails* rather than the interior-angle locus. At drag-start
+`SelectTool._captureCornerSquareGuides` records, for each of the two walls
+meeting at the corner, the fixed far end it pivots about (`_squareAnchorA/B`)
+and the unit direction perpendicular to that wall's adjacent (also fixed)
+neighbour wall (`_squareDirA/B`). During `onDragUpdate`, `_cornerSnap` calls the
+pure `SnapService.snapCornerSquare`: when the cursor comes within
+`squareCornerToleranceMm` (150 mm, = `alignThresholdMm`) perpendicular distance
+of a guide it is projected onto that guide line; when both engage the corner
+snaps to the guides' intersection (the square corner). Sides without a usable
+adjacent wall, free walls, and ADR-012
+rect-reshape leave the guides null, so the snap stays off there. Explicit
+endpoint / wall-interior joins still win; the square snap only overrides the
+plain grid fallback.
+
+**Why.**
+The first cut snapped to the exact interior-angle-90° locus (the Thales circle
+of the corner's two neighbours). That locus *curves*, so as the corner
+approached the clean square position the snap slid it along the arc and off the
+grid — it read as the corner *dodging* 90° rather than locking to it. Snapping
+each incident wall to a straight line perpendicular to its neighbour is stable
+(a guide rail, not a curve), locks firmly at the square corner where the two
+rails cross, and for a rectangular room reproduces the rectangular corner. The
+gate is a perpendicular *distance* (not an angle) so a long wall is no stickier
+than a short one and a deliberate small move off-square is not swallowed.
+Rectangular rooms still get full rectangular resize via the Ctrl rect-reshape
+(ADR-012); this covers the general modifier-free corner drag.
+
+**Verification.**
+`flutter analyze` clean; `snapCornerSquare` is covered by SS-RA01–05 in
+`test/widget/canvas/snap_service_test.dart` (both-edge intersection lock,
+single-edge line projection, oblique pass-through, reversed-direction
+engagement, no-guides guard). Existing `select_tool_test.dart` suites still
+pass.
