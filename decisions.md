@@ -965,6 +965,19 @@ maintained by the same code path that mutates either source.
    Both rebuild when any of the room's walls or their `thicknessMm` change.
    Neither polygon is persisted.
 
+   **Collinear de-taper.** A room side may be several collinear walls of
+   different thickness (ADR-003 partial shared wall: a 240 mm exterior run
+   with a 120 mm shared sub-segment). At those 180° "straight" vertices the
+   mitered corner would pull the thicker segment down to the thinner
+   neighbour's offset, rendering it as a wedge (thick→thin along its length).
+   `roomFaceEdges` therefore holds each wall at its **own** uniform
+   perpendicular offset across a collinear junction of differing thickness —
+   a clean perpendicular step, not a taper — so every wall keeps the constant
+   thickness defined by its construction. Genuine corners stay mitered and
+   equal-thickness collinear splits are unchanged (same offset on both sides).
+   The shared sub-segment keeps its own (interior-default, ADR-020 Rule 8a)
+   thickness; only the rendering taper is removed.
+
 5. **Inner polygon is authoritative for area / volume / wall-area.**
    - `roomAreaM2Provider(roomId)` and `roomVolumeM3Provider(roomId)` use the
      inner polygon (replaces the current use of `Room.polygon` directly).

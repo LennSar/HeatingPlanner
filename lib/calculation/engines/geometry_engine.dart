@@ -432,11 +432,68 @@ class GeometryEngine {
     );
     if (offsetPoly.isEmpty) return const {};
 
+    // De-taper collinear junctions of differing thickness. A wall drawn over
+    // part of another (ADR-003 partial shared wall) sits on a straight room
+    // side together with thicker/thinner neighbours. The mitered corner there
+    // pulls the thicker segment to the thinner neighbour's offset, rendering
+    // it as a wedge (thick→thin along its length). Instead, hold each wall at
+    // its own uniform perpendicular offset so it keeps a constant thickness,
+    // with a clean step at the junction. Genuine corners stay mitered, and
+    // equal-thickness collinear splits are unchanged (same offset both sides).
+    var signed2 = 0.0;
+    for (var i = 0; i < n; i++) {
+      final a = roomPolygon[i];
+      final b = roomPolygon[(i + 1) % n];
+      signed2 += a.x * b.y - b.x * a.y;
+    }
+    final windingSign = signed2 > 0 ? 1.0 : -1.0;
+
+    Point2D edgeDir(int i) {
+      final a = roomPolygon[i];
+      final b = roomPolygon[(i + 1) % n];
+      return Point2D(x: b.x - a.x, y: b.y - a.y);
+    }
+
+    // [vertex] offset along edge [i]'s outward normal by its own half-
+    // thickness (`offsets[i]`) — edge i's uniform face position at [vertex].
+    Point2D perpOffset(int i, Point2D vertex) {
+      final d = edgeDir(i);
+      final len = sqrt(d.x * d.x + d.y * d.y);
+      if (len < 1e-6) return vertex;
+      final nx = windingSign * d.y / len;
+      final ny = -windingSign * d.x / len;
+      return Point2D(
+        x: vertex.x + nx * offsets[i],
+        y: vertex.y + ny * offsets[i],
+      );
+    }
+
+    // True when edges [i] and [j] are (near-)collinear and same-direction —
+    // a 180° "straight" vertex from a split wall, not a real corner.
+    bool collinear(int i, int j) {
+      final di = edgeDir(i);
+      final dj = edgeDir(j);
+      final li = sqrt(di.x * di.x + di.y * di.y);
+      final lj = sqrt(dj.x * dj.x + dj.y * dj.y);
+      if (li < 1e-6 || lj < 1e-6) return false;
+      final cross = (di.x * dj.y - di.y * dj.x) / (li * lj);
+      final dot = (di.x * dj.x + di.y * dj.y) / (li * lj);
+      return cross.abs() < 1e-3 && dot > 0;
+    }
+
     final result = <String, ({Point2D start, Point2D end})>{};
     for (var i = 0; i < n; i++) {
       if (wallIds[i].isEmpty) continue; // unmatched edge — no face emitted
-      final a = offsetPoly[i];
-      final b = offsetPoly[(i + 1) % n];
+      final prev = (i + n - 1) % n;
+      final next = (i + 1) % n;
+      var a = offsetPoly[i];
+      if (collinear(prev, i) && offsets[prev] != offsets[i]) {
+        a = perpOffset(i, roomPolygon[i]);
+      }
+      var b = offsetPoly[next];
+      if (collinear(i, next) && offsets[next] != offsets[i]) {
+        b = perpOffset(i, roomPolygon[next]);
+      }
       result[wallIds[i]] =
           reversed[i] ? (start: b, end: a) : (start: a, end: b);
     }

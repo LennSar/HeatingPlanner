@@ -951,5 +951,67 @@ void main() {
       );
       expect(edges, isEmpty);
     });
+
+    test(
+        'collinear split of differing thickness de-tapers — each wall keeps '
+        'a uniform face (ADR-003 partial shared wall)', () {
+      // Top side runs straight from (-1000,0) to (3000,0) but is three
+      // collinear walls: a 240 outer, a 120 shared sub-segment, a 240 outer.
+      // Without de-taper the 240 segments would wedge down to the 120 offset
+      // at the junctions. With it, each holds its own uniform thickness.
+      const poly = [
+        Point2D(x: -1000, y: 0),
+        Point2D(x: 0, y: 0),
+        Point2D(x: 2000, y: 0),
+        Point2D(x: 3000, y: 0),
+        Point2D(x: 3000, y: -2000),
+        Point2D(x: -1000, y: -2000),
+      ];
+      final walls = [
+        wall(
+            id: 'left',
+            start: const Point2D(x: -1000, y: 0),
+            end: const Point2D(x: 0, y: 0),
+            thicknessMm: 240),
+        wall(
+            id: 'mid',
+            start: const Point2D(x: 0, y: 0),
+            end: const Point2D(x: 2000, y: 0),
+            thicknessMm: 120),
+        wall(
+            id: 'right',
+            start: const Point2D(x: 2000, y: 0),
+            end: const Point2D(x: 3000, y: 0),
+            thicknessMm: 240),
+        wall(
+            id: 'wr',
+            start: const Point2D(x: 3000, y: 0),
+            end: const Point2D(x: 3000, y: -2000),
+            thicknessMm: 240),
+        wall(
+            id: 'wb',
+            start: const Point2D(x: 3000, y: -2000),
+            end: const Point2D(x: -1000, y: -2000),
+            thicknessMm: 240),
+        wall(
+            id: 'wl',
+            start: const Point2D(x: -1000, y: -2000),
+            end: const Point2D(x: -1000, y: 0),
+            thicknessMm: 240),
+      ];
+      final inner = GeometryEngine.roomFaceEdges(
+        walls: walls,
+        roomPolygon: poly,
+        side: RoomFaceSide.inner,
+      );
+      // Interior is below (y<0); inner faces sit at -thickness/2 and must be
+      // flat (both endpoints at the same offset = uniform thickness).
+      expect(inner['left']!.start.y, closeTo(-120, 0.5));
+      expect(inner['left']!.end.y, closeTo(-120, 0.5));
+      expect(inner['mid']!.start.y, closeTo(-60, 0.5));
+      expect(inner['mid']!.end.y, closeTo(-60, 0.5));
+      expect(inner['right']!.start.y, closeTo(-120, 0.5));
+      expect(inner['right']!.end.y, closeTo(-120, 0.5));
+    });
   });
 }
