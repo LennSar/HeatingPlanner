@@ -48,6 +48,7 @@ import 'package:heating_planner/repositories/building_repository.dart'
     show buildingDaoProvider;
 import 'package:heating_planner/repositories/heating_repository.dart'
     show heatingDaoProvider;
+import 'package:heating_planner/ui/canvas/painters/interaction_data.dart';
 import 'package:heating_planner/ui/canvas/tools/editor_callbacks.dart';
 import 'package:heating_planner/ui/canvas/tools/select_tool.dart';
 import 'package:heating_planner/ui/canvas/tools/undo_redo_service.dart';
@@ -1658,6 +1659,185 @@ void main() {
           reason: 'wall end must not move on a separate click');
     },
   );
+
+  // ADR-034 — multi-wall select + rigid group translate ──────────────────────
+  group('ADR-034 multi-wall select + group drag', () {
+    // Two collinear top exterior walls meeting at x=5000, plus a vertical
+    // divider sharing that corner. Selecting both top walls and dragging
+    // them up must translate both rigidly and drag the divider's top
+    // corner along (keeping it vertical) — without re-angling anything.
+    List<WallSegment> freshWalls() => const [
+          WallSegment(
+            id: 'top-l',
+            roomId: '',
+            startPoint: Point2D(x: 0, y: 0),
+            endPoint: Point2D(x: 5000, y: 0),
+          ),
+          WallSegment(
+            id: 'top-r',
+            roomId: '',
+            startPoint: Point2D(x: 5000, y: 0),
+            endPoint: Point2D(x: 10000, y: 0),
+          ),
+          WallSegment(
+            id: 'divider',
+            roomId: '',
+            startPoint: Point2D(x: 5000, y: 0),
+            endPoint: Point2D(x: 5000, y: 3000),
+          ),
+        ];
+
+    /// Ctrl/Cmd-tap both top walls into the multi-selection.
+    void selectBothTop(SelectTool tool) {
+      tool.debugCtrlHeldOverride = true;
+      tool.onTap(const Point2D(x: 2500, y: 0), PointerDeviceKind.mouse);
+      tool.onTap(const Point2D(x: 7500, y: 0), PointerDeviceKind.mouse);
+      tool.debugCtrlHeldOverride = false;
+    }
+
+    test('Ctrl-tap builds a 2-wall selection; re-tap removes one', () {
+      final cb = _MutatingStub(walls: freshWalls());
+      final tool = _makeTool(cb);
+
+      selectBothTop(tool);
+      final data = tool.getInteractionData()! as SelectionHighlightData;
+      expect(data.selectedWalls.map((w) => w.id), ['top-l', 'top-r']);
+      expect(data.handles, isEmpty,
+          reason: 'group selection shows no endpoint handles');
+
+      // Ctrl-tap top-r again → removed → collapses to single selection.
+      tool.debugCtrlHeldOverride = true;
+      tool.onTap(const Point2D(x: 7500, y: 0), PointerDeviceKind.mouse);
+      tool.debugCtrlHeldOverride = false;
+      final after = tool.getInteractionData()! as SelectionHighlightData;
+      expect(after.selectedWalls.map((w) => w.id), ['top-l']);
+      expect(cb.lastSelectedId, 'top-l');
+    });
+
+    test('Group drag translates both walls and drags the shared corner', () {
+      final cb = _MutatingStub(walls: freshWalls());
+      final tool = _makeTool(cb);
+      selectBothTop(tool);
+
+      // Grab top-l and drag straight up 1000 mm.
+      tool.onPointerDown(const Point2D(x: 2500, y: 0), kPrimaryButton);
+      tool.onDragUpdate(const Point2D(x: 2500, y: -1000));
+      tool.onDragEnd(const Point2D(x: 2500, y: -1000));
+
+      final l = cb.currentWalls.firstWhere((w) => w.id == 'top-l');
+      final r = cb.currentWalls.firstWhere((w) => w.id == 'top-r');
+      final d = cb.currentWalls.firstWhere((w) => w.id == 'divider');
+
+      expect(l.startPoint, const Point2D(x: 0, y: -1000));
+      expect(l.endPoint, const Point2D(x: 5000, y: -1000));
+      expect(r.startPoint, const Point2D(x: 5000, y: -1000));
+      expect(r.endPoint, const Point2D(x: 10000, y: -1000));
+
+      // Divider's top corner follows; bottom stays — still vertical.
+      expect(d.startPoint, const Point2D(x: 5000, y: -1000));
+      expect(d.endPoint, const Point2D(x: 5000, y: 3000));
+      expect(d.startPoint.x, d.endPoint.x,
+          reason: 'divider must stay axis-aligned (vertical)');
+    });
+
+    test('Ctrl held → keep-orientation: parallel slide dropped, '
+        'divider stays vertical', () {
+      final cb = _MutatingStub(walls: freshWalls());
+      final tool = _makeTool(cb);
+      selectBothTop(tool);
+
+      // Keep Ctrl held through the drag and drag diagonally: +1000 x,
+      // -1000 y. Keep-orientation must apply only the perpendicular
+      // (vertical) component and drop the horizontal slide.
+      tool.debugCtrlHeldOverride = true;
+      tool.onPointerDown(const Point2D(x: 2500, y: 0), kPrimaryButton);
+      tool.onDragUpdate(const Point2D(x: 3500, y: -1000));
+      tool.onDragEnd(const Point2D(x: 3500, y: -1000));
+      tool.debugCtrlHeldOverride = false;
+
+      final l = cb.currentWalls.firstWhere((w) => w.id == 'top-l');
+      final r = cb.currentWalls.firstWhere((w) => w.id == 'top-r');
+      final d = cb.currentWalls.firstWhere((w) => w.id == 'divider');
+
+      // x unchanged (no parallel slide); y shifted by the perpendicular −1000.
+      expect(l.startPoint, const Point2D(x: 0, y: -1000));
+      expect(l.endPoint, const Point2D(x: 5000, y: -1000));
+      expect(r.startPoint, const Point2D(x: 5000, y: -1000));
+      expect(r.endPoint, const Point2D(x: 10000, y: -1000));
+
+      // Divider keeps its orientation (vertical) and only changes length.
+      expect(d.startPoint, const Point2D(x: 5000, y: -1000));
+      expect(d.endPoint, const Point2D(x: 5000, y: 3000));
+      expect(d.startPoint.x, d.endPoint.x);
+    });
+
+    test('Undo restores the pre-move geometry in one step', () {
+      final cb = _MutatingStub(walls: freshWalls());
+      final undo = UndoRedoService();
+      final tool = SelectTool(
+        callbacks: cb,
+        onStateChanged: () {},
+        undoRedo: undo,
+      );
+      selectBothTop(tool);
+
+      tool.onPointerDown(const Point2D(x: 2500, y: 0), kPrimaryButton);
+      tool.onDragUpdate(const Point2D(x: 2500, y: -1000));
+      tool.onDragEnd(const Point2D(x: 2500, y: -1000));
+      expect(cb.currentWalls.firstWhere((w) => w.id == 'top-l').startPoint,
+          const Point2D(x: 0, y: -1000));
+
+      undo.undo();
+      expect(cb.currentWalls.firstWhere((w) => w.id == 'top-l').startPoint,
+          const Point2D(x: 0, y: 0));
+      expect(cb.currentWalls.firstWhere((w) => w.id == 'top-r').endPoint,
+          const Point2D(x: 10000, y: 0));
+      expect(cb.currentWalls.firstWhere((w) => w.id == 'divider').startPoint,
+          const Point2D(x: 5000, y: 0));
+    });
+
+    test('Plain (non-Ctrl) click collapses a multi-selection to one', () {
+      final cb = _MutatingStub(walls: freshWalls());
+      final tool = _makeTool(cb);
+      selectBothTop(tool);
+      expect((tool.getInteractionData()! as SelectionHighlightData)
+          .selectedWalls.length, 2);
+
+      tool.onTap(const Point2D(x: 2500, y: 0), PointerDeviceKind.mouse);
+      final data = tool.getInteractionData()! as SelectionHighlightData;
+      expect(data.selectedWalls.map((w) => w.id), ['top-l']);
+    });
+  });
+}
+
+/// [_StubCallbacks] whose wall/room mutators actually edit the backing
+/// lists, so transient drags and `replaceAllWallsAndRooms` (used by the
+/// ADR-034 group-move command) are observable. Same-file privacy lets the
+/// subclass reach the base's private lists.
+class _MutatingStub extends _StubCallbacks {
+  _MutatingStub({super.walls});
+
+  @override
+  void updateWall(WallSegment wall) {
+    final i = _walls.indexWhere((w) => w.id == wall.id);
+    if (i >= 0) _walls[i] = wall;
+  }
+
+  @override
+  void updateRoom(Room room) {
+    final i = _rooms.indexWhere((r) => r.id == room.id);
+    if (i >= 0) _rooms[i] = room;
+  }
+
+  @override
+  void replaceAllWallsAndRooms(List<WallSegment> walls, List<Room> rooms) {
+    _walls
+      ..clear()
+      ..addAll(walls);
+    _rooms
+      ..clear()
+      ..addAll(rooms);
+  }
 }
 
 // ════════════════════════════════════════════════════════════════════════════

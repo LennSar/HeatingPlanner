@@ -2487,3 +2487,69 @@ importer. Auto-migration converts the existing library to files with no data los
 (orphan-free clear, shared-library preservation, preserve-ids round-trip with no
 duplicate on reopen) and the updated `Session restore` group in
 `test/integration/file_roundtrip_test.dart` (path-based routing) pass.
+
+---
+
+## ADR-034 — Ctrl/Cmd multi-wall select and rigid group translate
+
+**What.**
+`SelectTool` can hold more than one wall and translate the set as one rigid
+body. **Ctrl/Cmd-click** a wall toggles it in/out of a multi-selection
+(`_multiWalls`); the same modifier the rest of the app treats as "Ctrl"
+(`metaLeft/Right`, i.e. **Cmd on macOS**, since literal Ctrl-click there is a
+system right-click). With ≥2 walls selected, a body press on any member
+(`_isPointOnAnyGroupWall`) starts a **group drag**: every selected wall
+translates by the same grid-snapped delta (`_computeGroupDelta`, Alt = free
+placement), and any non-selected wall sharing an endpoint with the group has
+that shared corner dragged along — so a perpendicular divider simply lengthens
+and stays axis-aligned, and an exterior wall split across several rooms moves as
+a straight line instead of re-angling each room. ADR-011 mirror partners (which
+share both endpoints) translate wholly via `updateWallTransient`'s existing
+mirror sync. Affected room polygons are rebuilt each frame from their moved
+walls (`_buildPolygonFromWalls`).
+
+**Keep-orientation (Ctrl/Shift held through the drag).** Like the single-wall
+ADR-027 body drag, holding Ctrl (or Shift) for the whole group drag engages
+`_applyGroupDragKeepOrientation`: the selection slides only by the
+**perpendicular** component of the pointer motion (relative to the grab wall's
+normal — the parallel component is dropped), and each connected wall's shared
+corner is recomputed as the intersection of that wall's *fixed* line with the
+moved group wall's new line (`_groupCornerFor`, reusing
+`GeometryEngine.lineIntersection`). Connected walls keep their direction and only
+change length, so the angles to the rest of the plan never change. The modifier
+is sampled from the live key state at drag start and held for the whole drag.
+Every group wall translates by the one perpendicular offset, so
+group-internal corners stay joined regardless of the selection's shape.
+
+The primary (last-toggled) wall stays mirrored into `_selectedWall` and the
+global `selectedElementProvider`, so the properties panel keeps showing one
+wall. The interaction painter already iterates `SelectionHighlightData
+.selectedWalls`, so all members highlight with no per-wall endpoint handles
+(the group only supports a body translate).
+
+**Lifecycle.** The drag writes **transient** state only (`updateWallTransient`/
+`updateRoomTransient`); on `onDragEnd` `_commitGroupDrag` re-applies the settled
+geometry through the **persisting** `updateWall`/`updateRoom` and pushes one
+`_GroupMoveWallsCommand` (a before/after `replaceAllWallsAndRooms` snapshot, like
+`_RectReshapeCommand`) so a single Ctrl+Z reverts the whole move. Escape reverts
+transiently. A press that never crosses the drag threshold keeps the
+multi-selection and falls through to the normal `onTap` (a plain click collapses
+back to single selection).
+
+**Why.**
+Moving an exterior wall that spans several rooms previously meant dragging one
+per-room segment (ADR-001/003), which re-angled the neighbouring room's
+connected walls and broke the corners. Selecting the collinear segments and
+translating them together is the natural fix and matches CAD multi-select.
+Keeping the feature additive — gated on `_multiWalls.length >= 2` — leaves all
+existing single-wall behaviour (endpoint resize, ADR-012 rect-reshape, delete,
+mirror sync) untouched. Group mode also suppresses rect-reshape arming so a
+Ctrl-drag on a member is unambiguously a group move. This supersedes the
+"multi-select … are unaffected" note in **ADR-012**'s Scope section.
+
+**Verification.**
+`flutter analyze` clean; new group blocks in
+`test/widget/tools/select_tool_test.dart` cover the toggle build, the rigid
+translate (members + connected divider follow), the divider staying
+axis-aligned, undo restoring the pre-move tuple, and a plain click collapsing to
+single selection.

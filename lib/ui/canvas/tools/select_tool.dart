@@ -92,6 +92,14 @@ class SelectTool extends CanvasTool {
   /// Currently selected wall, if any.
   WallSegment? _selectedWall;
 
+  /// Walls in the multi-selection (Ctrl/Cmd-click).
+  ///
+  /// Length >= 2 means "group mode" — a body drag on any member translates
+  /// every member rigidly (see [_applyGroupDrag]). Length <= 1 means normal
+  /// single-wall behaviour. The last element is the primary and mirrors
+  /// [_selectedWall]. Reset by [_clearAllSelections].
+  List<WallSegment> _multiWalls = const [];
+
   /// Currently selected room, if any.
   Room? _selectedRoom;
 
@@ -110,6 +118,42 @@ class SelectTool extends CanvasTool {
   Room? _dragStartRoom;
   // ADR-011: snapshot of the mirror wall's room at drag start.
   Room? _dragStartMirrorRoom;
+
+  // -- Multi-wall group drag state (>= 2 walls selected) --
+
+  /// The selected walls, frozen at group-drag start (translated each frame
+  /// from these snapshots so motion is never accumulated).
+  List<WallSegment> _groupWallsAtStart = const [];
+
+  /// Non-group walls that shared an endpoint with a group wall at drag
+  /// start (their shared corner follows the translation). Includes ADR-011
+  /// mirror partners, which share both endpoints and so translate wholly.
+  List<WallSegment> _groupConnectedAtStart = const [];
+
+  /// Rooms whose polygon is rebuilt from its (now-moved) walls each frame.
+  Set<String> _groupRoomIds = const {};
+
+  /// World point where the group drag was grabbed.
+  Point2D? _groupDragAnchor;
+
+  /// True once the pointer crossed the drag threshold — the gesture is a
+  /// confirmed group move (below the threshold it stays a click).
+  bool _groupDragActive = false;
+
+  /// Full pre-drag snapshots (all walls / rooms) so the move commits and
+  /// reverts atomically via [_GroupMoveWallsCommand].
+  List<WallSegment> _groupOldWalls = const [];
+  List<Room> _groupOldRooms = const [];
+
+  /// True when the group drag keeps every wall's orientation (ADR-027): the
+  /// selection slides perpendicular to itself and connected walls only
+  /// change length, never angle. Sampled (Ctrl/Shift held) at drag start
+  /// and held for the whole drag, mirroring [_keepWallOrientation].
+  bool _groupKeepOrientation = false;
+
+  /// The selected wall under the grab point — its direction defines the
+  /// slide normal for [_applyGroupDragKeepOrientation].
+  WallSegment? _groupGrabWall;
 
   // -- ADR-012: Ctrl-endpoint rectangle-reshape state --
 
@@ -613,6 +657,19 @@ class SelectTool extends CanvasTool {
   /// Core tap/cycling logic, extracted so it can be called both
   /// from [onTap] and from deferred-tap execution paths.
   void _doTap(Point2D worldPoint, PointerDeviceKind deviceKind) {
+    // Ctrl/Cmd-click toggles a wall in the multi-selection (additive),
+    // bypassing the ADR-005 single-element cycle. Re-sync the live key
+    // state first so a missed key-up cannot strand the gate. On macOS the
+    // gesture is Cmd-click (literal Ctrl-click is a system right-click).
+    _syncCtrlHeldFromHardware();
+    if (_ctrlHeld) {
+      final hit = _hitTestWall(worldPoint);
+      if (hit != null) {
+        _toggleWallInMultiSelect(hit);
+        return;
+      }
+    }
+
     final cycleMm =
         _cycleThresholdPx / callbacks.currentZoom;
     final isSamePos = _lastClickPosition != null &&
@@ -823,6 +880,14 @@ class SelectTool extends CanvasTool {
       }
     }
 
+    // Multi-wall group drag: a body press on any selected wall translates
+    // every selected wall together (ADR-034). Takes priority over the
+    // single-wall handle path below.
+    if (_multiWalls.length >= 2 && _isPointOnAnyGroupWall(worldPoint)) {
+      _beginGroupDrag(worldPoint);
+      return;
+    }
+
     // Wall handle hit-test.
     if (_selectedWall == null) {
       _armRoomMoveIfApplicable(worldPoint);
@@ -886,6 +951,7 @@ class SelectTool extends CanvasTool {
 
     _rectReshapeMode = false;
     if (_ctrlHeld &&
+        _multiWalls.length < 2 &&
         (handleType == DragHandleType.start ||
             handleType == DragHandleType.end) &&
         _selectedWall!.roomId.isNotEmpty) {
@@ -1022,6 +1088,30 @@ class SelectTool extends CanvasTool {
       return;
     }
 
+    // ADR-034: multi-wall group drag.
+    if (_groupDragAnchor != null) {
+      if (!_groupDragActive) {
+        final thresholdMm =
+            _zoneDragThresholdPx / callbacks.currentZoom;
+        if (GeometryEngine.distanceMm(
+              worldPoint,
+              _groupDragAnchor!,
+            ) >=
+            thresholdMm) {
+          _groupDragActive = true;
+        }
+      }
+      if (_groupDragActive) {
+        if (_groupKeepOrientation) {
+          _applyGroupDragKeepOrientation(worldPoint);
+        } else {
+          _applyGroupDrag(_computeGroupDelta(worldPoint));
+        }
+        onStateChanged();
+      }
+      return;
+    }
+
     // Wall drag.
     if (_dragHandle == null || _dragStartWall == null) return;
 
@@ -1142,6 +1232,18 @@ class SelectTool extends CanvasTool {
         return;
       }
       _clearRoomMoveState();
+      onStateChanged();
+      return;
+    }
+
+    // ADR-034: multi-wall group drag end.
+    if (_groupDragAnchor != null) {
+      if (_groupDragActive) {
+        _commitGroupDrag();
+      }
+      // A non-drag release (below threshold) keeps the multi-selection;
+      // the GestureDetector still delivers onTap for a pure click.
+      _clearGroupDragState();
       onStateChanged();
       return;
     }
@@ -1309,6 +1411,10 @@ class SelectTool extends CanvasTool {
     if (_dragHandle != null) _clearDragState();
     if (_openingDragHandle != null) _clearOpeningDragState();
     if (_wallZoneDragHandle != null) _clearWallZoneDragState();
+    // ADR-034: drop an armed-but-undragged group grab so it can't leak.
+    if (_groupDragAnchor != null && !_groupDragActive) {
+      _clearGroupDragState();
+    }
 
     // Execute deferred distributor tap.
     if (_distributorDeferredTap != null) {
@@ -1386,6 +1492,16 @@ class SelectTool extends CanvasTool {
     // (the ghost is preview-only), so cancelling just drops the ghost.
     if (_roomMoveAnchor != null) {
       _clearRoomMoveState();
+      onStateChanged();
+      return;
+    }
+
+    // ADR-034: revert an in-flight group drag. The drag only ever wrote
+    // transient state, so restoring the pre-drag snapshot in memory is
+    // enough (the database still holds the pre-drag values).
+    if (_groupDragAnchor != null) {
+      _revertGroupDrag();
+      _clearGroupDragState();
       onStateChanged();
       return;
     }
@@ -1507,6 +1623,17 @@ class SelectTool extends CanvasTool {
         handles: zone.polygon,
         activeHandleIndex:
             _zoneDragActive ? _zoneHandleDragIndex : null,
+      );
+    }
+
+    // ADR-034: multi-wall selection highlights every member with no
+    // endpoint handles (the group only supports a rigid body translate).
+    if (_multiWalls.length >= 2) {
+      return SelectionHighlightData(
+        selectedWalls: [
+          for (final w in _multiWalls) _currentWallState(w),
+        ],
+        handles: const [],
       );
     }
 
@@ -2368,12 +2495,72 @@ class SelectTool extends CanvasTool {
 
   void _clearAllSelections() {
     _selectedWall = null;
+    _multiWalls = const [];
     _selectedRoom = null;
     _selectedWindow = null;
     _selectedDoor = null;
     _selectedZone = null;
     _selectedDistributor = false;
     _selectedCircuit = null;
+  }
+
+  // ================================================================
+  // Multi-wall selection (Ctrl/Cmd-click)
+  // ================================================================
+
+  /// Add or remove [wall] from the multi-wall selection.
+  ///
+  /// Seeds the set from the existing single wall selection (if any) so the
+  /// first Ctrl-click after a plain click extends rather than replaces.
+  /// Re-resolves every member to its live [WallSegment] and keeps the last
+  /// one as the primary (mirrored into [_selectedWall] and the global
+  /// selection provider so the properties panel still has a target).
+  void _toggleWallInMultiSelect(WallSegment wall) {
+    // Build the working id list, seeding from the current selection.
+    final ids = <String>[
+      if (_multiWalls.isNotEmpty)
+        for (final w in _multiWalls) w.id
+      else if (_selectedWall != null)
+        _selectedWall!.id,
+    ];
+
+    if (ids.contains(wall.id)) {
+      ids.remove(wall.id);
+    } else {
+      ids.add(wall.id);
+    }
+
+    // Re-resolve to live wall instances, preserving order.
+    final resolved = <WallSegment>[
+      for (final id in ids)
+        if (callbacks.currentWalls
+                .where((w) => w.id == id)
+                .firstOrNull
+            case final w?)
+          w,
+    ];
+
+    // Switching to a wall selection clears any other element type.
+    _selectedRoom = null;
+    _selectedWindow = null;
+    _selectedDoor = null;
+    _selectedZone = null;
+    _selectedDistributor = false;
+    _selectedCircuit = null;
+
+    _multiWalls = resolved.length >= 2 ? resolved : const [];
+    _selectedWall = resolved.isEmpty ? null : resolved.last;
+    callbacks.selectElement(
+      _selectedWall == null ? null : 'wall',
+      _selectedWall?.id,
+    );
+
+    // Reset the cycle anchor so the next plain click starts fresh.
+    _lastClickPosition = null;
+    _lastHitStack = const [];
+    _cycleIndex = 0;
+
+    onStateChanged();
   }
 
   // ================================================================
@@ -3010,6 +3197,380 @@ class SelectTool extends CanvasTool {
     _rectReshapeWalls = const [];
     _rectReshapeOldWalls = const [];
     _rectReshapeOldRooms = const [];
+  }
+
+  // ================================================================
+  // ADR-034: multi-wall group drag (rigid translate)
+  // ================================================================
+
+  /// True when [worldPoint] lies within the hit-band of any wall in the
+  /// multi-selection — the grab test that starts a group translate.
+  bool _isPointOnAnyGroupWall(Point2D worldPoint) {
+    for (final w in _multiWalls) {
+      if (GeometryUtils.distanceToSegment(
+            worldPoint,
+            w.startPoint,
+            w.endPoint,
+          ) <=
+          _wallHitThresholdMm) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Freeze the snapshots a group drag translates from each frame.
+  void _beginGroupDrag(Point2D worldPoint) {
+    final groupIds = _multiWalls.map((w) => w.id).toSet();
+
+    // ADR-027 / ADR-034: Ctrl or Shift held at drag start keeps every
+    // wall's orientation for the whole drag (re-sync from the live key
+    // state first so a missed key-up cannot strand the gate).
+    _syncCtrlHeldFromHardware();
+    _groupKeepOrientation = _ctrlHeld || _shiftHeld;
+
+    // Grab wall: the selected wall nearest the press — its direction sets
+    // the slide normal for the keep-orientation path.
+    _groupGrabWall = null;
+    var nearestDist = double.infinity;
+    for (final w in _multiWalls) {
+      final d = GeometryUtils.distanceToSegment(
+        worldPoint,
+        w.startPoint,
+        w.endPoint,
+      );
+      if (d < nearestDist) {
+        nearestDist = d;
+        _groupGrabWall = w;
+      }
+    }
+
+    // Live state of the selected walls, preserving order.
+    _groupWallsAtStart = [
+      for (final w in _multiWalls)
+        if (callbacks.currentWalls
+                .where((c) => c.id == w.id)
+                .firstOrNull
+            case final live?)
+          live,
+    ];
+
+    // Non-group walls that share an endpoint with any group wall — their
+    // shared corner follows the translation. ADR-011 mirror partners share
+    // both endpoints and so translate wholly.
+    _groupConnectedAtStart = [
+      for (final c in callbacks.currentWalls)
+        if (!groupIds.contains(c.id) &&
+            _groupWallsAtStart.any((g) => _sharesEndpoint(g, c)))
+          c,
+    ];
+
+    // Rooms whose polygon must be rebuilt from their (moved) walls.
+    _groupRoomIds = {
+      for (final w in _groupWallsAtStart)
+        if (w.roomId.isNotEmpty) w.roomId,
+      for (final c in _groupConnectedAtStart)
+        if (c.roomId.isNotEmpty) c.roomId,
+    };
+
+    _groupDragAnchor = worldPoint;
+    _groupDragActive = false;
+    _groupOldWalls = List<WallSegment>.unmodifiable(callbacks.currentWalls);
+    _groupOldRooms = List<Room>.unmodifiable(callbacks.currentRooms);
+    onStateChanged();
+  }
+
+  /// Grid-snapped translation `cursor − anchor` (Alt = raw, free
+  /// placement). Mirrors [_computeRoomMoveDelta].
+  Point2D _computeGroupDelta(Point2D cursor) {
+    final anchor = _groupDragAnchor!;
+    if (_altHeld) {
+      return Point2D(x: cursor.x - anchor.x, y: cursor.y - anchor.y);
+    }
+    final spacing = callbacks.currentGridSpacingMm;
+    final dx = ((cursor.x - anchor.x) / spacing).roundToDouble() * spacing;
+    final dy = ((cursor.y - anchor.y) / spacing).roundToDouble() * spacing;
+    return Point2D(x: dx, y: dy);
+  }
+
+  /// True when [p] coincides with an original endpoint of a group wall.
+  bool _endpointInGroup(Point2D p) {
+    for (final g in _groupWallsAtStart) {
+      if (_pointsEqual(g.startPoint, p) || _pointsEqual(g.endPoint, p)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Apply a live group translation (transient only — committed on
+  /// [onDragEnd]). Translates from the frozen snapshots each frame so the
+  /// motion is never accumulated.
+  void _applyGroupDrag(Point2D delta) {
+    // 1. Translate every selected wall rigidly.
+    for (final w in _groupWallsAtStart) {
+      callbacks.updateWallTransient(
+        w.copyWith(
+          startPoint:
+              Point2D(x: w.startPoint.x + delta.x, y: w.startPoint.y + delta.y),
+          endPoint:
+              Point2D(x: w.endPoint.x + delta.x, y: w.endPoint.y + delta.y),
+        ),
+      );
+    }
+
+    // 2. Move the shared corners of connected (non-group) walls. An
+    //    endpoint that coincided with an original group endpoint follows
+    //    by `delta`; the rest of the wall stays put (so a perpendicular
+    //    divider just lengthens and stays axis-aligned).
+    for (final c in _groupConnectedAtStart) {
+      var updated = c;
+      var changed = false;
+      if (_endpointInGroup(c.startPoint)) {
+        updated = updated.copyWith(
+          startPoint:
+              Point2D(x: c.startPoint.x + delta.x, y: c.startPoint.y + delta.y),
+        );
+        changed = true;
+      }
+      if (_endpointInGroup(c.endPoint)) {
+        updated = updated.copyWith(
+          endPoint:
+              Point2D(x: c.endPoint.x + delta.x, y: c.endPoint.y + delta.y),
+        );
+        changed = true;
+      }
+      if (changed) callbacks.updateWallTransient(updated);
+    }
+
+    // 3. Rebuild affected room polygons from their now-moved walls.
+    _rebuildGroupRoomPolygons();
+  }
+
+  /// Keep-orientation group translate (ADR-027 generalised to a set).
+  ///
+  /// The whole selection slides by the perpendicular component of the
+  /// pointer motion (relative to the grab wall's normal) — the parallel
+  /// component is dropped, so the walls never slide along their own axis.
+  /// Each connected (non-group) wall's shared corner is recomputed as the
+  /// intersection of that wall's fixed line with the moved group wall's new
+  /// line, so connected walls keep their direction and only change length
+  /// (angles to the rest of the plan are preserved).
+  void _applyGroupDragKeepOrientation(Point2D worldPoint) {
+    final ref = _groupGrabWall ??
+        (_groupWallsAtStart.isNotEmpty ? _groupWallsAtStart.first : null);
+    if (ref == null) return;
+
+    final dirX = ref.endPoint.x - ref.startPoint.x;
+    final dirY = ref.endPoint.y - ref.startPoint.y;
+    final len = math.sqrt(dirX * dirX + dirY * dirY);
+    if (len < 1e-6) {
+      // Degenerate grab wall — fall back to the plain translate.
+      _applyGroupDrag(_computeGroupDelta(worldPoint));
+      return;
+    }
+
+    // Unit normal of the grab wall.
+    final nx = -dirY / len;
+    final ny = dirX / len;
+    final anchor = _groupDragAnchor!;
+
+    // Perpendicular component of the raw pointer delta. Grid-snap the
+    // offset along the normal (Alt = free placement) exactly as the
+    // single-wall path does.
+    var perp =
+        (worldPoint.x - anchor.x) * nx + (worldPoint.y - anchor.y) * ny;
+    if (!_altHeld) {
+      final movedRef = Point2D(
+        x: ref.startPoint.x + perp * nx,
+        y: ref.startPoint.y + perp * ny,
+      );
+      final snapped = SnapService.snapToGrid(
+        movedRef,
+        callbacks.currentGridSpacingMm,
+      );
+      perp = (snapped.x - ref.startPoint.x) * nx +
+          (snapped.y - ref.startPoint.y) * ny;
+    }
+    final ox = perp * nx;
+    final oy = perp * ny;
+
+    // Translate every group wall by the same perpendicular offset, then
+    // pin each endpoint shared with a non-group wall to the recomputed
+    // corner. Record orig→new so the connected walls follow to the exact
+    // same corners.
+    final remap = <(Point2D, Point2D)>[];
+    for (final w in _groupWallsAtStart) {
+      final lineStart =
+          Point2D(x: w.startPoint.x + ox, y: w.startPoint.y + oy);
+      final lineEnd = Point2D(x: w.endPoint.x + ox, y: w.endPoint.y + oy);
+      final newStart =
+          _groupCornerFor(w.startPoint, w.id, lineStart, lineEnd) ?? lineStart;
+      final newEnd =
+          _groupCornerFor(w.endPoint, w.id, lineStart, lineEnd) ?? lineEnd;
+      callbacks.updateWallTransient(
+        w.copyWith(startPoint: newStart, endPoint: newEnd),
+      );
+      remap.add((w.startPoint, newStart));
+      remap.add((w.endPoint, newEnd));
+    }
+
+    // Connected (non-group) walls follow their shared corner only —
+    // length changes, orientation preserved.
+    for (final c in _groupConnectedAtStart) {
+      var updated = c;
+      var changed = false;
+      final ns = _remapLookup(remap, c.startPoint);
+      if (ns != null) {
+        updated = updated.copyWith(startPoint: ns);
+        changed = true;
+      }
+      final ne = _remapLookup(remap, c.endPoint);
+      if (ne != null) {
+        updated = updated.copyWith(endPoint: ne);
+        changed = true;
+      }
+      if (changed) callbacks.updateWallTransient(updated);
+    }
+
+    _rebuildGroupRoomPolygons();
+  }
+
+  /// New position of a group wall's [origEndpoint] under keep-orientation:
+  /// the intersection of a connected non-group wall's fixed line (through
+  /// its far endpoint and [origEndpoint]) with the moved group wall's new
+  /// line ([lineStart]–[lineEnd]). Returns null when no usable
+  /// (non-parallel, non-mirror) connected wall is attached there.
+  Point2D? _groupCornerFor(
+    Point2D origEndpoint,
+    String wallId,
+    Point2D lineStart,
+    Point2D lineEnd,
+  ) {
+    for (final conn in _groupConnectedAtStart) {
+      // Skip the ADR-011 mirror partner: collinear with the group wall, so
+      // no useful intersection. It is synced via updateWallTransient.
+      if (conn.mirrorId == wallId) continue;
+      Point2D? farPoint;
+      if (_pointsEqual(conn.startPoint, origEndpoint)) {
+        farPoint = conn.endPoint;
+      } else if (_pointsEqual(conn.endPoint, origEndpoint)) {
+        farPoint = conn.startPoint;
+      }
+      if (farPoint == null) continue;
+      final hit = GeometryEngine.lineIntersection(
+        farPoint,
+        origEndpoint,
+        lineStart,
+        lineEnd,
+      );
+      if (hit != null) return hit;
+    }
+    return null;
+  }
+
+  /// Look up the new position of [p] in an orig→new corner [remap].
+  Point2D? _remapLookup(List<(Point2D, Point2D)> remap, Point2D p) {
+    for (final pair in remap) {
+      if (_pointsEqual(pair.$1, p)) return pair.$2;
+    }
+    return null;
+  }
+
+  /// Rebuild the polygon of every room touched by the group drag from its
+  /// (now-moved) walls.
+  void _rebuildGroupRoomPolygons() {
+    for (final roomId in _groupRoomIds) {
+      final room = callbacks.currentRooms
+          .where((r) => r.id == roomId)
+          .firstOrNull;
+      if (room == null) continue;
+      final roomWalls = callbacks.currentWalls
+          .where((w) => w.roomId == roomId)
+          .toList();
+      if (roomWalls.length < 3) continue;
+      final polygon = _buildPolygonFromWalls(roomWalls);
+      if (polygon.isNotEmpty) {
+        callbacks.updateRoomTransient(room.copyWith(polygon: polygon));
+      }
+    }
+  }
+
+  /// Persist the settled group geometry and push one atomic undo command.
+  ///
+  /// The drag wrote transient (in-memory) state only, so the final values
+  /// are routed through the persisting [EditorCallbacks.updateWall] /
+  /// [EditorCallbacks.updateRoom] before snapshotting — the same pattern
+  /// as [_commitRectReshape] / [_commitRoomMove].
+  void _commitGroupDrag() {
+    final movedIds = <String>{
+      for (final w in _groupWallsAtStart) w.id,
+      for (final c in _groupConnectedAtStart) c.id,
+    };
+
+    var anyChange = false;
+    for (final id in movedIds) {
+      final cur =
+          callbacks.currentWalls.where((w) => w.id == id).firstOrNull;
+      final old = _groupOldWalls.where((w) => w.id == id).firstOrNull;
+      if (cur == null || old == null) continue;
+      if (cur.startPoint != old.startPoint || cur.endPoint != old.endPoint) {
+        callbacks.updateWall(cur);
+        anyChange = true;
+      }
+    }
+    if (!anyChange) return;
+
+    for (final roomId in _groupRoomIds) {
+      final cur =
+          callbacks.currentRooms.where((r) => r.id == roomId).firstOrNull;
+      if (cur != null) callbacks.updateRoom(cur);
+    }
+
+    final newWalls = List<WallSegment>.unmodifiable(callbacks.currentWalls);
+    final newRooms = List<Room>.unmodifiable(callbacks.currentRooms);
+    undoRedo.execute(_GroupMoveWallsCommand(
+      callbacks: callbacks,
+      oldWalls: _groupOldWalls,
+      oldRooms: _groupOldRooms,
+      newWalls: newWalls,
+      newRooms: newRooms,
+    ));
+
+    // Refresh the selection to the live (post-move) wall instances.
+    _multiWalls = [
+      for (final w in _multiWalls)
+        if (callbacks.currentWalls
+                .where((x) => x.id == w.id)
+                .firstOrNull
+            case final live?)
+          live,
+    ];
+    _selectedWall = _multiWalls.isEmpty ? null : _multiWalls.last;
+  }
+
+  /// Transient-restore the pre-drag geometry (cancel / Escape).
+  void _revertGroupDrag() {
+    for (final w in [..._groupWallsAtStart, ..._groupConnectedAtStart]) {
+      final old = _groupOldWalls.where((o) => o.id == w.id).firstOrNull;
+      if (old != null) callbacks.updateWallTransient(old);
+    }
+    for (final roomId in _groupRoomIds) {
+      final old = _groupOldRooms.where((o) => o.id == roomId).firstOrNull;
+      if (old != null) callbacks.updateRoomTransient(old);
+    }
+  }
+
+  void _clearGroupDragState() {
+    _groupWallsAtStart = const [];
+    _groupConnectedAtStart = const [];
+    _groupRoomIds = const {};
+    _groupDragAnchor = null;
+    _groupDragActive = false;
+    _groupOldWalls = const [];
+    _groupOldRooms = const [];
+    _groupKeepOrientation = false;
+    _groupGrabWall = null;
   }
 
   // ================================================================
@@ -4249,6 +4810,42 @@ class _RectReshapeCommand extends Command {
 
   @override
   String get label => 'Reshape rectangle';
+
+  @override
+  void execute() =>
+      callbacks.replaceAllWallsAndRooms(newWalls, newRooms);
+
+  @override
+  void undo() =>
+      callbacks.replaceAllWallsAndRooms(oldWalls, oldRooms);
+}
+
+/// Command: ADR-034 multi-wall group translate — all selected walls plus
+/// their connected boundary walls and rebuilt room polygons replaced
+/// atomically, so one Ctrl+Z reverts the whole move (including any ADR-011
+/// mirror-partner updates the translation triggered).
+///
+/// Mirrors [_RectReshapeCommand]: DAO writes are issued during the
+/// `_commitGroupDrag` `updateWall`/`updateRoom` calls; the initial
+/// `execute()` reconcile is therefore a no-op (state already equals the new
+/// tuple) and only matters for redo.
+class _GroupMoveWallsCommand extends Command {
+  _GroupMoveWallsCommand({
+    required this.callbacks,
+    required this.oldWalls,
+    required this.oldRooms,
+    required this.newWalls,
+    required this.newRooms,
+  });
+
+  final EditorCallbacks callbacks;
+  final List<WallSegment> oldWalls;
+  final List<Room> oldRooms;
+  final List<WallSegment> newWalls;
+  final List<Room> newRooms;
+
+  @override
+  String get label => 'Move walls';
 
   @override
   void execute() =>
