@@ -1151,4 +1151,186 @@ void main() {
       expect(walls, hasLength(2)); // unassigned + new-wall
     });
   });
+
+  // ── Group 5: reverse split — new wall longer than the existing wall ────────
+  //
+  // Symmetric counterpart to Group 4. The user draws the SMALL room first,
+  // then an adjacent WIDER room whose shared wall is longer than the small
+  // room's. The wide room's shared edge must be split at the small room's
+  // corners so the overlapping sub-segment becomes its own graph edge and
+  // is recognised as a shared (mirrored) wall — exactly as it would be if
+  // the rooms were drawn in the opposite order (screenshot bug).
+  //
+  // Layout (mm):
+  //
+  //          D(0,2000)──────C(2000,2000)
+  //            │  small room   │            (drawn first, y ∈ [0, 2000])
+  //   tl(-1000,0)──A(0,0)──────B(2000,0)──tr(3000,0)
+  //            │                              │
+  //            │       wide room (drawn 2nd)  │   (y ∈ [-2000, 0])
+  //   bl(-1000,-2000)──────────────────br(3000,-2000)
+  //
+  // Small room's bottom wall AB = (0,0)→(2000,0). The wide room's top edge
+  // tl→tr = (-1000,0)→(3000,0) is 4000 mm long; AB's endpoints A and B lie
+  // on its interior.
+  group(
+      'EditorStateNotifier.commitWallWithSplit — '
+      'reverse split when the new wall is longer (screenshot bug)', () {
+    const tl = Point2D(x: -1000, y: 0);
+    const tr = Point2D(x: 3000, y: 0);
+    const br = Point2D(x: 3000, y: -2000);
+    const bl = Point2D(x: -1000, y: -2000);
+
+    const smallA = Point2D(x: 0, y: 0);
+    const smallB = Point2D(x: 2000, y: 0);
+    const smallC = Point2D(x: 2000, y: 2000);
+    const smallD = Point2D(x: 0, y: 2000);
+
+    // Small room walls (assigned). Bottom wall is the shared candidate.
+    const smallBottom = WallSegment(
+      id: 'small-bottom',
+      roomId: 'small-room',
+      startPoint: smallA,
+      endPoint: smallB,
+    );
+    const smallRight = WallSegment(
+      id: 'small-right',
+      roomId: 'small-room',
+      startPoint: smallB,
+      endPoint: smallC,
+    );
+    const smallTop = WallSegment(
+      id: 'small-top',
+      roomId: 'small-room',
+      startPoint: smallC,
+      endPoint: smallD,
+    );
+    const smallLeft = WallSegment(
+      id: 'small-left',
+      roomId: 'small-room',
+      startPoint: smallD,
+      endPoint: smallA,
+    );
+
+    (ProviderContainer, EditorStateNotifier) makeContainer() {
+      final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
+      final container = ProviderContainer(
+        overrides: [$db.appDatabaseProvider.overrideWithValue(db)],
+      );
+      addTearDown(db.close);
+      final notifier = container.read(editorStateProvider.notifier);
+
+      notifier.addRoom(const Room(
+        id: 'small-room',
+        floorId: 'floor-1',
+        name: 'Small Room',
+        targetTempC: 20.0,
+      ));
+      notifier.addWall(smallBottom);
+      notifier.addWall(smallRight);
+      notifier.addWall(smallTop);
+      notifier.addWall(smallLeft);
+      return (container, notifier);
+    }
+
+    // The wide room's long top edge, drawn over the small room's bottom wall.
+    const wideTop = WallSegment(
+      id: 'wide-top',
+      roomId: '',
+      startPoint: tl,
+      endPoint: tr,
+    );
+
+    bool sameSpan(WallSegment w, Point2D a, Point2D b) {
+      bool eq(Point2D p, Point2D q) =>
+          (p.x - q.x).abs() < 1.0 && (p.y - q.y).abs() < 1.0;
+      return (eq(w.startPoint, a) && eq(w.endPoint, b)) ||
+          (eq(w.startPoint, b) && eq(w.endPoint, a));
+    }
+
+    test('RS-1: the longer new wall is split at the small room\'s corners',
+        () {
+      final (container, notifier) = makeContainer();
+      addTearDown(container.dispose);
+
+      notifier.commitWallWithSplit(wideTop);
+
+      final walls = container.read(editorStateProvider).walls;
+      // No single wall may span the full 4000 mm top edge any more.
+      expect(
+        walls.any((w) => sameSpan(w, tl, tr)),
+        isFalse,
+        reason: 'The full-length top edge must be split into fragments.',
+      );
+      // The two non-overlapping outer fragments must exist.
+      expect(walls.any((w) => sameSpan(w, tl, smallA)), isTrue,
+          reason: 'Left outer fragment (-1000,0)->(0,0) must be added.');
+      expect(walls.any((w) => sameSpan(w, smallB, tr)), isTrue,
+          reason: 'Right outer fragment (2000,0)->(3000,0) must be added.');
+    });
+
+    test('RS-2: the shared sub-segment is not duplicated', () {
+      final (container, notifier) = makeContainer();
+      addTearDown(container.dispose);
+
+      notifier.commitWallWithSplit(wideTop);
+
+      final walls = container.read(editorStateProvider).walls;
+      final sharedSpan =
+          walls.where((w) => sameSpan(w, smallA, smallB)).toList();
+      expect(
+        sharedSpan,
+        hasLength(1),
+        reason: 'Only the existing small-room wall covers the shared span; '
+            'the new wall must not duplicate it.',
+      );
+      expect(sharedSpan.single.id, 'small-bottom');
+    });
+
+    test(
+        'RS-3: detection from the wide room finds it through the existing '
+        'shared wall', () {
+      final (container, notifier) = makeContainer();
+      addTearDown(container.dispose);
+
+      // Draw the wide room as four edges (rect order), capturing the seed
+      // fragment returned for the reverse-split top edge.
+      final seed = notifier.commitWallWithSplit(wideTop);
+      notifier.commitWallWithSplit(const WallSegment(
+        id: 'wide-right',
+        roomId: '',
+        startPoint: tr,
+        endPoint: br,
+      ));
+      notifier.commitWallWithSplit(const WallSegment(
+        id: 'wide-bottom',
+        roomId: '',
+        startPoint: br,
+        endPoint: bl,
+      ));
+      notifier.commitWallWithSplit(const WallSegment(
+        id: 'wide-left',
+        roomId: '',
+        startPoint: bl,
+        endPoint: tl,
+      ));
+
+      final result = RoomDetection.detectRoom(
+        container.read(editorStateProvider).walls,
+        seed,
+        existingRooms: container.read(editorStateProvider).rooms,
+      );
+
+      expect(result.outcome, RoomDetectionOutcome.detected);
+      final room = result.room!;
+      // The detected boundary must traverse the existing small-room wall,
+      // so addRoomFromDetection will promote it to a shared (mirrored) wall.
+      expect(
+        room.wallIds,
+        contains('small-bottom'),
+        reason: 'The wide room must close through the existing shared wall, '
+            'not a duplicate fragment.',
+      );
+    });
+  });
 }

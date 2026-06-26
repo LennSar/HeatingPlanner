@@ -91,7 +91,9 @@ class _ProviderCallbacks implements EditorCallbacks {
   @override
   void commitWall(WallSegment wall) => _n.addWall(wall);
   @override
-  void commitWallWithSplit(WallSegment wall) => _n.commitWallWithSplit(wall);
+  WallSegment commitWallWithSplit(WallSegment wall,
+          {bool splitNewWall = true}) =>
+      _n.commitWallWithSplit(wall, splitNewWall: splitNewWall);
   @override
   void updateWall(WallSegment wall) => _n.updateWall(wall);
   @override

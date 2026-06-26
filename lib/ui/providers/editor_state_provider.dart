@@ -1640,8 +1640,31 @@ class EditorStateNotifier extends Notifier<EditorState>
   /// Only walls with a non-empty [WallSegment.roomId] are
   /// split; unassigned walls are left intact.
   ///
+  /// When [splitNewWall] is true (the room-draw default), the **new** wall
+  /// is also split — symmetrically to the host split — at any existing
+  /// room-wall endpoint that lies on its interior. This handles the case
+  /// where the new wall is *longer* than an existing wall it runs along
+  /// (e.g. drawing a wide room after an adjacent narrow one): the new wall
+  /// is divided at the narrow wall's corners so the shared sub-segment
+  /// becomes its own graph edge. The fragment that coincides with the
+  /// existing wall is dropped rather than duplicated — room detection then
+  /// closes the new room through the existing wall and
+  /// [addRoomFromDetection] promotes it to a shared (mirrored) wall, just
+  /// as in the reverse draw order. Callers that build the room boundary
+  /// themselves (e.g. the ADR-016 room-move reconciliation) pass false to
+  /// keep the new wall intact.
+  ///
+  /// Returns the wall segment that should seed room detection: a freshly
+  /// committed fragment that is a real edge on the new room's boundary, so
+  /// the planar-face trace closes correctly even when the new wall was
+  /// reverse-split. (Equal to [wall] with defaults applied when no split
+  /// occurred.)
+  ///
   /// All mutations are committed in a single state update.
-  void commitWallWithSplit(WallSegment wall) {
+  WallSegment commitWallWithSplit(
+    WallSegment wall, {
+    bool splitNewWall = true,
+  }) {
     var walls = List<WallSegment>.from(state.walls);
     final removed = <String>[];
     final addedPersisted = <WallSegment>[];
@@ -1698,8 +1721,51 @@ class EditorStateNotifier extends Notifier<EditorState>
         thicknessMm: _projectDefaultThicknessFor(prepared.wallType),
       );
     }
-    final newWall = _withOrientation(prepared);
-    walls.add(newWall);
+
+    // Reverse split (symmetric to the host split above): subdivide the new
+    // wall at any existing room-wall endpoint lying on its interior. Every
+    // fragment shares [prepared]'s thermal/geometric properties — they are
+    // one physical wall drawn by the user.
+    final boundary = <Point2D>[prepared.startPoint, prepared.endPoint];
+    if (splitNewWall) {
+      final seenKeys = <String>{};
+      final splitVertices = <Point2D>[];
+      for (final host in walls) {
+        if (host.roomId.isEmpty) continue;
+        for (final v in [host.startPoint, host.endPoint]) {
+          if (!_isStrictlyInterior(v, prepared)) continue;
+          final key = '${v.x.round()},${v.y.round()}';
+          if (seenKeys.add(key)) splitVertices.add(v);
+        }
+      }
+      splitVertices.sort((a, b) => GeometryEngine
+          .parameterAlongSegment(a, prepared.startPoint, prepared.endPoint)
+          .compareTo(GeometryEngine.parameterAlongSegment(
+              b, prepared.startPoint, prepared.endPoint)));
+      boundary.insertAll(1, splitVertices);
+    }
+
+    final addedNew = <WallSegment>[];
+    for (var i = 0; i < boundary.length - 1; i++) {
+      final a = boundary[i];
+      final b = boundary[i + 1];
+      // Drop a fragment that lies on top of an existing room wall — that
+      // wall already provides the graph edge, so duplicating it would
+      // create a second shared wall (ADR-009 §Rule 2, sub-segment level).
+      if (_coincidesWithRoomWall(a, b, walls)) continue;
+      addedNew.add(_withOrientation(prepared.copyWith(
+        id: addedNew.isEmpty ? prepared.id : IdGenerator.newId(),
+        startPoint: a,
+        endPoint: b,
+      )));
+    }
+    // Safety net: if every fragment coincided with an existing wall the new
+    // wall is fully redundant; keep it intact so the draw is never lost.
+    if (addedNew.isEmpty) {
+      addedNew.add(_withOrientation(prepared));
+    }
+
+    walls.addAll(addedNew);
     state = state.copyWith(walls: walls);
 
     final dao = ref.read(buildingDaoProvider);
@@ -1711,16 +1777,20 @@ class EditorStateNotifier extends Notifier<EditorState>
         unawaited(upsertWallSegment(dao, w));
       }
     }
-    // Persist the newly added wall whenever it carries a roomId so the
-    // ADR-017 startup restore picks up its constructionId. Bare
-    // (roomId-empty) walls remain in-memory until promoted to a room.
-    if (newWall.roomId.isNotEmpty) {
-      unawaited(upsertWallSegment(dao, newWall));
+    // Persist any new fragment carrying a roomId so the ADR-017 startup
+    // restore picks up its constructionId. Bare (roomId-empty) walls remain
+    // in-memory until promoted to a room.
+    final persistedNew = addedNew.where((w) => w.roomId.isNotEmpty).toList();
+    for (final w in persistedNew) {
+      unawaited(upsertWallSegment(dao, w));
     }
-    if (removed.isNotEmpty || addedPersisted.isNotEmpty ||
-        newWall.roomId.isNotEmpty) {
+    if (removed.isNotEmpty ||
+        addedPersisted.isNotEmpty ||
+        persistedNew.isNotEmpty) {
       markProjectDirty();
     }
+
+    return addedNew.first;
   }
 
   /// Create a room from auto-detection results, handling
@@ -1978,6 +2048,26 @@ class EditorStateNotifier extends Notifier<EditorState>
         pt, wall.startPoint, wall.endPoint);
     const eps = 1e-4;
     return t > eps && t < 1.0 - eps;
+  }
+
+  /// True when segment [a]→[b] lies on top of an existing room-assigned
+  /// wall in [walls] (both endpoints match within 1 mm, either direction).
+  /// Used by the reverse split to avoid duplicating a shared sub-segment.
+  static bool _coincidesWithRoomWall(
+    Point2D a,
+    Point2D b,
+    List<WallSegment> walls,
+  ) {
+    const tolMm = 1.0;
+    for (final w in walls) {
+      if (w.roomId.isEmpty) continue;
+      final fwd = GeometryEngine.distanceMm(w.startPoint, a) <= tolMm &&
+          GeometryEngine.distanceMm(w.endPoint, b) <= tolMm;
+      final rev = GeometryEngine.distanceMm(w.startPoint, b) <= tolMm &&
+          GeometryEngine.distanceMm(w.endPoint, a) <= tolMm;
+      if (fwd || rev) return true;
+    }
+    return false;
   }
 }
 

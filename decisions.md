@@ -109,6 +109,29 @@ it too, so both endpoints are checked independently. A single host wall can
 accumulate many junction nodes across successive room additions because each
 split piece remains individually splittable.
 
+**Reverse split (symmetric rule).**
+The host split above handles the case where the *new* wall ends on an existing
+wall. The mirror case — the *new* wall is **longer** than an existing wall it
+runs along, so the existing wall's endpoints fall on the new wall's interior —
+must behave identically regardless of draw order. (Bug: drawing a narrow room
+first, then a wider adjacent room, left the wider room's shared edge unsplit and
+un-shared.) When `splitNewWall` is true (the room-draw default),
+`commitWallWithSplit` also subdivides the new wall at every existing room-wall
+endpoint lying on its interior, in the same single state update. The fragment
+that coincides with the existing wall (both endpoints within 1 mm) is **dropped,
+not added**: the existing wall already provides that graph edge, so room
+detection closes the new room through it and `addRoomFromDetection` promotes it
+to a shared/mirrored wall (ADR-001) — exactly as in the opposite draw order.
+Duplicating it would create a second wall on the shared span (ADR-009 §Rule 2
+violation at the sub-segment level).
+
+Because the new wall may now be several fragments, `commitWallWithSplit` returns
+the first freshly committed fragment as the **detection seed**: a real edge on
+the new room's boundary so the planar-face trace closes correctly. Callers that
+construct the room boundary themselves (the ADR-016 room-move reconciliation in
+`SelectTool`) pass `splitNewWall: false` to keep the new wall intact; the host
+split still applies.
+
 > **Status:** Implemented in `EditorStateNotifier.commitWallWithSplit` and
 > `SnapService` (wall-interior snap, 150 mm threshold, grid-aligned where
 > possible). Cursor feedback via `SnapType.wallPoint` shown in

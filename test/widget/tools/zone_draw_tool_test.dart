@@ -75,7 +75,8 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   void commitWall(WallSegment wall) {}
   @override
-  void commitWallWithSplit(WallSegment wall) {}
+  WallSegment commitWallWithSplit(WallSegment wall, {bool splitNewWall = true}) =>
+      wall;
   @override
   void updateWall(WallSegment wall) {}
   @override

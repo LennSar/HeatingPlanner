@@ -407,8 +407,10 @@ class _FloorPlanCanvasState
   }
 
   @override
-  void commitWallWithSplit(WallSegment wall) {
-    ref.read(editorStateProvider.notifier).commitWallWithSplit(wall);
+  WallSegment commitWallWithSplit(WallSegment wall, {bool splitNewWall = true}) {
+    return ref
+        .read(editorStateProvider.notifier)
+        .commitWallWithSplit(wall, splitNewWall: splitNewWall);
   }
 
   @override

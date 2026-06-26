@@ -71,7 +71,12 @@ abstract class EditorCallbacks {
 
   /// Commit a new wall, splitting any existing room wall
   /// whose interior contains either endpoint (ADR-003).
-  void commitWallWithSplit(WallSegment wall);
+  ///
+  /// When [splitNewWall] is true (the default), the new wall is also split
+  /// at any existing room-wall endpoint on its interior so a longer new
+  /// wall sharing part of an existing wall is divided at the shared span's
+  /// corners. Returns the fragment that should seed room detection.
+  WallSegment commitWallWithSplit(WallSegment wall, {bool splitNewWall = true});
 
   /// Replace an existing wall segment (same ID).
   void updateWall(WallSegment wall);

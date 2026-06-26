@@ -302,9 +302,12 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
           startPoint: a,
           endPoint: b,
         );
-        callbacks.commitWallWithSplit(wall);
-        lastEffectiveWall = wall;
-        firstNewWall ??= wall;
+        // The returned seed is the first freshly committed fragment (the
+        // edge may have been reverse-split when it is longer than an
+        // existing wall it runs along); use it as the BFS anchor.
+        final seed = callbacks.commitWallWithSplit(wall);
+        lastEffectiveWall = seed;
+        firstNewWall ??= seed;
       }
     }
 
@@ -406,7 +409,9 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
 
     // Snapshot walls before commit for undo.
     final oldWalls = callbacks.currentWalls.toList();
-    callbacks.commitWallWithSplit(wall);
+    // A longer new wall sharing part of an existing wall is reverse-split;
+    // the returned fragment is a real graph edge to seed detection from.
+    final detectionSeed = callbacks.commitWallWithSplit(wall);
     // Snapshot walls after commit for redo.
     final newWalls = callbacks.currentWalls.toList();
 
@@ -421,7 +426,7 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
     // Check for room detection.
     final result = RoomDetection.detectRoom(
       callbacks.currentWalls,
-      wall,
+      detectionSeed,
       existingRooms: callbacks.currentRooms,
     );
     switch (result.outcome) {

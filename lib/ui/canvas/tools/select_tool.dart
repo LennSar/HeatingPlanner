@@ -4069,7 +4069,11 @@ class SelectTool extends CanvasTool {
         anchorMode: wasShared ? WallAnchorMode.centerline : w.anchorMode,
         constructionId: w.constructionId,
       );
-      callbacks.commitWallWithSplit(fresh);
+      // This path builds the room boundary itself from `fresh.id`, so the
+      // new wall must stay intact — opt out of reverse new-wall splitting
+      // (host splits still apply). Partial-overlap reconciliation here is
+      // handled by `matchExistingWall` above.
+      callbacks.commitWallWithSplit(fresh, splitNewWall: false);
       wallIdsForRoom.add(fresh.id);
     }
 
