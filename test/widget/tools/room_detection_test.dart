@@ -1333,4 +1333,150 @@ void main() {
       );
     });
   });
+
+  // ── Group 6: forward host split — attach a smaller room to a larger one ────
+  //
+  // The complement of Group 5. The LARGE room is drawn first; a SMALLER room
+  // is then attached, sharing only part of the large room's wall. The large
+  // wall is host-split at the small room's corners (Group 4 / ADR-003), and
+  // the small room's drawn shared edge — which now lies exactly on the
+  // host-split middle piece — must NOT be added as an orphan duplicate.
+  //
+  // Layout (mm): large room below the x-axis, top wall (0,0)→(4000,0). Small
+  // room above, bottom edge (1000,0)→(3000,0) on the large wall's interior.
+  group(
+      'EditorStateNotifier.commitWallWithSplit — '
+      'attaching a smaller room leaves no orphan duplicate wall', () {
+    const l0 = Point2D(x: 0, y: 0);
+    const l1 = Point2D(x: 4000, y: 0);
+    const l2 = Point2D(x: 4000, y: -2000);
+    const l3 = Point2D(x: 0, y: -2000);
+
+    const sTlBottomL = Point2D(x: 1000, y: 0); // shared span left
+    const sTrBottomR = Point2D(x: 3000, y: 0); // shared span right
+    const sTr = Point2D(x: 3000, y: 2000);
+    const sTl = Point2D(x: 1000, y: 2000);
+
+    (ProviderContainer, EditorStateNotifier) makeContainer() {
+      final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
+      final container = ProviderContainer(
+        overrides: [$db.appDatabaseProvider.overrideWithValue(db)],
+      );
+      addTearDown(db.close);
+      final notifier = container.read(editorStateProvider.notifier);
+      notifier.addRoom(const Room(
+        id: 'large',
+        floorId: 'floor-1',
+        name: 'Large',
+        targetTempC: 20.0,
+      ));
+      const corners = [l0, l1, l2, l3];
+      for (var i = 0; i < 4; i++) {
+        notifier.addWall(WallSegment(
+          id: 'large-$i',
+          roomId: 'large',
+          startPoint: corners[i],
+          endPoint: corners[(i + 1) % 4],
+        ));
+      }
+      return (container, notifier);
+    }
+
+    // Draw the small room's four edges; bottom drawn right→left so it is the
+    // reverse of the host-split middle piece.
+    void drawSmall(EditorStateNotifier n) {
+      final seed = n.commitWallWithSplit(const WallSegment(
+          id: 's-top', roomId: '', startPoint: sTl, endPoint: sTr));
+      n.commitWallWithSplit(const WallSegment(
+          id: 's-right', roomId: '', startPoint: sTr, endPoint: sTrBottomR));
+      n.commitWallWithSplit(const WallSegment(
+          id: 's-bottom',
+          roomId: '',
+          startPoint: sTrBottomR,
+          endPoint: sTlBottomL));
+      n.commitWallWithSplit(const WallSegment(
+          id: 's-left', roomId: '', startPoint: sTlBottomL, endPoint: sTl));
+      final r = RoomDetection.detectRoom(
+        n.state.walls,
+        seed,
+        existingRooms: n.state.rooms,
+      );
+      n.addRoomFromDetection(
+        room: const Room(
+            id: 'small', floorId: 'floor-1', name: 'Small', targetTempC: 20.0),
+        wallIds: r.room!.wallIds,
+      );
+    }
+
+    bool onSharedSpan(WallSegment w) {
+      bool eq(Point2D p, Point2D q) =>
+          (p.x - q.x).abs() < 1.0 && (p.y - q.y).abs() < 1.0;
+      return (eq(w.startPoint, sTlBottomL) && eq(w.endPoint, sTrBottomR)) ||
+          (eq(w.startPoint, sTrBottomR) && eq(w.endPoint, sTlBottomL));
+    }
+
+    test('FS-1: no orphan (room-less) wall is left on the shared span', () {
+      final (container, notifier) = makeContainer();
+      addTearDown(container.dispose);
+      drawSmall(notifier);
+
+      final orphans = container
+          .read(editorStateProvider)
+          .walls
+          .where((w) => w.roomId.isEmpty && onSharedSpan(w))
+          .toList();
+      expect(
+        orphans,
+        isEmpty,
+        reason: 'The drawn shared edge must be absorbed into the shared wall, '
+            'not left as a duplicate orphan over it.',
+      );
+    });
+
+    test('FS-2: the shared span is exactly one mirrored interior pair', () {
+      final (container, notifier) = makeContainer();
+      addTearDown(container.dispose);
+      drawSmall(notifier);
+
+      final spanWalls = container
+          .read(editorStateProvider)
+          .walls
+          .where(onSharedSpan)
+          .toList();
+      expect(spanWalls, hasLength(2),
+          reason: 'Exactly the shared wall and its mirror.');
+      for (final w in spanWalls) {
+        expect(w.wallType, WallType.interior);
+        expect(w.mirrorId, isNotNull);
+        expect(w.roomId, isNotEmpty);
+      }
+      expect(
+        spanWalls.map((w) => w.roomId).toSet(),
+        {'large', 'small'},
+        reason: 'One side belongs to each room.',
+      );
+    });
+
+    test('FS-3: the large wall is host-split into three pieces', () {
+      final (container, notifier) = makeContainer();
+      addTearDown(container.dispose);
+      drawSmall(notifier);
+
+      final largeTopPieces = container
+          .read(editorStateProvider)
+          .walls
+          .where((w) =>
+              w.roomId == 'large' &&
+              w.startPoint.y.abs() < 1.0 &&
+              w.endPoint.y.abs() < 1.0)
+          .toList();
+      // (0,0)-(1000,0) exterior, (1000,0)-(3000,0) shared interior,
+      // (3000,0)-(4000,0) exterior.
+      expect(largeTopPieces, hasLength(3));
+      expect(
+        largeTopPieces.where((w) => w.wallType == WallType.interior),
+        hasLength(1),
+      );
+    });
+  });
 }

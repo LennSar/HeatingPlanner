@@ -1746,23 +1746,30 @@ class EditorStateNotifier extends Notifier<EditorState>
     }
 
     final addedNew = <WallSegment>[];
+    WallSegment? coincidentSeed;
     for (var i = 0; i < boundary.length - 1; i++) {
       final a = boundary[i];
       final b = boundary[i + 1];
-      // Drop a fragment that lies on top of an existing room wall — that
-      // wall already provides the graph edge, so duplicating it would
-      // create a second shared wall (ADR-009 §Rule 2, sub-segment level).
-      if (_coincidesWithRoomWall(a, b, walls)) continue;
+      // Drop a fragment that lies on top of an existing room wall: that wall
+      // (a host-split piece, or the neighbour's wall) already provides the
+      // graph edge, so room detection closes the new room through it and
+      // addRoomFromDetection promotes it to a shared/mirrored wall. Adding a
+      // coincident copy would leave an orphan duplicate over the shared wall
+      // (ADR-009 §Rule 2, sub-segment level). Only the room-draw path
+      // (splitNewWall) drops; callers that build the boundary themselves
+      // (splitNewWall=false) keep the wall intact.
+      if (splitNewWall) {
+        final existing = _coincidentRoomWall(a, b, walls);
+        if (existing != null) {
+          coincidentSeed ??= existing;
+          continue;
+        }
+      }
       addedNew.add(_withOrientation(prepared.copyWith(
         id: addedNew.isEmpty ? prepared.id : IdGenerator.newId(),
         startPoint: a,
         endPoint: b,
       )));
-    }
-    // Safety net: if every fragment coincided with an existing wall the new
-    // wall is fully redundant; keep it intact so the draw is never lost.
-    if (addedNew.isEmpty) {
-      addedNew.add(_withOrientation(prepared));
     }
 
     walls.addAll(addedNew);
@@ -1790,7 +1797,11 @@ class EditorStateNotifier extends Notifier<EditorState>
       markProjectDirty();
     }
 
-    return addedNew.first;
+    // Seed for room detection: a freshly added fragment when one exists,
+    // otherwise the existing wall the whole drawn wall coincides with (the
+    // host-split piece that will be promoted to a shared wall).
+    if (addedNew.isNotEmpty) return addedNew.first;
+    return coincidentSeed ?? _withOrientation(prepared);
   }
 
   /// Create a room from auto-detection results, handling
@@ -2050,10 +2061,11 @@ class EditorStateNotifier extends Notifier<EditorState>
     return t > eps && t < 1.0 - eps;
   }
 
-  /// True when segment [a]→[b] lies on top of an existing room-assigned
-  /// wall in [walls] (both endpoints match within 1 mm, either direction).
-  /// Used by the reverse split to avoid duplicating a shared sub-segment.
-  static bool _coincidesWithRoomWall(
+  /// The existing room-assigned wall in [walls] that segment [a]→[b] lies on
+  /// top of (both endpoints match within 1 mm, either direction), or null.
+  /// Used by the reverse split to drop a duplicate shared sub-segment and to
+  /// seed room detection from the existing wall.
+  static WallSegment? _coincidentRoomWall(
     Point2D a,
     Point2D b,
     List<WallSegment> walls,
@@ -2065,9 +2077,9 @@ class EditorStateNotifier extends Notifier<EditorState>
           GeometryEngine.distanceMm(w.endPoint, b) <= tolMm;
       final rev = GeometryEngine.distanceMm(w.startPoint, b) <= tolMm &&
           GeometryEngine.distanceMm(w.endPoint, a) <= tolMm;
-      if (fwd || rev) return true;
+      if (fwd || rev) return w;
     }
-    return false;
+    return null;
   }
 }
 

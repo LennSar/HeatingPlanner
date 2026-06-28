@@ -125,12 +125,22 @@ to a shared/mirrored wall (ADR-001) — exactly as in the opposite draw order.
 Duplicating it would create a second wall on the shared span (ADR-009 §Rule 2
 violation at the sub-segment level).
 
-Because the new wall may now be several fragments, `commitWallWithSplit` returns
-the first freshly committed fragment as the **detection seed**: a real edge on
-the new room's boundary so the planar-face trace closes correctly. Callers that
+The same coincidence drop applies to the **forward** rectangle case (attaching a
+*smaller* room to a larger one): the larger wall is host-split into three pieces,
+and the small room's drawn shared edge lands exactly on the middle piece. That
+edge is dropped too — otherwise it survives as a room-less **orphan duplicate**
+lying on top of the (thinner, promoted) shared wall, which renders as a stray
+full-thickness wall over the shared span. A drawn edge is dropped whenever it
+fully coincides with an existing room wall, regardless of which room is larger.
+
+Because the new wall may now be several fragments — or none, when the whole drawn
+wall coincided with existing walls — `commitWallWithSplit` returns the first
+freshly committed fragment as the **detection seed**, or (when nothing new was
+added) the existing wall the drawn edge coincided with: in both cases a real edge
+on the new room's boundary so the planar-face trace closes correctly. Callers that
 construct the room boundary themselves (the ADR-016 room-move reconciliation in
-`SelectTool`) pass `splitNewWall: false` to keep the new wall intact; the host
-split still applies.
+`SelectTool`) pass `splitNewWall: false` to keep the new wall intact (no reverse
+split, no coincidence drop); the host split still applies.
 
 > **Status:** Implemented in `EditorStateNotifier.commitWallWithSplit` and
 > `SnapService` (wall-interior snap, 150 mm threshold, grid-aligned where
