@@ -4,8 +4,7 @@ import 'package:flutter/foundation.dart' show ValueListenable;
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:vector_math/vector_math_64.dart'
-    show Vector3;
+import 'package:vector_math/vector_math_64.dart' show Vector3;
 
 import '../../calculation/engines/geometry_engine.dart';
 import '../../core/theme/app_theme.dart';
@@ -45,8 +44,7 @@ import '../../repositories/app_preferences.dart';
 
 /// Provider that signals tools to cancel (incremented on
 /// Escape). Tools check this to know when cancel is pressed.
-final toolCancelProvider =
-    NotifierProvider<ToolCancelNotifier, int>(
+final toolCancelProvider = NotifierProvider<ToolCancelNotifier, int>(
   ToolCancelNotifier.new,
 );
 
@@ -62,8 +60,7 @@ class ToolCancelNotifier extends Notifier<int> {
 }
 
 /// Provider that signals tools to delete the selection.
-final toolDeleteProvider =
-    NotifierProvider<ToolDeleteNotifier, int>(
+final toolDeleteProvider = NotifierProvider<ToolDeleteNotifier, int>(
   ToolDeleteNotifier.new,
 );
 
@@ -81,8 +78,8 @@ class ToolDeleteNotifier extends Notifier<int> {
 /// Provider that signals the select tool to rotate the selected distributor.
 final toolRotateDistributorProvider =
     NotifierProvider<ToolRotateDistributorNotifier, int>(
-  ToolRotateDistributorNotifier.new,
-);
+      ToolRotateDistributorNotifier.new,
+    );
 
 /// Whether a tool drag (wall/room/zone/opening move) is currently in
 /// progress (ADR-026).
@@ -93,8 +90,9 @@ final toolRotateDistributorProvider =
 /// per-frame whole-floor text layout that made wall drags lag). Kept as a
 /// provider (rather than local widget state) so the flip drives a single
 /// canvas rebuild at each drag boundary and the behaviour is unit-testable.
-final activeDragProvider =
-    NotifierProvider<ActiveDragNotifier, bool>(ActiveDragNotifier.new);
+final activeDragProvider = NotifierProvider<ActiveDragNotifier, bool>(
+  ActiveDragNotifier.new,
+);
 
 /// Notifier backing [activeDragProvider].
 class ActiveDragNotifier extends Notifier<bool> {
@@ -129,8 +127,8 @@ const Duration annotationSampleInterval = Duration(milliseconds: 100);
 /// full frame rate — only the labels lag by up to one sample.
 final annotationGeometryProvider =
     NotifierProvider<AnnotationGeometryNotifier, AnnotationGeometry>(
-  AnnotationGeometryNotifier.new,
-);
+      AnnotationGeometryNotifier.new,
+    );
 
 /// Notifier backing [annotationGeometryProvider].
 class AnnotationGeometryNotifier extends Notifier<AnnotationGeometry> {
@@ -210,8 +208,8 @@ class WallModifiersNotifier extends Notifier<WallModifiers> {
 /// Provider that exposes the current wall-tool modifier flags.
 final wallModifiersProvider =
     NotifierProvider<WallModifiersNotifier, WallModifiers>(
-  WallModifiersNotifier.new,
-);
+      WallModifiersNotifier.new,
+    );
 
 /// Notifier that increments a counter to trigger distributor rotation.
 class ToolRotateDistributorNotifier extends Notifier<int> {
@@ -235,32 +233,30 @@ class FloorPlanCanvas extends ConsumerStatefulWidget {
   const FloorPlanCanvas({super.key});
 
   @override
-  ConsumerState<FloorPlanCanvas> createState() =>
-      _FloorPlanCanvasState();
+  ConsumerState<FloorPlanCanvas> createState() => _FloorPlanCanvasState();
 }
 
 /// Pointer-driven state consumed only by the interaction painter.
 ///
 /// Kept as a record so [ValueNotifier] equality is structural — writing the
 /// same `(hoverWorldPoint, data)` pair twice does not fire listeners.
-typedef _InteractionState = ({
-  Offset? hoverWorldPoint,
-  InteractionData? data,
-});
+typedef _InteractionState = ({Offset? hoverWorldPoint, InteractionData? data});
 
-const _InteractionState _emptyInteractionState =
-    (hoverWorldPoint: null, data: null);
+const _InteractionState _emptyInteractionState = (
+  hoverWorldPoint: null,
+  data: null,
+);
 
-class _FloorPlanCanvasState
-    extends ConsumerState<FloorPlanCanvas>
+class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
     implements EditorCallbacks {
   /// Pointer/hover state consumed by the interaction layer only.
   ///
   /// Mutating this notifier triggers a repaint of the interaction
   /// [CustomPaint] (via [CustomPainter.repaint]) without rebuilding the
   /// FloorPlanCanvas widget tree — that is what keeps hover and drag cheap.
-  final ValueNotifier<_InteractionState> _interactionState =
-      ValueNotifier(_emptyInteractionState);
+  final ValueNotifier<_InteractionState> _interactionState = ValueNotifier(
+    _emptyInteractionState,
+  );
 
   /// Whether the canvas zoom has been initialised from the
   /// actual widget size. Set on the first [LayoutBuilder]
@@ -303,26 +299,39 @@ class _FloorPlanCanvasState
   /// highlight behind the dialog so the user sees which room they are
   /// naming. Null when no room dialog is open. Mutating it repaints only
   /// the pending-room highlight layer.
-  final ValueNotifier<List<Point2D>?> _pendingRoomHighlight =
-      ValueNotifier(null);
+  final ValueNotifier<List<Point2D>?> _pendingRoomHighlight = ValueNotifier(
+    null,
+  );
 
   /// FIFO of room-name dialog requests awaiting display. A single wall
   /// draw can detect two rooms; they are queued here and shown one at a
   /// time so the highlight can track the room being named.
   final List<
-      ({
-        List<Point2D> polygon,
-        List<String> wallIds,
-        void Function(List<WallSegment> walls, List<Room> rooms)? onCreated,
-      })> _roomDialogQueue = [];
+    ({
+      List<Point2D> polygon,
+      List<String> wallIds,
+      void Function(List<WallSegment> walls, List<Room> rooms)? onCreated,
+    })
+  >
+  _roomDialogQueue = [];
 
   /// True while a room-name dialog is on screen (queue is draining).
   bool _roomDialogActive = false;
+
+  /// Keyboard-focus node for the canvas surface. Requested on every
+  /// pointer-down (see the [Listener] in [build]) so that after the user
+  /// clicks anywhere on the canvas, keyboard focus lands here rather than
+  /// lingering on a properties-panel text field or going null. Without it
+  /// the [EditorShortcuts] `Shortcuts` widget never receives Backspace/Delete
+  /// (key events only bubble up from the focused descendant), so deleting a
+  /// selected element silently did nothing after editing a panel field.
+  final FocusNode _canvasFocusNode = FocusNode(debugLabel: 'FloorPlanCanvas');
 
   @override
   void dispose() {
     _interactionState.dispose();
     _pendingRoomHighlight.dispose();
+    _canvasFocusNode.dispose();
     super.dispose();
   }
 
@@ -407,7 +416,10 @@ class _FloorPlanCanvasState
   }
 
   @override
-  WallSegment commitWallWithSplit(WallSegment wall, {bool splitNewWall = true}) {
+  WallSegment commitWallWithSplit(
+    WallSegment wall, {
+    bool splitNewWall = true,
+  }) {
     return ref
         .read(editorStateProvider.notifier)
         .commitWallWithSplit(wall, splitNewWall: splitNewWall);
@@ -448,13 +460,9 @@ class _FloorPlanCanvasState
     List<WindowElement> windows,
     List<Door> doors,
   ) {
-    ref.read(editorStateProvider.notifier).replaceAllForRoomCascade(
-          walls,
-          rooms,
-          zones,
-          windows,
-          doors,
-        );
+    ref
+        .read(editorStateProvider.notifier)
+        .replaceAllForRoomCascade(walls, rooms, zones, windows, doors);
   }
 
   @override
@@ -476,16 +484,11 @@ class _FloorPlanCanvasState
 
   @override
   void replaceAllWalls(List<WallSegment> walls) {
-    ref
-        .read(editorStateProvider.notifier)
-        .replaceAllWalls(walls);
+    ref.read(editorStateProvider.notifier).replaceAllWalls(walls);
   }
 
   @override
-  void replaceAllWallsAndRooms(
-    List<WallSegment> walls,
-    List<Room> rooms,
-  ) {
+  void replaceAllWallsAndRooms(List<WallSegment> walls, List<Room> rooms) {
     ref
         .read(editorStateProvider.notifier)
         .replaceAllWallsAndRooms(walls, rooms);
@@ -508,7 +511,9 @@ class _FloorPlanCanvasState
     required List<String> wallIds,
     Map<String, WallSegment>? movedSideProperties,
   }) {
-    ref.read(editorStateProvider.notifier).addRoomFromDetection(
+    ref
+        .read(editorStateProvider.notifier)
+        .addRoomFromDetection(
           room: room,
           wallIds: wallIds,
           movedSideProperties: movedSideProperties,
@@ -585,16 +590,12 @@ class _FloorPlanCanvasState
 
   @override
   void commitCircuit(HeatingCircuit circuit) {
-    ref
-        .read(editorStateProvider.notifier)
-        .addCircuit(circuit);
+    ref.read(editorStateProvider.notifier).addCircuit(circuit);
   }
 
   @override
   void updateCircuit(HeatingCircuit circuit) {
-    ref
-        .read(editorStateProvider.notifier)
-        .updateCircuit(circuit);
+    ref.read(editorStateProvider.notifier).updateCircuit(circuit);
   }
 
   @override
@@ -620,12 +621,10 @@ class _FloorPlanCanvasState
   // ---- Default IDs (from seeded data in HeatingDao.seedDefaults) ----
 
   @override
-  String get currentFloorId =>
-      ref.read(currentFloorIdProvider);
+  String get currentFloorId => ref.read(currentFloorIdProvider);
 
   /// First available tube type ID (PE-Xa 16×2, seeded default).
-  static const _defaultTubeTypeId =
-      '10000000-0000-4000-8000-000000000001';
+  static const _defaultTubeTypeId = '10000000-0000-4000-8000-000000000001';
 
   /// First available flooring material ID (Ceramic tile, seeded default).
   static const _defaultFlooringMaterialId =
@@ -640,9 +639,9 @@ class _FloorPlanCanvasState
   @override
   void selectElement(String? type, String? id) {
     if (type != null && id != null) {
-      ref.read(selectedElementProvider.notifier).select(
-            SelectedElement(type: type, id: id),
-          );
+      ref
+          .read(selectedElementProvider.notifier)
+          .select(SelectedElement(type: type, id: id));
     } else {
       ref.read(selectedElementProvider.notifier).select(null);
     }
@@ -688,8 +687,7 @@ class _FloorPlanCanvasState
     List<String> wallIds,
     void Function(List<WallSegment> walls, List<Room> rooms)? onCreated,
   ) {
-    final roomNumber =
-        ref.read(editorStateProvider.notifier).nextRoomNumber;
+    final roomNumber = ref.read(editorStateProvider.notifier).nextRoomNumber;
 
     final l10n = AppLocalizations.of(context)!;
     return showDialog<String>(
@@ -703,9 +701,7 @@ class _FloorPlanCanvasState
           content: TextField(
             controller: controller,
             autofocus: true,
-            decoration: InputDecoration(
-              labelText: l10n.roomNameLabel,
-            ),
+            decoration: InputDecoration(labelText: l10n.roomNameLabel),
           ),
           actions: [
             TextButton(
@@ -713,8 +709,7 @@ class _FloorPlanCanvasState
               child: Text(l10n.cancel),
             ),
             FilledButton(
-              onPressed: () =>
-                  Navigator.pop(ctx, controller.text),
+              onPressed: () => Navigator.pop(ctx, controller.text),
               child: Text(l10n.create),
             ),
           ],
@@ -754,15 +749,17 @@ class _FloorPlanCanvasState
       } else {
         // Single-wall mode: register a dedicated room undo command.
         // execute() is a no-op on first call (state is already newState).
-        ref.read(undoRedoProvider).execute(
-          _CreateRoomCommand(
-            callbacks: this,
-            oldWalls: oldState.walls,
-            oldRooms: oldState.rooms,
-            newWalls: newState.walls,
-            newRooms: newState.rooms,
-          ),
-        );
+        ref
+            .read(undoRedoProvider)
+            .execute(
+              _CreateRoomCommand(
+                callbacks: this,
+                oldWalls: oldState.walls,
+                oldRooms: oldState.rooms,
+                newWalls: newState.walls,
+                newRooms: newState.rooms,
+              ),
+            );
       }
 
       // Auto-select the new room.
@@ -783,24 +780,20 @@ class _FloorPlanCanvasState
   }
 
   @override
-  List<WallSegment> get currentWalls =>
-      ref.read(editorStateProvider).walls;
+  List<WallSegment> get currentWalls => ref.read(editorStateProvider).walls;
 
   @override
-  List<Room> get currentRooms =>
-      ref.read(editorStateProvider).rooms;
+  List<Room> get currentRooms => ref.read(editorStateProvider).rooms;
 
   @override
   List<WindowElement> get currentWindows =>
       ref.read(editorStateProvider).windows;
 
   @override
-  List<Door> get currentDoors =>
-      ref.read(editorStateProvider).doors;
+  List<Door> get currentDoors => ref.read(editorStateProvider).doors;
 
   @override
-  List<HeatingZone> get currentZones =>
-      ref.read(editorStateProvider).zones;
+  List<HeatingZone> get currentZones => ref.read(editorStateProvider).zones;
 
   // ---- Distributor ----
 
@@ -866,9 +859,7 @@ class _FloorPlanCanvasState
   }
 
   @override
-  void requestDistributorDeleteDialog({
-    required void Function() onConfirmed,
-  }) {
+  void requestDistributorDeleteDialog({required void Function() onConfirmed}) {
     final l10n = AppLocalizations.of(context)!;
     showDialog<void>(
       context: context,
@@ -950,11 +941,9 @@ class _FloorPlanCanvasState
       );
     }
 
-    showMenu<String>(
-      context: context,
-      position: position,
-      items: items,
-    ).then((value) {
+    showMenu<String>(context: context, position: position, items: items).then((
+      value,
+    ) {
       switch (value) {
         case 'delete':
           request.onDelete();
@@ -967,15 +956,12 @@ class _FloorPlanCanvasState
   }
 
   @override
-  double get currentZoom =>
-      ref.read(canvasControllerProvider).zoom;
+  double get currentZoom => ref.read(canvasControllerProvider).zoom;
 
   @override
-  double get currentGridSpacingMm =>
-      ref.read(gridSpacingMmProvider).maybeWhen(
-        data: (v) => v.toDouble(),
-        orElse: () => 100.0,
-      );
+  double get currentGridSpacingMm => ref
+      .read(gridSpacingMmProvider)
+      .maybeWhen(data: (v) => v.toDouble(), orElse: () => 100.0);
 
   // ---- Build ----
 
@@ -985,18 +971,20 @@ class _FloorPlanCanvasState
     final canvasState = ref.watch(canvasControllerProvider);
     final editorState = ref.watch(editorStateProvider);
     final gridSpacingMm = ref
-            .watch(gridSpacingMmProvider)
-            .when(data: (v) => v.toDouble(), loading: () => 100.0, error: (_, __) => 100.0);
+        .watch(gridSpacingMmProvider)
+        .when(
+          data: (v) => v.toDouble(),
+          loading: () => 100.0,
+          error: (_, __) => 100.0,
+        );
     final hoveredElement = ref.watch(hoveredElementProvider);
 
     // ADR-026: the annotation layer reads a geometry snapshot that is throttled
     // to ~10 fps during a drag, so the whole-floor text layout no longer runs
     // every frame.
     final annotationGeometry = ref.watch(annotationGeometryProvider);
-    final colors = Theme.of(context)
-        .extension<HeatingPlannerColors>()!;
-    final onSurface =
-        Theme.of(context).colorScheme.onSurface;
+    final colors = Theme.of(context).extension<HeatingPlannerColors>()!;
+    final onSurface = Theme.of(context).colorScheme.onSurface;
 
     // ADR-004 zone display states — memoised in [zoneColorStatesProvider]
     // so the per-zone heat-demand/output watches do not run on every
@@ -1073,17 +1061,12 @@ class _FloorPlanCanvasState
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final viewSize = Size(
-          constraints.maxWidth,
-          constraints.maxHeight,
-        );
+        final viewSize = Size(constraints.maxWidth, constraints.maxHeight);
 
         // On first layout, set zoom so ≥12 m is visible in
         // the smallest dimension (guarantees a 10 m wall fits
         // without manual zoom-out), and centre the origin.
-        if (!_viewInitialized &&
-            viewSize.width > 0 &&
-            viewSize.height > 0) {
+        if (!_viewInitialized && viewSize.width > 0 && viewSize.height > 0) {
           _viewInitialized = true;
           WidgetsBinding.instance.addPostFrameCallback((_) {
             final smallest = viewSize.shortestSide;
@@ -1091,354 +1074,328 @@ class _FloorPlanCanvasState
               CanvasState.minZoom,
               CanvasState.maxZoom,
             );
-            final pan = Offset(
-              viewSize.width / 2,
-              viewSize.height / 2,
-            );
+            final pan = Offset(viewSize.width / 2, viewSize.height / 2);
             ref
                 .read(canvasControllerProvider.notifier)
                 .setInitialView(zoom, pan);
           });
         }
 
-        final visibleRect = _computeVisibleRect(
-          canvasState,
-          viewSize,
-        );
+        final visibleRect = _computeVisibleRect(canvasState, viewSize);
 
-        return Listener(
-          onPointerSignal: (event) {
-            if (event is PointerScrollEvent) {
-              final ctrl =
-                  ref.read(canvasControllerProvider.notifier);
-              final delta =
-                  -event.scrollDelta.dy / 1000.0;
-              ctrl.zoomBy(delta, event.localPosition);
-            }
-          },
-          onPointerDown: (event) {
-            // Right (secondary) button starts a potential view-pan (ADR-032).
-            // The context menu (onSecondaryTap) is deferred to pointer-up and
-            // only fires if the press never moved — a moved press pans.
-            if (event.buttons & kSecondaryButton != 0) {
-              _isPanningView = true;
-              _panMoved = false;
-              _panLastScreen = event.localPosition;
-              return;
-            }
-
-            final worldOffset = _toWorld(
-              canvasState,
-              event.localPosition,
-            );
-            final worldPoint = Point2D(
-              x: worldOffset.dx,
-              y: worldOffset.dy,
-            );
-
-            // Forward pointer-down for drag initiation.
-            _activeTool?.onPointerDown(
-              worldPoint,
-              event.buttons,
-            );
-          },
-          onPointerMove: (event) {
-            // ADR-032: right-button drag pans the view.
-            if (_isPanningView &&
-                event.buttons & kSecondaryButton != 0) {
-              final last = _panLastScreen ?? event.localPosition;
-              final delta = event.localPosition - last;
-              _panLastScreen = event.localPosition;
-              if (delta != Offset.zero) {
-                _panMoved = true;
-                ref
-                    .read(canvasControllerProvider.notifier)
-                    .panBy(delta);
+        return Focus(
+          focusNode: _canvasFocusNode,
+          // The node is requested explicitly on pointer-down; it should not
+          // be reachable via Tab traversal nor draw a focus highlight.
+          canRequestFocus: true,
+          skipTraversal: true,
+          child: Listener(
+            onPointerSignal: (event) {
+              if (event is PointerScrollEvent) {
+                final ctrl = ref.read(canvasControllerProvider.notifier);
+                final delta = -event.scrollDelta.dy / 1000.0;
+                ctrl.zoomBy(delta, event.localPosition);
               }
-              return;
-            }
-            if (event.down) {
-              // Drag in progress.
-              final worldOffset = _toWorld(
-                canvasState,
-                event.localPosition,
-              );
-              final worldPoint = Point2D(
-                x: worldOffset.dx,
-                y: worldOffset.dy,
-              );
-              if (!_isDragging) {
-                _isDragging = true;
-                // ADR-026: suppress the dimension-label layer for the drag.
-                ref.read(activeDragProvider.notifier).begin();
-              }
-              _activeTool?.onDragUpdate(worldPoint);
+            },
+            onPointerDown: (event) {
+              // Take keyboard focus so Backspace/Delete and other editor
+              // shortcuts route to the canvas after this click, instead of
+              // staying trapped in a properties-panel text field.
+              _canvasFocusNode.requestFocus();
 
-              _setHoverAndData(
-                worldOffset,
-                _activeTool?.getInteractionData(),
-              );
-            }
-          },
-          onPointerUp: (event) {
-            // ADR-032: end of a right-button interaction — if it moved it was
-            // a pan; otherwise fall back to the deferred context-menu tap.
-            if (_isPanningView) {
-              _isPanningView = false;
-              _panLastScreen = null;
-              if (!_panMoved) {
-                final worldOffset =
-                    _toWorld(canvasState, event.localPosition);
-                _activeTool?.onSecondaryTap(
-                  Point2D(x: worldOffset.dx, y: worldOffset.dy),
+              // Right (secondary) button starts a potential view-pan (ADR-032).
+              // The context menu (onSecondaryTap) is deferred to pointer-up and
+              // only fires if the press never moved — a moved press pans.
+              if (event.buttons & kSecondaryButton != 0) {
+                _isPanningView = true;
+                _panMoved = false;
+                _panLastScreen = event.localPosition;
+                return;
+              }
+
+              final worldOffset = _toWorld(canvasState, event.localPosition);
+              final worldPoint = Point2D(x: worldOffset.dx, y: worldOffset.dy);
+
+              // Forward pointer-down for drag initiation.
+              _activeTool?.onPointerDown(worldPoint, event.buttons);
+            },
+            onPointerMove: (event) {
+              // ADR-032: right-button drag pans the view.
+              if (_isPanningView && event.buttons & kSecondaryButton != 0) {
+                final last = _panLastScreen ?? event.localPosition;
+                final delta = event.localPosition - last;
+                _panLastScreen = event.localPosition;
+                if (delta != Offset.zero) {
+                  _panMoved = true;
+                  ref.read(canvasControllerProvider.notifier).panBy(delta);
+                }
+                return;
+              }
+              if (event.down) {
+                // Drag in progress.
+                final worldOffset = _toWorld(canvasState, event.localPosition);
+                final worldPoint = Point2D(
+                  x: worldOffset.dx,
+                  y: worldOffset.dy,
+                );
+                if (!_isDragging) {
+                  _isDragging = true;
+                  // ADR-026: suppress the dimension-label layer for the drag.
+                  ref.read(activeDragProvider.notifier).begin();
+                }
+                _activeTool?.onDragUpdate(worldPoint);
+
+                _setHoverAndData(
+                  worldOffset,
+                  _activeTool?.getInteractionData(),
                 );
               }
-              return;
-            }
-
-            final worldOffset = _toWorld(
-              canvasState,
-              event.localPosition,
-            );
-            final worldPoint = Point2D(
-              x: worldOffset.dx,
-              y: worldOffset.dy,
-            );
-            if (_isDragging) {
-              _activeTool?.onDragEnd(worldPoint);
-              _isDragging = false;
-              // ADR-026: drag committed — bring the labels back (one repaint,
-              // recomputed from the settled geometry).
-              ref.read(activeDragProvider.notifier).end();
-            } else {
-              // Non-drag pointer-up: let tools execute deferred
-              // actions (e.g. zone body drag threshold not reached).
-              _activeTool?.onPointerUp(worldPoint);
-            }
-            _setInteractionData(_activeTool?.getInteractionData());
-          },
-          child: GestureDetector(
-            onScaleStart: (details) {
-              if (_isDragging || _isPanningView) return;
-              ref
-                  .read(canvasControllerProvider.notifier)
-                  .onScaleStart(details.localFocalPoint);
             },
-            onScaleUpdate: (details) {
-              if (_isDragging || _isPanningView) return;
-              // Pass the cumulative gesture scale straight through; the
-              // controller anchors it on the zoom captured at gesture start.
-              // Deriving a per-event delta here from the build-time
-              // `canvasState` snapshot made zoom flicker when several scale
-              // events fired within one frame (the snapshot was stale).
-              ref
-                  .read(canvasControllerProvider.notifier)
-                  .onScaleUpdate(
-                    focalPoint: details.localFocalPoint,
-                    scale: details.scale,
+            onPointerUp: (event) {
+              // ADR-032: end of a right-button interaction — if it moved it was
+              // a pan; otherwise fall back to the deferred context-menu tap.
+              if (_isPanningView) {
+                _isPanningView = false;
+                _panLastScreen = null;
+                if (!_panMoved) {
+                  final worldOffset = _toWorld(
+                    canvasState,
+                    event.localPosition,
                   );
+                  _activeTool?.onSecondaryTap(
+                    Point2D(x: worldOffset.dx, y: worldOffset.dy),
+                  );
+                }
+                return;
+              }
+
+              final worldOffset = _toWorld(canvasState, event.localPosition);
+              final worldPoint = Point2D(x: worldOffset.dx, y: worldOffset.dy);
+              if (_isDragging) {
+                _activeTool?.onDragEnd(worldPoint);
+                _isDragging = false;
+                // ADR-026: drag committed — bring the labels back (one repaint,
+                // recomputed from the settled geometry).
+                ref.read(activeDragProvider.notifier).end();
+              } else {
+                // Non-drag pointer-up: let tools execute deferred
+                // actions (e.g. zone body drag threshold not reached).
+                _activeTool?.onPointerUp(worldPoint);
+              }
+              _setInteractionData(_activeTool?.getInteractionData());
             },
-            onTapDown: (details) {
-              final worldOffset = _toWorld(
-                canvasState,
-                details.localPosition,
-              );
-              final worldPoint = Point2D(
-                x: worldOffset.dx,
-                y: worldOffset.dy,
-              );
-              _activeTool?.onTap(
-                worldPoint,
-                details.kind ?? PointerDeviceKind.mouse,
-              );
-            },
-            // ADR-018 Rule 10: 500 ms long-press is the tablet
-            // equivalent of desktop right-click — forward to the
-            // active tool's onSecondaryTap path.
-            onLongPressStart: (details) {
-              final worldOffset = _toWorld(
-                canvasState,
-                details.localPosition,
-              );
-              final worldPoint = Point2D(
-                x: worldOffset.dx,
-                y: worldOffset.dy,
-              );
-              _activeTool?.onSecondaryTap(worldPoint);
-            },
-            child: MouseRegion(
-              cursor: _cursorForTool(
-                ref.watch(selectedToolProvider),
-              ),
-              onHover: (event) {
+            child: GestureDetector(
+              onScaleStart: (details) {
+                if (_isDragging || _isPanningView) return;
+                ref
+                    .read(canvasControllerProvider.notifier)
+                    .onScaleStart(details.localFocalPoint);
+              },
+              onScaleUpdate: (details) {
+                if (_isDragging || _isPanningView) return;
+                // Pass the cumulative gesture scale straight through; the
+                // controller anchors it on the zoom captured at gesture start.
+                // Deriving a per-event delta here from the build-time
+                // `canvasState` snapshot made zoom flicker when several scale
+                // events fired within one frame (the snapshot was stale).
+                ref
+                    .read(canvasControllerProvider.notifier)
+                    .onScaleUpdate(
+                      focalPoint: details.localFocalPoint,
+                      scale: details.scale,
+                    );
+              },
+              onTapDown: (details) {
                 final worldOffset = _toWorld(
                   canvasState,
-                  event.localPosition,
+                  details.localPosition,
                 );
                 final worldPoint = Point2D(
                   x: worldOffset.dx,
                   y: worldOffset.dy,
                 );
-
-                // Update cursor position provider.
-                ref
-                    .read(cursorPositionProvider.notifier)
-                    .update(worldPoint);
-
-                // Notify active tool.
-                _activeTool?.onPointerMove(worldPoint);
-
-                final idata = _activeTool?.getInteractionData();
-
-                // Surface tool hints to the status bar.
-                final String? hint;
-                if (idata is ZoneDrawData &&
-                    idata.cursorOutsideValidArea) {
-                  hint = 'Move cursor inside a room to '
-                      'place zone vertices';
-                } else if (ref.read(selectedToolProvider) ==
-                        DrawingTool.drawWallZone &&
-                    idata == null) {
-                  hint = 'Hover over a wall to place a '
-                      'wall heating zone';
-                } else if (idata is RouteDrawData) {
-                  final lenM =
-                      idata.cumulativeLengthMm / 1000.0;
-                  hint =
-                      'Pipe length: '
-                      '${lenM.toStringAsFixed(1)} m';
-                } else if (idata is MeasureData) {
-                  final lenMm = GeometryEngine.distanceMm(
-                    idata.start,
-                    idata.end,
+                _activeTool?.onTap(
+                  worldPoint,
+                  details.kind ?? PointerDeviceKind.mouse,
+                );
+              },
+              // ADR-018 Rule 10: 500 ms long-press is the tablet
+              // equivalent of desktop right-click — forward to the
+              // active tool's onSecondaryTap path.
+              onLongPressStart: (details) {
+                final worldOffset = _toWorld(
+                  canvasState,
+                  details.localPosition,
+                );
+                final worldPoint = Point2D(
+                  x: worldOffset.dx,
+                  y: worldOffset.dy,
+                );
+                _activeTool?.onSecondaryTap(worldPoint);
+              },
+              child: MouseRegion(
+                cursor: _cursorForTool(ref.watch(selectedToolProvider)),
+                onHover: (event) {
+                  final worldOffset = _toWorld(
+                    canvasState,
+                    event.localPosition,
                   );
-                  final base = 'Distance: '
-                      '${(lenMm / 1000.0).toStringAsFixed(3)} m '
-                      '(${lenMm.round()} mm)';
-                  hint = idata.snapEnabled
-                      ? base
-                      : '$base · hold Shift to snap';
-                } else {
-                  hint = null;
-                }
-                ref
-                    .read(toolStatusHintProvider.notifier)
-                    .set(hint);
+                  final worldPoint = Point2D(
+                    x: worldOffset.dx,
+                    y: worldOffset.dy,
+                  );
 
-                _setHoverAndData(worldOffset, idata);
-              },
-              onExit: (_) {
-                ref
-                    .read(cursorPositionProvider.notifier)
-                    .update(null);
-                ref
-                    .read(toolStatusHintProvider.notifier)
-                    .set(null);
-                _setHoverAndData(null, _interactionState.value.data);
-              },
-              child: Container(
-                color: Theme.of(context)
-                    .colorScheme
-                    .surface,
-                child: ClipRect(
-                  // Five independent layers, each behind its own
-                  // RepaintBoundary. The non-interactive world is split
-                  // into grid / committed-geometry / pipes+annotations so
-                  // a geometry edit repaints only the layers whose inputs
-                  // changed — the grid in particular never repaints during
-                  // a wall/room drag. Pointer-move repaints touch only the
-                  // interaction layer.
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      RepaintBoundary(
-                        child: CustomPaint(
-                          size: viewSize,
-                          painter: GridLayerPainter(
-                            transform: canvasState.transform,
-                            gridSpacingMm: gridSpacingMm,
-                            visibleRect: visibleRect,
-                            dotColor: colors.gridDot,
+                  // Update cursor position provider.
+                  ref.read(cursorPositionProvider.notifier).update(worldPoint);
+
+                  // Notify active tool.
+                  _activeTool?.onPointerMove(worldPoint);
+
+                  final idata = _activeTool?.getInteractionData();
+
+                  // Surface tool hints to the status bar.
+                  final String? hint;
+                  if (idata is ZoneDrawData && idata.cursorOutsideValidArea) {
+                    hint =
+                        'Move cursor inside a room to '
+                        'place zone vertices';
+                  } else if (ref.read(selectedToolProvider) ==
+                          DrawingTool.drawWallZone &&
+                      idata == null) {
+                    hint =
+                        'Hover over a wall to place a '
+                        'wall heating zone';
+                  } else if (idata is RouteDrawData) {
+                    final lenM = idata.cumulativeLengthMm / 1000.0;
+                    hint =
+                        'Pipe length: '
+                        '${lenM.toStringAsFixed(1)} m';
+                  } else if (idata is MeasureData) {
+                    final lenMm = GeometryEngine.distanceMm(
+                      idata.start,
+                      idata.end,
+                    );
+                    final base =
+                        'Distance: '
+                        '${(lenMm / 1000.0).toStringAsFixed(3)} m '
+                        '(${lenMm.round()} mm)';
+                    hint = idata.snapEnabled
+                        ? base
+                        : '$base · hold Shift to snap';
+                  } else {
+                    hint = null;
+                  }
+                  ref.read(toolStatusHintProvider.notifier).set(hint);
+
+                  _setHoverAndData(worldOffset, idata);
+                },
+                onExit: (_) {
+                  ref.read(cursorPositionProvider.notifier).update(null);
+                  ref.read(toolStatusHintProvider.notifier).set(null);
+                  _setHoverAndData(null, _interactionState.value.data);
+                },
+                child: Container(
+                  color: Theme.of(context).colorScheme.surface,
+                  child: ClipRect(
+                    // Five independent layers, each behind its own
+                    // RepaintBoundary. The non-interactive world is split
+                    // into grid / committed-geometry / pipes+annotations so
+                    // a geometry edit repaints only the layers whose inputs
+                    // changed — the grid in particular never repaints during
+                    // a wall/room drag. Pointer-move repaints touch only the
+                    // interaction layer.
+                    child: Stack(
+                      fit: StackFit.expand,
+                      children: [
+                        RepaintBoundary(
+                          child: CustomPaint(
+                            size: viewSize,
+                            painter: GridLayerPainter(
+                              transform: canvasState.transform,
+                              gridSpacingMm: gridSpacingMm,
+                              visibleRect: visibleRect,
+                              dotColor: colors.gridDot,
+                            ),
                           ),
                         ),
-                      ),
-                      RepaintBoundary(
-                        child: CustomPaint(
-                          size: viewSize,
-                          painter: GeometryLayerPainter(
-                            transform: canvasState.transform,
-                            colors: colors,
-                            walls: editorState.walls,
-                            rooms: editorState.rooms,
-                            windows: editorState.windows,
-                            doors: editorState.doors,
-                            zones: editorState.zones,
-                            zoneStates: zoneStates,
+                        RepaintBoundary(
+                          child: CustomPaint(
+                            size: viewSize,
+                            painter: GeometryLayerPainter(
+                              transform: canvasState.transform,
+                              colors: colors,
+                              walls: editorState.walls,
+                              rooms: editorState.rooms,
+                              windows: editorState.windows,
+                              doors: editorState.doors,
+                              zones: editorState.zones,
+                              zoneStates: zoneStates,
+                            ),
                           ),
                         ),
-                      ),
-                      RepaintBoundary(
-                        child: CustomPaint(
-                          size: viewSize,
-                          painter: PipeLayerPainter(
-                            transform: canvasState.transform,
-                            colors: colors,
-                            circuits: editorState.circuits,
-                            distributor: editorState.distributor,
+                        RepaintBoundary(
+                          child: CustomPaint(
+                            size: viewSize,
+                            painter: PipeLayerPainter(
+                              transform: canvasState.transform,
+                              colors: colors,
+                              circuits: editorState.circuits,
+                              distributor: editorState.distributor,
+                            ),
                           ),
                         ),
-                      ),
-                      RepaintBoundary(
-                        child: CustomPaint(
-                          size: viewSize,
-                          // ADR-026: throttled geometry → labels relayout at
-                          // ~10 fps during a drag, full rate at rest.
-                          painter: AnnotationLayerPainter(
-                            transform: canvasState.transform,
-                            onSurface: onSurface,
-                            walls: annotationGeometry.walls,
-                            rooms: annotationGeometry.rooms,
-                            cache: _annotationLabelCache,
+                        RepaintBoundary(
+                          child: CustomPaint(
+                            size: viewSize,
+                            // ADR-026: throttled geometry → labels relayout at
+                            // ~10 fps during a drag, full rate at rest.
+                            painter: AnnotationLayerPainter(
+                              transform: canvasState.transform,
+                              onSurface: onSurface,
+                              walls: annotationGeometry.walls,
+                              rooms: annotationGeometry.rooms,
+                              cache: _annotationLabelCache,
+                            ),
                           ),
                         ),
-                      ),
-                      RepaintBoundary(
-                        child: CustomPaint(
-                          size: viewSize,
-                          painter: _HoverHighlightLayerPainter(
-                            transform: canvasState.transform,
-                            hoveredElement: hoveredElement,
-                            walls: editorState.walls,
-                            zones: editorState.zones,
-                            circuits: editorState.circuits,
-                            distributor: editorState.distributor,
+                        RepaintBoundary(
+                          child: CustomPaint(
+                            size: viewSize,
+                            painter: _HoverHighlightLayerPainter(
+                              transform: canvasState.transform,
+                              hoveredElement: hoveredElement,
+                              walls: editorState.walls,
+                              zones: editorState.zones,
+                              circuits: editorState.circuits,
+                              distributor: editorState.distributor,
+                            ),
                           ),
                         ),
-                      ),
-                      RepaintBoundary(
-                        child: CustomPaint(
-                          size: viewSize,
-                          painter: _PendingRoomHighlightLayerPainter(
-                            transform: canvasState.transform,
-                            highlight: _pendingRoomHighlight,
-                            color: colors.selectionHighlight,
+                        RepaintBoundary(
+                          child: CustomPaint(
+                            size: viewSize,
+                            painter: _PendingRoomHighlightLayerPainter(
+                              transform: canvasState.transform,
+                              highlight: _pendingRoomHighlight,
+                              color: colors.selectionHighlight,
+                            ),
                           ),
                         ),
-                      ),
-                      RepaintBoundary(
-                        child: CustomPaint(
-                          size: viewSize,
-                          painter: _InteractionLayerPainter(
-                            transform: canvasState.transform,
-                            state: _interactionState,
-                            selectionHighlightColor:
-                                colors.selectionHighlight,
-                            supplyPipeColor: colors.supplyPipe,
-                            returnPipeColor: colors.returnPipe,
+                        RepaintBoundary(
+                          child: CustomPaint(
+                            size: viewSize,
+                            painter: _InteractionLayerPainter(
+                              transform: canvasState.transform,
+                              state: _interactionState,
+                              selectionHighlightColor:
+                                  colors.selectionHighlight,
+                              supplyPipeColor: colors.supplyPipe,
+                              returnPipeColor: colors.returnPipe,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -1473,23 +1430,16 @@ class _FloorPlanCanvasState
       DrawingTool.placeDoor => SystemMouseCursors.precise,
       DrawingTool.drawZone => SystemMouseCursors.precise,
       DrawingTool.drawWallZone => SystemMouseCursors.precise,
-      DrawingTool.placeDistributor =>
-        SystemMouseCursors.precise,
+      DrawingTool.placeDistributor => SystemMouseCursors.precise,
       DrawingTool.routePipe => SystemMouseCursors.precise,
       DrawingTool.measure => SystemMouseCursors.precise,
     };
   }
 
-  Rect _computeVisibleRect(
-    CanvasState state,
-    Size viewSize,
-  ) {
+  Rect _computeVisibleRect(CanvasState state, Size viewSize) {
     final inv = Matrix4.inverted(state.transform);
     final tl = _transformPoint(inv, Offset.zero);
-    final br = _transformPoint(
-      inv,
-      Offset(viewSize.width, viewSize.height),
-    );
+    final br = _transformPoint(inv, Offset(viewSize.width, viewSize.height));
     return Rect.fromLTRB(tl.dx, tl.dy, br.dx, br.dy);
   }
 
@@ -1498,13 +1448,8 @@ class _FloorPlanCanvasState
     return _transformPoint(inv, screen);
   }
 
-  static Offset _transformPoint(
-    Matrix4 matrix,
-    Offset point,
-  ) {
-    final result = matrix.transform3(
-      Vector3(point.dx, point.dy, 0),
-    );
+  static Offset _transformPoint(Matrix4 matrix, Offset point) {
+    final result = matrix.transform3(Vector3(point.dx, point.dy, 0));
     return Offset(result.x, result.y);
   }
 }
@@ -1651,8 +1596,7 @@ class _HoverHighlightLayerPainter extends CustomPainter {
           canvas.drawPath(path, strokePaint);
         }
       case 'circuit':
-        final circuit =
-            circuits.where((c) => c.id == hovered.id).firstOrNull;
+        final circuit = circuits.where((c) => c.id == hovered.id).firstOrNull;
         if (circuit != null) {
           for (final pts in [
             circuit.supplyRoutePath,
@@ -1776,10 +1720,8 @@ class _CreateRoomCommand extends Command {
   String get label => 'Create room';
 
   @override
-  void execute() =>
-      callbacks.replaceAllWallsAndRooms(newWalls, newRooms);
+  void execute() => callbacks.replaceAllWallsAndRooms(newWalls, newRooms);
 
   @override
-  void undo() =>
-      callbacks.replaceAllWallsAndRooms(oldWalls, oldRooms);
+  void undo() => callbacks.replaceAllWallsAndRooms(oldWalls, oldRooms);
 }
