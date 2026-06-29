@@ -1395,6 +1395,21 @@ class $RoomsTable extends Rooms with TableInfo<$RoomsTable, Room> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _isHeatedMeta = const VerificationMeta(
+    'isHeated',
+  );
+  @override
+  late final GeneratedColumn<bool> isHeated = GeneratedColumn<bool>(
+    'is_heated',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_heated" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   static const VerificationMeta _targetTempCMeta = const VerificationMeta(
     'targetTempC',
   );
@@ -1504,6 +1519,7 @@ class $RoomsTable extends Rooms with TableInfo<$RoomsTable, Room> {
     id,
     floorId,
     name,
+    isHeated,
     targetTempC,
     airChangeRate,
     polygonJson,
@@ -1546,6 +1562,12 @@ class $RoomsTable extends Rooms with TableInfo<$RoomsTable, Room> {
       );
     } else if (isInserting) {
       context.missing(_nameMeta);
+    }
+    if (data.containsKey('is_heated')) {
+      context.handle(
+        _isHeatedMeta,
+        isHeated.isAcceptableOrUnknown(data['is_heated']!, _isHeatedMeta),
+      );
     }
     if (data.containsKey('target_temp_c')) {
       context.handle(
@@ -1649,6 +1671,10 @@ class $RoomsTable extends Rooms with TableInfo<$RoomsTable, Room> {
         DriftSqlType.string,
         data['${effectivePrefix}name'],
       )!,
+      isHeated: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_heated'],
+      )!,
       targetTempC: attachedDatabase.typeMapping.read(
         DriftSqlType.double,
         data['${effectivePrefix}target_temp_c'],
@@ -1698,6 +1724,10 @@ class Room extends DataClass implements Insertable<Room> {
   final String id;
   final String floorId;
   final String name;
+
+  /// Whether the room is part of the heating system (ADR-036).
+  /// `false` = unheated space (staircase, hallway): no demand, no zone.
+  final bool isHeated;
   final double targetTempC;
   final double airChangeRate;
 
@@ -1727,6 +1757,7 @@ class Room extends DataClass implements Insertable<Room> {
     required this.id,
     required this.floorId,
     required this.name,
+    required this.isHeated,
     required this.targetTempC,
     required this.airChangeRate,
     required this.polygonJson,
@@ -1743,6 +1774,7 @@ class Room extends DataClass implements Insertable<Room> {
     map['id'] = Variable<String>(id);
     map['floor_id'] = Variable<String>(floorId);
     map['name'] = Variable<String>(name);
+    map['is_heated'] = Variable<bool>(isHeated);
     map['target_temp_c'] = Variable<double>(targetTempC);
     map['air_change_rate'] = Variable<double>(airChangeRate);
     map['polygon_json'] = Variable<String>(polygonJson);
@@ -1768,6 +1800,7 @@ class Room extends DataClass implements Insertable<Room> {
       id: Value(id),
       floorId: Value(floorId),
       name: Value(name),
+      isHeated: Value(isHeated),
       targetTempC: Value(targetTempC),
       airChangeRate: Value(airChangeRate),
       polygonJson: Value(polygonJson),
@@ -1797,6 +1830,7 @@ class Room extends DataClass implements Insertable<Room> {
       id: serializer.fromJson<String>(json['id']),
       floorId: serializer.fromJson<String>(json['floorId']),
       name: serializer.fromJson<String>(json['name']),
+      isHeated: serializer.fromJson<bool>(json['isHeated']),
       targetTempC: serializer.fromJson<double>(json['targetTempC']),
       airChangeRate: serializer.fromJson<double>(json['airChangeRate']),
       polygonJson: serializer.fromJson<String>(json['polygonJson']),
@@ -1823,6 +1857,7 @@ class Room extends DataClass implements Insertable<Room> {
       'id': serializer.toJson<String>(id),
       'floorId': serializer.toJson<String>(floorId),
       'name': serializer.toJson<String>(name),
+      'isHeated': serializer.toJson<bool>(isHeated),
       'targetTempC': serializer.toJson<double>(targetTempC),
       'airChangeRate': serializer.toJson<double>(airChangeRate),
       'polygonJson': serializer.toJson<String>(polygonJson),
@@ -1841,6 +1876,7 @@ class Room extends DataClass implements Insertable<Room> {
     String? id,
     String? floorId,
     String? name,
+    bool? isHeated,
     double? targetTempC,
     double? airChangeRate,
     String? polygonJson,
@@ -1854,6 +1890,7 @@ class Room extends DataClass implements Insertable<Room> {
     id: id ?? this.id,
     floorId: floorId ?? this.floorId,
     name: name ?? this.name,
+    isHeated: isHeated ?? this.isHeated,
     targetTempC: targetTempC ?? this.targetTempC,
     airChangeRate: airChangeRate ?? this.airChangeRate,
     polygonJson: polygonJson ?? this.polygonJson,
@@ -1877,6 +1914,7 @@ class Room extends DataClass implements Insertable<Room> {
       id: data.id.present ? data.id.value : this.id,
       floorId: data.floorId.present ? data.floorId.value : this.floorId,
       name: data.name.present ? data.name.value : this.name,
+      isHeated: data.isHeated.present ? data.isHeated.value : this.isHeated,
       targetTempC: data.targetTempC.present
           ? data.targetTempC.value
           : this.targetTempC,
@@ -1913,6 +1951,7 @@ class Room extends DataClass implements Insertable<Room> {
           ..write('id: $id, ')
           ..write('floorId: $floorId, ')
           ..write('name: $name, ')
+          ..write('isHeated: $isHeated, ')
           ..write('targetTempC: $targetTempC, ')
           ..write('airChangeRate: $airChangeRate, ')
           ..write('polygonJson: $polygonJson, ')
@@ -1931,6 +1970,7 @@ class Room extends DataClass implements Insertable<Room> {
     id,
     floorId,
     name,
+    isHeated,
     targetTempC,
     airChangeRate,
     polygonJson,
@@ -1948,6 +1988,7 @@ class Room extends DataClass implements Insertable<Room> {
           other.id == this.id &&
           other.floorId == this.floorId &&
           other.name == this.name &&
+          other.isHeated == this.isHeated &&
           other.targetTempC == this.targetTempC &&
           other.airChangeRate == this.airChangeRate &&
           other.polygonJson == this.polygonJson &&
@@ -1963,6 +2004,7 @@ class RoomsCompanion extends UpdateCompanion<Room> {
   final Value<String> id;
   final Value<String> floorId;
   final Value<String> name;
+  final Value<bool> isHeated;
   final Value<double> targetTempC;
   final Value<double> airChangeRate;
   final Value<String> polygonJson;
@@ -1977,6 +2019,7 @@ class RoomsCompanion extends UpdateCompanion<Room> {
     this.id = const Value.absent(),
     this.floorId = const Value.absent(),
     this.name = const Value.absent(),
+    this.isHeated = const Value.absent(),
     this.targetTempC = const Value.absent(),
     this.airChangeRate = const Value.absent(),
     this.polygonJson = const Value.absent(),
@@ -1992,6 +2035,7 @@ class RoomsCompanion extends UpdateCompanion<Room> {
     required String id,
     required String floorId,
     required String name,
+    this.isHeated = const Value.absent(),
     this.targetTempC = const Value.absent(),
     this.airChangeRate = const Value.absent(),
     this.polygonJson = const Value.absent(),
@@ -2009,6 +2053,7 @@ class RoomsCompanion extends UpdateCompanion<Room> {
     Expression<String>? id,
     Expression<String>? floorId,
     Expression<String>? name,
+    Expression<bool>? isHeated,
     Expression<double>? targetTempC,
     Expression<double>? airChangeRate,
     Expression<String>? polygonJson,
@@ -2024,6 +2069,7 @@ class RoomsCompanion extends UpdateCompanion<Room> {
       if (id != null) 'id': id,
       if (floorId != null) 'floor_id': floorId,
       if (name != null) 'name': name,
+      if (isHeated != null) 'is_heated': isHeated,
       if (targetTempC != null) 'target_temp_c': targetTempC,
       if (airChangeRate != null) 'air_change_rate': airChangeRate,
       if (polygonJson != null) 'polygon_json': polygonJson,
@@ -2045,6 +2091,7 @@ class RoomsCompanion extends UpdateCompanion<Room> {
     Value<String>? id,
     Value<String>? floorId,
     Value<String>? name,
+    Value<bool>? isHeated,
     Value<double>? targetTempC,
     Value<double>? airChangeRate,
     Value<String>? polygonJson,
@@ -2060,6 +2107,7 @@ class RoomsCompanion extends UpdateCompanion<Room> {
       id: id ?? this.id,
       floorId: floorId ?? this.floorId,
       name: name ?? this.name,
+      isHeated: isHeated ?? this.isHeated,
       targetTempC: targetTempC ?? this.targetTempC,
       airChangeRate: airChangeRate ?? this.airChangeRate,
       polygonJson: polygonJson ?? this.polygonJson,
@@ -2085,6 +2133,9 @@ class RoomsCompanion extends UpdateCompanion<Room> {
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
+    }
+    if (isHeated.present) {
+      map['is_heated'] = Variable<bool>(isHeated.value);
     }
     if (targetTempC.present) {
       map['target_temp_c'] = Variable<double>(targetTempC.value);
@@ -2131,6 +2182,7 @@ class RoomsCompanion extends UpdateCompanion<Room> {
           ..write('id: $id, ')
           ..write('floorId: $floorId, ')
           ..write('name: $name, ')
+          ..write('isHeated: $isHeated, ')
           ..write('targetTempC: $targetTempC, ')
           ..write('airChangeRate: $airChangeRate, ')
           ..write('polygonJson: $polygonJson, ')
@@ -9828,6 +9880,7 @@ typedef $$RoomsTableCreateCompanionBuilder =
       required String id,
       required String floorId,
       required String name,
+      Value<bool> isHeated,
       Value<double> targetTempC,
       Value<double> airChangeRate,
       Value<String> polygonJson,
@@ -9844,6 +9897,7 @@ typedef $$RoomsTableUpdateCompanionBuilder =
       Value<String> id,
       Value<String> floorId,
       Value<String> name,
+      Value<bool> isHeated,
       Value<double> targetTempC,
       Value<double> airChangeRate,
       Value<String> polygonJson,
@@ -9953,6 +10007,11 @@ class $$RoomsTableFilterComposer extends Composer<_$AppDatabase, $RoomsTable> {
 
   ColumnFilters<String> get name => $composableBuilder(
     column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<bool> get isHeated => $composableBuilder(
+    column: $table.isHeated,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -10119,6 +10178,11 @@ class $$RoomsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isHeated => $composableBuilder(
+    column: $table.isHeated,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<double> get targetTempC => $composableBuilder(
     column: $table.targetTempC,
     builder: (column) => ColumnOrderings(column),
@@ -10202,6 +10266,9 @@ class $$RoomsTableAnnotationComposer
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<bool> get isHeated =>
+      $composableBuilder(column: $table.isHeated, builder: (column) => column);
 
   GeneratedColumn<double> get targetTempC => $composableBuilder(
     column: $table.targetTempC,
@@ -10383,6 +10450,7 @@ class $$RoomsTableTableManager
                 Value<String> id = const Value.absent(),
                 Value<String> floorId = const Value.absent(),
                 Value<String> name = const Value.absent(),
+                Value<bool> isHeated = const Value.absent(),
                 Value<double> targetTempC = const Value.absent(),
                 Value<double> airChangeRate = const Value.absent(),
                 Value<String> polygonJson = const Value.absent(),
@@ -10397,6 +10465,7 @@ class $$RoomsTableTableManager
                 id: id,
                 floorId: floorId,
                 name: name,
+                isHeated: isHeated,
                 targetTempC: targetTempC,
                 airChangeRate: airChangeRate,
                 polygonJson: polygonJson,
@@ -10413,6 +10482,7 @@ class $$RoomsTableTableManager
                 required String id,
                 required String floorId,
                 required String name,
+                Value<bool> isHeated = const Value.absent(),
                 Value<double> targetTempC = const Value.absent(),
                 Value<double> airChangeRate = const Value.absent(),
                 Value<String> polygonJson = const Value.absent(),
@@ -10427,6 +10497,7 @@ class $$RoomsTableTableManager
                 id: id,
                 floorId: floorId,
                 name: name,
+                isHeated: isHeated,
                 targetTempC: targetTempC,
                 airChangeRate: airChangeRate,
                 polygonJson: polygonJson,

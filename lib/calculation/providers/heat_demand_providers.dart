@@ -42,6 +42,13 @@ final roomHeatDemandProvider =
   final room = ref.watch(roomProvider(roomId)).asData?.value;
   if (room == null) return 0.0;
 
+  // ADR-036: an unheated room (staircase, hallway) carries no heating
+  // demand of its own. Its effect on neighbours is already captured by the
+  // adjacent rooms reading this room's (low) targetTempC for their
+  // interior-wall correction factor. Return a genuine 0.0 — not NaN — so it
+  // simply drops out of the building total and never expects a zone.
+  if (!room.isHeated) return 0.0;
+
   final walls =
       ref.watch(wallSegmentsProvider(roomId)).asData?.value;
   if (walls == null) return double.nan;

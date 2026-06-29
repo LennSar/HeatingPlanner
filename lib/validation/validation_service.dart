@@ -168,9 +168,19 @@ List<ValidationResult> _missingConstructionResults(Ref ref) {
   final state = ref.watch(editorStateProvider);
   final results = <ValidationResult>[];
 
+  // ADR-036: an unheated room's own exterior-wall U-value is read by no
+  // consumer (its demand is 0; neighbours use the shared interior wall plus
+  // this room's assumed temperature). Skip its walls so the missing
+  // construction is not flagged as a blocking error.
+  final unheatedRoomIds = {
+    for (final room in state.rooms)
+      if (!room.isHeated) room.id,
+  };
+
   for (final wall in state.walls) {
     if (wall.wallType == WallType.exterior &&
-        wall.constructionId == null) {
+        wall.constructionId == null &&
+        !unheatedRoomIds.contains(wall.roomId)) {
       results.add(
         ValidationResult(
           severity: WarningSeverity.error,
@@ -346,6 +356,13 @@ List<ValidationResult> _disconnectedCircuitResults(Ref ref) {
 /// (not yet part of a room) are excluded because duplicate unassigned segments
 /// are transient and harmless during drawing.
 ///
+/// A valid ADR-001 shared wall between two adjacent rooms is *intentionally*
+/// stored as two coincident segments linked by a reciprocal [mirrorId]
+/// (`a.mirrorId == b.id && b.mirrorId == a.id`, set on both walls by
+/// `addRoomFromDetection` per ADR-011). That pair is legitimate, so it is
+/// skipped — the warning fires only for coincident walls that are *not* a
+/// properly cross-linked mirror pair (genuine duplicates or a broken link).
+///
 /// Each coincident *pair* emits one [ValidationResult] on the wall with the
 /// lower-sorted ID so the same pair is never reported twice.
 List<ValidationResult> _overlappingWallResults(Ref ref) {
@@ -370,6 +387,11 @@ List<ValidationResult> _overlappingWallResults(Ref ref) {
           GeometryEngine.distanceMm(a.endPoint, b.startPoint) <= tol;
 
       if (!fwdMatch && !revMatch) continue;
+
+      // ADR-001 shared wall: a reciprocal mirror pair is the legitimate way
+      // two adjacent rooms share a boundary. The cross-linked ids show the
+      // pair is intact, so it is not a duplicate — skip it.
+      if (a.mirrorId == b.id && b.mirrorId == a.id) continue;
 
       // Report on the wall with the lexicographically smaller ID so each
       // pair is emitted exactly once.

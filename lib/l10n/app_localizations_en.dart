@@ -372,6 +372,18 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get heatedRoomLabel => 'Heated room';
+
+  @override
+  String assumedTemperatureValue(String temp) {
+    return 'Assumed Temperature: $temp °C';
+  }
+
+  @override
+  String get unheatedRoomNote =>
+      'Unheated space — excluded from heating demand. Its temperature is used as the adjacent temperature for neighbouring heated rooms.';
+
+  @override
   String get airChangeRate => 'Air Change Rate';
 
   @override

@@ -22,7 +22,20 @@ abstract class Room with _$Room {
     /// Display name (1–100 chars).
     required String name,
 
-    /// Target indoor temperature in °C. Range: 15.0–30.0.
+    /// Whether this room is part of the heating system (ADR-036).
+    ///
+    /// `true` (default) is a normal conditioned room. `false` marks an
+    /// unheated space — a staircase, internal hallway, store room — that is
+    /// still drawn as a room (its walls and adjacencies participate in the
+    /// model) but carries no heating demand and expects no [HeatingZone].
+    @Default(true) bool isHeated,
+
+    /// Target indoor temperature in °C.
+    ///
+    /// For a heated room ([isHeated] == true) this is the design set-point,
+    /// range 15.0–30.0. For an unheated room it is the *assumed* floating
+    /// temperature of the space (range 0.0–20.0), used by adjacent heated
+    /// rooms when computing interior-wall heat loss (ADR-036).
     @Default(20.0) double targetTempC,
 
     /// Ventilation air-change rate in h⁻¹. Range: 0.1–5.0.

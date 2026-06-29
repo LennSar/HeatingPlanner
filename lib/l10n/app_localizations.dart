@@ -704,6 +704,24 @@ abstract class AppLocalizations {
   /// **'Target Temperature: {temp} °C'**
   String targetTemperatureValue(String temp);
 
+  /// Toggle label: whether the room is part of the heating system (ADR-036)
+  ///
+  /// In en, this message translates to:
+  /// **'Heated room'**
+  String get heatedRoomLabel;
+
+  /// Unheated room assumed floating temperature with value (ADR-036)
+  ///
+  /// In en, this message translates to:
+  /// **'Assumed Temperature: {temp} °C'**
+  String assumedTemperatureValue(String temp);
+
+  /// Note shown in place of the heat-demand breakdown for an unheated room (ADR-036)
+  ///
+  /// In en, this message translates to:
+  /// **'Unheated space — excluded from heating demand. Its temperature is used as the adjacent temperature for neighbouring heated rooms.'**
+  String get unheatedRoomNote;
+
   /// Label for air change rate dropdown
   ///
   /// In en, this message translates to:

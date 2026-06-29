@@ -65,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 18;
+  int get schemaVersion => 19;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -110,6 +110,14 @@ class AppDatabase extends _$AppDatabase {
             );
             await m.database.customStatement(
               'ALTER TABLE material_entries DROP COLUMN category',
+            );
+          }
+          // ADR-036 (v19): add `is_heated` flag on `rooms`. Existing rooms
+          // default to heated so prior projects are unchanged.
+          if (from < 19) {
+            await m.database.customStatement(
+              'ALTER TABLE rooms '
+              'ADD COLUMN is_heated INTEGER NOT NULL DEFAULT 1',
             );
           }
         },

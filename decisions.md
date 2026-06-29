@@ -2637,3 +2637,80 @@ Rectangular rooms still get full rectangular resize via the Ctrl rect-reshape
 single-edge line projection, oblique pass-through, reversed-direction
 engagement, no-guides guard). Existing `select_tool_test.dart` suites still
 pass.
+
+---
+
+## ADR-036 — Unheated rooms are a per-room flag, not a temperature hack
+
+**Decision.**
+A `Room` carries a boolean `isHeated` (default `true`). When `isHeated == false`
+the room models an unconditioned space on the floor plan — a staircase, an
+internal hallway, a store room — that is *drawn as a normal room* (so its walls,
+geometry, and adjacencies participate in the model) but is **not part of the
+heating system**.
+
+The flag re-purposes the existing `Room.targetTempC` field rather than adding a
+new temperature concept:
+- **Heated room:** `targetTempC` is the design indoor set-point. UI range
+  `minIndoorTempC..maxIndoorTempC` (15–30 °C) as before.
+- **Unheated room:** `targetTempC` is the *assumed* floating temperature of the
+  space. UI range widens to `minUnheatedRoomTempC..maxUnheatedRoomTempC`
+  (0–20 °C). On toggling a room to unheated the value is pre-filled from the
+  project-level `unheatedSpaceTempC` default (10 °C) — the same default already
+  used for the `BoundaryCondition.unheatedSpace` floor/ceiling case.
+
+**Behavioural rules.**
+1. **The physics is unchanged — only the temperature carries it.** A heated
+   room losing heat across an interior wall to an unheated neighbour already
+   reads the neighbour's `targetTempC` through
+   `ThermalEngine.interiorCorrectionFactor`
+   (`heat_demand_providers.dart`, ADR-002). Allowing that neighbour to sit below
+   15 °C is the entire mechanism by which a staircase pulls heat from the rooms
+   around it. No new wall math is introduced.
+2. **An unheated room contributes zero heating demand.**
+   `roomHeatDemandProvider` returns `0.0` (not `double.nan` — this is a genuine
+   zero, not missing data) when `!room.isHeated`. Consequences: the room drops
+   out of `buildingHeatDemandProvider`, its ventilation loss is not summed, it
+   never expects a `HeatingZone`, and zone-coverage colour is never evaluated
+   against it.
+3. **`VR-01` (missing exterior-wall construction) is suppressed for the walls of
+   an unheated room.** Under the fixed-assumed-temperature simplification no
+   consumer reads an unheated room's own exterior-wall U-value (its own demand
+   is 0; neighbours read the shared *interior* wall plus this room's
+   temperature). Flagging it as a blocking error would be a false positive.
+   Heated rooms are unaffected.
+4. **Transit routing still applies.** A circuit may still route supply/return
+   through an unheated room at zero output (ADR-006 `insulationLayer`); the flag
+   and ADR-006 compose — the flag says "this space needs no heat", ADR-006 says
+   "this pipe gives none to the space it crosses".
+
+**Why a flag and not a boundary condition.**
+`BoundaryCondition.unheatedSpace` already exists but only for the floor/ceiling
+slab (attic/cellar above or below). It cannot express an unheated *neighbour on
+the same floor* because room auto-detection links `adjacentRoomId` on shared
+interior walls and the correction factor keys off the adjacent room's
+temperature. A per-room flag rides that existing machinery: the staircase is a
+real room with real shared walls, and every adjacent heated room already
+accounts for it correctly the moment its temperature is allowed below 15 °C.
+Trying to model the staircase as a boundary condition would mean *not* drawing
+it as a room and fighting the auto-linking.
+
+**Why fixed assumed temperature, not a computed balance.**
+EN 12831 permits a temperature-reduction (b-factor) simplification for
+unconditioned spaces; a user-set assumed temperature is exactly that. Deriving
+the unheated space's floating temperature from its own envelope heat balance is
+more accurate but materially more work (an extra solve coupled to every
+neighbour) and is deferred. If added later it must surface its own validation
+when the unheated room's envelope is under-specified.
+
+**Persistence.**
+`is_heated` boolean column on `rooms` (`withDefault(true)`), schema v19. The
+v19 migration `ALTER TABLE rooms ADD COLUMN is_heated INTEGER NOT NULL DEFAULT
+1`. `.hsp` round-trips through `Room.toJson`/`fromJson`; older files without the
+key import as heated (`isHeated ?? true`).
+
+**Verification.**
+`flutter analyze` clean; `dart run build_runner build` regenerates the freezed /
+drift / json sources. Heat-demand provider tests assert an unheated room returns
+`0.0` and that a heated neighbour's interior-wall loss rises as the unheated
+room's assumed temperature falls.

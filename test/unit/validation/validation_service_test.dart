@@ -205,6 +205,53 @@ void main() {
         expect(results.first.elementId, equals('w-ext-no-constr'));
       },
     );
+
+    test(
+      'VR01-5: exterior wall of an unheated room without construction -> '
+      'no error (ADR-036)',
+      () {
+        final room = createTestRoom(id: 'room-unheated', isHeated: false);
+        final wall = createTestWall(
+          id: 'w-unheated-ext',
+          roomId: room.id,
+          wallType: WallType.exterior,
+        );
+        final state = EditorState(rooms: [room], walls: [wall]);
+        final container = _containerWith(state);
+        addTearDown(container.dispose);
+
+        final results = container
+            .read(validationResultsProvider(''))
+            .where((r) => r.message.contains('has no construction assigned'))
+            .toList();
+
+        expect(results, isEmpty);
+      },
+    );
+
+    test(
+      'VR01-6: exterior wall of a heated room without construction still '
+      'errors (ADR-036 guard)',
+      () {
+        final room = createTestRoom(id: 'room-heated');
+        final wall = createTestWall(
+          id: 'w-heated-ext',
+          roomId: room.id,
+          wallType: WallType.exterior,
+        );
+        final state = EditorState(rooms: [room], walls: [wall]);
+        final container = _containerWith(state);
+        addTearDown(container.dispose);
+
+        final results = container
+            .read(validationResultsProvider(''))
+            .where((r) => r.message.contains('has no construction assigned'))
+            .toList();
+
+        expect(results, hasLength(1));
+        expect(results.first.elementId, equals('w-heated-ext'));
+      },
+    );
   });
 
   // ── VR-02: EN 1264 surface temperature exceeded ────────────────────────────
@@ -733,6 +780,71 @@ void main() {
             .toList();
 
         expect(results, isEmpty);
+      },
+    );
+  });
+
+  // ── GE-01: Overlapping (coincident) walls ──────────────────────────────────
+
+  group('GE-01 overlapping walls', () {
+    const stacked = 'stacked on top of each other';
+
+    test('GE01-1: two coincident walls with no mirror link -> error', () {
+      // Default createTestWall walls are coincident (both 0,0 -> 5000,0).
+      final a = createTestWall(id: 'wall-a');
+      final b = createTestWall(id: 'wall-b');
+      final state = EditorState(walls: [a, b]);
+      final container = _containerWith(state);
+      addTearDown(container.dispose);
+
+      final results = container
+          .read(validationResultsProvider(''))
+          .where((r) => r.message.contains(stacked))
+          .toList();
+
+      expect(results, hasLength(1));
+      expect(results.first.elementId, equals('wall-a'));
+      expect(results.first.severity, equals(WarningSeverity.error));
+    });
+
+    test(
+      'GE01-2: coincident reciprocal mirror pair (adjacent rooms) -> no error',
+      () {
+        // ADR-001 shared wall: one segment per room, cross-linked by mirrorId.
+        final a = createTestWall(id: 'wall-a', roomId: 'room-1')
+            .copyWith(mirrorId: 'wall-b', adjacentRoomId: 'room-2');
+        final b = createTestWall(id: 'wall-b', roomId: 'room-2')
+            .copyWith(mirrorId: 'wall-a', adjacentRoomId: 'room-1');
+        final state = EditorState(walls: [a, b]);
+        final container = _containerWith(state);
+        addTearDown(container.dispose);
+
+        final results = container
+            .read(validationResultsProvider(''))
+            .where((r) => r.message.contains(stacked))
+            .toList();
+
+        expect(results, isEmpty);
+      },
+    );
+
+    test(
+      'GE01-3: coincident walls with a one-sided mirror link still error',
+      () {
+        // Broken linkage: only one wall points at the other. Not a valid
+        // pair, so the data-integrity warning must still fire.
+        final a = createTestWall(id: 'wall-a').copyWith(mirrorId: 'wall-b');
+        final b = createTestWall(id: 'wall-b');
+        final state = EditorState(walls: [a, b]);
+        final container = _containerWith(state);
+        addTearDown(container.dispose);
+
+        final results = container
+            .read(validationResultsProvider(''))
+            .where((r) => r.message.contains(stacked))
+            .toList();
+
+        expect(results, hasLength(1));
       },
     );
   });

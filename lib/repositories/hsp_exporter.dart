@@ -176,6 +176,7 @@ class HspExporter {
         id: row.id,
         floorId: row.floorId,
         name: row.name,
+        isHeated: row.isHeated,
         targetTempC: row.targetTempC,
         airChangeRate: row.airChangeRate,
         polygon: _decodePoints(row.polygonJson),

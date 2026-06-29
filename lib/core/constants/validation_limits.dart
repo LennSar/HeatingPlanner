@@ -6,6 +6,14 @@ const double minOutdoorTempC = -50.0;
 const double maxOutdoorTempC = 10.0;
 const double minIndoorTempC = 15.0;
 const double maxIndoorTempC = 30.0;
+
+/// Assumed-temperature range for an unheated room (ADR-036).
+///
+/// An unheated room ([Room.isHeated] == false) holds an assumed floating
+/// temperature rather than a heating set-point, so its range extends below
+/// [minIndoorTempC] down towards outdoor conditions.
+const double minUnheatedRoomTempC = 0.0;
+const double maxUnheatedRoomTempC = 20.0;
 const double minSupplyTempC = 20.0;
 const double maxSupplyTempC = 55.0;
 

@@ -416,6 +416,15 @@
     "description": "Room target temperature with value",
     "placeholders": { "temp": { "type": "String" } }
   },
+  "heatedRoomLabel": "Heated room",
+  "@heatedRoomLabel": { "description": "Toggle label: whether the room is part of the heating system (ADR-036)" },
+  "assumedTemperatureValue": "Assumed Temperature: {temp} °C",
+  "@assumedTemperatureValue": {
+    "description": "Unheated room assumed floating temperature with value (ADR-036)",
+    "placeholders": { "temp": { "type": "String" } }
+  },
+  "unheatedRoomNote": "Unheated space — excluded from heating demand. Its temperature is used as the adjacent temperature for neighbouring heated rooms.",
+  "@unheatedRoomNote": { "description": "Note shown in place of the heat-demand breakdown for an unheated room (ADR-036)" },
   "airChangeRate": "Air Change Rate",
   "@airChangeRate": { "description": "Label for air change rate dropdown" },
   "custom": "Custom",

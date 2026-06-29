@@ -9,6 +9,7 @@ import '../../calculation/engines/thermal_engine.dart';
 import '../../calculation/providers/heat_demand_providers.dart';
 import '../../calculation/providers/project_settings_provider.dart';
 import '../../calculation/providers/u_value_providers.dart';
+import '../../core/constants/validation_limits.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/point2d.dart';
@@ -391,6 +392,30 @@ class _RoomPropertiesState
         );
   }
 
+  /// ADR-036: flip the heated/unheated flag. When switching to unheated the
+  /// temperature is reset to the project unheated default (clamped into the
+  /// unheated range); switching back to heated lifts a sub-15 °C value to the
+  /// project indoor default. Both directions are a single undo entry.
+  void _toggleHeated(Room room, bool heated) {
+    if (room.isHeated == heated) return;
+    double newTemp = room.targetTempC;
+    if (!heated) {
+      newTemp = ref
+          .read(unheatedSpaceTempCProvider)
+          .clamp(minUnheatedRoomTempC, maxUnheatedRoomTempC);
+    } else if (newTemp < minIndoorTempC) {
+      newTemp = ref.read(defaultIndoorTempCProvider);
+    }
+    ref.read(undoRedoProvider).execute(
+          _UpdateRoomCommand(
+            oldRoom: room,
+            newRoom: room.copyWith(isHeated: heated, targetTempC: newTemp),
+            update:
+                ref.read(editorStateProvider.notifier).updateRoom,
+          ),
+        );
+  }
+
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
@@ -526,20 +551,39 @@ class _RoomPropertiesState
               }
             },
           ),
-          const SizedBox(height: Spacing.md),
+          const SizedBox(height: Spacing.sm),
 
-          // Temperature slider.
+          // ADR-036: heated / unheated toggle. An unheated room (staircase,
+          // hallway) carries no heating demand; its temperature becomes the
+          // assumed floating value used by adjacent heated rooms.
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            dense: true,
+            title: Text(l10n.heatedRoomLabel, style: textTheme.bodyMedium),
+            value: room.isHeated,
+            onChanged: (heated) => _toggleHeated(room, heated),
+          ),
+          const SizedBox(height: Spacing.sm),
+
+          // Temperature slider. Range and label depend on isHeated.
           Text(
-            l10n.targetTemperatureValue(
-              room.targetTempC.toStringAsFixed(0),
-            ),
+            room.isHeated
+                ? l10n.targetTemperatureValue(
+                    room.targetTempC.toStringAsFixed(0),
+                  )
+                : l10n.assumedTemperatureValue(
+                    room.targetTempC.toStringAsFixed(0),
+                  ),
             style: textTheme.bodyMedium,
           ),
           Slider(
-            value: room.targetTempC,
-            min: 15,
-            max: 30,
-            divisions: 30,
+            value: room.targetTempC.clamp(
+              room.isHeated ? minIndoorTempC : minUnheatedRoomTempC,
+              room.isHeated ? maxIndoorTempC : maxUnheatedRoomTempC,
+            ),
+            min: room.isHeated ? minIndoorTempC : minUnheatedRoomTempC,
+            max: room.isHeated ? maxIndoorTempC : maxUnheatedRoomTempC,
+            divisions: room.isHeated ? 30 : 40,
             label: '${room.targetTempC.toStringAsFixed(1)} \u00B0C',
             onChangeStart: (_) {
               _roomAtSliderStart = room;
@@ -685,22 +729,33 @@ class _RoomPropertiesState
           ),
           const Divider(height: Spacing.lg),
 
-          // Heat demand breakdown (inline, from editorState).
-          Text(
-            l10n.heatDemand,
-            style: textTheme.headlineSmall,
-          ),
-          const SizedBox(height: Spacing.xs),
-          ..._heatDemandRows(
-            context,
-            ref,
-            room,
-            areaM2,
-            totalDemandW,
-            tOutdoor,
-            textTheme,
-            l10n,
-          ),
+          // ADR-036: an unheated room has no heating demand or output. Show a
+          // short note in place of the heat-demand breakdown.
+          if (!room.isHeated)
+            Text(
+              l10n.unheatedRoomNote,
+              style: textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            )
+          else ...[
+            // Heat demand breakdown (inline, from editorState).
+            Text(
+              l10n.heatDemand,
+              style: textTheme.headlineSmall,
+            ),
+            const SizedBox(height: Spacing.xs),
+            ..._heatDemandRows(
+              context,
+              ref,
+              room,
+              areaM2,
+              totalDemandW,
+              tOutdoor,
+              textTheme,
+              l10n,
+            ),
+          ],
           const SizedBox(height: Spacing.xs),
           _EnvelopeSection(room: room),
         ],

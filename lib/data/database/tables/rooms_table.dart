@@ -10,6 +10,9 @@ class Rooms extends Table {
   TextColumn get floorId =>
       text().references(Floors, #id, onDelete: KeyAction.cascade)();
   TextColumn get name => text().withLength(min: 1, max: 100)();
+  /// Whether the room is part of the heating system (ADR-036).
+  /// `false` = unheated space (staircase, hallway): no demand, no zone.
+  BoolColumn get isHeated => boolean().withDefault(const Constant(true))();
   RealColumn get targetTempC => real().withDefault(const Constant(20.0))();
   RealColumn get airChangeRate => real().withDefault(const Constant(0.5))();
   /// JSON array of {x, y} objects representing the room polygon in mm.

@@ -341,6 +341,7 @@ class HspImporter {
       id: fresh(d['id'] as String),
       floorId: idMap[oldFloorId] ?? oldFloorId,
       name: d['name'] as String,
+      isHeated: Value(d['isHeated'] as bool? ?? true),
       targetTempC: Value(_double(d, 'targetTempC')),
       airChangeRate:
           Value(_double(d, 'airChangeRate')),
