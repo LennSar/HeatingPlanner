@@ -210,6 +210,72 @@ void main() {
       expect(projects.length, equals(2),
           reason: 'both imported projects must coexist in the database');
     });
+
+    test('shared-wall mirrorId survives import (remapped, reciprocal)',
+        () async {
+      // Minimal snapshot: one floor, two adjacent rooms, and the ADR-001
+      // shared wall as two coincident segments cross-linked by mirrorId.
+      // Regression for the importer dropping mirrorId — which made GE-01
+      // mis-flag legitimate shared walls as overlapping after a reload.
+      Map<String, dynamic> wall(String id, String roomId, String mirror) => {
+            'id': id,
+            'roomId': roomId,
+            'startPoint': {'x': 0.0, 'y': 0.0},
+            'endPoint': {'x': 5000.0, 'y': 0.0},
+            'wallType': 'interior',
+            'thicknessMm': 120.0,
+            'anchorMode': 0,
+            'orientation': 'south',
+            'mirrorId': mirror,
+          };
+      final now = DateTime.now().toIso8601String();
+      final snapshot = <String, dynamic>{
+        'version': 1,
+        'project': {
+          'id': 'p1',
+          'name': 'Mirror Test',
+          'createdAt': now,
+          'modifiedAt': now,
+          'designOutdoorTempC': -12.0,
+          'defaultIndoorTempC': 20.0,
+        },
+        'floors': [
+          {'id': 'f1', 'projectId': 'p1', 'name': 'GF', 'level': 0,
+              'heightMm': 2600},
+        ],
+        'rooms': [
+          {'id': 'r1', 'floorId': 'f1', 'name': 'Living',
+              'targetTempC': 20.0, 'airChangeRate': 0.5, 'polygon': <dynamic>[]},
+          {'id': 'r2', 'floorId': 'f1', 'name': 'Hall',
+              'targetTempC': 20.0, 'airChangeRate': 0.5, 'polygon': <dynamic>[]},
+        ],
+        'wallSegments': [
+          wall('wa', 'r1', 'wb'),
+          wall('wb', 'r2', 'wa'),
+        ],
+      };
+
+      final db2 = $db.AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db2.close);
+
+      await HspImporter(db2).importSnapshot(snapshot);
+
+      final walls = await db2.select(db2.wallSegments).get();
+      expect(walls.length, equals(2));
+
+      // Both walls keep a mirror link, and the links point at each other's
+      // (remapped) ids — i.e. the reciprocal pair GE-01 recognises as valid.
+      final byId = {for (final w in walls) w.id: w};
+      for (final w in walls) {
+        expect(w.mirrorId, isNotNull,
+            reason: 'mirrorId must round-trip through import');
+        final partner = byId[w.mirrorId];
+        expect(partner, isNotNull,
+            reason: 'mirrorId must resolve to the imported partner wall');
+        expect(partner!.mirrorId, equals(w.id),
+            reason: 'the mirror link must be reciprocal');
+      }
+    });
   });
 
   // ── Session restore ─────────────────────────────────────────────────────────

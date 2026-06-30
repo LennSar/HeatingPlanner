@@ -9,6 +9,7 @@
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:heating_planner/calculation/providers/heat_demand_providers.dart';
 import 'package:heating_planner/calculation/providers/heat_output_providers.dart';
 import 'package:heating_planner/calculation/providers/hydraulic_balance_providers.dart';
 import 'package:heating_planner/calculation/providers/tube_length_providers.dart';
@@ -40,6 +41,9 @@ ProviderContainer _containerWith(EditorState state) {
     overrides: [
       editorStateProvider
           .overrideWith(() => _StubEditorStateNotifier(state)),
+      // VR-06 reads real heat demand; stub to 0.0 (never NaN) so it stays
+      // silent unless a test opts into the demand-overriding container.
+      roomHeatDemandProvider.overrideWith((ref, _) => 0.0),
       tubeLengthProvider.overrideWith((ref, _) => double.nan),
       zoneSurfaceTempProvider.overrideWith((ref, _) => double.nan),
       hydraulicBalanceProvider.overrideWith((ref, _) async => {}),
@@ -57,6 +61,9 @@ ProviderContainer _containerWithZoneTemps(
     overrides: [
       editorStateProvider
           .overrideWith(() => _StubEditorStateNotifier(state)),
+      // VR-06 reads real heat demand; stub to 0.0 (never NaN) so it stays
+      // silent unless a test opts into the demand-overriding container.
+      roomHeatDemandProvider.overrideWith((ref, _) => 0.0),
       tubeLengthProvider.overrideWith((ref, _) => double.nan),
       zoneSurfaceTempProvider.overrideWith(
         (ref, id) => temps[id] ?? double.nan,
@@ -76,6 +83,9 @@ ProviderContainer _containerWithTubeLengths(
     overrides: [
       editorStateProvider
           .overrideWith(() => _StubEditorStateNotifier(state)),
+      // VR-06 reads real heat demand; stub to 0.0 (never NaN) so it stays
+      // silent unless a test opts into the demand-overriding container.
+      roomHeatDemandProvider.overrideWith((ref, _) => 0.0),
       tubeLengthProvider.overrideWith(
         (ref, id) => lengths[id] ?? double.nan,
       ),
@@ -100,6 +110,9 @@ ProviderContainer _containerForHB01(
     overrides: [
       editorStateProvider
           .overrideWith(() => _StubEditorStateNotifier(state)),
+      // VR-06 reads real heat demand; stub to 0.0 (never NaN) so it stays
+      // silent unless a test opts into the demand-overriding container.
+      roomHeatDemandProvider.overrideWith((ref, _) => 0.0),
       tubeLengthProvider.overrideWith(
         (ref, id) => tubeLengths[id] ?? double.nan,
       ),
@@ -107,6 +120,26 @@ ProviderContainer _containerForHB01(
       hydraulicBalanceProvider.overrideWith(
         (ref, id) async => id == distributorId ? balanceMap : {},
       ),
+    ],
+  );
+}
+
+/// Builds a container where [roomHeatDemandProvider] returns values from
+/// [demands] (keyed by room id, default NaN); other calc providers neutral.
+ProviderContainer _containerWithDemands(
+  EditorState state,
+  Map<String, double> demands,
+) {
+  return ProviderContainer(
+    overrides: [
+      editorStateProvider
+          .overrideWith(() => _StubEditorStateNotifier(state)),
+      roomHeatDemandProvider.overrideWith(
+        (ref, id) => demands[id] ?? double.nan,
+      ),
+      tubeLengthProvider.overrideWith((ref, _) => double.nan),
+      zoneSurfaceTempProvider.overrideWith((ref, _) => double.nan),
+      hydraulicBalanceProvider.overrideWith((ref, _) async => {}),
     ],
   );
 }
@@ -250,6 +283,122 @@ void main() {
 
         expect(results, hasLength(1));
         expect(results.first.elementId, equals('w-heated-ext'));
+      },
+    );
+  });
+
+  // ── VR-06: Room heat demand cannot be calculated ───────────────────────────
+
+  group('VR-06 uncomputable room heat demand', () {
+    const msg = 'could not be calculated';
+
+    test('VR06-1: room with NaN demand -> room-level error', () {
+      final room = createTestRoom(id: 'room-nan');
+      final state = EditorState(rooms: [room]);
+      final container =
+          _containerWithDemands(state, {'room-nan': double.nan});
+      addTearDown(container.dispose);
+
+      final results = container
+          .read(validationResultsProvider(''))
+          .where((r) => r.message.contains(msg))
+          .toList();
+
+      expect(results, hasLength(1));
+      expect(results.first.elementId, equals('room-nan'));
+      expect(results.first.elementType, equals('room'));
+      expect(results.first.severity, equals(WarningSeverity.error));
+    });
+
+    test('VR06-2: room with a real demand -> no error', () {
+      final room = createTestRoom(id: 'room-ok');
+      final state = EditorState(rooms: [room]);
+      final container =
+          _containerWithDemands(state, {'room-ok': 850.0});
+      addTearDown(container.dispose);
+
+      final results = container
+          .read(validationResultsProvider(''))
+          .where((r) => r.message.contains(msg))
+          .toList();
+
+      expect(results, isEmpty);
+    });
+
+    test('VR06-3: unheated room returns 0.0, not NaN -> no error', () {
+      // ADR-036: roomHeatDemandProvider returns a genuine 0.0 for an
+      // unheated room, so VR-06 must stay silent.
+      final room = createTestRoom(id: 'room-unheated', isHeated: false);
+      final state = EditorState(rooms: [room]);
+      final container =
+          _containerWithDemands(state, {'room-unheated': 0.0});
+      addTearDown(container.dispose);
+
+      final results = container
+          .read(validationResultsProvider(''))
+          .where((r) => r.message.contains(msg))
+          .toList();
+
+      expect(results, isEmpty);
+    });
+
+    test(
+      'VR06-4: NaN demand already covered by VR-01 is not double-reported',
+      () {
+        // Heated room with an exterior wall missing a construction: VR-01
+        // gives the specific wall-level error, so VR-06 stays silent on it.
+        final room = createTestRoom(id: 'room-missing-constr');
+        final wall = createTestWall(
+          id: 'w-ext',
+          roomId: room.id,
+          wallType: WallType.exterior,
+        );
+        final state = EditorState(rooms: [room], walls: [wall]);
+        final container = _containerWithDemands(
+          state,
+          {'room-missing-constr': double.nan},
+        );
+        addTearDown(container.dispose);
+
+        final vr06 = container
+            .read(validationResultsProvider(''))
+            .where((r) => r.message.contains(msg))
+            .toList();
+        final vr01 = container
+            .read(validationResultsProvider(''))
+            .where((r) => r.message.contains('has no construction assigned'))
+            .toList();
+
+        expect(vr01, hasLength(1));
+        expect(vr06, isEmpty);
+      },
+    );
+
+    test(
+      'VR06-5: NaN demand with no exterior wall (VR-01 silent) -> VR-06 fires',
+      () {
+        // An interior-only room whose demand is NaN gets no VR-01 warning,
+        // so VR-06 is the safety net that surfaces it.
+        final room = createTestRoom(id: 'room-interior');
+        final wall = createTestWall(
+          id: 'w-int',
+          roomId: room.id,
+          wallType: WallType.interior,
+        );
+        final state = EditorState(rooms: [room], walls: [wall]);
+        final container = _containerWithDemands(
+          state,
+          {'room-interior': double.nan},
+        );
+        addTearDown(container.dispose);
+
+        final results = container
+            .read(validationResultsProvider(''))
+            .where((r) => r.message.contains(msg))
+            .toList();
+
+        expect(results, hasLength(1));
+        expect(results.first.elementId, equals('room-interior'));
       },
     );
   });
@@ -835,6 +984,50 @@ void main() {
         // pair, so the data-integrity warning must still fire.
         final a = createTestWall(id: 'wall-a').copyWith(mirrorId: 'wall-b');
         final b = createTestWall(id: 'wall-b');
+        final state = EditorState(walls: [a, b]);
+        final container = _containerWith(state);
+        addTearDown(container.dispose);
+
+        final results = container
+            .read(validationResultsProvider(''))
+            .where((r) => r.message.contains(stacked))
+            .toList();
+
+        expect(results, hasLength(1));
+      },
+    );
+
+    test(
+      'GE01-4: coincident walls of two adjacent rooms (reciprocal '
+      'adjacentRoomId, mirrorId dropped) -> no error',
+      () {
+        // Mimics a .hsp reloaded by an older build that stripped mirrorId but
+        // preserved adjacentRoomId. The reciprocal adjacency still identifies
+        // a legitimate shared wall, so no warning.
+        final a = createTestWall(id: 'wall-a', roomId: 'room-1')
+            .copyWith(adjacentRoomId: 'room-2');
+        final b = createTestWall(id: 'wall-b', roomId: 'room-2')
+            .copyWith(adjacentRoomId: 'room-1');
+        final state = EditorState(walls: [a, b]);
+        final container = _containerWith(state);
+        addTearDown(container.dispose);
+
+        final results = container
+            .read(validationResultsProvider(''))
+            .where((r) => r.message.contains(stacked))
+            .toList();
+
+        expect(results, isEmpty);
+      },
+    );
+
+    test(
+      'GE01-5: coincident duplicates in the SAME room still error',
+      () {
+        // Two segments in one room with no cross-references: a genuine
+        // duplicate, not a shared boundary. Must still warn.
+        final a = createTestWall(id: 'wall-a', roomId: 'room-1');
+        final b = createTestWall(id: 'wall-b', roomId: 'room-1');
         final state = EditorState(walls: [a, b]);
         final container = _containerWith(state);
         addTearDown(container.dispose);

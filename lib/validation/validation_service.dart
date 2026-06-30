@@ -3,6 +3,7 @@ import 'dart:math' show min, max;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../calculation/engines/geometry_engine.dart';
+import '../calculation/providers/heat_demand_providers.dart';
 import '../calculation/providers/heat_output_providers.dart';
 import '../calculation/providers/hydraulic_balance_providers.dart';
 import '../calculation/providers/tube_length_providers.dart';
@@ -35,6 +36,9 @@ import '../ui/providers/transient_warnings_provider.dart';
 /// - **VR-03** Heating circuit tube length exceeds hydraulic maximum.
 /// - **VR-04** Heating zone not connected to any circuit.
 /// - **VR-05** Circuit supply route not connected to the distributor.
+/// - **VR-06** Heated room whose heat demand cannot be calculated (the room
+///   panel shows "—") — catch-all so no room is silently excluded from the
+///   building total without a warning.
 /// - **GE-01** Two room-assigned wall segments are geometrically coincident
 ///   (overlapping walls).
 final validationResultsProvider =
@@ -47,6 +51,7 @@ final validationResultsProvider =
     results.addAll(_circuitLengthResults(ref));
     results.addAll(_unconnectedZoneResults(ref));
     results.addAll(_disconnectedCircuitResults(ref));
+    results.addAll(_uncomputableDemandResults(ref));
     results.addAll(_overlappingWallResults(ref));
     // ADR-017 Rule 8d: shared-wall promotion conflicts emitted by
     // EditorStateNotifier.addRoomFromDetection are picked up here so
@@ -193,6 +198,73 @@ List<ValidationResult> _missingConstructionResults(Ref ref) {
         ),
       );
     }
+  }
+
+  return results;
+}
+
+// ── Rule VR-06: Room heat demand cannot be calculated ─────────────────────────
+
+/// Returns a room-level [ValidationResult] for every room whose heat demand
+/// is [double.nan] — i.e. the room panel shows "—" and the room is silently
+/// excluded from the building total.
+///
+/// This is the catch-all that closes the gap left by [VR-01]: VR-01 only
+/// flags the single most common cause (an exterior wall missing a
+/// construction), is wall-level, and reads [editorStateProvider]. The heat
+/// demand the user actually sees comes from [roomHeatDemandProvider] (the
+/// repository-backed EN 12831 total). Watching that provider directly here
+/// guarantees the warnings panel and the room panel can never disagree, and
+/// covers every other cause of an uncomputable demand (degenerate room
+/// outline, future data-source divergences, etc.).
+///
+/// An unheated room ([Room.isHeated] == false, ADR-036) returns a genuine
+/// 0.0 from [roomHeatDemandProvider] — never NaN — so it is naturally
+/// skipped here and never warned about.
+///
+/// To avoid duplicating VR-01, rooms already flagged by VR-01 (heated room
+/// with an exterior wall missing a construction) are skipped — that rule
+/// gives a more specific, actionable message. When VR-01 did *not* fire
+/// (e.g. the room has no exterior walls, or a data-source divergence), this
+/// rule still surfaces the problem.
+List<ValidationResult> _uncomputableDemandResults(Ref ref) {
+  final state = ref.watch(editorStateProvider);
+
+  // Mirror VR-01's exact firing predicate so a room VR-01 did *not* flag
+  // still gets this room-level catch-all.
+  final unheatedRoomIds = {
+    for (final room in state.rooms)
+      if (!room.isHeated) room.id,
+  };
+  final vr01RoomIds = {
+    for (final wall in state.walls)
+      if (wall.wallType == WallType.exterior &&
+          wall.constructionId == null &&
+          !unheatedRoomIds.contains(wall.roomId))
+        wall.roomId,
+  };
+
+  final results = <ValidationResult>[];
+  for (final room in state.rooms) {
+    // Read the same value the room panel displays. NaN ⇒ "—" and excluded
+    // from the building total; a real number (including 0.0) ⇒ fine.
+    final demand = ref.watch(roomHeatDemandProvider(room.id));
+    if (!demand.isNaN) continue;
+    if (vr01RoomIds.contains(room.id)) continue;
+
+    results.add(
+      ValidationResult(
+        severity: WarningSeverity.error,
+        elementId: room.id,
+        elementType: 'room',
+        message: 'Heat demand for this room could not be calculated, so '
+            'it is silently excluded from the building total.',
+        suggestedFix: 'Assign a construction to every exterior wall and '
+            'make sure the room outline is a valid closed shape. If the '
+            'room is intentionally unheated (staircase, store room), mark '
+            'it as unheated in the room properties.',
+      ),
+    );
   }
 
   return results;
@@ -357,11 +429,16 @@ List<ValidationResult> _disconnectedCircuitResults(Ref ref) {
 /// are transient and harmless during drawing.
 ///
 /// A valid ADR-001 shared wall between two adjacent rooms is *intentionally*
-/// stored as two coincident segments linked by a reciprocal [mirrorId]
-/// (`a.mirrorId == b.id && b.mirrorId == a.id`, set on both walls by
-/// `addRoomFromDetection` per ADR-011). That pair is legitimate, so it is
-/// skipped — the warning fires only for coincident walls that are *not* a
-/// properly cross-linked mirror pair (genuine duplicates or a broken link).
+/// stored as two coincident segments, so it is skipped. The pair is recognised
+/// as legitimate when its ids show a real shared boundary, by either signal:
+///   - a reciprocal mirror link (`a.mirrorId == b.id && b.mirrorId == a.id`),
+///     set by `addRoomFromDetection` per ADR-011; or
+///   - reciprocal adjacency — two *different* rooms each naming the other as
+///     its neighbour (`a.adjacentRoomId == b.roomId && b.adjacentRoomId ==
+///     a.roomId`). This is the durable signal: it survives a `.hsp` round-trip
+///     that an older build stripped `mirrorId` from.
+/// The warning fires only for coincident walls showing *neither* — genuine
+/// duplicates (e.g. two segments in the same room) or a broken/one-sided link.
 ///
 /// Each coincident *pair* emits one [ValidationResult] on the wall with the
 /// lower-sorted ID so the same pair is never reported twice.
@@ -388,10 +465,21 @@ List<ValidationResult> _overlappingWallResults(Ref ref) {
 
       if (!fwdMatch && !revMatch) continue;
 
-      // ADR-001 shared wall: a reciprocal mirror pair is the legitimate way
-      // two adjacent rooms share a boundary. The cross-linked ids show the
-      // pair is intact, so it is not a duplicate — skip it.
-      if (a.mirrorId == b.id && b.mirrorId == a.id) continue;
+      // ADR-001 shared wall between two adjacent rooms is *intentionally* two
+      // coincident segments. It is legitimate — not a duplicate — when the
+      // pair's ids show it is a real shared boundary, recognised two ways:
+      //   1. Reciprocal mirror link (`mirrorId`), the bookkeeping field set by
+      //      room detection / shared-wall promotion (ADR-011).
+      //   2. Reciprocal adjacency: the segments belong to two *different* rooms
+      //      and each names the other's room as its neighbour
+      //      (`adjacentRoomId`). This is the durable semantic signal — it
+      //      survives a `.hsp` round-trip that an older build stripped
+      //      `mirrorId` from, so a reloaded shared wall is still recognised.
+      final isMirrorPair = a.mirrorId == b.id && b.mirrorId == a.id;
+      final isAdjacentRoomPair = a.roomId != b.roomId &&
+          a.adjacentRoomId == b.roomId &&
+          b.adjacentRoomId == a.roomId;
+      if (isMirrorPair || isAdjacentRoomPair) continue;
 
       // Report on the wall with the lexicographically smaller ID so each
       // pair is emitted exactly once.

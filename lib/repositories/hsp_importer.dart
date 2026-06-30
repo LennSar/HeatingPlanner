@@ -382,6 +382,11 @@ class HspImporter {
         d['constructionId'] as String?;
     final oldAdjRoomId =
         d['adjacentRoomId'] as String?;
+    // ADR-011 shared-wall link. The pre-scan has already minted a new id for
+    // every wall, so the mirror partner's remapped id is known here. Without
+    // this, every wall imports with mirrorId == null and a legitimate shared
+    // wall (two coincident segments) is mis-flagged as overlapping by GE-01.
+    final oldMirrorId = d['mirrorId'] as String?;
     return $db.WallSegmentsCompanion.insert(
       id: fresh(d['id'] as String),
       roomId: idMap[oldRoomId] ?? oldRoomId,
@@ -397,6 +402,11 @@ class HspImporter {
       adjacentRoomId: Value(
         oldAdjRoomId != null
             ? (idMap[oldAdjRoomId] ?? oldAdjRoomId)
+            : null,
+      ),
+      mirrorId: Value(
+        oldMirrorId != null
+            ? (idMap[oldMirrorId] ?? oldMirrorId)
             : null,
       ),
       orientation: Value(
