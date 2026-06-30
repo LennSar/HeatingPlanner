@@ -33,6 +33,10 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Generated code (build_runner: freezed, json_serializable, drift, riverpod)
+*.g.dart
+*.freezed.dart
+
 # Symbolication related
 app.*.symbols
 
