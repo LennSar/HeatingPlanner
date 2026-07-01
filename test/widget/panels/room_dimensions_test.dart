@@ -180,6 +180,15 @@ Widget _build(EditorState initial) {
       // Real service so RD-5 can exercise a genuine undo.
       undoRedoProvider.overrideWith((_) => UndoRedoService()),
       roomHeatDemandProvider.overrideWith((ref, _) => double.nan),
+      roomHeatDemandBreakdownProvider.overrideWith(
+        (ref, _) => (
+          transmissionW: double.nan,
+          floorW: double.nan,
+          ceilingW: double.nan,
+          ventilationW: double.nan,
+          totalW: double.nan,
+        ),
+      ),
       uValueProvider.overrideWith((ref, _) => double.nan),
     ],
     child: MaterialApp(

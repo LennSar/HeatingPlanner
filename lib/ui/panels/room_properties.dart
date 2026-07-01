@@ -476,17 +476,6 @@ class _RoomPropertiesState
           )
         : double.nan;
 
-    // Watch outdoor temp directly so this widget rebuilds when
-    // the project setting changes, even while roomProvider is
-    // a stub (the provider chain's early-return prevents the
-    // indirect dependency from being established).
-    final tOutdoor = ref.watch(designOutdoorTempCProvider);
-
-    // Provider-backed total heat demand (NaN while repository
-    // stubs are unconnected; will auto-update when wired).
-    final totalDemandW =
-        ref.watch(roomHeatDemandProvider(widget.roomId));
-
     final wallCount = editorState.walls
         .where((w) => w.roomId == widget.roomId)
         .length;
@@ -739,7 +728,9 @@ class _RoomPropertiesState
               ),
             )
           else ...[
-            // Heat demand breakdown (inline, from editorState).
+            // Heat demand breakdown — components and total come from the
+            // single roomHeatDemandBreakdownProvider, so the rows always
+            // reconcile with the total.
             Text(
               l10n.heatDemand,
               style: textTheme.headlineSmall,
@@ -750,8 +741,6 @@ class _RoomPropertiesState
               ref,
               room,
               areaM2,
-              totalDemandW,
-              tOutdoor,
               textTheme,
               l10n,
             ),
@@ -765,259 +754,39 @@ class _RoomPropertiesState
 
   /// Computes and returns heat demand display rows.
   ///
-  /// [totalDemandW] comes from [roomHeatDemandProvider].
-  /// When it is [double.nan] the total and specific heat
-  /// demand rows show "—". The transmission and ventilation
-  /// breakdown is computed inline from [editorStateProvider]
-  /// (no separate providers exist for these components yet).
+  /// Both the component rows and the total come from the single
+  /// [roomHeatDemandBreakdownProvider], so the breakdown always reconciles
+  /// with the total. When the total is [double.nan] the demand is
+  /// uncomputable and the total / specific rows show "—".
   List<Widget> _heatDemandRows(
     BuildContext context,
     WidgetRef ref,
     Room room,
     double areaM2,
-    double totalDemandW,
-    double tOutdoor,
     TextTheme textTheme,
     AppLocalizations l10n,
   ) {
-    const ceilingHeightMm = 2600.0;
-    final tIndoor = room.targetTempC;
-
     final editorState = ref.read(editorStateProvider);
     final roomWalls = editorState.walls
         .where((w) => w.roomId == room.id)
         .toList();
+    final hasAnyConstruction =
+        roomWalls.any((w) => w.constructionId != null);
 
-    var qTransmission = 0.0;
-    var hasAnyConstruction = false;
+    // Single source of truth: the same computation that yields the total.
+    final demand =
+        ref.watch(roomHeatDemandBreakdownProvider(room.id));
+    final qTransmission = demand.transmissionW;
+    final qFloor = demand.floorW; // NaN ⇒ no floor construction (n/a).
+    final qCeiling = demand.ceilingW; // NaN ⇒ no ceiling construction (n/a).
+    final qVent = demand.ventilationW; // NaN ⇒ degenerate room (not shown).
+    final totalDemandW = demand.totalW;
 
-    for (final wall in roomWalls) {
-      if (wall.constructionId == null) continue;
-      final construction = editorState.constructions
-          .where((c) => c.id == wall.constructionId)
-          .firstOrNull;
-      if (construction == null) continue;
-
-      final layers = editorState.materialLayers
-          .where((l) => l.constructionId == construction.id)
-          .toList()
-        ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-      if (layers.isEmpty) continue;
-
-      final u = ThermalEngine.uValue(
-        layerThicknessesMm:
-            layers.map((l) => l.thicknessMm).toList(),
-        layerLambdas:
-            layers.map((l) => l.thermalConductivity).toList(),
-        rsi: construction.rsi,
-        rse: construction.rse,
-      );
-      if (u.isNaN) continue;
-      hasAnyConstruction = true;
-
-      final wallLengthMm = GeometryEngine.distanceMm(
-        wall.startPoint,
-        wall.endPoint,
-      );
-
-      final wallWindows = editorState.windows
-          .where((w) => w.wallSegmentId == wall.id)
-          .toList();
-      final wallDoors = editorState.doors
-          .where((d) => d.wallSegmentId == wall.id)
-          .toList();
-
-      final openings = <({int widthMm, int heightMm})>[
-        for (final w in wallWindows)
-          (widthMm: w.widthMm, heightMm: w.heightMm),
-        for (final d in wallDoors)
-          (widthMm: d.widthMm, heightMm: d.heightMm),
-      ];
-
-      final netAreaM2 = ThermalEngine.netWallAreaM2(
-        wallLengthMm: wallLengthMm,
-        wallHeightMm: ceilingHeightMm,
-        openings: openings,
-      );
-
-      double corrF = 1.0;
-      if (wall.adjacentRoomId != null &&
-          wall.adjacentRoomId!.isNotEmpty) {
-        final adjRoom = editorState.rooms
-            .where((r) => r.id == wall.adjacentRoomId)
-            .firstOrNull;
-        final tAdj = adjRoom?.targetTempC ?? tIndoor;
-        corrF = ThermalEngine.interiorCorrectionFactor(
-          tThisRoomC: tIndoor,
-          tAdjacentRoomC: tAdj,
-          tOutdoorC: tOutdoor,
-        );
-        if (corrF.isNaN) corrF = 0.0;
-      }
-
-      if (!netAreaM2.isNaN && netAreaM2 > 0) {
-        final loss = ThermalEngine.transmissionLoss(
-          uValue: u,
-          areaM2: netAreaM2,
-          correctionF: corrF,
-          tIndoorC: tIndoor,
-          tOutdoorC: tOutdoor,
-        );
-        if (!loss.isNaN) qTransmission += loss;
-      }
-
-      for (final w in wallWindows) {
-        final q = ThermalEngine.transmissionLoss(
-          uValue: w.uValue,
-          areaM2: w.widthMm * w.heightMm / 1e6,
-          correctionF: corrF,
-          tIndoorC: tIndoor,
-          tOutdoorC: tOutdoor,
-        );
-        if (!q.isNaN) qTransmission += q;
-      }
-
-      for (final d in wallDoors) {
-        final q = ThermalEngine.transmissionLoss(
-          uValue: d.uValue,
-          areaM2: d.widthMm * d.heightMm / 1e6,
-          correctionF: corrF,
-          tIndoorC: tIndoor,
-          tOutdoorC: tOutdoor,
-        );
-        if (!q.isNaN) qTransmission += q;
-      }
-    }
-
-    final volumeM3 = ThermalEngine.roomVolumeM3(
-      floorAreaM2: areaM2,
-      ceilingHeightMm: ceilingHeightMm,
-    );
-    final qVent = ThermalEngine.ventilationLoss(
-      roomVolumeM3: volumeM3,
-      airChangeRate: room.airChangeRate,
-      tIndoorC: tIndoor,
-      tOutdoorC: tOutdoor,
-    );
-
-    final tUnheatedDefault =
-        ref.read(unheatedSpaceTempCProvider);
-    final tIndoorDefault = ref.read(defaultIndoorTempCProvider);
-
-    // Floor transmission loss (inline from editorState).
-    double? qFloor;
-    if (room.floorConstructionId != null && areaM2 > 0) {
-      final floorConstruction = editorState.constructions
-          .where((c) => c.id == room.floorConstructionId)
-          .firstOrNull;
-      if (floorConstruction != null) {
-        final floorLayers = editorState.materialLayers
-            .where(
-              (l) => l.constructionId == room.floorConstructionId,
-            )
-            .toList()
-          ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-        if (floorLayers.isNotEmpty) {
-          final uFloor = ThermalEngine.uValue(
-            layerThicknessesMm:
-                floorLayers.map((l) => l.thicknessMm).toList(),
-            layerLambdas: floorLayers
-                .map((l) => l.thermalConductivity)
-                .toList(),
-            rsi: floorConstruction.rsi,
-            rse: floorConstruction.rse,
-          );
-          if (!uFloor.isNaN) {
-            final tFloorAdj = room.floorAdjacentTempC ??
-                (room.floorBoundary == BoundaryCondition.interior
-                    ? tIndoorDefault
-                    : tUnheatedDefault);
-            final fFloor =
-                ThermalEngine.boundaryCorrectionFactor(
-              condition: room.floorBoundary,
-              tRoomC: tIndoor,
-              tOutdoorC: tOutdoor,
-              tAdjacentC: tFloorAdj,
-            );
-            if (!fFloor.isNaN) {
-              final loss = ThermalEngine.transmissionLoss(
-                uValue: uFloor,
-                areaM2: areaM2,
-                correctionF: fFloor,
-                tIndoorC: tIndoor,
-                tOutdoorC: tOutdoor,
-              );
-              if (!loss.isNaN) qFloor = loss;
-            }
-          }
-        }
-      }
-    }
-
-    // Ceiling transmission loss (same pattern).
-    double? qCeiling;
-    if (room.ceilingConstructionId != null && areaM2 > 0) {
-      final ceilConstruction = editorState.constructions
-          .where((c) => c.id == room.ceilingConstructionId)
-          .firstOrNull;
-      if (ceilConstruction != null) {
-        final ceilLayers = editorState.materialLayers
-            .where(
-              (l) =>
-                  l.constructionId == room.ceilingConstructionId,
-            )
-            .toList()
-          ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
-        if (ceilLayers.isNotEmpty) {
-          final uCeiling = ThermalEngine.uValue(
-            layerThicknessesMm:
-                ceilLayers.map((l) => l.thicknessMm).toList(),
-            layerLambdas: ceilLayers
-                .map((l) => l.thermalConductivity)
-                .toList(),
-            rsi: ceilConstruction.rsi,
-            rse: ceilConstruction.rse,
-          );
-          if (!uCeiling.isNaN) {
-            final tCeilAdj = room.ceilingAdjacentTempC ??
-                (room.ceilingBoundary == BoundaryCondition.interior
-                    ? tIndoorDefault
-                    : tUnheatedDefault);
-            final fCeiling =
-                ThermalEngine.boundaryCorrectionFactor(
-              condition: room.ceilingBoundary,
-              tRoomC: tIndoor,
-              tOutdoorC: tOutdoor,
-              tAdjacentC: tCeilAdj,
-            );
-            if (!fCeiling.isNaN) {
-              final loss = ThermalEngine.transmissionLoss(
-                uValue: uCeiling,
-                areaM2: areaM2,
-                correctionF: fCeiling,
-                tIndoorC: tIndoor,
-                tOutdoorC: tOutdoor,
-              );
-              if (!loss.isNaN) qCeiling = loss;
-            }
-          }
-        }
-      }
-    }
-
-    // Specific heat demand: use provider total if available,
-    // fall back to inline total.
-    final inlineTotal =
-        (hasAnyConstruction ? qTransmission : 0.0) +
-            (qVent.isNaN ? 0.0 : qVent) +
-            (qFloor ?? 0.0) +
-            (qCeiling ?? 0.0);
-    final effectiveTotal =
-        totalDemandW.isNaN ? inlineTotal : totalDemandW;
-    final specificW =
-        (areaM2 > 0 && effectiveTotal > 0)
-            ? effectiveTotal / areaM2
-            : double.nan;
+    final specificW = (areaM2 > 0 &&
+            !totalDemandW.isNaN &&
+            totalDemandW > 0)
+        ? totalDemandW / areaM2
+        : double.nan;
 
     final colorScheme = Theme.of(context).colorScheme;
     final demandTooltip = _roomDemandMissingPrereqs(
@@ -1030,7 +799,7 @@ class _RoomPropertiesState
       if (hasAnyConstruction)
         _readOnlyRow(
           l10n.transmissionQt,
-          '${qTransmission.round()} W',
+          qTransmission.isNaN ? '—' : '${qTransmission.round()} W',
           textTheme,
         )
       else
@@ -1045,12 +814,12 @@ class _RoomPropertiesState
         ),
       _readOnlyRow(
         l10n.transmissionFloor,
-        qFloor != null ? '${qFloor.round()} W' : '\u2014',
+        qFloor.isNaN ? '\u2014' : '${qFloor.round()} W',
         textTheme,
       ),
       _readOnlyRow(
         l10n.transmissionCeiling,
-        qCeiling != null ? '${qCeiling.round()} W' : '\u2014',
+        qCeiling.isNaN ? '\u2014' : '${qCeiling.round()} W',
         textTheme,
       ),
       if (!qVent.isNaN)

@@ -130,6 +130,15 @@ Widget _buildPanel({
       ),
       // Calculation providers — return NaN / empty so rows show "—"
       roomHeatDemandProvider.overrideWith((ref, _) => double.nan),
+      roomHeatDemandBreakdownProvider.overrideWith(
+        (ref, _) => (
+          transmissionW: double.nan,
+          floorW: double.nan,
+          ceilingW: double.nan,
+          ventilationW: double.nan,
+          totalW: double.nan,
+        ),
+      ),
       zoneHeatOutputProvider.overrideWith((ref, _) => double.nan),
       zoneSurfaceTempProvider.overrideWith((ref, _) => double.nan),
       flowRateProvider.overrideWith((ref, _) => double.nan),

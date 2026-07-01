@@ -12,10 +12,55 @@ import '../engines/geometry_engine.dart';
 import '../engines/thermal_engine.dart';
 import 'u_value_providers.dart';
 
-/// Heat demand for a single room in watts (W).
+/// Component breakdown of a room's EN 12831 design heat demand, in watts (W).
+///
+/// Every loss component plus their sum, produced by one computation so a UI
+/// can show a breakdown that always reconciles with [totalW] (there is no
+/// second, parallel calculation that could diverge).
+///
+/// - [transmissionW]: transmission loss through the room's walls, windows and
+///   doors (Q_T).
+/// - [floorW] / [ceilingW]: transmission loss through the floor slab / ceiling
+///   slab. [double.nan] when the corresponding construction is not assigned —
+///   the term is *not applicable*, distinct from a computed 0.
+/// - [ventilationW]: ventilation loss (Q_V). [double.nan] when the room outline
+///   is degenerate so no volume is available.
+/// - [totalW]: the design heat demand — the sum of the applicable components,
+///   or [double.nan] to signal incomplete data (see
+///   [roomHeatDemandBreakdownProvider]).
+///
+/// When [totalW] is [double.nan] every component is also [double.nan].
+typedef RoomHeatDemand = ({
+  double transmissionW,
+  double floorW,
+  double ceilingW,
+  double ventilationW,
+  double totalW,
+});
+
+/// Incomplete-data sentinel: total and every component are NaN.
+const RoomHeatDemand _uncomputableDemand = (
+  transmissionW: double.nan,
+  floorW: double.nan,
+  ceilingW: double.nan,
+  ventilationW: double.nan,
+  totalW: double.nan,
+);
+
+/// Genuine zero demand (e.g. an unheated room): total 0, refinement terms
+/// not applicable.
+const RoomHeatDemand _zeroDemand = (
+  transmissionW: 0.0,
+  floorW: double.nan,
+  ceilingW: double.nan,
+  ventilationW: double.nan,
+  totalW: 0.0,
+);
+
+/// Component breakdown of a single room's EN 12831 design heat demand.
 ///
 /// EN 12831 design heat demand:
-///   Q_total = Q_T (transmission) + Q_V (ventilation)
+///   Q_total = Q_T (transmission: walls + floor + ceiling) + Q_V (ventilation)
 ///
 /// Iterates all [WallSegment]s owned by the room per ADR-001. Interior
 /// and partition walls use [ThermalEngine.interiorCorrectionFactor] per
@@ -28,39 +73,39 @@ import 'u_value_providers.dart';
 /// floor height minus opening areas — never the raw centerline polygon
 /// or centerline segment length.
 ///
-/// Returns [double.nan] when any exterior wall has no
-/// [WallSegment.constructionId] assigned — this signals incomplete
-/// data (as opposed to a genuinely zero demand) so that downstream
-/// consumers (e.g. zone colour logic) can distinguish the two cases.
+/// Returns [_uncomputableDemand] (all NaN) when any exterior wall has no
+/// [WallSegment.constructionId] assigned — this signals incomplete data
+/// (as opposed to a genuinely zero demand) so that downstream consumers
+/// (e.g. zone colour logic) can distinguish the two cases.
 ///
 /// Depends on [roomProvider], [wallSegmentsProvider],
 /// [roomInnerPolygonProvider], [wallInnerEdgeLengthProvider],
 /// [windowsProvider], [doorsProvider], [floorProvider],
 /// [uValueProvider], and [designOutdoorTempCProvider].
-final roomHeatDemandProvider =
-    Provider.family<double, String>((ref, roomId) {
+final roomHeatDemandBreakdownProvider =
+    Provider.family<RoomHeatDemand, String>((ref, roomId) {
   final room = ref.watch(roomProvider(roomId)).asData?.value;
-  if (room == null) return 0.0;
+  if (room == null) return _zeroDemand;
 
   // ADR-036: an unheated room (staircase, hallway) carries no heating
   // demand of its own. Its effect on neighbours is already captured by the
   // adjacent rooms reading this room's (low) targetTempC for their
   // interior-wall correction factor. Return a genuine 0.0 — not NaN — so it
   // simply drops out of the building total and never expects a zone.
-  if (!room.isHeated) return 0.0;
+  if (!room.isHeated) return _zeroDemand;
 
   final walls =
       ref.watch(wallSegmentsProvider(roomId)).asData?.value;
-  if (walls == null) return double.nan;
+  if (walls == null) return _uncomputableDemand;
 
   // If any exterior wall lacks a construction the demand cannot be
-  // accurately computed — return NaN to signal incomplete data.
+  // accurately computed — signal incomplete data.
   final hasIncompleteExteriorWall = walls.any(
     (w) =>
         w.wallType == WallType.exterior &&
         w.constructionId == null,
   );
-  if (hasIncompleteExteriorWall) return double.nan;
+  if (hasIncompleteExteriorWall) return _uncomputableDemand;
 
   final tOutdoor = ref.watch(designOutdoorTempCProvider);
   final tThis = room.targetTempC;
@@ -76,7 +121,7 @@ final roomHeatDemandProvider =
           .toDouble() ??
       2600.0;
 
-  var totalW = 0.0;
+  var transmissionW = 0.0;
 
   for (final wall in walls) {
     if (wall.constructionId == null) continue;
@@ -147,7 +192,7 @@ final roomHeatDemandProvider =
         tIndoorC: tThis,
         tOutdoorC: tOutdoor,
       );
-      if (!wallQ.isNaN) totalW += wallQ;
+      if (!wallQ.isNaN) transmissionW += wallQ;
     }
 
     // Transmission loss through each window opening.
@@ -159,7 +204,7 @@ final roomHeatDemandProvider =
         tIndoorC: tThis,
         tOutdoorC: tOutdoor,
       );
-      if (!q.isNaN) totalW += q;
+      if (!q.isNaN) transmissionW += q;
     }
 
     // Transmission loss through each door opening.
@@ -171,7 +216,7 @@ final roomHeatDemandProvider =
         tIndoorC: tThis,
         tOutdoorC: tOutdoor,
       );
-      if (!q.isNaN) totalW += q;
+      if (!q.isNaN) transmissionW += q;
     }
   }
 
@@ -186,6 +231,8 @@ final roomHeatDemandProvider =
   final floorAreaM2 = innerPolygon.isEmpty
       ? double.nan
       : GeometryEngine.polygonAreaM2(innerPolygon);
+
+  var ventilationW = double.nan;
   if (!floorAreaM2.isNaN && floorAreaM2 > 0) {
     final volumeM3 = ThermalEngine.roomVolumeM3(
       floorAreaM2: floorAreaM2,
@@ -198,16 +245,17 @@ final roomHeatDemandProvider =
         tIndoorC: tThis,
         tOutdoorC: tOutdoor,
       );
-      if (!qV.isNaN) totalW += qV;
+      if (!qV.isNaN) ventilationW = qV;
     }
   }
 
   // Floor heat loss — optional refinement.
   //
   // Only included when room.floorConstructionId is set. Missing
-  // floor construction does NOT cause NaN in the total — it simply
-  // means no floor loss is added (per task spec: floor/ceiling are
-  // additive refinements, not required inputs).
+  // floor construction does NOT cause NaN in the total — the term is
+  // simply not applicable (floor/ceiling are additive refinements, not
+  // required inputs).
+  var floorW = double.nan;
   if (room.floorConstructionId != null &&
       !floorAreaM2.isNaN &&
       floorAreaM2 > 0) {
@@ -232,12 +280,13 @@ final roomHeatDemandProvider =
           tIndoorC: tThis,
           tOutdoorC: tOutdoor,
         );
-        if (!qFloor.isNaN) totalW += qFloor;
+        if (!qFloor.isNaN) floorW = qFloor;
       }
     }
   }
 
   // Ceiling heat loss — optional refinement (same pattern as floor).
+  var ceilingW = double.nan;
   if (room.ceilingConstructionId != null &&
       !floorAreaM2.isNaN &&
       floorAreaM2 > 0) {
@@ -262,12 +311,35 @@ final roomHeatDemandProvider =
           tIndoorC: tThis,
           tOutdoorC: tOutdoor,
         );
-        if (!qCeiling.isNaN) totalW += qCeiling;
+        if (!qCeiling.isNaN) ceilingW = qCeiling;
       }
     }
   }
 
-  return totalW;
+  // Sum the applicable components (NaN = not applicable → contributes 0).
+  final totalW = transmissionW +
+      (ventilationW.isNaN ? 0.0 : ventilationW) +
+      (floorW.isNaN ? 0.0 : floorW) +
+      (ceilingW.isNaN ? 0.0 : ceilingW);
+
+  return (
+    transmissionW: transmissionW,
+    floorW: floorW,
+    ceilingW: ceilingW,
+    ventilationW: ventilationW,
+    totalW: totalW,
+  );
+});
+
+/// Heat demand for a single room in watts (W).
+///
+/// Thin accessor for [roomHeatDemandBreakdownProvider]'s [RoomHeatDemand.totalW].
+/// Returns [double.nan] when the demand cannot be computed (any exterior wall
+/// missing a construction, or data still loading) so downstream consumers can
+/// distinguish incomplete data from a genuine zero.
+final roomHeatDemandProvider =
+    Provider.family<double, String>((ref, roomId) {
+  return ref.watch(roomHeatDemandBreakdownProvider(roomId)).totalW;
 });
 
 /// Total heat demand for all rooms in a project in watts (W).

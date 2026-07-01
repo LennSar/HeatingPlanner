@@ -13,6 +13,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/calculation/providers/heat_demand_providers.dart';
 import 'package:heating_planner/calculation/providers/u_value_providers.dart';
 import 'package:heating_planner/core/theme/app_theme.dart';
+import 'package:heating_planner/data/models/enums.dart';
 import 'package:heating_planner/data/models/heating_zone.dart';
 import 'package:heating_planner/data/models/point2d.dart';
 import 'package:heating_planner/data/models/room.dart';
@@ -20,6 +21,8 @@ import 'package:heating_planner/l10n/app_localizations.dart';
 import 'package:heating_planner/ui/canvas/tools/undo_redo_service.dart';
 import 'package:heating_planner/ui/panels/room_properties.dart';
 import 'package:heating_planner/ui/providers/editor_state_provider.dart';
+
+import '../../helpers/test_factories.dart';
 
 // ── Stub notifiers ────────────────────────────────────────────────────────────
 
@@ -84,8 +87,17 @@ Widget _buildWidget({Room room = _testRoom}) {
         () => _StubEditorNotifier(EditorState(rooms: [room])),
       ),
       undoRedoProvider.overrideWith((_) => _StubUndoRedo()),
-      // Heat demand returns NaN → display rows show "—" (no DB needed)
-      roomHeatDemandProvider.overrideWith((ref, _) => double.nan),
+      // Heat demand breakdown all-NaN → display rows show "—" (no DB needed).
+      // roomHeatDemandProvider derives its total from this override.
+      roomHeatDemandBreakdownProvider.overrideWith(
+        (ref, _) => (
+          transmissionW: double.nan,
+          floorW: double.nan,
+          ceilingW: double.nan,
+          ventilationW: double.nan,
+          totalW: double.nan,
+        ),
+      ),
       // U-value returns NaN → envelope section shows "—"
       uValueProvider.overrideWith((ref, _) => double.nan),
     ],
@@ -175,6 +187,67 @@ void main() {
           .firstWhere((r) => r.id == _roomId);
 
       expect(updatedRoom.name, 'Dining Room');
+    },
+  );
+
+  // RP-5 ─────────────────────────────────────────────────────────────────────
+
+  testWidgets(
+    'RP-5: breakdown component rows reconcile with the total',
+    (tester) async {
+      await tester.binding.setSurfaceSize(const Size(800, 3000));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
+      // A wall with a construction so the transmission (Q_T) row renders
+      // instead of the "assign constructions" hint.
+      final wall = createTestWall(
+        roomId: _roomId,
+        wallType: WallType.exterior,
+        constructionId: 'constr-1',
+      );
+
+      // 478 + 46 + 271 = 795 (ceiling is not applicable → "—").
+      const breakdown = (
+        transmissionW: 478.0,
+        floorW: 46.0,
+        ceilingW: double.nan,
+        ventilationW: 271.0,
+        totalW: 795.0,
+      );
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            editorStateProvider.overrideWith(
+              () => _StubEditorNotifier(
+                EditorState(rooms: const [_testRoom], walls: [wall]),
+              ),
+            ),
+            undoRedoProvider.overrideWith((_) => _StubUndoRedo()),
+            uValueProvider.overrideWith((ref, _) => double.nan),
+            roomHeatDemandBreakdownProvider.overrideWith(
+              (ref, _) => breakdown,
+            ),
+          ],
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            localizationsDelegates:
+                AppLocalizations.localizationsDelegates,
+            supportedLocales: const [Locale('en')],
+            home: const Scaffold(
+              body: RoomProperties(roomId: _roomId),
+            ),
+          ),
+        ),
+      );
+      await tester.pump();
+
+      // Every component row and the total come from the one breakdown, so
+      // they reconcile on screen (no more total < sum of parts).
+      expect(find.text('478 W'), findsOneWidget);
+      expect(find.text('46 W'), findsOneWidget);
+      expect(find.text('271 W'), findsOneWidget);
+      expect(find.text('795 W'), findsOneWidget);
     },
   );
 }
