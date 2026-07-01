@@ -1,0 +1,8 @@
+# Inno Setup installer settings (target: exe).
+# Produces a signed-optional .exe installer that installs into Program Files,
+# creates Start Menu entries and a proper uninstaller.
+app_id: com.heatingplanner.heating_planner
+publisher_name: HeatingPlanner
+display_name: HeatingPlanner
+create_desktop_icon: true
+install_dir_name: HeatingPlanner

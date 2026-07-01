@@ -1,0 +1,17 @@
+# .dmg settings (target: dmg), rendered via appdmg.
+# The build output heating_planner.app is copied into the packaging dir before
+# appdmg runs, so `path` below is just the bundle's basename.
+title: HeatingPlanner
+window:
+  size:
+    width: 640
+    height: 400
+contents:
+  - x: 180
+    y: 180
+    type: file
+    path: heating_planner.app
+  - x: 460
+    y: 180
+    type: link
+    path: /Applications

@@ -1,0 +1,14 @@
+# Debian package settings (target: deb).
+# Installs the bundle under /opt and symlinks the binary into /usr/bin,
+# with a .desktop entry for the application menu.
+display_name: HeatingPlanner
+package_name: heating-planner
+maintainer:
+  name: Lennart
+  email: t.tsernohh@gmail.com
+generic_name: Heating System Planner
+# Approximate installed size in kB; metadata only, refined by the packager.
+installed_size: 120000
+categories:
+  - Utility
+  - Engineering

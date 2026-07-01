@@ -35,11 +35,15 @@ jobs:
       - name: Run code generation
         run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Build Linux
-        run: flutter build linux --release
+      - name: Activate flutter_distributor
+        run: dart pub global activate flutter_distributor
+
+      - name: Build Linux installer (.deb)
+        run: dart pub global run flutter_distributor:main release --name stable --jobs linux-deb
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: heating_planner-linux
-          path: build/linux/x64/release/bundle/
+          name: heating_planner-linux-installer
+          path: dist/**/*.deb
+          if-no-files-found: error

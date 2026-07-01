@@ -1,0 +1,26 @@
+# flutter_distributor configuration.
+# Docs: https://distributor.leanflutter.dev
+#
+# Per-target installer settings live in:
+#   windows/packaging/exe/make_config.yaml   (Inno Setup installer)
+#   macos/packaging/dmg/make_config.yaml     (drag-to-Applications .dmg)
+#   linux/packaging/deb/make_config.yaml     (.deb package)
+#
+# CI runs one job per OS, e.g.:
+#   dart pub global run flutter_distributor:main release --name stable --jobs windows-exe
+output: dist/
+releases:
+  - name: stable
+    jobs:
+      - name: windows-exe
+        package:
+          platform: windows
+          target: exe
+      - name: macos-dmg
+        package:
+          platform: macos
+          target: dmg
+      - name: linux-deb
+        package:
+          platform: linux
+          target: deb
