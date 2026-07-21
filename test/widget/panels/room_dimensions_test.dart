@@ -136,33 +136,79 @@ List<WallSegment> _thickRectWalls() => const [
     ];
 
 /// Five segments (the bottom edge is split) → not rectangle-eligible.
+// A genuine L-shape (six 90° corners) — not a rectangle even after collapsing
+// collinear edges, so the Dimensions group must stay hidden. (The previous
+// fixture was a rectangle whose top edge happened to be split into two
+// collinear walls — that IS rectangle-eligible now, so it moved to RD-8.)
 List<WallSegment> _nonRectWalls() => const [
       WallSegment(
-        id: 'w1a',
+        id: 'w1',
         roomId: _roomId,
         startPoint: Point2D(x: 0, y: 0),
-        endPoint: Point2D(x: 2500, y: 0),
-      ),
-      WallSegment(
-        id: 'w1b',
-        roomId: _roomId,
-        startPoint: Point2D(x: 2500, y: 0),
         endPoint: Point2D(x: 5000, y: 0),
       ),
       WallSegment(
         id: 'w2',
         roomId: _roomId,
         startPoint: Point2D(x: 5000, y: 0),
-        endPoint: Point2D(x: 5000, y: 4000),
+        endPoint: Point2D(x: 5000, y: 2000),
       ),
       WallSegment(
         id: 'w3',
         roomId: _roomId,
-        startPoint: Point2D(x: 5000, y: 4000),
-        endPoint: Point2D(x: 0, y: 4000),
+        startPoint: Point2D(x: 5000, y: 2000),
+        endPoint: Point2D(x: 2500, y: 2000),
       ),
       WallSegment(
         id: 'w4',
+        roomId: _roomId,
+        startPoint: Point2D(x: 2500, y: 2000),
+        endPoint: Point2D(x: 2500, y: 4000),
+      ),
+      WallSegment(
+        id: 'w5',
+        roomId: _roomId,
+        startPoint: Point2D(x: 2500, y: 4000),
+        endPoint: Point2D(x: 0, y: 4000),
+      ),
+      WallSegment(
+        id: 'w6',
+        roomId: _roomId,
+        startPoint: Point2D(x: 0, y: 4000),
+        endPoint: Point2D(x: 0, y: 0),
+      ),
+    ];
+
+// A rectangle whose bottom edge is split into two collinear walls — the exact
+// shape produced when a smaller room is attached (ADR-003). It is still
+// geometrically rectangular, so the Dimensions group must show.
+List<WallSegment> _splitRectWalls() => const [
+      WallSegment(
+        id: 's1',
+        roomId: _roomId,
+        startPoint: Point2D(x: 0, y: 0),
+        endPoint: Point2D(x: 5000, y: 0),
+      ),
+      WallSegment(
+        id: 's2',
+        roomId: _roomId,
+        startPoint: Point2D(x: 5000, y: 0),
+        endPoint: Point2D(x: 5000, y: 4000),
+      ),
+      WallSegment(
+        id: 's3',
+        roomId: _roomId,
+        startPoint: Point2D(x: 5000, y: 4000),
+        endPoint: Point2D(x: 2500, y: 4000),
+      ),
+      WallSegment(
+        id: 's4',
+        roomId: _roomId,
+        startPoint: Point2D(x: 2500, y: 4000),
+        endPoint: Point2D(x: 0, y: 4000),
+      ),
+      WallSegment(
+        id: 's5',
         roomId: _roomId,
         startPoint: Point2D(x: 0, y: 4000),
         endPoint: Point2D(x: 0, y: 0),
@@ -401,6 +447,25 @@ void main() {
       expect(find.text('Dimensions'), findsNothing);
       expect(find.byKey(const Key('roomWidthField')), findsNothing);
       expect(find.byKey(const Key('roomHeightField')), findsNothing);
+    },
+  );
+
+  // RD-8 ──────────────────────────────────────────────────────────────────────
+
+  testWidgets(
+    'RD-8: a rectangle with a collinear split wall (adjacent room attached) '
+    'still shows the Dimensions group',
+    (tester) async {
+      await sized(tester);
+      await tester.pumpWidget(
+        _build(
+          EditorState(rooms: const [_rectRoom], walls: _splitRectWalls()),
+        ),
+      );
+      await tester.pump();
+
+      expect(find.byKey(const Key('roomWidthField')), findsOneWidget);
+      expect(find.byKey(const Key('roomHeightField')), findsOneWidget);
     },
   );
 

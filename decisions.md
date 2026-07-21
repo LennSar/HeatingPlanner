@@ -103,6 +103,30 @@ happened — a circular dependency.
 6. All mutations (removals + insertions + new wall addition) happen in a single
    `state = state.copyWith(walls: ...)` call so no intermediate state is
    observable.
+7. **Host-room polygon gains the split vertex.** `Room.polygon` is the
+   centerline polygon and each wall is one of its edges (ADR-017). When a host
+   wall is split, the junction point is inserted into the host room's polygon
+   between the two vertices of the edge being split (via
+   `_insertPolygonVertexOnEdge`, matched direction-agnostically within 1 mm).
+   Otherwise the polygon's original full-length edge no longer matches either
+   fragment in `GeometryEngine.roomFaceEdges`, both fragments fall back to
+   un-mitred `±½t` rectangles, and the host room visibly detaches at that
+   corner. Successive splits of the same edge (a fragment split again) insert
+   in order because each split matches against the current fragment's
+   endpoints. The updated polygons are committed in the same `state.copyWith`
+   and persisted alongside the split walls.
+
+   **Undo command must carry the post-split room list.** `WallDrawTool`'s
+   rect-draw wraps the whole operation in a `_RectDrawCommand` whose
+   `execute()` reapplies `(newWalls, newRooms)`. `newRooms` must be captured
+   *after* the `commitWallWithSplit` calls — the post-split room list — not the
+   pre-split `oldRooms`. Seeding it with `oldRooms` makes the immediate
+   `execute()` revert the just-inserted split vertex, so the host room's split
+   walls again have no matching polygon edge and their faces vanish (the
+   corner renders as a wedge). This bit only shows up through the real tool
+   pipeline; direct `commitWallWithSplit` + `addRoomFromDetection` calls in
+   tests bypass the command, so `wall_draw_tool_test.dart` WDT-22 drives the
+   full rect-draw path.
 
 A wall drawn across the open side can land on a second assigned wall, splitting
 it too, so both endpoints are checked independently. A single host wall can
@@ -502,16 +526,24 @@ require complex per-wall heuristics (fragile).
 **Rules.**
 
 1. **Rectangle eligibility check.** Before applying Ctrl-reshape, the
-   `SelectTool` evaluates the dragged wall's `Room`:
-   - `wallSegmentsProvider(roomId)` returns **exactly 4** segments;
-   - every segment is axis-aligned within a 1 mm tolerance
+   `SelectTool` evaluates the dragged wall's `Room` (`rectangleCorners`):
+   - **at least 4** segments, every one axis-aligned within a 1 mm tolerance
      (`|startPoint.x − endPoint.x| < 1 mm` OR
      `|startPoint.y − endPoint.y| < 1 mm`);
-   - the 4 segments form a closed loop with 4 distinct corners and
-     90° interior angles (perpendicular adjacent edges).
+   - the **true corners** — endpoints where a horizontal and a vertical wall
+     meet — are exactly 4 distinct points with 2 distinct x-values and 2
+     distinct y-values (→ 90° interior angles);
+   - every wall lies on the rectangle's boundary (a horizontal wall on one of
+     the two y-lines, a vertical wall on one of the two x-lines).
 
-   If any check fails, Ctrl has **no effect** — the drag proceeds with
-   default endpoint-drag behaviour.
+   Collinear mid-edge points (180° "straight" vertices) are **not** true
+   corners: attaching a smaller room splits a shared wall into two collinear
+   fragments (ADR-003), so a still-rectangular room can carry 5+ walls. Such a
+   room stays rectangle-eligible — its Width/Height dimensions keep showing and
+   Ctrl-reshape still applies. The boundary check rejects a rectangle that
+   carries a *stray interior* wall (whose endpoints are not true corners but
+   which does not lie on the boundary). If any check fails, Ctrl has **no
+   effect** and the Width/Height group is hidden.
 
 2. **Diagonal-corner identification.** From the 4 corners, the dragged
    corner `C_drag` is the endpoint being moved. The fixed anchor `D` is the
@@ -975,18 +1007,28 @@ maintained by the same code path that mutates either source.
    Both rebuild when any of the room's walls or their `thicknessMm` change.
    Neither polygon is persisted.
 
-   **Collinear de-taper.** A room side may be several collinear walls of
-   different thickness (ADR-003 partial shared wall: a 240 mm exterior run
-   with a 120 mm shared sub-segment). At those 180° "straight" vertices the
-   mitered corner would pull the thicker segment down to the thinner
-   neighbour's offset, rendering it as a wedge (thick→thin along its length).
-   `roomFaceEdges` therefore holds each wall at its **own** uniform
-   perpendicular offset across a collinear junction of differing thickness —
-   a clean perpendicular step, not a taper — so every wall keeps the constant
-   thickness defined by its construction. Genuine corners stay mitered and
-   equal-thickness collinear splits are unchanged (same offset on both sides).
-   The shared sub-segment keeps its own (interior-default, ADR-020 Rule 8a)
-   thickness; only the rendering taper is removed.
+   **Differing-thickness de-taper.** Two walls of unequal thickness meeting
+   at a vertex cannot share a single mitred corner. `roomFaceEdges` therefore
+   holds each wall at its **own** uniform perpendicular offset at any
+   differing-thickness junction — collinear *or* a genuine corner — so every
+   wall keeps the constant thickness defined by its construction:
+   - *Collinear* (ADR-003 partial shared wall: a 240 mm exterior run with a
+     120 mm shared sub-segment). Without de-taper the mitre pulls the thicker
+     segment down to the thinner offset, rendering it as a wedge (thick→thin
+     along its length). Squaring gives a clean perpendicular step instead.
+   - *Genuine corner* (a smaller room shares only part of a bigger room's
+     wall). The thin shared sub-segment (120 mm interior) meets the thick
+     240 mm exterior wall that continues past it into the neighbouring room.
+     A mitre there leaves a triangular **notch** in the corner; squaring each
+     wall to its own offset makes the thin wall butt into the thick wall's
+     face and the two overlap cleanly into the corner. This is the fix for
+     the "attaching a smaller room detaches a corner" bug — the shared wall's
+     thickness reduction on promotion (Rule 8) is what exposes it.
+
+   Equal-thickness junctions (the common all-exterior case) keep their mitre
+   unchanged (same offset on both sides). The shared sub-segment keeps its own
+   (interior-default, ADR-020 Rule 8a) thickness; only the corner rendering is
+   squared.
 
 5. **Inner polygon is authoritative for area / volume / wall-area.**
    - `roomAreaM2Provider(roomId)` and `roomVolumeM3Provider(roomId)` use the
@@ -1011,6 +1053,21 @@ maintained by the same code path that mutates either source.
    "Outward" is determined by `Room.polygon` winding order. For shared walls
    (`anchorMode = centerline`, forced) the centerline never shifts and ADR-011
    mirror sync keeps both copies in lockstep.
+
+   **Corner reconciliation.** A perpendicular centerline shift moves the
+   wall's endpoints away from the corners it shares with its two neighbours,
+   which would split the room open. `EditorStateNotifier._applyReanchor`
+   therefore re-mitres each moved corner as the intersection of the shifted
+   wall's new (parallel) line with the neighbour wall's own fixed line, then
+   moves every wall endpoint and `Room.polygon` vertex sitting on the old
+   corner to the new one. Neighbours keep their direction and only change
+   length; the loop stays closed and mitred. A corner with no attached
+   neighbour (a free wall end) keeps the plain perpendicular-translated
+   endpoint. The remap is applied by coordinate, so it also reaches ADR-011
+   mirror partners of the neighbours and every adjacent room polygon touching
+   that corner. All four thickness-change entry points (construction assign /
+   clear, construction-layer edit cascade, project-default cascade) route
+   through this method.
 
 7. **ADR-011 mirror sync extension.** Fields that sync between mirror partners
    are extended to include `thicknessMm` and `anchorMode`. Both partners

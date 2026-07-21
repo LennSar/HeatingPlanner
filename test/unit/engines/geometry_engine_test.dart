@@ -1013,5 +1013,72 @@ void main() {
       expect(inner['right']!.start.y, closeTo(-120, 0.5));
       expect(inner['right']!.end.y, closeTo(-120, 0.5));
     });
+
+    test(
+        'genuine corner of differing thickness squares off (thin shared wall '
+        'butts into a thick perpendicular wall — no corner notch)', () {
+      // Regression: a smaller room shares only part of a bigger room's wall.
+      // The shared sub-segment (120 mm interior) meets the thick 240 mm
+      // exterior wall that continues into the neighbour room at a genuine
+      // 90° corner. A mitred corner there leaves a triangular notch; the
+      // de-taper must square each wall to its own perpendicular offset so
+      // they overlap cleanly into the corner.
+      //
+      // Room-1 polygon (interior above, y<4000): the bottom side is split at
+      // P(2760,4000) into a 240 exterior fragment (BR→P) and a 120 shared
+      // wall (P→BL). BL→TL is the 240 left exterior wall.
+      const poly = [
+        Point2D(x: 0, y: 0), // TL
+        Point2D(x: 6000, y: 0), // TR
+        Point2D(x: 6000, y: 4000), // BR
+        Point2D(x: 2760, y: 4000), // P
+        Point2D(x: 0, y: 4000), // BL
+      ];
+      final walls = [
+        wall(
+            id: 'top',
+            start: const Point2D(x: 0, y: 0),
+            end: const Point2D(x: 6000, y: 0),
+            thicknessMm: 240),
+        wall(
+            id: 'right',
+            start: const Point2D(x: 6000, y: 0),
+            end: const Point2D(x: 6000, y: 4000),
+            thicknessMm: 240),
+        wall(
+            id: 'frag',
+            start: const Point2D(x: 6000, y: 4000),
+            end: const Point2D(x: 2760, y: 4000),
+            thicknessMm: 240),
+        wall(
+            id: 'shared',
+            start: const Point2D(x: 2760, y: 4000),
+            end: const Point2D(x: 0, y: 4000),
+            thicknessMm: 120),
+        wall(
+            id: 'left',
+            start: const Point2D(x: 0, y: 4000),
+            end: const Point2D(x: 0, y: 0),
+            thicknessMm: 240),
+      ];
+      final inner = GeometryEngine.roomFaceEdges(
+        walls: walls,
+        roomPolygon: poly,
+        side: RoomFaceSide.inner,
+      );
+
+      // The shared wall keeps a uniform 120 face (inner at y=3940) and its
+      // BL end squares to the centerline corner x=0 rather than mitering.
+      expect(inner['shared']!.start.y, closeTo(3940, 0.5));
+      expect(inner['shared']!.end.y, closeTo(3940, 0.5));
+      expectPointCloseTo(inner['shared']!.end, const Point2D(x: 0, y: 3940));
+
+      // The thick left wall squares its bottom to the corner (y=4000) instead
+      // of being pulled up to the thin wall's offset. Its inner face stays at
+      // x=120 and reaches the centerline corner, so the two faces overlap into
+      // the corner with no gap.
+      expect(inner['left']!.start.x, closeTo(120, 0.5));
+      expectPointCloseTo(inner['left']!.start, const Point2D(x: 120, y: 4000));
+    });
   });
 }

@@ -501,16 +501,22 @@ class SelectTool extends CanvasTool {
   /// Returns the 4 corners of a rectangular room when [walls] satisfies
   /// the eligibility rules (ADR-012 Rule 1); otherwise returns null.
   ///
-  /// Rules: exactly 4 walls, all axis-aligned within 1 mm, with 4
-  /// distinct corner points using exactly 2 distinct x-values and 2
-  /// distinct y-values (which implies 90° interior angles for any
-  /// closed cycle through those 4 corners with axis-aligned segments).
+  /// Rules: at least 4 walls, all axis-aligned within 1 mm, whose **true
+  /// corners** (endpoints where a horizontal and a vertical wall meet) are
+  /// exactly 4 distinct points using exactly 2 distinct x-values and 2
+  /// distinct y-values (→ 90° interior angles).
+  ///
+  /// A shared wall is often split into two collinear fragments when an
+  /// adjacent room is attached (ADR-003), so a geometrically rectangular room
+  /// can carry 5+ walls with a 180° "straight" vertex mid-edge. Those
+  /// collinear mid-edge points are not real corners and are ignored, so the
+  /// room stays rectangle-eligible (its Width/Height dimensions keep showing).
   ///
   /// Public API: also consumed by the room properties panel as the
   /// single source of rectangle-eligibility / corner extraction for the
   /// ADR-015 Width/Height resize (the panel must not reimplement this).
   static List<Point2D>? rectangleCorners(List<WallSegment> walls) {
-    if (walls.length != 4) return null;
+    if (walls.length < 4) return null;
     const tol = _rectTolMm;
 
     // Every wall must be axis-aligned: either Δx < tol or Δy < tol.
@@ -518,23 +524,44 @@ class SelectTool extends CanvasTool {
       final dx = (w.startPoint.x - w.endPoint.x).abs();
       final dy = (w.startPoint.y - w.endPoint.y).abs();
       if (dx >= tol && dy >= tol) return null;
+      if (dx < tol && dy < tol) return null; // degenerate (zero-length)
     }
 
-    // Collect distinct corner points (within tolerance).
-    final corners = <Point2D>[];
-    bool addUnique(Point2D p) {
-      for (final c in corners) {
-        if ((c.x - p.x).abs() < tol && (c.y - p.y).abs() < tol) {
-          return false;
+    bool isHorizontal(WallSegment w) =>
+        (w.startPoint.y - w.endPoint.y).abs() < tol;
+
+    // Collect distinct endpoints and, per point, whether a horizontal and/or
+    // a vertical wall is incident. A true corner has both; a collinear
+    // mid-edge point (from an ADR-003 split) has only one orientation.
+    final pts = <Point2D>[];
+    final hasH = <bool>[];
+    final hasV = <bool>[];
+    void mark(Point2D p, bool horizontal) {
+      for (var i = 0; i < pts.length; i++) {
+        if ((pts[i].x - p.x).abs() < tol && (pts[i].y - p.y).abs() < tol) {
+          if (horizontal) {
+            hasH[i] = true;
+          } else {
+            hasV[i] = true;
+          }
+          return;
         }
       }
-      corners.add(p);
-      return true;
+      pts.add(p);
+      hasH.add(horizontal);
+      hasV.add(!horizontal);
     }
+
     for (final w in walls) {
-      addUnique(w.startPoint);
-      addUnique(w.endPoint);
+      final h = isHorizontal(w);
+      mark(w.startPoint, h);
+      mark(w.endPoint, h);
     }
+
+    final corners = <Point2D>[
+      for (var i = 0; i < pts.length; i++)
+        if (hasH[i] && hasV[i]) pts[i],
+    ];
     if (corners.length != 4) return null;
 
     // Exactly 2 distinct x and 2 distinct y → axis-aligned rectangle.
@@ -545,6 +572,25 @@ class SelectTool extends CanvasTool {
       if (!ys.any((v) => (v - c.y).abs() < tol)) ys.add(c.y);
     }
     if (xs.length != 2 || ys.length != 2) return null;
+
+    // Every wall must lie on the rectangle's boundary — a horizontal wall on
+    // one of the two y-lines, a vertical wall on one of the two x-lines. This
+    // rejects a rectangle carrying a stray interior wall (whose endpoints were
+    // filtered out above as non-corners) while still accepting collinear edge
+    // splits (which sit on a boundary line).
+    for (final w in walls) {
+      if (isHorizontal(w)) {
+        if ((w.startPoint.y - ys[0]).abs() >= tol &&
+            (w.startPoint.y - ys[1]).abs() >= tol) {
+          return null;
+        }
+      } else {
+        if ((w.startPoint.x - xs[0]).abs() >= tol &&
+            (w.startPoint.x - xs[1]).abs() >= tol) {
+          return null;
+        }
+      }
+    }
 
     return corners;
   }

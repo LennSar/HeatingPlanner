@@ -273,6 +273,165 @@ class EditorStateNotifier extends Notifier<EditorState>
     return _shiftedForThickness(wall, newThickness);
   }
 
+  /// Commits a thickness re-anchor for [original] → [shifted] while keeping
+  /// the room closed (ADR-017 Rule 6 corner reconciliation).
+  ///
+  /// [_shiftedForThickness] translates the wall's centerline perpendicular to
+  /// itself for `innerFace` / `outerFace` anchors. That leaves the two
+  /// neighbouring walls (and the `Room.polygon` corners) sharing the *old*
+  /// endpoints, so the corner splits and the room loses its dimension. This
+  /// method instead recomputes each moved corner as the mitre between the
+  /// wall's new (parallel-shifted) line and the neighbour's own fixed line,
+  /// then moves every wall endpoint and room-polygon vertex sitting on that
+  /// old corner to the new one. Neighbours keep their direction and only
+  /// change length; the loop stays closed and mitred.
+  ///
+  /// `centerline`-anchored recomputes do not shift the centerline, so they
+  /// route straight through [updateWall] (thickness + ADR-011 mirror sync).
+  void _applyReanchor(WallSegment original, WallSegment shifted) {
+    final startMoved = GeometryEngine.distanceMm(
+          original.startPoint,
+          shifted.startPoint,
+        ) >
+        1e-6;
+    final endMoved = GeometryEngine.distanceMm(
+          original.endPoint,
+          shifted.endPoint,
+        ) >
+        1e-6;
+
+    if (!startMoved && !endMoved) {
+      // Thickness-only change (centerline anchor, or degenerate/roomless
+      // wall): no corner reflow needed. updateWall persists + mirror-syncs.
+      updateWall(shifted);
+      return;
+    }
+
+    // Neighbour walls in the same room whose fixed line the shifted wall
+    // mitres against. The wall being re-anchored is never shared (Rule 3
+    // forces shared walls to centerline, which cannot reach this branch),
+    // so it has no mirror partner to special-case here.
+    final roomWalls = state.walls
+        .where((w) => w.roomId == original.roomId && w.id != original.id)
+        .toList();
+
+    final newStart = startMoved
+        ? (_mitreCorner(
+              sharedCorner: original.startPoint,
+              neighbours: roomWalls,
+              lineA: shifted.startPoint,
+              lineB: shifted.endPoint,
+            ) ??
+            shifted.startPoint)
+        : original.startPoint;
+    final newEnd = endMoved
+        ? (_mitreCorner(
+              sharedCorner: original.endPoint,
+              neighbours: roomWalls,
+              lineA: shifted.startPoint,
+              lineB: shifted.endPoint,
+            ) ??
+            shifted.endPoint)
+        : original.endPoint;
+
+    // Old-corner → new-corner remap, applied by coordinate so it reaches the
+    // neighbour walls, any ADR-011 mirror partners of those neighbours (which
+    // share the corner coordinate), and every room polygon touching it.
+    final remap = <({Point2D from, Point2D to})>[
+      if (startMoved) (from: original.startPoint, to: newStart),
+      if (endMoved) (from: original.endPoint, to: newEnd),
+    ];
+
+    Point2D mapPoint(Point2D p) {
+      for (final m in remap) {
+        if (GeometryEngine.distanceMm(p, m.from) < 1.0) return m.to;
+      }
+      return p;
+    }
+
+    final reanchored = _withOrientation(
+      shifted.copyWith(startPoint: newStart, endPoint: newEnd),
+    );
+
+    final newWalls = <WallSegment>[];
+    final changedWallIds = <String>{reanchored.id};
+    for (final w in state.walls) {
+      if (w.id == reanchored.id) {
+        newWalls.add(reanchored);
+        continue;
+      }
+      final ms = mapPoint(w.startPoint);
+      final me = mapPoint(w.endPoint);
+      if (!identical(ms, w.startPoint) || !identical(me, w.endPoint)) {
+        newWalls.add(_withOrientation(
+          w.copyWith(startPoint: ms, endPoint: me),
+        ));
+        changedWallIds.add(w.id);
+      } else {
+        newWalls.add(w);
+      }
+    }
+
+    final newRooms = <Room>[];
+    final changedRoomIds = <String>{};
+    for (final r in state.rooms) {
+      var touched = false;
+      final poly = <Point2D>[];
+      for (final v in r.polygon) {
+        final mapped = mapPoint(v);
+        if (!identical(mapped, v)) touched = true;
+        poly.add(mapped);
+      }
+      if (touched) {
+        newRooms.add(r.copyWith(polygon: poly));
+        changedRoomIds.add(r.id);
+      } else {
+        newRooms.add(r);
+      }
+    }
+
+    state = state.copyWith(walls: newWalls, rooms: newRooms);
+
+    final dao = ref.read(buildingDaoProvider);
+    for (final w in newWalls) {
+      if (changedWallIds.contains(w.id)) unawaited(upsertWallSegment(dao, w));
+    }
+    for (final r in newRooms) {
+      if (changedRoomIds.contains(r.id)) unawaited(upsertRoom(dao, r));
+    }
+    markProjectDirty();
+  }
+
+  /// New mitred position of [sharedCorner]: the intersection of the fixed
+  /// line of the neighbour wall meeting at [sharedCorner] with the shifted
+  /// wall's new line [lineA]–[lineB]. Returns null when no usable
+  /// (non-parallel) neighbour is attached there, so the caller falls back to
+  /// the plain perpendicular-translated endpoint (a free wall end).
+  Point2D? _mitreCorner({
+    required Point2D sharedCorner,
+    required List<WallSegment> neighbours,
+    required Point2D lineA,
+    required Point2D lineB,
+  }) {
+    for (final n in neighbours) {
+      Point2D? far;
+      if (GeometryEngine.distanceMm(n.startPoint, sharedCorner) < 1.0) {
+        far = n.endPoint;
+      } else if (GeometryEngine.distanceMm(n.endPoint, sharedCorner) < 1.0) {
+        far = n.startPoint;
+      }
+      if (far == null) continue;
+      final hit = GeometryEngine.lineIntersection(
+        far,
+        sharedCorner,
+        lineA,
+        lineB,
+      );
+      if (hit != null) return hit;
+    }
+    return null;
+  }
+
   /// Applies ADR-017 Rule 2 creation-time anchor defaults to [wall]:
   /// exterior walls coming in with the freezed fallback
   /// `WallAnchorMode.centerline` are upgraded to `innerFace` so that
@@ -641,7 +800,10 @@ class EditorStateNotifier extends Notifier<EditorState>
     if (wall == null) return;
     final withConstruction =
         wall.copyWith(constructionId: constructionId);
-    updateWall(_recomputeWallThickness(withConstruction));
+    _applyReanchor(
+      withConstruction,
+      _recomputeWallThickness(withConstruction),
+    );
   }
 
   /// Detach the construction from wall [wallId] and re-anchor the
@@ -652,7 +814,10 @@ class EditorStateNotifier extends Notifier<EditorState>
     final wall = state.walls.where((w) => w.id == wallId).firstOrNull;
     if (wall == null) return;
     final withoutConstruction = wall.copyWith(constructionId: null);
-    updateWall(_recomputeWallThickness(withoutConstruction));
+    _applyReanchor(
+      withoutConstruction,
+      _recomputeWallThickness(withoutConstruction),
+    );
   }
 
   /// Re-anchor every wall whose `constructionId` equals [constructionId]
@@ -674,7 +839,7 @@ class EditorStateNotifier extends Notifier<EditorState>
       if (identical(recomputed, w)) continue;
       // Skip the partner if updateWall will sync it via ADR-011.
       if (recomputed.mirrorId != null) visited.add(recomputed.mirrorId!);
-      updateWall(recomputed);
+      _applyReanchor(w, recomputed);
     }
   }
 
@@ -694,7 +859,7 @@ class EditorStateNotifier extends Notifier<EditorState>
       final recomputed = _recomputeWallThickness(w);
       if (identical(recomputed, w)) continue;
       if (recomputed.mirrorId != null) visited.add(recomputed.mirrorId!);
-      updateWall(recomputed);
+      _applyReanchor(w, recomputed);
     }
   }
 
@@ -1669,6 +1834,14 @@ class EditorStateNotifier extends Notifier<EditorState>
     final removed = <String>[];
     final addedPersisted = <WallSegment>[];
 
+    // Host-room polygons gain each split vertex so every fragment still
+    // matches a polygon edge in [GeometryEngine.roomFaceEdges]. Without this
+    // the split edge no longer matches any wall (each fragment is only part
+    // of it), so the fragments lose their mitred faces and the host room
+    // appears to detach at that corner. Keyed by room id; seeded lazily from
+    // the current polygon and mutated per split.
+    final roomPolys = <String, List<Point2D>>{};
+
     for (final pt in [wall.startPoint, wall.endPoint]) {
       for (var i = 0; i < walls.length; i++) {
         final host = walls[i];
@@ -1706,6 +1879,23 @@ class EditorStateNotifier extends Notifier<EditorState>
         addedPersisted.addAll([before, after]);
         walls.removeAt(i);
         walls.insertAll(i, [before, after]);
+
+        // Insert [pt] into the host room's polygon between the two vertices
+        // of the edge being split (this may be a fragment from an earlier
+        // split, so match against the current host's endpoints).
+        final base = roomPolys[host.roomId] ??
+            state.rooms
+                .where((r) => r.id == host.roomId)
+                .firstOrNull
+                ?.polygon;
+        if (base != null && base.isNotEmpty) {
+          roomPolys[host.roomId] = _insertPolygonVertexOnEdge(
+            base,
+            host.startPoint,
+            host.endPoint,
+            pt,
+          );
+        }
         break;
       }
     }
@@ -1773,7 +1963,17 @@ class EditorStateNotifier extends Notifier<EditorState>
     }
 
     walls.addAll(addedNew);
-    state = state.copyWith(walls: walls);
+
+    // Fold the split vertices into each host room's polygon (see roomPolys).
+    final updatedRooms = roomPolys.isEmpty
+        ? state.rooms
+        : [
+            for (final r in state.rooms)
+              roomPolys.containsKey(r.id)
+                  ? r.copyWith(polygon: roomPolys[r.id]!)
+                  : r,
+          ];
+    state = state.copyWith(walls: walls, rooms: updatedRooms);
 
     final dao = ref.read(buildingDaoProvider);
     if (removed.isNotEmpty || addedPersisted.isNotEmpty) {
@@ -1784,6 +1984,10 @@ class EditorStateNotifier extends Notifier<EditorState>
         unawaited(upsertWallSegment(dao, w));
       }
     }
+    for (final id in roomPolys.keys) {
+      final r = updatedRooms.where((x) => x.id == id).firstOrNull;
+      if (r != null) unawaited(upsertRoom(dao, r));
+    }
     // Persist any new fragment carrying a roomId so the ADR-017 startup
     // restore picks up its constructionId. Bare (roomId-empty) walls remain
     // in-memory until promoted to a room.
@@ -1793,7 +1997,8 @@ class EditorStateNotifier extends Notifier<EditorState>
     }
     if (removed.isNotEmpty ||
         addedPersisted.isNotEmpty ||
-        persistedNew.isNotEmpty) {
+        persistedNew.isNotEmpty ||
+        roomPolys.isNotEmpty) {
       markProjectDirty();
     }
 
@@ -1802,6 +2007,29 @@ class EditorStateNotifier extends Notifier<EditorState>
     // host-split piece that will be promoted to a shared wall).
     if (addedNew.isNotEmpty) return addedNew.first;
     return coincidentSeed ?? _withOrientation(prepared);
+  }
+
+  /// Returns [polygon] with [pt] inserted between the consecutive vertices
+  /// matching edge [a]→[b] (direction-agnostic, 1 mm tolerance). When no
+  /// edge matches (the split wall is not on this room's boundary) the polygon
+  /// is returned unchanged.
+  List<Point2D> _insertPolygonVertexOnEdge(
+    List<Point2D> polygon,
+    Point2D a,
+    Point2D b,
+    Point2D pt,
+  ) {
+    bool eq(Point2D p, Point2D q) => GeometryEngine.distanceMm(p, q) < 1.0;
+    for (var i = 0; i < polygon.length; i++) {
+      final v1 = polygon[i];
+      final v2 = polygon[(i + 1) % polygon.length];
+      if ((eq(v1, a) && eq(v2, b)) || (eq(v1, b) && eq(v2, a))) {
+        final out = List<Point2D>.from(polygon);
+        out.insert(i + 1, pt);
+        return out;
+      }
+    }
+    return polygon;
   }
 
   /// Create a room from auto-detection results, handling

@@ -319,16 +319,24 @@ class WallDrawTool extends CanvasTool with ModifierDrawTool {
     }
 
     final newWalls = callbacks.currentWalls.toList();
+    // Post-split rooms: `commitWallWithSplit` may have inserted a vertex into
+    // an existing host room's polygon (ADR-003 Rule 7) when the new rectangle
+    // ran along part of that room's wall. This must be the command's "new"
+    // room state — using `oldRooms` here would make `execute()` revert that
+    // polygon vertex, leaving the host room's split walls without matching
+    // polygon edges (their mitred faces vanish → detached/wedged corner).
+    final splitRooms = callbacks.currentRooms.toList();
 
     // Register one undo command covering walls + room (ADR-009 §Rule 5).
-    // newRooms starts as oldRooms (safe default when dialog is cancelled).
-    // The onCreated callback updates it when the room is confirmed.
+    // newRooms starts at the post-split rooms (safe default when the dialog is
+    // cancelled — the host-wall split still stands). The onCreated callback
+    // updates it to include the freshly created room when confirmed.
     final cmd = _RectDrawCommand(
       callbacks: callbacks,
       oldWalls: oldWalls,
       oldRooms: oldRooms,
       newWalls: newWalls,
-      newRooms: oldRooms,
+      newRooms: splitRooms,
     );
     undoRedo.execute(cmd);
 

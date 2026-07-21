@@ -217,8 +217,12 @@ class AnnotationPainter extends CustomPainter {
     // rectangle-eligible rooms.
     for (final room in rooms) {
       if (room.polygon.length < 3) continue;
+      // Rectangle-eligible even when an edge is split into collinear walls by
+      // an attached adjacent room (ADR-003): the centerline polygon still
+      // collapses to 4 axis-aligned corners. A strict `walls.length == 4`
+      // gate would drop the central W×H label for such a room.
+      if (!polygonRectangleEligible(room.polygon)) continue;
       final roomWalls = walls.where((w) => w.roomId == room.id).toList();
-      if (roomWalls.length != 4) continue;
       final offsets = <double>[];
       var matched = true;
       for (var i = 0; i < room.polygon.length; i++) {
@@ -243,8 +247,10 @@ class AnnotationPainter extends CustomPainter {
         centerline: room.polygon,
         edgeOffsetsMm: offsets,
       );
-      if (inner.length != 4) continue;
-      if (!_isAxisAlignedRectangle(inner)) continue;
+      // The centerline is already a (possibly collinear-split) axis-aligned
+      // rectangle, so the inner offset — which may carry >4 vertices at a
+      // split — is measured by its bounding box.
+      if (inner.length < 4) continue;
       var minX = inner.first.x;
       var maxX = inner.first.x;
       var minY = inner.first.y;
@@ -364,16 +370,47 @@ class AnnotationPainter extends CustomPainter {
 
   /// Whether [vertices] form an axis-aligned 4-vertex rectangle within
   /// 1 mm tolerance.
-  bool _isAxisAlignedRectangle(List<Point2D> vertices) {
-    if (vertices.length != 4) return false;
-    for (var i = 0; i < 4; i++) {
-      final a = vertices[i];
-      final b = vertices[(i + 1) % 4];
+  /// True when [polygon] (a centerline loop) is an axis-aligned rectangle,
+  /// tolerating collinear "split" vertices (180° straight points) left when an
+  /// adjacent room splits a shared wall (ADR-003). A vertex is a true corner
+  /// only where a horizontal and a vertical edge meet; the true corners must
+  /// be exactly 4, spanning 2 distinct x-values and 2 distinct y-values.
+  @visibleForTesting
+  static bool polygonRectangleEligible(List<Point2D> polygon) {
+    const tol = 1.0;
+    final n = polygon.length;
+    if (n < 4) return false;
+
+    bool horizontalEdge(int i) =>
+        (polygon[i].y - polygon[(i + 1) % n].y).abs() < tol;
+
+    // Every edge must be axis-aligned and non-degenerate.
+    for (var i = 0; i < n; i++) {
+      final a = polygon[i];
+      final b = polygon[(i + 1) % n];
       final dx = (a.x - b.x).abs();
       final dy = (a.y - b.y).abs();
-      if (dx > 1.0 && dy > 1.0) return false;
+      if (dx >= tol && dy >= tol) return false; // diagonal
+      if (dx < tol && dy < tol) return false; // zero-length
     }
-    return true;
+
+    final corners = <Point2D>[];
+    for (var i = 0; i < n; i++) {
+      // The edge ending at vertex i vs the edge starting at it: a true corner
+      // changes orientation; a collinear split keeps it.
+      if (horizontalEdge((i - 1 + n) % n) != horizontalEdge(i)) {
+        corners.add(polygon[i]);
+      }
+    }
+    if (corners.length != 4) return false;
+
+    final xs = <double>[];
+    final ys = <double>[];
+    for (final c in corners) {
+      if (!xs.any((v) => (v - c.x).abs() < tol)) xs.add(c.x);
+      if (!ys.any((v) => (v - c.y).abs() < tol)) ys.add(c.y);
+    }
+    return xs.length == 2 && ys.length == 2;
   }
 
   @override

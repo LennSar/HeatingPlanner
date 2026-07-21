@@ -626,6 +626,37 @@ class _ProviderWallDrawCallbacks implements EditorCallbacks {
   double get currentGridSpacingMm => 100.0;
 }
 
+/// Provider-backed callbacks whose [requestRoomDialog] synchronously confirms
+/// the room — running the real [EditorStateNotifier.addRoomFromDetection] and
+/// then the tool's [onCreated] callback, exactly like the room dialog does in
+/// the app. This exercises the full rect-draw pipeline, including the
+/// `_RectDrawCommand.execute()` that reapplies the room list.
+class _RoomCreatingProviderCallbacks extends _ProviderWallDrawCallbacks {
+  _RoomCreatingProviderCallbacks(super.container);
+
+  int _seq = 0;
+
+  @override
+  void requestRoomDialog(
+    List<Point2D> polygon,
+    List<String> wallIds, {
+    void Function(List<WallSegment>, List<Room>)? onCreated,
+  }) {
+    _seq++;
+    _n.addRoomFromDetection(
+      room: Room(
+        id: 'room-$_seq',
+        floorId: 'floor-1',
+        name: 'Room $_seq',
+        targetTempC: 20.0,
+        polygon: polygon,
+      ),
+      wallIds: wallIds,
+    );
+    onCreated?.call(currentWalls, currentRooms);
+  }
+}
+
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
 void main() {
@@ -1462,6 +1493,74 @@ void main() {
       expect(ghost.alignYAnchor, isNull);
       expect(ghost.currentPoint.x, closeTo(500, 0.5));
       expect(ghost.currentPoint.y, closeTo(1700, 0.5));
+    },
+  );
+
+  // WDT-22 ───────────────────────────────────────────────────────────────────
+  //
+  // Regression: Ctrl+drag a smaller room against part of a larger room's wall
+  // through the FULL rect-draw pipeline (including `_RectDrawCommand.execute()`
+  // re-applying the room list). The host wall is split (ADR-003) and the split
+  // vertex is inserted into the host room's polygon (ADR-003 Rule 7). The undo
+  // command must carry the POST-split room list, otherwise `execute()` reverts
+  // the polygon vertex and the host room's split walls lose their matching
+  // polygon edges — their mitred faces vanish and the corner renders as a
+  // wedge/notch (the reported bug). This path is what the app runs; the direct
+  // provider tests in adjacent_room_corner_test.dart bypass the command.
+
+  test(
+    'WDT-22: attaching a smaller room via Ctrl+drag keeps the host room '
+    'polygon split so no wall loses its mitred face',
+    () {
+      final container = ProviderContainer(overrides: [
+        appDatabaseProvider.overrideWith((ref) {
+          final db = AppDatabase.forTesting(NativeDatabase.memory());
+          ref.onDispose(db.close);
+          return db;
+        }),
+      ]);
+      addTearDown(container.dispose);
+      final cb = _RoomCreatingProviderCallbacks(container);
+      final tool = WallDrawTool(
+        callbacks: cb,
+        onStateChanged: () {},
+        undoRedo: UndoRedoService(),
+      );
+      tool.updateModifiers(shift: false, ctrl: true, alt: false);
+
+      // Big room 4000×4000.
+      tool.onPointerDown(const Point2D(x: 0, y: 0), 1);
+      tool.onDragEnd(const Point2D(x: 4000, y: 4000));
+
+      // Smaller room 2000×2000 below-left, sharing part of the big room's
+      // bottom wall (splits it at (2000,4000)).
+      tool.onPointerDown(const Point2D(x: 0, y: 4000), 1);
+      tool.onDragEnd(const Point2D(x: 2000, y: 6000));
+
+      final st = container.read(editorStateProvider);
+      expect(st.rooms, hasLength(2));
+
+      final big = st.rooms.firstWhere((r) => r.name == 'Room 1');
+      // The host wall was split at (2000,4000); the vertex must survive in the
+      // polygon (5 vertices) rather than being reverted by execute().
+      expect(
+        big.polygon,
+        hasLength(5),
+        reason: 'host room polygon must keep the ADR-003 split vertex',
+      );
+
+      // Every big-room wall must resolve a mitred inner + outer face; a missing
+      // face means an unmatched polygon edge → fallback rendering → wedge.
+      final bigWalls =
+          st.walls.where((w) => w.roomId == big.id).toList();
+      final inner = GeometryEngine.roomFaceEdges(
+          walls: bigWalls, roomPolygon: big.polygon, side: RoomFaceSide.inner);
+      final outer = GeometryEngine.roomFaceEdges(
+          walls: bigWalls, roomPolygon: big.polygon, side: RoomFaceSide.outer);
+      expect(inner.length, bigWalls.length,
+          reason: 'no big-room wall may lose its inner face');
+      expect(outer.length, bigWalls.length,
+          reason: 'no big-room wall may lose its outer face');
     },
   );
 }
