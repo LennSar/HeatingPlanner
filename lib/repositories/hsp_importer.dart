@@ -504,7 +504,8 @@ class HspImporter {
         d['borderDistanceMm'] as int? ?? 100,
       ),
       layoutPattern: Value(
-        d['layoutPattern'] as String? ?? 'meander',
+        // ADR-043: older files carry `spiral` / `bifilar`.
+        LayoutPattern.fromName(d['layoutPattern'] as String?).name,
       ),
       // circuitId has no FK constraint — safe to set before circuit exists.
       circuitId: Value(

@@ -74,8 +74,7 @@ ProviderContainer _container(EditorState state) {
 }
 
 void main() {
-  test('connectionPipeLengthsM measures each pipe up to the zone boundary',
-      () {
+  test('connectionPipeLengthsM measures each pipe up to the zone boundary', () {
     final lengths = connectionPipeLengthsM(
       _circuit,
       zone: _zone,
@@ -93,11 +92,13 @@ void main() {
   });
 
   test('zone tube length is the length of the drawn tube', () {
-    final container = _container(EditorState(
-      zones: const [_zone],
-      circuits: [_circuit],
-      distributor: _distributor,
-    ));
+    final container = _container(
+      EditorState(
+        zones: const [_zone],
+        circuits: [_circuit],
+        distributor: _distributor,
+      ),
+    );
 
     final drawn = container.read(zonePipeLayoutsProvider)['zone-1']!.pipePath;
     expect(drawn.length, greaterThan(10));
@@ -113,11 +114,13 @@ void main() {
   });
 
   test('it is not the area ÷ spacing estimate', () {
-    final container = _container(EditorState(
-      zones: const [_zone],
-      circuits: [_circuit],
-      distributor: _distributor,
-    ));
+    final container = _container(
+      EditorState(
+        zones: const [_zone],
+        circuits: [_circuit],
+        distributor: _distributor,
+      ),
+    );
     final estimate = HydraulicEngine.zoneTubeLength(
       zoneAreaM2: 12.0,
       perimeterM: 14.0,
@@ -131,13 +134,18 @@ void main() {
   });
 
   test('circuit length = supply pipe + tube in the zone + return pipe', () {
-    final container = _container(EditorState(
-      zones: const [_zone],
-      circuits: [_circuit],
-      distributor: _distributor,
-    ));
-    final pipes =
-        connectionPipeLengthsM(_circuit, zone: _zone, bendRadiusMm: 80);
+    final container = _container(
+      EditorState(
+        zones: const [_zone],
+        circuits: [_circuit],
+        distributor: _distributor,
+      ),
+    );
+    final pipes = connectionPipeLengthsM(
+      _circuit,
+      zone: _zone,
+      bendRadiusMm: 80,
+    );
     expect(
       container.read(tubeLengthProvider('circuit-1')),
       closeTo(
@@ -153,39 +161,44 @@ void main() {
       'length', () {
     final lengths = <LayoutPattern, double>{};
     for (final pattern in LayoutPattern.values) {
-      final container = _container(EditorState(
-        zones: [_zone.copyWith(layoutPattern: pattern)],
-        circuits: [_circuit],
-        distributor: _distributor,
-      ));
-      final drawn =
-          container.read(zonePipeLayoutsProvider)['zone-1']!.pipePath;
+      final container = _container(
+        EditorState(
+          zones: [_zone.copyWith(layoutPattern: pattern)],
+          circuits: [_circuit],
+          distributor: _distributor,
+        ),
+      );
+      final drawn = container.read(zonePipeLayoutsProvider)['zone-1']!.pipePath;
       lengths[pattern] = container.read(zoneTubeLengthProvider('zone-1'));
       expect(drawn, isNotEmpty, reason: '${pattern.name} must draw a tube');
-      expect(lengths[pattern], greaterThan(50),
-          reason: '${pattern.name} must have a length');
+      expect(
+        lengths[pattern],
+        greaterThan(50),
+        reason: '${pattern.name} must have a length',
+      );
     }
-    expect(lengths[LayoutPattern.spiral],
-        isNot(closeTo(lengths[LayoutPattern.meander]!, 0.01)));
+    expect(
+      lengths[LayoutPattern.counterflow],
+      isNot(closeTo(lengths[LayoutPattern.meander]!, 0.01)),
+    );
   });
 
   test('the length follows the drawing: a longer connection pipe adds '
       'exactly its extra length', () {
-    final container = _container(EditorState(
-      zones: const [_zone],
-      circuits: [_circuit],
-      distributor: _distributor,
-    ));
+    final container = _container(
+      EditorState(
+        zones: const [_zone],
+        circuits: [_circuit],
+        distributor: _distributor,
+      ),
+    );
     final before = container.read(tubeLengthProvider('circuit-1'));
 
     // Same route, started 1 m further west.
     final longer = relaidConnectionPipes(
       _circuit,
       const [],
-      centerline: const [
-        Point2D(x: -1000, y: 1500),
-        Point2D(x: 3000, y: 1500),
-      ],
+      centerline: const [Point2D(x: -1000, y: 1500), Point2D(x: 3000, y: 1500)],
     );
     (container.read(editorStateProvider.notifier) as _StubEditorNotifier).set(
       EditorState(
@@ -202,11 +215,13 @@ void main() {
 
   test('the drawn tube carries bend radii, so it is shorter than its '
       'corner polyline', () {
-    final container = _container(EditorState(
-      zones: const [_zone],
-      circuits: [_circuit],
-      distributor: _distributor,
-    ));
+    final container = _container(
+      EditorState(
+        zones: const [_zone],
+        circuits: [_circuit],
+        distributor: _distributor,
+      ),
+    );
     final corners = PipeLayoutEngine.tubePath(
       pattern: LayoutPattern.meander,
       polygon: _zone.polygon,
@@ -222,39 +237,43 @@ void main() {
   });
 
   test('unknown ids give NaN; a zone too small for any tube gives 0', () {
-    final container = _container(EditorState(
-      zones: [
-        _zone.copyWith(
-          id: 'tiny',
-          polygon: const [
-            Point2D(x: 0, y: 0),
-            Point2D(x: 250, y: 0),
-            Point2D(x: 250, y: 250),
-            Point2D(x: 0, y: 250),
-          ],
-        ),
-      ],
-    ));
+    final container = _container(
+      EditorState(
+        zones: [
+          _zone.copyWith(
+            id: 'tiny',
+            polygon: const [
+              Point2D(x: 0, y: 0),
+              Point2D(x: 250, y: 0),
+              Point2D(x: 250, y: 250),
+              Point2D(x: 0, y: 250),
+            ],
+          ),
+        ],
+      ),
+    );
     expect(container.read(zoneTubeLengthProvider('nope')).isNaN, isTrue);
     expect(container.read(tubeLengthProvider('nope')).isNaN, isTrue);
     expect(container.read(zoneTubeLengthProvider('tiny')), 0.0);
   });
 
   test('neighbouring zones get different identity colours', () {
-    final container = _container(EditorState(
-      zones: [
-        _zone,
-        _zone.copyWith(
-          id: 'zone-2',
-          polygon: const [
-            Point2D(x: 6000, y: 0),
-            Point2D(x: 9000, y: 0),
-            Point2D(x: 9000, y: 3000),
-            Point2D(x: 6000, y: 3000),
-          ],
-        ),
-      ],
-    ));
+    final container = _container(
+      EditorState(
+        zones: [
+          _zone,
+          _zone.copyWith(
+            id: 'zone-2',
+            polygon: const [
+              Point2D(x: 6000, y: 0),
+              Point2D(x: 9000, y: 0),
+              Point2D(x: 9000, y: 3000),
+              Point2D(x: 6000, y: 3000),
+            ],
+          ),
+        ],
+      ),
+    );
     final indices = container.read(zoneColorIndicesProvider);
     expect(indices.keys, containsAll(<String>['zone-1', 'zone-2']));
     expect(indices['zone-1'], isNot(indices['zone-2']));

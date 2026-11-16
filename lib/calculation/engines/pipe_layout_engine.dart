@@ -219,31 +219,46 @@ class PipeLayoutEngine {
   // Meander
   // ──────────────────────────────────────────────────────────────────────
 
+  /// Width of the edge zone of [LayoutPattern.edgeZoneMeander], in mm
+  /// (ADR-043 Rule 4).
+  static const double edgeZoneWidthMm = 1000.0;
+
+  /// Tube spacing in the edge zone of [LayoutPattern.edgeZoneMeander]:
+  /// half the zone's spacing, but at least 50 mm (ADR-043 Rule 4).
+  static double edgeZoneSpacingMm(int tubeSpacingMm) =>
+      math.max(50.0, tubeSpacingMm / 2.0);
+
   /// Continuous tube path for a zone in the given layout [pattern]
-  /// (ADR-038 Rule 2, ADR-042 Rule 2): `entry → tube → exit`.
+  /// (ADR-043): `entry → tube → exit`.
   ///
-  /// - [LayoutPattern.meander] — serpentine rows; the tube comes back
-  ///   along one side (the return lane). Supply goes into the first row.
-  /// - [LayoutPattern.counterflow] — the same tube run the other way
-  ///   round: supply goes along the lane to the far end first and the
-  ///   rows work back towards the entry.
-  /// - [LayoutPattern.bifilar] — double meander: the tube is laid as a
-  ///   folded pair, so supply and return rows alternate.
-  /// - [LayoutPattern.spiral] — snail: the tube spirals in to the centre
-  ///   at double pitch and back out between its own turns. Where rings
-  ///   would cover less than 70 % of the zone (L-shapes) the double
-  ///   meander is used instead, and the meander where even that fails.
+  /// - [LayoutPattern.meander] — single serpentine: rows back and forth,
+  ///   the tube returns along one side (the return lane). Supply enters
+  ///   the first row, so the water cools from one side of the zone to
+  ///   the other.
+  /// - [LayoutPattern.doubleMeander] — double serpentine: supply and
+  ///   return run side by side through the serpentine and fold back at
+  ///   the far end, so warm and cool rows alternate.
+  /// - [LayoutPattern.counterflow] — counterflow spiral (snail): the
+  ///   supply spirals in to the centre at double spacing and the return
+  ///   spirals back out between its turns. Where rings would cover less
+  ///   than 70 % of the zone (an L-shape) the double serpentine is used,
+  ///   which also alternates supply and return.
+  /// - [LayoutPattern.edgeZoneMeander] — serpentine with an edge zone:
+  ///   rows parallel to the longest of [exteriorEdges] (zone edges along
+  ///   an exterior wall), the first [edgeZoneWidthMm] at
+  ///   [edgeZoneSpacingMm], fed by the supply first. Without an exterior
+  ///   edge it is a plain serpentine.
   ///
   /// Tubes keep [borderDistanceMm] from the zone boundary. The pitch is
-  /// at most [tubeSpacingMm]; the serpentine layouts tighten it slightly
-  /// where needed for an even row count, and keep out of [exclusions]
-  /// (the spiral does not route around them).
+  /// at most [tubeSpacingMm]; the serpentines tighten it slightly where
+  /// needed for an even row count, and keep out of [exclusions] (the
+  /// spiral does not route around them). Where nothing of the requested
+  /// pattern fits, the single serpentine is used.
   ///
-  /// Among the possible layouts the one starting closest to
-  /// [entryPoint] is preferred, and its leads must not cross the tube
-  /// (ADR-041): if the preferred direction crosses, the tube is run the
-  /// other way round. [exitPoint] defaults to [entryPoint]. Returns an
-  /// empty list when the inputs are invalid or nothing fits.
+  /// Among the possible layouts the one starting closest to [entryPoint]
+  /// is preferred, and its leads must not cross the tube (ADR-041).
+  /// [exitPoint] defaults to [entryPoint]. Returns an empty list when the
+  /// inputs are invalid or nothing fits.
   static List<Point2D> tubePath({
     required LayoutPattern pattern,
     required List<Point2D> polygon,
@@ -252,6 +267,7 @@ class PipeLayoutEngine {
     Point2D? entryPoint,
     Point2D? exitPoint,
     List<List<Point2D>> exclusions = const [],
+    List<({Point2D start, Point2D end})> exteriorEdges = const [],
   }) {
     if (polygon.length < 3 || tubeSpacingMm <= 0 || borderDistanceMm < 0) {
       return const [];
@@ -263,8 +279,9 @@ class PipeLayoutEngine {
       borderDistanceMm: borderDistanceMm,
       entryPoint: entryPoint,
       exclusions: exclusions,
+      exteriorEdges: exteriorEdges,
     );
-    var bodies = pattern == LayoutPattern.spiral
+    var bodies = pattern == LayoutPattern.counterflow
         ? _spiralBodies(
             polygon: polygon,
             spacing: tubeSpacingMm.toDouble(),
@@ -272,21 +289,33 @@ class PipeLayoutEngine {
             entryPoint: entryPoint,
           )
         : serpentine(pattern);
-    if (pattern == LayoutPattern.spiral && bodies.isNotEmpty) {
+    if (pattern == LayoutPattern.counterflow && bodies.isNotEmpty) {
       // Rings stop as soon as the narrowest part of the zone is full. If
-      // that leaves much of the zone without tube (an L-shape, say), the
-      // double meander — which also alternates supply and return — is
-      // used instead.
+      // that leaves much of the zone without tube, the double serpentine
+      // — which also alternates supply and return — is used instead.
       final coveredM2 =
           GeometryEngine.polylineLengthMm(bodies.first) * tubeSpacingMm / 1e6;
       if (coveredM2 < 0.7 * GeometryEngine.polygonAreaM2(polygon)) {
-        bodies = serpentine(LayoutPattern.bifilar);
+        bodies = serpentine(LayoutPattern.doubleMeander);
       }
+    }
+    if (pattern == LayoutPattern.counterflow && bodies.isEmpty) {
+      bodies = serpentine(LayoutPattern.doubleMeander);
     }
     if (bodies.isEmpty && pattern != LayoutPattern.meander) {
       bodies = serpentine(LayoutPattern.meander);
     }
-    return _pickCrossingFree(bodies, entryPoint, exitPoint ?? entryPoint);
+    return _pickCrossingFree(
+      bodies,
+      entryPoint,
+      exitPoint ?? entryPoint,
+      // The edge zone must get the supply first: reversing its flow is a
+      // last resort.
+      reverseFlowPenaltyMm: pattern == LayoutPattern.edgeZoneMeander &&
+              exteriorEdges.isNotEmpty
+          ? 1e7
+          : _reverseFlowPenaltyMm,
+    );
   }
 
   /// [tubePath] for [LayoutPattern.meander].
@@ -324,9 +353,37 @@ class PipeLayoutEngine {
     required int borderDistanceMm,
     required Point2D? entryPoint,
     required List<List<Point2D>> exclusions,
+    List<({Point2D start, Point2D end})> exteriorEdges = const [],
   }) {
     final spacing = tubeSpacingMm.toDouble();
     final border = borderDistanceMm.toDouble();
+
+    // Edge zone (ADR-043 Rule 4): rows parallel to the longest exterior
+    // edge, starting at it, densely spaced for the first metre.
+    ({bool swap, bool fromMin})? edgeSide;
+    if (pattern == LayoutPattern.edgeZoneMeander && exteriorEdges.isNotEmpty) {
+      final edge = exteriorEdges.reduce(
+        (a, b) => GeometryEngine.distanceMm(a.start, a.end) >=
+                GeometryEngine.distanceMm(b.start, b.end)
+            ? a
+            : b,
+      );
+      final horizontal = (edge.end.x - edge.start.x).abs() >=
+          (edge.end.y - edge.start.y).abs();
+      final cx = polygon.map((p) => p.x).reduce((a, b) => a + b) /
+          polygon.length;
+      final cy = polygon.map((p) => p.y).reduce((a, b) => a + b) /
+          polygon.length;
+      edgeSide = horizontal
+          ? (swap: false, fromMin: (edge.start.y + edge.end.y) / 2 < cy)
+          : (swap: true, fromMin: (edge.start.x + edge.end.x) / 2 < cx);
+    }
+    final dense = edgeSide == null
+        ? null
+        : (
+            widthMm: edgeZoneWidthMm,
+            spacingMm: edgeZoneSpacingMm(tubeSpacingMm),
+          );
 
     final minX = polygon.map((p) => p.x).reduce(math.min);
     final maxX = polygon.map((p) => p.x).reduce(math.max);
@@ -338,6 +395,10 @@ class PipeLayoutEngine {
     final candidates = <_Candidate>[];
     for (final swap in const [false, true]) {
       for (final fromMin in const [true, false]) {
+        if (edgeSide != null &&
+            (swap != edgeSide.swap || fromMin != edgeSide.fromMin)) {
+          continue;
+        }
         final entryUv = entryPoint == null
             ? null
             : (
@@ -352,6 +413,7 @@ class PipeLayoutEngine {
           swap: swap,
           fromMin: fromMin,
           entryU: entryUv?.u,
+          dense: dense,
         );
         final rows = built.rows;
         if (rows.length < 2) continue;
@@ -365,6 +427,8 @@ class PipeLayoutEngine {
             (r) => ((laneLo ? r.lo : r.hi) - near0).abs() <= _tolMm,
           );
           final startU = near0 + (laneLo ? spacing : -spacing);
+          // The return lane steps in by the row pitch; in the edge zone
+          // that is the denser one.
           var score = straight ? 0.0 : 1e7;
           if (entryUv != null) {
             final du = entryUv.u - startU;
@@ -399,21 +463,33 @@ class PipeLayoutEngine {
     final bodies = <List<Point2D>>[];
     for (final c in eligible) {
       final List<Point2D> body;
-      if (pattern == LayoutPattern.bifilar) {
+      if (pattern == LayoutPattern.doubleMeander) {
         body = _assembleBifilar(rows: c.rows, swap: c.swap, startLo: c.laneLo);
       } else {
-        final meander = _assemblePath(
+        final laneStep =
+            dense == null ? spacing : math.min(spacing, dense.spacingMm);
+        body = _assemblePath(
           rows: c.rows,
           swap: c.swap,
           laneLo: c.laneLo,
-          spacing: spacing,
+          spacing: laneStep,
           entryPoint: null,
           exitPoint: null,
         );
-        // Counterflow: supply into the lane, rows back towards the entry.
-        body = pattern == LayoutPattern.counterflow
-            ? meander.reversed.toList()
-            : meander;
+        if (dense != null) {
+          // Entry on the far side of the zone: feed the edge zone along
+          // the lane instead of running the leads across the zone.
+          final fedFromFar = _assemblePath(
+            rows: c.rows,
+            swap: c.swap,
+            laneLo: c.laneLo,
+            spacing: laneStep,
+            entryPoint: null,
+            exitPoint: null,
+            feedFromFar: true,
+          );
+          if (fedFromFar.length >= 4) bodies.add(fedFromFar);
+        }
       }
       if (body.length >= 4) bodies.add(body);
     }
@@ -431,8 +507,9 @@ class PipeLayoutEngine {
   static List<Point2D> _pickCrossingFree(
     List<List<Point2D>> bodies,
     Point2D? entry,
-    Point2D? exit,
-  ) {
+    Point2D? exit, {
+    double reverseFlowPenaltyMm = _reverseFlowPenaltyMm,
+  }) {
     if (bodies.isEmpty) return const [];
     if (entry == null || exit == null) return bodies.first;
     List<Point2D>? fallback;
@@ -451,7 +528,7 @@ class PipeLayoutEngine {
         if (crossings == 0) {
           final cost = GeometryEngine.distanceMm(entry, ordered.first) +
               GeometryEngine.distanceMm(ordered.last, exit) +
-              (reversed ? _reverseFlowPenaltyMm : 0.0);
+              (reversed ? reverseFlowPenaltyMm : 0.0);
           if (cost < bestCost) {
             bestCost = cost;
             best = path;
@@ -550,9 +627,8 @@ class PipeLayoutEngine {
           GeometryEngine.distanceMm(ring[i], ring[(i + 1) % n]),
         );
       }
-      // Every edge must be long enough for the tube to leave the ring
-      // two spacings before its start corner.
-      if (shortest <= 2 * spacing + _tolMm) break;
+      // A ring narrower than one spacing has no room for the U-turn.
+      if (shortest <= spacing + _tolMm) break;
       rings.add(ring);
     }
     if (rings.length < 2) return const [];
@@ -576,6 +652,20 @@ class PipeLayoutEngine {
       if (turn * area2 <= 0) continue;
 
       for (final forward in const [true, false]) {
+        // The closing edge of every ring used (the edge leading into the
+        // start corner) must leave room to step in two spacings before
+        // the corner; deeper rings are dropped once it does not.
+        var ringCount = 0;
+        while (ringCount < rings.length) {
+          final ring = rings[ringCount];
+          final into = ring[(forward ? start - 1 + n : start + 1) % n];
+          if (GeometryEngine.distanceMm(into, ring[start]) <=
+              2 * spacing + _tolMm) {
+            break;
+          }
+          ringCount++;
+        }
+        if (ringCount < 2) continue;
         // Ring k re-ordered to begin at the start corner.
         List<Point2D> ordered(int k) => [
           for (var i = 0; i < n; i++)
@@ -594,7 +684,7 @@ class PipeLayoutEngine {
 
         final supply = <Point2D>[];
         final back = <Point2D>[before(ordered(0), spacing)];
-        final lastRing = rings.length - 1;
+        final lastRing = ringCount - 1;
         for (var k = 0; k <= lastRing; k++) {
           final ring = ordered(k);
           final chain = k.isEven ? supply : back;
@@ -687,6 +777,7 @@ class PipeLayoutEngine {
     required bool swap,
     required bool fromMin,
     required double? entryU,
+    ({double widthMm, double spacingMm})? dense,
   }) {
     final vs = polygon.map((p) => swap ? p.x : p.y);
     final v0 = vs.reduce(math.min) + border;
@@ -694,10 +785,7 @@ class PipeLayoutEngine {
     final extent = v1 - v0;
     if (extent < spacing / 2) return (rows: const <_Row>[], jumps: 0);
 
-    var count = (extent / spacing - 1e-6).ceil() + 1;
-    if (count < 2) count = 2;
-    if (count.isOdd) count += 1;
-    final pitch = extent / (count - 1);
+    final offsets = _rowOffsets(extent, spacing, dense);
     // Sample slightly inside the border offset so the first and last
     // rows still see the polygon edge they run along.
     final probe = math.max(0.0, border - 0.5);
@@ -705,8 +793,8 @@ class PipeLayoutEngine {
     final rows = <_Row>[];
     var jumps = 0;
     var jumping = false;
-    for (var i = 0; i < count; i++) {
-      final v = fromMin ? v0 + i * pitch : v1 - i * pitch;
+    for (final offset in offsets) {
+      final v = fromMin ? v0 + offset : v1 - offset;
       var spans = _spansAt(polygon, v, swap);
       if (probe > 0) {
         spans = _intersect(spans, _spansAt(polygon, v - probe, swap));
@@ -774,6 +862,46 @@ class PipeLayoutEngine {
     return (rows: rows, jumps: jumps);
   }
 
+  /// Distances of the serpentine rows from the start side, across an
+  /// [extent] of the zone (ADR-043).
+  ///
+  /// Without [dense] the rows are evenly spaced at most [spacing] apart.
+  /// With it, the first `dense.widthMm` are covered at
+  /// `dense.spacingMm` (the edge zone) and the rest at most [spacing]
+  /// apart. The count is always even so the last row ends on the side
+  /// of the return lane, and the last row lies exactly at [extent].
+  static List<double> _rowOffsets(
+    double extent,
+    double spacing,
+    ({double widthMm, double spacingMm})? dense,
+  ) {
+    List<double> even(double from, double to, double maxPitch, int parity) {
+      final span = to - from;
+      var gaps = math.max(1, (span / maxPitch - 1e-6).ceil());
+      if (gaps % 2 != parity) gaps += 1;
+      return [for (var i = 1; i <= gaps; i++) from + span * i / gaps];
+    }
+
+    if (dense == null ||
+        dense.spacingMm <= 0 ||
+        dense.widthMm < dense.spacingMm ||
+        extent <= dense.widthMm + spacing) {
+      // One even block: rows 0 … gaps, gaps odd for an even count.
+      return [0.0, ...even(0.0, extent, spacing, 1)];
+    }
+    final denseGaps = (dense.widthMm / dense.spacingMm).floor();
+    final denseEnd = denseGaps * dense.spacingMm;
+    final denseRows = [
+      for (var i = 0; i <= denseGaps; i++) i * dense.spacingMm,
+    ];
+    // The rest must bring the total to an even count.
+    final restParity = denseRows.length.isOdd ? 1 : 0;
+    return [
+      ...denseRows,
+      ...even(denseEnd, extent, spacing, restParity),
+    ];
+  }
+
   /// Turns [rows] into the world-space tube polyline.
   static List<Point2D> _assemblePath({
     required List<_Row> rows,
@@ -782,6 +910,7 @@ class PipeLayoutEngine {
     required double spacing,
     required Point2D? entryPoint,
     required Point2D? exitPoint,
+    bool feedFromFar = false,
   }) {
     Point2D world(double u, double v) =>
         swap ? Point2D(x: v, y: u) : Point2D(x: u, y: v);
@@ -792,10 +921,19 @@ class PipeLayoutEngine {
     final path = <Point2D>[];
     if (entryPoint != null) path.add(entryPoint);
     final last = rows.length - 1;
+    if (feedFromFar) {
+      // ADR-043 Rule 4: the lane comes first — from the far end of the
+      // rows back to the first row — so the supply reaches the first
+      // row (the edge zone) before anything else.
+      for (var i = last; i >= 0; i--) {
+        path.add(world(near(rows[i]), rows[i].v));
+      }
+    }
     final nearEnds = [
-      // Every row but the last stops one spacing short of the lane.
+      // Every row but the last stops one spacing short of the lane; with
+      // the lane fed first, the last row does too.
       for (var i = 0; i <= last; i++)
-        i == last ? near(rows[i]) : near(rows[i]) + inward,
+        i == last && !feedFromFar ? near(rows[i]) : near(rows[i]) + inward,
     ];
     final farEnds = [for (final r in rows) far(r)];
     _squareOffTurns(nearEnds, farEnds, 2 * spacing, lastTurn: last - 1);
@@ -812,8 +950,10 @@ class PipeLayoutEngine {
       }
     }
     // Return lane back along the near side to the first row.
-    for (var i = last - 1; i >= 0; i--) {
-      path.add(world(near(rows[i]), rows[i].v));
+    if (!feedFromFar) {
+      for (var i = last - 1; i >= 0; i--) {
+        path.add(world(near(rows[i]), rows[i].v));
+      }
     }
     if (exitPoint != null) path.add(exitPoint);
     return path;

@@ -626,6 +626,34 @@ class AppLocalizationsDe extends AppLocalizations {
   String get layoutPattern => 'Verlegemuster';
 
   @override
+  String get layoutPattern_meander => 'Mäander';
+
+  @override
+  String get layoutPattern_meanderHint =>
+      'Einfacher Mäander; kühlt von einer Seite zur anderen ab';
+
+  @override
+  String get layoutPattern_doubleMeander => 'Doppelmäander';
+
+  @override
+  String get layoutPattern_doubleMeanderHint =>
+      'Vor- und Rücklauf nebeneinander; gleichmäßige Temperatur';
+
+  @override
+  String get layoutPattern_counterflow => 'Schnecke (Gegenstrom)';
+
+  @override
+  String get layoutPattern_counterflowHint =>
+      'Spiralförmig hinein und zurück; gleichmäßigste Temperatur';
+
+  @override
+  String get layoutPattern_edgeZoneMeander => 'Mäander mit Randzone';
+
+  @override
+  String get layoutPattern_edgeZoneMeanderHint =>
+      'Engere Verlegung an der Außenwand, zuerst durchströmt';
+
+  @override
   String get tubeType => 'Rohrtyp';
 
   @override

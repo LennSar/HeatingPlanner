@@ -65,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 21;
+  int get schemaVersion => 22;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -142,6 +142,19 @@ class AppDatabase extends _$AppDatabase {
             await m.database.customStatement(
               'ALTER TABLE heating_circuits ADD COLUMN supply_on_right '
               'INTEGER NOT NULL DEFAULT 0 CHECK (supply_on_right IN (0, 1))',
+            );
+          }
+          // ADR-043 (v22): layout patterns renamed to the four in common
+          // use. `spiral` and the old `counterflow` are both the
+          // counterflow spiral; `bifilar` is the double serpentine.
+          if (from < 22) {
+            await m.database.customStatement(
+              "UPDATE heating_zones SET layout_pattern = 'counterflow' "
+              "WHERE layout_pattern = 'spiral'",
+            );
+            await m.database.customStatement(
+              "UPDATE heating_zones SET layout_pattern = 'doubleMeander' "
+              "WHERE layout_pattern = 'bifilar'",
             );
           }
         },

@@ -285,7 +285,7 @@ enum CardinalDirection {
 
 enum ZoneType { floorHeating, wallHeating }
 
-enum LayoutPattern { meander, spiral, bifilar, counterflow }
+enum LayoutPattern { meander, doubleMeander, counterflow, edgeZoneMeander } // ADR-043
 
 enum TubeMaterial { peRt, peXa, peXb, peXc, pb, copper, multiLayer }
 

@@ -3224,8 +3224,7 @@ zones are told apart by colour; and tube length is measured along the drawing.
    before, only the meander was drawn and the others left the zone empty.
    - **meander** — serpentine rows, return along one side; supply into the
      first row (ADR-038).
-   - **counterflow** — the same tube with the flow reversed: supply runs
-     along the lane to the far end first, the rows work back to the entry.
+   - **counterflow** — *superseded by ADR-043:* counterflow is the spiral.
    - **bifilar** — double meander: a serpentine centre line through every
      pair of rows, the tube laid as a pair either side of it and folded at
      the far end, so supply and return rows alternate.
@@ -3286,3 +3285,75 @@ splitting them into rectangles (ADR-037) gives full coverage.
 `test/unit/platform/undo_redo_shortcuts_test.dart`;
 `test/widget/tools/route_draw_tool_test.dart` RDT-19, RDT-20;
 `test/widget/panels/circuit_properties_test.dart` CP-7.
+
+---
+
+## ADR-043 — The four tube layouts in common use; counterflow is the spiral
+
+**Decision.**
+`LayoutPattern` holds the four layouts that dominate practice (EN 1264
+manufacturer literature, DIN trade usage: *Mäander, Doppelmäander, Schnecke,
+Randzone*) and each is drawn as such:
+
+| Value | Name (EN / DE) | Tube |
+|---|---|---|
+| `meander` | Meander / Mäander | Single serpentine; supply enters the first row, the tube returns along one side. Water cools from one side of the zone to the other. |
+| `doubleMeander` | Double meander / Doppelmäander | Supply and return run side by side through a serpentine at double pitch and fold back at the far end; warm and cool rows alternate. |
+| `counterflow` | Counterflow spiral / Schnecke (Gegenstrom) | Supply spirals in to the centre at double pitch, the return spirals back out between its turns; the most even surface temperature. |
+| `edgeZoneMeander` | Meander with edge zone / Mäander mit Randzone | Serpentine with a denser band along the exterior wall, fed first. |
+
+**Why.**
+ADR-042 implemented `counterflow` as the meander with its flow reversed — it
+looked exactly like a serpentine. In trade usage *counterflow* is the
+spiral (counter-flow spiral, bifilar spiral, *Schnecke*): supply and return
+lie next to each other throughout. The old enum also listed `spiral` and
+`counterflow` as two patterns, which in practice are one, and lacked the
+edge zone, which is standard along large exterior glazing.
+
+**Rules.**
+
+1. **Renaming.** `spiral` and the old `counterflow` → `counterflow`;
+   `bifilar` → `doubleMeander`. `LayoutPattern.fromName` maps the old names
+   wherever a pattern is read (database rows, `.hsp` import, JSON), and the
+   v22 migration rewrites stored rows. A database that reached v22 without
+   the rename (parallel ADR-044 work also used v22) still loads correctly
+   through `fromName`.
+
+2. **Counterflow spiral.** Concentric rings one spacing apart, starting
+   `borderDistanceMm` inside the zone. A ring narrower than one spacing has
+   no room for the U-turn and ends the spiral. Start corners must be convex
+   and leave room to step in two spacings before the corner on every ring
+   used. Where the rings cover less than 70 % of the zone (an L-shape: the
+   rings stop once the narrow arm is full) the double meander is drawn — it
+   also alternates supply and return. Splitting such a zone into rectangles
+   (ADR-037) gives a true spiral in each.
+
+3. **Double meander.** Unchanged from ADR-042 (`bifilar`), renamed.
+
+4. **Edge zone.** Rows run parallel to the longest zone edge that lies
+   along an exterior wall (`exteriorEdgesForZone`: parallel within 3°, within
+   half the wall thickness + 400 mm of its centerline, alongside it for at
+   least half its length). The first `PipeLayoutEngine.edgeZoneWidthMm`
+   (1 m) are laid at `edgeZoneSpacingMm` = half the zone's spacing, at least
+   50 mm; the rest at the zone's spacing. The supply always reaches the edge
+   zone first: when the pipes arrive on the far side, the supply runs along
+   the return lane to the wall and the serpentine works back towards the
+   entry (reversing the flow is penalised so heavily that it happens only
+   when every other option crosses). Without an exterior wall the edge-zone
+   pattern is a plain meander.
+
+5. **Panel.** Each option shows its name and a one-line explanation.
+
+**Not covered.**
+Edge-zone width and spacing are fixed (1 m, half spacing) rather than
+editable. Heat output is still calculated with the zone's one spacing
+(EN 1264), so the extra output of the edge zone is not credited; its extra
+tube length is (ADR-042 Rule 4). The counterflow spiral does not route
+around transit corridors.
+
+**Verification.**
+`test/unit/engines/pipe_layout_engine_test.dart` (each pattern: continuous,
+inside the zone, no crossings, coverage; counterflow is a spiral; edge zone
+spacing, feed order and density; name mapping);
+`test/unit/models/serialization_test.dart` (old names);
+`test/unit/repositories/heating_circuit_persistence_test.dart` (v22 rename).

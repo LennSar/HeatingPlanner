@@ -1172,6 +1172,54 @@ abstract class AppLocalizations {
   /// **'Layout Pattern'**
   String get layoutPattern;
 
+  /// Tube layout pattern — single serpentine (ADR-043)
+  ///
+  /// In en, this message translates to:
+  /// **'Meander'**
+  String get layoutPattern_meander;
+
+  /// Short explanation under the meander pattern option
+  ///
+  /// In en, this message translates to:
+  /// **'Single serpentine; cools from one side to the other'**
+  String get layoutPattern_meanderHint;
+
+  /// Tube layout pattern — double serpentine, supply and return side by side (ADR-043)
+  ///
+  /// In en, this message translates to:
+  /// **'Double meander'**
+  String get layoutPattern_doubleMeander;
+
+  /// Short explanation under the double meander pattern option
+  ///
+  /// In en, this message translates to:
+  /// **'Supply and return side by side; even temperature'**
+  String get layoutPattern_doubleMeanderHint;
+
+  /// Tube layout pattern — counterflow spiral / snail (ADR-043)
+  ///
+  /// In en, this message translates to:
+  /// **'Counterflow spiral'**
+  String get layoutPattern_counterflow;
+
+  /// Short explanation under the counterflow spiral pattern option
+  ///
+  /// In en, this message translates to:
+  /// **'Spirals in and back out; most even temperature'**
+  String get layoutPattern_counterflowHint;
+
+  /// Tube layout pattern — serpentine with a denser edge zone along exterior walls (ADR-043)
+  ///
+  /// In en, this message translates to:
+  /// **'Meander with edge zone'**
+  String get layoutPattern_edgeZoneMeander;
+
+  /// Short explanation under the meander-with-edge-zone pattern option
+  ///
+  /// In en, this message translates to:
+  /// **'Denser tubes along the exterior wall, fed first'**
+  String get layoutPattern_edgeZoneMeanderHint;
+
   /// Section label for tube type selection
   ///
   /// In en, this message translates to:

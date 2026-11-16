@@ -50,8 +50,34 @@ enum CardinalDirection {
 /// Heating system type embedded in a zone.
 enum ZoneType { floorHeating, wallHeating }
 
-/// Tube layout pattern within a heating zone.
-enum LayoutPattern { meander, spiral, bifilar, counterflow }
+/// Tube layout pattern within a heating zone (ADR-043).
+enum LayoutPattern {
+  /// Single serpentine (Mäander).
+  meander,
+
+  /// Double serpentine (Doppelmäander): supply and return side by side.
+  doubleMeander,
+
+  /// Counterflow spiral (Schnecke): supply spirals in, return spirals
+  /// back out between its turns.
+  counterflow,
+
+  /// Serpentine with a denser edge zone along exterior walls (Randzone).
+  edgeZoneMeander;
+
+  /// Pattern stored under [name], including names used before ADR-043:
+  /// `spiral` and the old `counterflow` → [counterflow], `bifilar` →
+  /// [doubleMeander]. Unknown names → [meander].
+  static LayoutPattern fromName(String? name) => switch (name) {
+        'spiral' => counterflow,
+        'bifilar' => doubleMeander,
+        _ => LayoutPattern.values.asNameMap()[name] ?? meander,
+      };
+}
+
+/// JSON reader for [LayoutPattern] that accepts pre-ADR-043 names.
+LayoutPattern layoutPatternFromJson(Object? json) =>
+    LayoutPattern.fromName(json as String?);
 
 /// Pipe material options for heating circuits.
 enum TubeMaterial { peRt, peXa, peXb, peXc, pb, copper, multiLayer }

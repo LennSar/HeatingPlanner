@@ -313,7 +313,9 @@ void main() {
       final changed = current(container);
       expect(changed.wallClearanceMm, 300);
 
-      await tester.tap(find.byKey(const ValueKey('circuit-swap-supply-return')));
+      await tester.tap(
+        find.byKey(const ValueKey('circuit-swap-supply-return')),
+      );
       await tester.pumpAndSettle();
       expect(current(container).supplyOnRight, isTrue);
 

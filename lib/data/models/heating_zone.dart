@@ -38,7 +38,11 @@ abstract class HeatingZone with _$HeatingZone {
     @Default(100) int borderDistanceMm,
 
     /// Pipe routing pattern within the zone.
-    @Default(LayoutPattern.meander) LayoutPattern layoutPattern,
+    // Accepts names stored before ADR-043 (`spiral`, `bifilar`).
+    // ignore: invalid_annotation_target
+    @JsonKey(fromJson: layoutPatternFromJson)
+    @Default(LayoutPattern.meander)
+    LayoutPattern layoutPattern,
 
     /// UUID of the assigned [HeatingCircuit]; null until connected.
     String? circuitId,

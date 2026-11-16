@@ -28,14 +28,18 @@ Intent? _intentFor(
 
 void main() {
   test('Ctrl+Z and Cmd+Z undo', () {
-    expect(_intentFor(LogicalKeyboardKey.keyZ, control: true),
-        isA<UndoIntent>());
+    expect(
+      _intentFor(LogicalKeyboardKey.keyZ, control: true),
+      isA<UndoIntent>(),
+    );
     expect(_intentFor(LogicalKeyboardKey.keyZ, meta: true), isA<UndoIntent>());
   });
 
   test('Ctrl+Y and Cmd+Y redo', () {
-    expect(_intentFor(LogicalKeyboardKey.keyY, control: true),
-        isA<RedoIntent>());
+    expect(
+      _intentFor(LogicalKeyboardKey.keyY, control: true),
+      isA<RedoIntent>(),
+    );
     expect(_intentFor(LogicalKeyboardKey.keyY, meta: true), isA<RedoIntent>());
   });
 

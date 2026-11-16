@@ -419,12 +419,17 @@ class _HeatingZonePropertiesState
               children: LayoutPattern.values
                   .map(
                     (pattern) => RadioListTile<LayoutPattern>(
+                      key: ValueKey('layout-pattern-${pattern.name}'),
                       dense: true,
                       contentPadding: EdgeInsets.zero,
                       visualDensity: VisualDensity.compact,
                       title: Text(
-                        _patternLabel(pattern),
+                        _patternLabel(l10n, pattern),
                         style: textTheme.bodyMedium,
+                      ),
+                      subtitle: Text(
+                        _patternHint(l10n, pattern),
+                        style: textTheme.bodySmall,
                       ),
                       value: pattern,
                     ),
@@ -608,11 +613,18 @@ String _tubeLengthText(double lengthM) {
   return '${lengthM.toStringAsFixed(1)}\u202Fm';
 }
 
-String _patternLabel(LayoutPattern p) => switch (p) {
-      LayoutPattern.meander => 'Meander',
-      LayoutPattern.spiral => 'Spiral',
-      LayoutPattern.bifilar => 'Bifilar',
-      LayoutPattern.counterflow => 'Counterflow',
+String _patternLabel(AppLocalizations l10n, LayoutPattern p) => switch (p) {
+      LayoutPattern.meander => l10n.layoutPattern_meander,
+      LayoutPattern.doubleMeander => l10n.layoutPattern_doubleMeander,
+      LayoutPattern.counterflow => l10n.layoutPattern_counterflow,
+      LayoutPattern.edgeZoneMeander => l10n.layoutPattern_edgeZoneMeander,
+    };
+
+String _patternHint(AppLocalizations l10n, LayoutPattern p) => switch (p) {
+      LayoutPattern.meander => l10n.layoutPattern_meanderHint,
+      LayoutPattern.doubleMeander => l10n.layoutPattern_doubleMeanderHint,
+      LayoutPattern.counterflow => l10n.layoutPattern_counterflowHint,
+      LayoutPattern.edgeZoneMeander => l10n.layoutPattern_edgeZoneMeanderHint,
     };
 
 Widget _readOnlyRow(

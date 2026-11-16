@@ -268,7 +268,7 @@ At viewport width < 600dp:
 2. A ghost polygon fills as vertices are added.
 3. Tube routing preview lines appear inside the polygon based on the default layout pattern (meander) and default spacing (150mm).
 4. To close the polygon: click near the first vertex (within 15px) or double-click.
-5. On close: zone is created. Properties panel shows zone settings: tube spacing (slider 50-400mm), tube type (dropdown), flooring material (dropdown), layout pattern (radio: meander/spiral/bifilar/counterflow).
+5. On close: zone is created. Properties panel shows zone settings: tube spacing (slider 50-400mm), tube type (dropdown), flooring material (dropdown), layout pattern (radio, ADR-043: meander / double meander / counterflow spiral / meander with edge zone; was meander/spiral/bifilar/counterflow).
 6. Tube preview updates in real time as settings change.
 7. Zone is filled with semi-transparent colour based on heat output adequacy (green/yellow/red — see Section 3.1).
 
@@ -1023,7 +1023,7 @@ thickness changes."*
 | Tube spacing | Slider 50-400mm + numeric | Yes |
 | Tube type | Dropdown (from tube library) | Yes |
 | Flooring material | Dropdown (from flooring library) | Yes |
-| Layout pattern | Radio: Meander/Spiral/Bifilar/Counterflow | Yes |
+| Layout pattern | Radio: Meander / Double meander / Counterflow spiral / Meander with edge zone (ADR-043) | Yes |
 | Border distance | Slider 50-300mm | Yes |
 | **Computed** |
 | Zone area | Display (m²) | No |

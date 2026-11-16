@@ -264,7 +264,7 @@ class HspExporter {
         tubeTypeId: row.tubeTypeId,
         flooringMaterialId: row.flooringMaterialId,
         borderDistanceMm: row.borderDistanceMm,
-        layoutPattern: LayoutPattern.values.byName(row.layoutPattern),
+        layoutPattern: LayoutPattern.fromName(row.layoutPattern),
         circuitId: row.circuitId,
         wallSegmentId: row.wallSegmentId,
         heightMm: row.heightMm,

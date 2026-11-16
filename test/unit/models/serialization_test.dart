@@ -325,7 +325,7 @@ void main() {
         tubeTypeId: 'tube-1',
         flooringMaterialId: 'floor-mat-1',
         borderDistanceMm: 100,
-        layoutPattern: LayoutPattern.spiral,
+        layoutPattern: LayoutPattern.counterflow,
         circuitId: 'circuit-1',
         customFlooringResistance: 0.05,
       );
@@ -333,7 +333,7 @@ void main() {
       final restored = HeatingZone.fromJson(_fullRoundTrip(original.toJson()));
 
       expect(restored, equals(original));
-      expect(restored.layoutPattern, LayoutPattern.spiral);
+      expect(restored.layoutPattern, LayoutPattern.counterflow);
       expect(restored.circuitId, 'circuit-1');
       expect(restored.customFlooringResistance, 0.05);
     });
@@ -415,6 +415,24 @@ void main() {
       expect(restored.pumpCapacityPa, isNull);
       expect(restored.rotationDeg, 0);
     });
+  });
+
+  group('HeatingZone layout pattern names from before ADR-043', () {
+    for (final (old, expected) in [
+      ('spiral', LayoutPattern.counterflow),
+      ('bifilar', LayoutPattern.doubleMeander),
+      ('counterflow', LayoutPattern.counterflow),
+    ]) {
+      test("'$old' loads as ${expected.name}", () {
+        final json = const HeatingZone(
+          id: 'z',
+          roomId: 'r',
+          tubeTypeId: 't',
+          flooringMaterialId: 'f',
+        ).toJson()..['layoutPattern'] = old;
+        expect(HeatingZone.fromJson(json).layoutPattern, expected);
+      });
+    }
   });
 
   // ── HeatingCircuit ────────────────────────────────────────────────────────

@@ -2,6 +2,8 @@
 // All mutations happen in response to user actions or via
 // ref.listen inside provider definitions.
 
+import 'dart:math' as math;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/models/enums.dart';
@@ -301,6 +303,58 @@ final defaultBendRadiusMmProvider = Provider<double>((ref) {
   return (supplyM: metres(supply), returnM: metres(back));
 }
 
+/// How far a zone edge may lie from the face of an exterior wall and
+/// still count as running along it, in mm (ADR-043 Rule 4).
+const double exteriorEdgeToleranceMm = 400.0;
+
+/// Edges of [zone] that run along an exterior wall (ADR-043 Rule 4) —
+/// where [LayoutPattern.edgeZoneMeander] puts its edge zone.
+///
+/// An edge qualifies when it is parallel to an exterior wall (within
+/// 3°), lies on the room side within half the wall thickness plus
+/// [exteriorEdgeToleranceMm] of its centerline, and runs alongside it
+/// for at least half of its length.
+List<({Point2D start, Point2D end})> exteriorEdgesForZone(
+  HeatingZone zone,
+  List<WallSegment> walls,
+) {
+  final out = <({Point2D start, Point2D end})>[];
+  final n = zone.polygon.length;
+  if (n < 3) return out;
+  final exterior = [
+    for (final w in walls)
+      if (w.wallType == WallType.exterior) w,
+  ];
+  for (var i = 0; i < n; i++) {
+    final a = zone.polygon[i];
+    final b = zone.polygon[(i + 1) % n];
+    final len = GeometryEngine.distanceMm(a, b);
+    if (len < 1.0) continue;
+    final ux = (b.x - a.x) / len;
+    final uy = (b.y - a.y) / len;
+    final mx = (a.x + b.x) / 2;
+    final my = (a.y + b.y) / 2;
+    for (final w in exterior) {
+      final wl = GeometryEngine.distanceMm(w.startPoint, w.endPoint);
+      if (wl < 1.0) continue;
+      final wx = (w.endPoint.x - w.startPoint.x) / wl;
+      final wy = (w.endPoint.y - w.startPoint.y) / wl;
+      if ((ux * wy - uy * wx).abs() > 0.0523) continue;
+      final dist = ((mx - w.startPoint.x) * -wy + (my - w.startPoint.y) * wx)
+          .abs();
+      if (dist > w.thicknessMm / 2 + exteriorEdgeToleranceMm) continue;
+      final t0 = (a.x - w.startPoint.x) * wx + (a.y - w.startPoint.y) * wy;
+      final t1 = (b.x - w.startPoint.x) * wx + (b.y - w.startPoint.y) * wy;
+      final overlap = math.min(math.max(t0, t1), wl) -
+          math.max(math.min(t0, t1), 0.0);
+      if (overlap < 0.5 * len) continue;
+      out.add((start: a, end: b));
+      break;
+    }
+  }
+  return out;
+}
+
 /// Number of identity colours zones are distinguished by (ADR-042
 /// Rule 3) — the length of `HeatingPlannerColors.zonePalette`.
 const int zoneIdentityColorCount = 10;
@@ -332,6 +386,7 @@ final zonePipeLayoutsProvider = Provider<Map<String, ZonePipeLayout>>((ref) {
   );
 
   final bendRadii = ref.watch(zoneBendRadiiMmProvider);
+  final walls = ref.watch(editorStateProvider.select((s) => s.walls));
 
   final circuitById = {for (final c in circuits) c.id: c};
   final result = <String, ZonePipeLayout>{};
@@ -359,6 +414,9 @@ final zonePipeLayoutsProvider = Provider<Map<String, ZonePipeLayout>>((ref) {
       entryPoint: entry,
       exitPoint: exit,
       exclusions: keepOut,
+      exteriorEdges: zone.layoutPattern == LayoutPattern.edgeZoneMeander
+          ? exteriorEdgesForZone(zone, walls)
+          : const [],
     );
     result[zone.id] = (
       // ADR-039 Rule 3: turns are drawn with the tube's bend radius.

@@ -249,7 +249,7 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas> {
 - All four layout patterns are drawn (ADR-042 Rule 2) from the same provider.
 - Meander pattern (ADR-038): the painter draws the path from `zonePipeLayoutsProvider` — a continuous polyline that starts where the zone's supply line enters it (`PipeLayoutEngine.zoneEntryPoint`), runs the serpentine rows and comes back along a return lane. Do not generate the meander in the painter from the bounding box.
 - Transit corridors (ADR-038 Rule 3): cut the corridors from `zonePipeLayoutsProvider` out of the zone's fill, hatch and tube layout.
-- Spiral pattern: concentric inward path.
+- Counterflow pattern (ADR-043): spiral — supply coils in, return coils out between its turns. Double meander and meander with edge zone: see ADR-043.
 - These are visual previews — approximate rendering is acceptable.
 
 **Pipe route painter specifics:**

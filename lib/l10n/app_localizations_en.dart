@@ -627,6 +627,34 @@ class AppLocalizationsEn extends AppLocalizations {
   String get layoutPattern => 'Layout Pattern';
 
   @override
+  String get layoutPattern_meander => 'Meander';
+
+  @override
+  String get layoutPattern_meanderHint =>
+      'Single serpentine; cools from one side to the other';
+
+  @override
+  String get layoutPattern_doubleMeander => 'Double meander';
+
+  @override
+  String get layoutPattern_doubleMeanderHint =>
+      'Supply and return side by side; even temperature';
+
+  @override
+  String get layoutPattern_counterflow => 'Counterflow spiral';
+
+  @override
+  String get layoutPattern_counterflowHint =>
+      'Spirals in and back out; most even temperature';
+
+  @override
+  String get layoutPattern_edgeZoneMeander => 'Meander with edge zone';
+
+  @override
+  String get layoutPattern_edgeZoneMeanderHint =>
+      'Denser tubes along the exterior wall, fed first';
+
+  @override
   String get tubeType => 'Tube Type';
 
   @override

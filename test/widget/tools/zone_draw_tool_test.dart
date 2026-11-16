@@ -466,7 +466,7 @@ void main() {
       tubeTypeId: 'tube-X',
       flooringMaterialId: 'mat-X',
       borderDistanceMm: 120,
-      layoutPattern: LayoutPattern.spiral,
+      layoutPattern: LayoutPattern.counterflow,
     );
     final cb = _StubCallbacks(rooms: [_testRoom], zones: [parentZone]);
     final undo = UndoRedoService();

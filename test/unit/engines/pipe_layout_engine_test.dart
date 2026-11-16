@@ -595,13 +595,16 @@ void main() {
     test('the four patterns are four different tubes', () {
       // Without an entry: the bare tubes, each in its own direction.
       final paths = [
+        // The edge zone needs an exterior wall to differ from the meander
+        // (tested in its own group).
         for (final p in LayoutPattern.values)
-          PipeLayoutEngine.tubePath(
-            pattern: p,
-            polygon: _rect,
-            tubeSpacingMm: 150,
-            borderDistanceMm: 100,
-          ),
+          if (p != LayoutPattern.edgeZoneMeander)
+            PipeLayoutEngine.tubePath(
+              pattern: p,
+              polygon: _rect,
+              tubeSpacingMm: 150,
+              borderDistanceMm: 100,
+            ),
       ];
       for (var i = 0; i < paths.length; i++) {
         for (var j = i + 1; j < paths.length; j++) {
@@ -610,9 +613,52 @@ void main() {
       }
     });
 
-    test('counterflow is the meander run the other way round', () {
-      // No entry: the bodies come back without leads, in their preferred
-      // direction.
+    test(
+      'counterflow is a spiral, not a serpentine: the supply coils in '
+      'along all four sides, the return coils back out between its turns',
+      () {
+        final body = PipeLayoutEngine.tubePath(
+          pattern: LayoutPattern.counterflow,
+          polygon: _rect,
+          tubeSpacingMm: 150,
+          borderDistanceMm: 100,
+        );
+        // First turn runs all the way round the zone.
+        final firstTurn = body.take(5).toList();
+        expect(firstTurn.map((p) => p.x).reduce((a, b) => a < b ? a : b), 1100);
+        expect(firstTurn.map((p) => p.x).reduce((a, b) => a > b ? a : b), 4900);
+        expect(firstTurn.map((p) => p.y).reduce((a, b) => a < b ? a : b), 1100);
+        expect(firstTurn.map((p) => p.y).reduce((a, b) => a > b ? a : b), 3900);
+        // Both ends lie side by side on the outer rings.
+        expect(
+          GeometryEngine.distanceMm(body.first, body.last),
+          closeTo(150, 1e-6),
+        );
+        // The U-turn in the middle of the tube is near the zone centre.
+        final mid = body[body.length ~/ 2];
+        expect((mid.x - 3000).abs(), lessThan(1600));
+        expect((mid.y - 2500).abs(), lessThan(600));
+        // A serpentine has no turn that changes direction by 90° four times
+        // in a row in the same sense; a spiral does.
+        var sameSenseRun = 0;
+        var best = 0;
+        double? lastSign;
+        for (var k = 1; k + 1 < body.length ~/ 2; k++) {
+          final a = body[k - 1];
+          final b = body[k];
+          final c = body[k + 1];
+          final cross = (b.x - a.x) * (c.y - b.y) - (b.y - a.y) * (c.x - b.x);
+          if (cross.abs() < 1e-6) continue;
+          final sign = cross.sign;
+          sameSenseRun = sign == lastSign ? sameSenseRun + 1 : 1;
+          lastSign = sign;
+          if (sameSenseRun > best) best = sameSenseRun;
+        }
+        expect(best, greaterThanOrEqualTo(4));
+      },
+    );
+
+    test('counterflow is no longer the meander run backwards', () {
       List<Point2D> body(LayoutPattern pattern) => PipeLayoutEngine.tubePath(
         pattern: pattern,
         polygon: _rect,
@@ -621,62 +667,160 @@ void main() {
       );
       expect(
         body(LayoutPattern.counterflow),
-        body(LayoutPattern.meander).reversed.toList(),
+        isNot(body(LayoutPattern.meander).reversed.toList()),
       );
     });
 
-    test('bifilar: the tube starts and ends side by side, one pitch apart, '
-        'and supply and return rows alternate', () {
+    test('double meander: the tube starts and ends side by side, one pitch '
+        'apart, and supply and return rows alternate', () {
       final body = PipeLayoutEngine.tubePath(
-        pattern: LayoutPattern.bifilar,
+        pattern: LayoutPattern.doubleMeander,
         polygon: _rect,
         tubeSpacingMm: 150,
         borderDistanceMm: 100,
       );
       final gap = GeometryEngine.distanceMm(body.first, body.last);
       expect(gap, inInclusiveRange(120, 150 + 1e-6));
-      // First run of the supply half and last run of the return half are
-      // neighbouring rows running the same way.
       expect((body[1].y - body.first.y).abs(), lessThan(1e-6));
       expect((body.last.y - body[body.length - 2].y).abs(), lessThan(1e-6));
       expect((body.first.y - body.last.y).abs(), closeTo(gap, 1e-6));
     });
 
-    test('spiral: rings run all the way round — the tube reaches all four '
-        'sides of the zone in its first turn and ends near the centre', () {
-      final body = PipeLayoutEngine.tubePath(
-        pattern: LayoutPattern.spiral,
+    test('counterflow in an L-shaped zone, where rings would leave most of '
+        'it empty, uses the double meander instead', () {
+      expect(
+        path(LayoutPattern.counterflow, _lShape),
+        path(LayoutPattern.doubleMeander, _lShape),
+      );
+    });
+
+    group('edge zone', () {
+      // Exterior wall along the right edge of the zone (x = 5000).
+      const exterior = (
+        start: Point2D(x: 5000, y: 1000),
+        end: Point2D(x: 5000, y: 4000),
+      );
+
+      List<Point2D> edgePath({
+        Point2D? entry,
+        Point2D? exit,
+        List<({Point2D start, Point2D end})> edges = const [exterior],
+      }) => PipeLayoutEngine.tubePath(
+        pattern: LayoutPattern.edgeZoneMeander,
         polygon: _rect,
         tubeSpacingMm: 150,
         borderDistanceMm: 100,
+        entryPoint: entry,
+        exitPoint: exit,
+        exteriorEdges: edges,
       );
-      final firstTurn = body.take(5).toList();
-      expect(firstTurn.map((p) => p.x).reduce((a, b) => a < b ? a : b), 1100);
-      expect(firstTurn.map((p) => p.x).reduce((a, b) => a > b ? a : b), 4900);
-      expect(firstTurn.map((p) => p.y).reduce((a, b) => a < b ? a : b), 1100);
-      expect(firstTurn.map((p) => p.y).reduce((a, b) => a > b ? a : b), 3900);
-      // Both ends lie on the outermost rings, one spacing apart.
-      expect(
-        GeometryEngine.distanceMm(body.first, body.last),
-        closeTo(150, 1e-6),
-      );
-      // The U-turn in the middle of the tube is near the zone centre.
-      final mid = body[body.length ~/ 2];
-      expect((mid.x - 3000).abs(), lessThan(1600));
-      expect((mid.y - 2500).abs(), lessThan(600));
+
+      /// Distinct x of the vertical rows (≥ 1 m long) of [p], sorted.
+      List<double> columns(List<Point2D> p) {
+        final xs = <double>{};
+        for (var i = 0; i + 1 < p.length; i++) {
+          if ((p[i].x - p[i + 1].x).abs() < 1e-6 &&
+              (p[i].y - p[i + 1].y).abs() >= 1000) {
+            xs.add(double.parse(p[i].x.toStringAsFixed(3)));
+          }
+        }
+        return xs.toList()..sort();
+      }
+
+      test('rows run parallel to the exterior wall, at half the spacing '
+          'within 1 m of it and at most the spacing elsewhere', () {
+        final cols = columns(edgePath());
+        expect(cols.last, closeTo(4900, 1e-6), reason: 'first row at wall');
+        final gaps = [
+          for (var i = 0; i + 1 < cols.length; i++) cols[i + 1] - cols[i],
+        ];
+        for (var i = 0; i < cols.length - 1; i++) {
+          // Both rows of the gap within the edge zone.
+          final distFromWall = 4900 - cols[i];
+          if (distFromWall < 1000 - 1e-6) {
+            expect(
+              gaps[i],
+              closeTo(75, 1e-6),
+              reason: 'edge zone at ${cols[i + 1]}',
+            );
+          } else {
+            expect(gaps[i], lessThanOrEqualTo(150 + 1e-6));
+            expect(gaps[i], greaterThan(100));
+          }
+        }
+        expect(cols.length.isEven, isTrue);
+      });
+
+      test('the supply reaches the edge zone first', () {
+        for (final (entry, exit) in [
+          (const Point2D(x: 5000, y: 3000), const Point2D(x: 5000, y: 2900)),
+          (const Point2D(x: 1000, y: 1500), const Point2D(x: 1000, y: 1400)),
+        ]) {
+          final p = edgePath(entry: entry, exit: exit);
+          expect(p.first, entry);
+          expect(p.last, exit);
+          expect(PipeLayoutEngine.leadCrossings(p), 0);
+          // First vertical run of the tube is the row next to the wall.
+          for (var i = 0; i + 1 < p.length; i++) {
+            if ((p[i].x - p[i + 1].x).abs() < 1e-6 &&
+                (p[i].y - p[i + 1].y).abs() >= 1000) {
+              expect(
+                p[i].x,
+                closeTo(4900, 1e-6),
+                reason: 'entry $entry: supply must start at the wall',
+              );
+              break;
+            }
+          }
+        }
+      });
+
+      test('the edge zone holds more tube than the same strip elsewhere', () {
+        final p = edgePath();
+        double tubeIn(double x0, double x1) {
+          var sum = 0.0;
+          for (var i = 0; i + 1 < p.length; i++) {
+            final mx = (p[i].x + p[i + 1].x) / 2;
+            if (mx >= x0 && mx <= x1) {
+              sum += GeometryEngine.distanceMm(p[i], p[i + 1]);
+            }
+          }
+          return sum;
+        }
+
+        expect(tubeIn(3900, 5000), greaterThan(1.6 * tubeIn(2000, 3100)));
+      });
+
+      test('without an exterior wall it is a plain serpentine', () {
+        expect(
+          edgePath(edges: const []),
+          PipeLayoutEngine.tubePath(
+            pattern: LayoutPattern.meander,
+            polygon: _rect,
+            tubeSpacingMm: 150,
+            borderDistanceMm: 100,
+          ),
+        );
+      });
+
+      test('edgeZoneSpacingMm is half the spacing, at least 50 mm', () {
+        expect(PipeLayoutEngine.edgeZoneSpacingMm(200), 100);
+        expect(PipeLayoutEngine.edgeZoneSpacingMm(150), 75);
+        expect(PipeLayoutEngine.edgeZoneSpacingMm(80), 50);
+      });
     });
 
-    test('spiral in an L-shaped zone, where rings would leave most of it '
-        'empty, uses the double meander instead', () {
+    test('LayoutPattern.fromName maps names from before ADR-043', () {
+      expect(LayoutPattern.fromName('spiral'), LayoutPattern.counterflow);
+      expect(LayoutPattern.fromName('counterflow'), LayoutPattern.counterflow);
+      expect(LayoutPattern.fromName('bifilar'), LayoutPattern.doubleMeander);
+      expect(LayoutPattern.fromName('meander'), LayoutPattern.meander);
       expect(
-        path(LayoutPattern.spiral, _lShape),
-        path(LayoutPattern.bifilar, _lShape),
+        LayoutPattern.fromName('edgeZoneMeander'),
+        LayoutPattern.edgeZoneMeander,
       );
-      final p = path(LayoutPattern.spiral, _lShape);
-      expect(
-        GeometryEngine.polylineLengthMm(p) * 150 / 1e6,
-        greaterThan(0.7 * 8.0 * 0.8),
-      );
+      expect(LayoutPattern.fromName('nonsense'), LayoutPattern.meander);
+      expect(LayoutPattern.fromName(null), LayoutPattern.meander);
     });
 
     test('L-shape: no turn runs outside the zone in any pattern', () {
@@ -716,7 +860,7 @@ void main() {
         Point2D(x: 0, y: 700),
       ];
       final spiral = PipeLayoutEngine.tubePath(
-        pattern: LayoutPattern.spiral,
+        pattern: LayoutPattern.counterflow,
         polygon: small,
         tubeSpacingMm: 150,
         borderDistanceMm: 100,

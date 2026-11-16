@@ -29,8 +29,8 @@ void main() {
     await db.close();
   });
 
-  test('schema v21: heating_circuits has the ADR-040/041 columns', () async {
-    expect(db.schemaVersion, 21);
+  test('schema v22: heating_circuits has the ADR-040/041 columns', () async {
+    expect(db.schemaVersion, 22);
     final cols = await db
         .customSelect('PRAGMA table_info(heating_circuits)')
         .get();
@@ -127,7 +127,7 @@ CREATE TABLE heating_circuits (
 )''';
 
 void upgradeTests() {
-  test('a v19 database upgrades to v21 and keeps its circuits', () async {
+  test('a v19 database upgrades to v22 and keeps its circuits', () async {
     final db = $db.AppDatabase.forTesting(
       NativeDatabase.memory(
         setup: (raw) {
@@ -139,6 +139,16 @@ void upgradeTests() {
               'supply_route_path_json) VALUES '
               "('old', 'dist-1', 'zone-1', "
               '\'[{"x":0.0,"y":0.0},{"x":1000.0,"y":0.0}]\')',
+            )
+            // Only the columns the v22 rename touches.
+            ..execute(
+              'CREATE TABLE heating_zones '
+              '(id TEXT NOT NULL PRIMARY KEY, layout_pattern TEXT NOT NULL)',
+            )
+            ..execute(
+              'INSERT INTO heating_zones (id, layout_pattern) VALUES '
+              "('z-spiral', 'spiral'), ('z-bifilar', 'bifilar'), "
+              "('z-counterflow', 'counterflow'), ('z-meander', 'meander')",
             )
             ..execute('PRAGMA user_version = 19');
         },
@@ -158,5 +168,20 @@ void upgradeTests() {
     expect(row.wallClearanceMm, 100);
     expect(row.supplyPipeInsulationType, isNull);
     expect(row.supplyOnRight, isFalse);
+
+    // ADR-043 (v22): layout patterns renamed to the four in common use.
+    final zones = await db
+        .customSelect('SELECT id, layout_pattern FROM heating_zones')
+        .get();
+    final patterns = {
+      for (final r in zones)
+        r.read<String>('id'): r.read<String>('layout_pattern'),
+    };
+    expect(patterns, {
+      'z-spiral': 'counterflow',
+      'z-bifilar': 'doubleMeander',
+      'z-counterflow': 'counterflow',
+      'z-meander': 'meander',
+    });
   });
 }
