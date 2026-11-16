@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/engines/geometry_engine.dart';
 import '../../calculation/providers/heat_output_providers.dart';
+import '../../calculation/providers/pipe_layout_providers.dart';
 import '../../calculation/providers/project_settings_provider.dart';
 import '../../calculation/providers/tube_length_providers.dart';
 import '../../core/constants/validation_limits.dart';
@@ -197,7 +198,8 @@ class _HeatingZonePropertiesState
           (zone.heightMm ?? floorHeightMm).toDouble();
       areaM2 = effectiveWidthMm * heightMm / 1e6;
     } else if (zone.polygon.length >= 3) {
-      areaM2 = GeometryEngine.polygonAreaM2(zone.polygon);
+      // ADR-038 Rule 3: heated area excludes transit corridors.
+      areaM2 = ref.watch(zoneEffectiveAreaM2Provider(zone.id));
     } else {
       areaM2 = double.nan;
     }

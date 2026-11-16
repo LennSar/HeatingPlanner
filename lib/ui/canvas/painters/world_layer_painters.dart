@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../calculation/engines/pipe_layout_engine.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../data/models/distributor.dart';
 import '../../../data/models/door.dart';
@@ -118,6 +119,8 @@ class GeometryLayerPainter extends CustomPainter {
     required this.doors,
     required this.zones,
     required this.zoneStates,
+    this.zoneLayouts = const {},
+    this.zoneColorIndices = const {},
   });
 
   /// World → screen transform.
@@ -144,6 +147,13 @@ class GeometryLayerPainter extends CustomPainter {
   /// ADR-004 display state per zone id.
   final Map<String, ZoneColorState> zoneStates;
 
+  /// ADR-038 tube layout per floor zone id.
+  final Map<String, ZonePipeLayout> zoneLayouts;
+
+  /// ADR-042 identity colour index per zone id (into
+  /// `colors.zonePalette`).
+  final Map<String, int> zoneColorIndices;
+
   @override
   void paint(Canvas canvas, Size size) {
     canvas.save();
@@ -157,6 +167,9 @@ class GeometryLayerPainter extends CustomPainter {
       supplyPipe: colors.supplyPipe,
       zones: zones,
       zoneStates: zoneStates,
+      layouts: zoneLayouts,
+      palette: colors.zonePalette,
+      colorIndices: zoneColorIndices,
     ).paint(canvas, size);
 
     WallPainter(
@@ -186,7 +199,9 @@ class GeometryLayerPainter extends CustomPainter {
         !identical(windows, oldDelegate.windows) ||
         !identical(doors, oldDelegate.doors) ||
         !identical(zones, oldDelegate.zones) ||
-        !identical(zoneStates, oldDelegate.zoneStates);
+        !identical(zoneStates, oldDelegate.zoneStates) ||
+        !identical(zoneLayouts, oldDelegate.zoneLayouts) ||
+        !identical(zoneColorIndices, oldDelegate.zoneColorIndices);
   }
 }
 
@@ -203,6 +218,9 @@ class PipeLayerPainter extends CustomPainter {
     required this.transform,
     required this.colors,
     required this.circuits,
+    this.zones = const [],
+    this.bendRadiiMm = const {},
+    this.defaultBendRadiusMm = 80.0,
     this.distributor,
   });
 
@@ -214,6 +232,17 @@ class PipeLayerPainter extends CustomPainter {
 
   /// All heating circuits — read by the pipe-route painter.
   final List<HeatingCircuit> circuits;
+
+  /// All heating zones — the pipe-route painter stops each route at the
+  /// boundary of its own zone, where the zone's tube layout takes over
+  /// (ADR-038 Rule 1).
+  final List<HeatingZone> zones;
+
+  /// Tube bend radius in mm per zone id (ADR-039 Rule 3).
+  final Map<String, double> bendRadiiMm;
+
+  /// Bend radius in mm for a circuit whose zone is unknown.
+  final double defaultBendRadiusMm;
 
   /// The single distributor, or null when none is placed.
   final Distributor? distributor;
@@ -236,6 +265,9 @@ class PipeLayerPainter extends CustomPainter {
       supplyPipe: colors.supplyPipe,
       returnPipe: colors.returnPipe,
       circuits: circuits,
+      zones: zones,
+      bendRadiiMm: bendRadiiMm,
+      defaultBendRadiusMm: defaultBendRadiusMm,
     ).paint(canvas, size);
 
     canvas.restore();
@@ -246,6 +278,9 @@ class PipeLayerPainter extends CustomPainter {
     return transform != oldDelegate.transform ||
         !identical(colors, oldDelegate.colors) ||
         !identical(circuits, oldDelegate.circuits) ||
+        !identical(zones, oldDelegate.zones) ||
+        !identical(bendRadiiMm, oldDelegate.bendRadiiMm) ||
+        defaultBendRadiusMm != oldDelegate.defaultBendRadiusMm ||
         distributor != oldDelegate.distributor;
   }
 }

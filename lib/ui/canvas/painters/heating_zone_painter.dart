@@ -2,8 +2,10 @@ import 'dart:math' show sqrt;
 
 import 'package:flutter/material.dart';
 
+import '../../../calculation/engines/pipe_layout_engine.dart';
 import '../../../data/models/enums.dart';
 import '../../../data/models/heating_zone.dart';
+import '../../../data/models/point2d.dart';
 
 /// ADR-004 display state for a heating zone.
 enum ZoneColorState {
@@ -30,9 +32,12 @@ enum ZoneColorState {
 /// [zoneStates]; zones not present in the map default to
 /// [ZoneColorState.unconnected] (red hatched).
 ///
-/// Inside every zone a simplified tube-routing preview is drawn
-/// for the [LayoutPattern.meander] pattern, based on
-/// [HeatingZone.tubeSpacingMm] and [HeatingZone.borderDistanceMm].
+/// Inside every floor zone the tube layout from [layouts] is drawn in the
+/// zone's [LayoutPattern]: one continuous tube that starts where the
+/// zone's supply line enters it (ADR-038, ADR-042). The outline shows
+/// the ADR-004 state; fill and tube use the zone's identity colour from
+/// [palette] so neighbouring zones can be told apart (ADR-042 Rule 3). Transit corridors of
+/// other circuits are cut out of the zone's fill, hatch and tube layout.
 class HeatingZonePainter extends CustomPainter {
   /// Creates a [HeatingZonePainter].
   const HeatingZonePainter({
@@ -43,6 +48,9 @@ class HeatingZonePainter extends CustomPainter {
     required this.supplyPipe,
     this.zones = const [],
     this.zoneStates = const {},
+    this.layouts = const {},
+    this.palette = const [],
+    this.colorIndices = const {},
   });
 
   /// Sufficient-output zone colour.
@@ -66,17 +74,39 @@ class HeatingZonePainter extends CustomPainter {
   /// ADR-004 display state keyed by zone ID.
   final Map<String, ZoneColorState> zoneStates;
 
+  /// ADR-038 tube layout keyed by floor zone ID. A floor zone without
+  /// an entry falls back to a layout with no entry point and no transit
+  /// corridors.
+  final Map<String, ZonePipeLayout> layouts;
+
+  /// Identity colours for telling zones apart (ADR-042 Rule 3). Empty =
+  /// zones are filled with their ADR-004 state colour, as before.
+  final List<Color> palette;
+
+  /// Index into [palette] per zone id. Neighbouring zones carry
+  /// different indices.
+  final Map<String, int> colorIndices;
+
+  /// Identity colour of [zone], or null when no palette is in use.
+  Color? _identity(HeatingZone zone) {
+    if (palette.isEmpty) return null;
+    return palette[(colorIndices[zone.id] ?? 0) % palette.length];
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     for (final zone in zones) {
       if (zone.polygon.length < 3) continue;
 
-      final path = Path()
+      final outline = Path()
         ..moveTo(zone.polygon.first.x, zone.polygon.first.y);
       for (var i = 1; i < zone.polygon.length; i++) {
-        path.lineTo(zone.polygon[i].x, zone.polygon[i].y);
+        outline.lineTo(zone.polygon[i].x, zone.polygon[i].y);
       }
-      path.close();
+      outline.close();
+      // ADR-038 Rule 3: the heated shape is the polygon minus the
+      // transit corridors of other circuits.
+      final path = _heatedPath(outline, layouts[zone.id]);
 
       final state =
           zoneStates[zone.id] ?? ZoneColorState.unconnected;
@@ -99,8 +129,9 @@ class HeatingZonePainter extends CustomPainter {
     }
   }
 
-  /// Paint a connected zone (ADR-004 states 2–5) with a solid
-  /// semi-transparent [color] fill and a tube-routing preview.
+  /// Paint a connected zone (ADR-004 states 2–5): outline in the state
+  /// [color], fill and tube in the zone's identity colour (ADR-042
+  /// Rule 3) — or in [color] when no palette is in use.
   void _paintConnected(
     Canvas canvas,
     Path path,
@@ -110,7 +141,7 @@ class HeatingZonePainter extends CustomPainter {
     canvas.drawPath(
       path,
       Paint()
-        ..color = color.withValues(alpha: 0.25)
+        ..color = (_identity(zone) ?? color).withValues(alpha: 0.25)
         ..style = PaintingStyle.fill,
     );
     canvas.drawPath(
@@ -124,8 +155,8 @@ class HeatingZonePainter extends CustomPainter {
     canvas.clipPath(path);
     if (zone.zoneType == ZoneType.wallHeating) {
       _drawWallZoneTubePreview(canvas, zone);
-    } else if (zone.layoutPattern == LayoutPattern.meander) {
-      _drawMeanderPreview(canvas, path, zone);
+    } else {
+      _drawTubeLayout(canvas, zone);
     }
     canvas.restore();
   }
@@ -140,7 +171,8 @@ class HeatingZonePainter extends CustomPainter {
     canvas.drawPath(
       path,
       Paint()
-        ..color = zoneRed.withValues(alpha: 0.15)
+        ..color = (_identity(zone)?.withValues(alpha: 0.25) ??
+            zoneRed.withValues(alpha: 0.15))
         ..style = PaintingStyle.fill,
     );
 
@@ -162,9 +194,7 @@ class HeatingZonePainter extends CustomPainter {
     // Tube-routing preview (clipped to polygon).
     canvas.save();
     canvas.clipPath(path);
-    if (zone.layoutPattern == LayoutPattern.meander) {
-      _drawMeanderPreview(canvas, path, zone);
-    }
+    _drawTubeLayout(canvas, zone);
     canvas.restore();
   }
 
@@ -199,63 +229,52 @@ class HeatingZonePainter extends CustomPainter {
     }
   }
 
-  /// Draws a simplified meander tube-routing preview inside [path].
-  ///
-  /// Generates horizontal parallel lines spaced
-  /// [HeatingZone.tubeSpacingMm] apart, starting
-  /// [HeatingZone.borderDistanceMm] inset from the bounding-box
-  /// edges, connected by vertical segments on alternating sides to
-  /// form a snake/meander pattern.
-  ///
-  /// The canvas must already be clipped to [path].
-  void _drawMeanderPreview(
-    Canvas canvas,
-    Path path,
-    HeatingZone zone,
-  ) {
-    final bounds = path.getBounds();
-    final border = zone.borderDistanceMm.toDouble();
-    final spacing = zone.tubeSpacingMm.toDouble();
+  /// Returns [outline] with the transit corridors of [layout] removed
+  /// (ADR-038 Rule 3), or [outline] itself when there are none.
+  Path _heatedPath(Path outline, ZonePipeLayout? layout) {
+    if (layout == null || layout.corridors.isEmpty) return outline;
+    final cut = Path();
+    for (final corridor in layout.corridors) {
+      if (corridor.length < 3) continue;
+      cut.addPolygon(
+        [for (final p in corridor) Offset(p.x, p.y)],
+        true,
+      );
+    }
+    return Path.combine(PathOperation.difference, outline, cut);
+  }
 
-    final left = bounds.left + border;
-    final right = bounds.right - border;
-    final top = bounds.top + border;
-    final bottom = bounds.bottom - border;
-
-    if (right <= left || bottom <= top || spacing <= 0) return;
+  /// Draws the tube layout of a floor [zone] in its
+  /// [HeatingZone.layoutPattern] (ADR-038 Rule 2, ADR-042 Rule 2).
+  ///
+  /// Uses the precomputed path from [layouts]; a zone without an entry
+  /// there gets a layout with no entry point. The path is one continuous
+  /// polyline from the supply to the return pipe.
+  ///
+  /// The canvas must already be clipped to the zone's heated shape.
+  void _drawTubeLayout(Canvas canvas, HeatingZone zone) {
+    final List<Point2D> points = layouts[zone.id]?.pipePath ??
+        PipeLayoutEngine.tubePath(
+          pattern: zone.layoutPattern,
+          polygon: zone.polygon,
+          tubeSpacingMm: zone.tubeSpacingMm,
+          borderDistanceMm: zone.borderDistanceMm,
+        );
+    if (points.length < 2) return;
 
     final tubePaint = Paint()
-      ..color = supplyPipe.withValues(alpha: 0.45)
+      ..color = _identity(zone)?.withValues(alpha: 0.9) ??
+          supplyPipe.withValues(alpha: 0.45)
       ..strokeWidth = 8.0 // ~8 mm tube diameter in world-space
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
 
-    final meander = Path();
-    var y = top;
-    var lineIndex = 0;
-    var started = false;
-
-    while (y <= bottom + 0.5) {
-      final isEven = lineIndex.isEven;
-      final xStart = isEven ? left : right;
-      final xEnd = isEven ? right : left;
-
-      if (!started) {
-        meander.moveTo(xStart, y);
-        started = true;
-      } else {
-        // Vertical connector from previous line-end to this
-        // line-start (same x side, next y level).
-        meander.lineTo(xStart, y);
-      }
-      meander.lineTo(xEnd, y);
-
-      y += spacing;
-      lineIndex++;
+    final tube = Path()..moveTo(points.first.x, points.first.y);
+    for (var i = 1; i < points.length; i++) {
+      tube.lineTo(points[i].x, points[i].y);
     }
-
-    canvas.drawPath(meander, tubePaint);
+    canvas.drawPath(tube, tubePaint);
   }
 
   /// Paint an unconnected wall heating zone (ADR-004 state 1).
@@ -277,7 +296,8 @@ class HeatingZonePainter extends CustomPainter {
     canvas.drawPath(
       path,
       Paint()
-        ..color = zoneRed.withValues(alpha: 0.15)
+        ..color = (_identity(zone)?.withValues(alpha: 0.25) ??
+            zoneRed.withValues(alpha: 0.15))
         ..style = PaintingStyle.fill,
     );
 
@@ -331,7 +351,8 @@ class HeatingZonePainter extends CustomPainter {
     final perpDy = p3.y - p0.y;
 
     final tubePaint = Paint()
-      ..color = supplyPipe.withValues(alpha: 0.45)
+      ..color = _identity(zone)?.withValues(alpha: 0.9) ??
+          supplyPipe.withValues(alpha: 0.45)
       ..strokeWidth = 8.0
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
@@ -358,6 +379,9 @@ class HeatingZonePainter extends CustomPainter {
   bool shouldRepaint(HeatingZonePainter oldDelegate) {
     return oldDelegate.zones != zones ||
         oldDelegate.zoneStates != zoneStates ||
+        oldDelegate.layouts != layouts ||
+        oldDelegate.palette != palette ||
+        oldDelegate.colorIndices != colorIndices ||
         oldDelegate.zoneRed != zoneRed ||
         oldDelegate.zoneGreen != zoneGreen ||
         oldDelegate.zoneYellow != zoneYellow ||

@@ -52,7 +52,24 @@ class HeatingPlannerColors
     required this.errorRed,
     required this.warningAmber,
     required this.infoBlue,
+    this.zonePalette = defaultZonePalette,
   });
+
+  /// Default [zonePalette]: ten hues that stay distinguishable at the
+  /// 25 % fill opacity used for zones, and that avoid the pure
+  /// green / yellow / red of the zone state outlines.
+  static const List<Color> defaultZonePalette = [
+    Color(0xFF2563EB), // blue
+    Color(0xFFEA580C), // orange
+    Color(0xFF7C3AED), // violet
+    Color(0xFF0D9488), // teal
+    Color(0xFFDB2777), // pink
+    Color(0xFF92400E), // brown
+    Color(0xFF0891B2), // cyan
+    Color(0xFF65A30D), // olive green
+    Color(0xFF4338CA), // indigo
+    Color(0xFFB45309), // amber brown
+  ];
 
   /// Default light-theme colour set.
   factory HeatingPlannerColors.light() {
@@ -128,6 +145,11 @@ class HeatingPlannerColors
   /// Info severity badge colour (UI/UX §3.1).
   final Color infoBlue;
 
+  /// Identity colours for heating zones (ADR-042 Rule 3): each zone is
+  /// filled and its tube drawn in one of these so neighbouring zones can
+  /// be told apart. The zone outline keeps the ADR-004 state colour.
+  final List<Color> zonePalette;
+
   @override
   HeatingPlannerColors copyWith({
     Color? wallFill,
@@ -168,6 +190,7 @@ class HeatingPlannerColors
       errorRed: errorRed ?? this.errorRed,
       warningAmber: warningAmber ?? this.warningAmber,
       infoBlue: infoBlue ?? this.infoBlue,
+      zonePalette: zonePalette,
     );
   }
 
@@ -221,6 +244,7 @@ class HeatingPlannerColors
       )!,
       infoBlue:
           Color.lerp(infoBlue, other.infoBlue, t)!,
+      zonePalette: t < 0.5 ? zonePalette : other.zonePalette,
     );
   }
 }

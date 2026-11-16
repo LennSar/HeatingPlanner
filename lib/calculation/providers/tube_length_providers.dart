@@ -6,27 +6,27 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/engines/geometry_engine.dart';
 import '../../calculation/engines/hydraulic_engine.dart';
+import '../../calculation/engines/pipe_layout_engine.dart';
 import '../../data/models/enums.dart';
-import '../../repositories/heating_repository.dart';
 import '../../ui/providers/editor_state_provider.dart';
+import 'pipe_layout_providers.dart';
 import 'project_settings_provider.dart';
 
-/// Zone tube length (m) for [zoneId].
+/// Tube length (m) laid inside the zone with [zoneId].
 ///
-/// For floor-heating zones, watches the zone's polygon,
-/// [HeatingZone.tubeSpacingMm], and [HeatingZone.borderDistanceMm]
-/// via [editorStateProvider].
+/// **Floor zones:** the length of the tube as it is drawn (ADR-042
+/// Rule 4) — the zone's layout path from [zonePipeLayoutsProvider], from
+/// the point where the supply pipe enters the zone to the point where
+/// the return pipe leaves it, bends included. It therefore follows the
+/// layout pattern, the zone shape, the border distance, transit
+/// corridors and the entry position. 0.0 when no tube fits.
 ///
-/// For wall-heating zones, derives area from the wall segment
-/// geometry: area = widthMm × heightMm / 1e6, where widthMm is
-/// [HeatingZone.widthMm] (or the full wall length when null) and
-/// heightMm is [HeatingZone.heightMm] (or [floorHeightMmProvider]
-/// when null).
+/// **Wall zones** have no drawn layout; their length is still estimated
+/// as area ÷ spacing from [HeatingZone.widthMm] (or the full wall
+/// length) × [HeatingZone.heightMm] (or [floorHeightMmProvider]).
 ///
-/// Returns [double.nan] when the zone is not found, the wall
-/// segment is missing, or inputs are otherwise invalid.
-/// Returns 0.0 when the effective area after border subtraction
-/// is non-positive.
+/// Returns [double.nan] when the zone is not found, has fewer than 3
+/// vertices, or its wall segment is missing.
 final zoneTubeLengthProvider =
     Provider.family<double, String>((ref, zoneId) {
   final zones = ref.watch(
@@ -36,108 +36,75 @@ final zoneTubeLengthProvider =
   final zone = zones.where((z) => z.id == zoneId).firstOrNull;
   if (zone == null) return double.nan;
 
-  final double areaM2;
-  final double perimeterM;
-
-  if (zone.zoneType == ZoneType.wallHeating) {
-    if (zone.wallSegmentId == null) return double.nan;
-
-    final walls = ref.watch(
-      editorStateProvider.select((s) => s.walls),
-    );
-    final wall =
-        walls.where((w) => w.id == zone.wallSegmentId).firstOrNull;
-    if (wall == null) return double.nan;
-
-    final wallLengthMm =
-        GeometryEngine.distanceMm(wall.startPoint, wall.endPoint);
-    final int effectiveWidthMm =
-        zone.widthMm ?? wallLengthMm.round();
-    final int effectiveHeightMm =
-        zone.heightMm ?? ref.watch(floorHeightMmProvider);
-    final widthMm = effectiveWidthMm.toDouble();
-    final heightMm = effectiveHeightMm.toDouble();
-
-    areaM2 = widthMm * heightMm / 1e6;
-    perimeterM = 2.0 * (widthMm + heightMm) / 1000.0;
-  } else {
+  if (zone.zoneType != ZoneType.wallHeating) {
     if (zone.polygon.length < 3) return double.nan;
-    areaM2 = GeometryEngine.polygonAreaM2(zone.polygon);
-    perimeterM = GeometryEngine.polygonPerimeterM(zone.polygon);
+    final path = ref.watch(zonePipeLayoutsProvider)[zone.id]?.pipePath;
+    if (path == null || path.length < 2) return 0.0;
+    return GeometryEngine.polylineLengthMm(path) / 1000.0;
   }
 
+  if (zone.wallSegmentId == null) return double.nan;
+  final walls = ref.watch(
+    editorStateProvider.select((s) => s.walls),
+  );
+  final wall =
+      walls.where((w) => w.id == zone.wallSegmentId).firstOrNull;
+  if (wall == null) return double.nan;
+
+  final wallLengthMm =
+      GeometryEngine.distanceMm(wall.startPoint, wall.endPoint);
+  final widthMm = (zone.widthMm ?? wallLengthMm.round()).toDouble();
+  final int floorHeightMm = ref.watch(floorHeightMmProvider);
+  final heightMm = (zone.heightMm ?? floorHeightMm).toDouble();
+
   return HydraulicEngine.zoneTubeLength(
-    zoneAreaM2: areaM2,
-    perimeterM: perimeterM,
+    zoneAreaM2: widthMm * heightMm / 1e6,
+    perimeterM: 2.0 * (widthMm + heightMm) / 1000.0,
     tubeSpacingMm: zone.tubeSpacingMm,
     borderDistanceMm: zone.borderDistanceMm,
   );
 });
 
-/// Total tube length for a circuit (m): zone loop + supply + return routes.
+/// Total tube length of a circuit (m), measured along the drawing
+/// (ADR-042 Rule 4):
 ///
-/// L_total = L_zone + L_supply + L_return
+/// `supply connection pipe + tube in the zone + return connection pipe`
 ///
-/// Zone loop length is derived from the zone polygon (floor heating) or from
-/// [HeatingZone.widthMm] × [HeatingZone.heightMm] (wall heating). Supply and
-/// return route lengths are the polyline lengths of
-/// [HeatingCircuit.supplyRoutePath] and [HeatingCircuit.returnRoutePath];
-/// an empty or single-point path (not yet drawn) contributes 0 m.
+/// The connection pipes are measured with their bend radii and only up
+/// to the zone boundary ([connectionPipeLengthsM]); the tube in the zone
+/// comes from [zoneTubeLengthProvider] and starts and ends at that
+/// boundary, so nothing is counted twice and nothing is left out.
 ///
-/// Watches:
-/// - [circuitByIdProvider] for route paths and zone reference
-/// - [zoneByIdProvider] for polygon, spacingMm, borderDistanceMm
-///
-/// Returns [double.nan] while any upstream data is loading or when
-/// a wall-heating zone has unset [HeatingZone.widthMm]/[HeatingZone.heightMm].
+/// Reads the circuit and its zone from [editorStateProvider], so the
+/// value follows every edit immediately. Returns [double.nan] when the
+/// circuit or its zone is unknown or the zone length is undefined.
 final tubeLengthProvider =
     Provider.family<double, String>((ref, circuitId) {
-  final circuit =
-      ref.watch(circuitByIdProvider(circuitId)).asData?.value;
+  final circuit = ref
+      .watch(editorStateProvider.select((s) => s.circuits))
+      .where((c) => c.id == circuitId)
+      .firstOrNull;
   if (circuit == null) return double.nan;
 
-  final zone =
-      ref
-          .watch(zoneByIdProvider(circuit.heatingZoneId))
-          .asData
-          ?.value;
+  final zone = ref
+      .watch(editorStateProvider.select((s) => s.zones))
+      .where((z) => z.id == circuit.heatingZoneId)
+      .firstOrNull;
   if (zone == null) return double.nan;
 
-  final double areaM2;
-  final double perimeterM;
-
-  if (zone.zoneType == ZoneType.wallHeating) {
-    final w = zone.widthMm;
-    final h = zone.heightMm;
-    if (w == null || h == null) return double.nan;
-    areaM2 = w * h / 1e6;
-    perimeterM = 2.0 * (w + h) / 1000.0;
-  } else {
-    if (zone.polygon.length < 3) return double.nan;
-    areaM2 = GeometryEngine.polygonAreaM2(zone.polygon);
-    perimeterM = GeometryEngine.polygonPerimeterM(zone.polygon);
-    if (areaM2.isNaN || perimeterM.isNaN) return double.nan;
-  }
-
-  final zoneLengthM = HydraulicEngine.zoneTubeLength(
-    zoneAreaM2: areaM2,
-    perimeterM: perimeterM,
-    tubeSpacingMm: zone.tubeSpacingMm,
-    borderDistanceMm: zone.borderDistanceMm,
-  );
+  final zoneLengthM = ref.watch(zoneTubeLengthProvider(zone.id));
   if (zoneLengthM.isNaN) return double.nan;
 
-  // Empty or single-point route paths (not yet drawn) contribute 0 m.
-  final supplyLengthM = circuit.supplyRoutePath.length >= 2
-      ? HydraulicEngine.polylineLengthM(circuit.supplyRoutePath)
-      : 0.0;
-  final returnLengthM = circuit.returnRoutePath.length >= 2
-      ? HydraulicEngine.polylineLengthM(circuit.returnRoutePath)
-      : 0.0;
+  final pipes = connectionPipeLengthsM(
+    circuit,
+    zone: zone,
+    bendRadiusMm: ref.watch(zoneBendRadiiMmProvider)[zone.id] ??
+        PipeLayoutEngine.minBendRadiusMm(fallbackTubeOuterDiameterMm),
+  );
 
   return HydraulicEngine.totalTubeLength(
     zoneTubeLengthM: zoneLengthM,
-    supplyRouteLengthM: supplyLengthM,
-    returnRouteLengthM: returnLengthM,
+    supplyRouteLengthM: pipes.supplyM,
+    returnRouteLengthM: pipes.returnM,
   );
 });

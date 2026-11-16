@@ -5,14 +5,15 @@ import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../calculation/engines/geometry_engine.dart';
 import '../../calculation/providers/flow_rate_providers.dart';
 import '../../calculation/providers/heat_demand_providers.dart';
 import '../../calculation/providers/heat_output_providers.dart';
 import '../../calculation/providers/hydraulic_balance_providers.dart';
+import '../../calculation/providers/pipe_layout_providers.dart';
 import '../../calculation/providers/pressure_loss_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/enums.dart';
+import '../../data/models/heating_circuit.dart';
 import '../../data/models/heating_zone.dart';
 import '../../data/models/validation_result.dart';
 import '../../l10n/app_localizations.dart';
@@ -496,7 +497,7 @@ class _HeatBalanceTab extends ConsumerWidget {
       for (final zone in roomZones) {
         final spec =
             ref.watch(zoneHeatOutputProvider(zone.id));
-        final area = _zoneAreaM2(zone);
+        final area = _zoneAreaM2(zone, state.circuits);
         if (!spec.isNaN && !area.isNaN) {
           roomOutputW += spec * area;
         }
@@ -630,18 +631,22 @@ class _HeatBalanceTab extends ConsumerWidget {
 
   /// Returns the heated area of [zone] in m².
   ///
-  /// For floor-heating zones the polygon area is used.
+  /// For floor-heating zones the polygon area minus the transit
+  /// corridors of other [circuits] is used (ADR-038 Rule 3).
   /// For wall-heating zones, [HeatingZone.widthMm] ×
   /// [HeatingZone.heightMm] / 1e6 is used; returns [double.nan] when
   /// either dimension is unset.
-  static double _zoneAreaM2(HeatingZone zone) {
+  static double _zoneAreaM2(
+    HeatingZone zone,
+    List<HeatingCircuit> circuits,
+  ) {
     if (zone.zoneType == ZoneType.wallHeating) {
       final w = zone.widthMm;
       final h = zone.heightMm;
       if (w == null || h == null) return double.nan;
       return w * h / 1e6;
     }
-    return GeometryEngine.polygonAreaM2(zone.polygon);
+    return zoneEffectiveAreaM2(zone, circuits);
   }
 }
 

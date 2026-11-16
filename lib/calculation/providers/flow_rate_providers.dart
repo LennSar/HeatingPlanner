@@ -8,6 +8,7 @@ import '../../repositories/heating_repository.dart';
 import '../engines/geometry_engine.dart';
 import '../engines/hydraulic_engine.dart';
 import 'heat_output_providers.dart';
+import 'pipe_layout_providers.dart';
 
 /// Design mass flow rate for a circuit (kg/h).
 ///
@@ -45,7 +46,11 @@ final flowRateProvider =
   if (specificOutputWPerM2.isNaN) return double.nan;
 
   // Zone area (m²) — used to convert W/m² to total W.
-  final areaM2 = GeometryEngine.polygonAreaM2(zone.polygon);
+  // ADR-038 Rule 3: transit corridors of other circuits emit no zone heat.
+  final effectiveM2 = ref.watch(zoneEffectiveAreaM2Provider(zone.id));
+  final areaM2 = effectiveM2.isNaN
+      ? GeometryEngine.polygonAreaM2(zone.polygon)
+      : effectiveM2;
   if (areaM2.isNaN || areaM2 <= 0) return double.nan;
 
   final heatOutputW = specificOutputWPerM2 * areaM2;

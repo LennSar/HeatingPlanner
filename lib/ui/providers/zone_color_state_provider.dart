@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../calculation/engines/geometry_engine.dart';
 import '../../calculation/providers/heat_demand_providers.dart';
 import '../../calculation/providers/heat_output_providers.dart';
+import '../../calculation/providers/pipe_layout_providers.dart';
 import '../../calculation/providers/project_settings_provider.dart';
 import '../canvas/painters/heating_zone_painter.dart' show ZoneColorState;
 import 'editor_state_provider.dart';
@@ -156,8 +157,10 @@ class ZoneColorStatesNotifier
         continue;
       }
 
+      // ADR-038 Rule 3: transit corridors of other circuits emit no
+      // zone heat, so the output uses the reduced area.
       final areaM2 = zone.polygon.length >= 3
-          ? GeometryEngine.polygonAreaM2(zone.polygon)
+          ? zoneEffectiveAreaM2(zone, state.circuits)
           : 0.0;
       if (areaM2 <= 0) {
         result[zone.id] = ZoneColorState.unconnected;
