@@ -340,9 +340,10 @@ class ZoneDrawTool extends CanvasTool with ModifierDrawTool {
       return;
     }
 
-    // Single room only: the zone polygon is exactly the room
-    // polygon. Shared commit path → one undo entry (ADR-013 rule 5).
-    _commitZone(List<Point2D>.from(room.polygon), room);
+    // Single room only: the zone polygon is the room's inner clear
+    // polygon (ADR-037 Rule 4). Shared commit path → one undo entry
+    // (ADR-013 rule 5).
+    _commitZone(_fillRoomPolygon(room), room);
     _reset();
   }
 
@@ -386,11 +387,11 @@ class ZoneDrawTool extends CanvasTool with ModifierDrawTool {
       );
     }
 
-    // ADR-018 Rule 8: with an empty polygon buffer and the raw cursor
-    // inside an existing rectangular floor zone, preview the bisector
-    // line a double-click would cut along.
+    // ADR-018 Rule 8 / ADR-037 Rule 3: with an empty polygon buffer and
+    // the raw cursor inside an existing floor zone, preview the
+    // equal-area cut line a double-click would split along.
     if (_vertices.isEmpty && _rawCursor != null) {
-      final zone = _rectangularZoneUnder(_rawCursor!);
+      final zone = _anyZoneUnder(_rawCursor!);
       if (zone != null) {
         final line =
             SplitZoneCommand.bisectorForDoubleClick(zone.polygon);
@@ -500,6 +501,51 @@ class ZoneDrawTool extends CanvasTool with ModifierDrawTool {
     _reset();
   }
 
+  /// Polygon of a fill-room zone for [room]: the room's inner clear
+  /// polygon (ADR-017 Rule 4, ADR-037 Rule 4).
+  ///
+  /// [Room.polygon] follows the wall centerlines, so a zone drawn on it
+  /// would reach half a wall thickness under every wall — and two split
+  /// halves would look unequal wherever opposite walls differ in
+  /// thickness. Each edge is therefore moved inward by half the
+  /// thickness of the room's wall on that edge; an edge with no matching
+  /// wall stays on the centerline. Straight-through vertices left by
+  /// split walls (ADR-003) are dropped so a rectangular room yields a
+  /// 4-vertex rectangle.
+  ///
+  /// Falls back to [Room.polygon] when the offset is degenerate.
+  List<Point2D> _fillRoomPolygon(Room room) {
+    final polygon = room.polygon;
+    final n = polygon.length;
+    final fallback = List<Point2D>.from(polygon);
+    if (n < 3) return fallback;
+
+    bool same(Point2D a, Point2D b) =>
+        (a.x - b.x).abs() <= 1.0 && (a.y - b.y).abs() <= 1.0;
+    final roomWalls =
+        callbacks.currentWalls.where((w) => w.roomId == room.id).toList();
+    if (roomWalls.isEmpty) return fallback;
+
+    final offsets = List<double>.filled(n, 0.0);
+    for (var i = 0; i < n; i++) {
+      final a = polygon[i];
+      final b = polygon[(i + 1) % n];
+      for (final w in roomWalls) {
+        if ((same(w.startPoint, a) && same(w.endPoint, b)) ||
+            (same(w.startPoint, b) && same(w.endPoint, a))) {
+          offsets[i] = -w.thicknessMm / 2.0;
+          break;
+        }
+      }
+    }
+    final inner = GeometryEngine.offsetPolygonPerEdge(
+      centerline: polygon,
+      edgeOffsetsMm: offsets,
+    );
+    if (inner.length < 3) return fallback;
+    return GeometryEngine.removeCollinearVertices(inner);
+  }
+
   /// Commits a zone [polygon] for [parentRoom] with the spec-required
   /// defaults. Shared by the polygon-close and rectangle-commit paths
   /// (ADR-013: "both commit through the existing zone-commit path").
@@ -545,27 +591,9 @@ class ZoneDrawTool extends CanvasTool with ModifierDrawTool {
   // ADR-018: double-click on empty buffer
   // ----------------------------------------------------------------
 
-  /// Returns the first floor zone whose polygon contains [point] and
-  /// is rectangle-eligible per [SplitZoneCommand.isRectangularZone],
-  /// or null. Used by both the hover preview ([getInteractionData])
-  /// and the double-click routing path.
-  HeatingZone? _rectangularZoneUnder(Point2D point) {
-    for (final z in callbacks.currentZones) {
-      if (z.zoneType != ZoneType.floorHeating) continue;
-      if (z.polygon.length < 3) continue;
-      if (!GeometryEngine.isPointInPolygon(point, z.polygon)) {
-        continue;
-      }
-      if (!SplitZoneCommand.isRectangularZone(z.polygon)) continue;
-      return z;
-    }
-    return null;
-  }
-
-  /// Returns the first floor zone whose polygon contains [point]
-  /// regardless of rectangle eligibility, or null. Used by the
-  /// double-click routing path so we can show the "non-rectangular"
-  /// toast when the user double-clicks a non-rect zone.
+  /// Returns the first floor zone whose polygon contains [point], or
+  /// null. Used by the split hover preview ([getInteractionData]) and
+  /// the double-click routing path.
   HeatingZone? _anyZoneUnder(Point2D point) {
     for (final z in callbacks.currentZones) {
       if (z.zoneType != ZoneType.floorHeating) continue;
@@ -586,7 +614,8 @@ class ZoneDrawTool extends CanvasTool with ModifierDrawTool {
       final direction =
           SplitZoneCommand.doubleClickDirection(zone.polygon);
       if (direction == null) {
-        // Non-rectangular zone — Rule 1.1 / Rule 9 toast, no mutation.
+        // Shape cannot be cut in two (ADR-037 Rule 1) — toast, no
+        // mutation.
         callbacks.showToast(
           callbacks.l10n.zone_splitNonRectangularToast,
         );
@@ -612,7 +641,7 @@ class ZoneDrawTool extends CanvasTool with ModifierDrawTool {
       _reset();
       return;
     }
-    _commitZone(List<Point2D>.from(room.polygon), room);
+    _commitZone(_fillRoomPolygon(room), room);
     _reset();
   }
 
@@ -634,7 +663,7 @@ class ZoneDrawTool extends CanvasTool with ModifierDrawTool {
         undoRedo.execute(command);
       case SplitBuildRejectedTooSmall():
         callbacks.showToast(callbacks.l10n.zone_splitTooSmallToast);
-      case SplitBuildRejectedNonRectangular():
+      case SplitBuildRejectedShape():
         callbacks.showToast(
           callbacks.l10n.zone_splitNonRectangularToast,
         );

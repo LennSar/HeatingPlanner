@@ -19,6 +19,7 @@
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:heating_planner/calculation/engines/geometry_engine.dart';
 import 'package:heating_planner/data/models/distributor.dart';
 import 'package:heating_planner/data/models/door.dart';
 import 'package:heating_planner/data/models/enums.dart';
@@ -50,13 +51,17 @@ class _StubCallbacks implements EditorCallbacks {
   final List<HeatingCircuit> _circuits;
   final List<String> _toasts = [];
 
+  final List<WallSegment> _walls;
+
   _StubCallbacks({
     List<Room>? rooms,
     List<HeatingZone>? zones,
     List<HeatingCircuit>? circuits,
-  })  : _rooms = List<Room>.of(rooms ?? const []),
-        _zones = List<HeatingZone>.of(zones ?? const []),
-        _circuits = List<HeatingCircuit>.of(circuits ?? const []);
+    List<WallSegment>? walls,
+  }) : _walls = List<WallSegment>.of(walls ?? const []),
+       _rooms = List<Room>.of(rooms ?? const []),
+       _zones = List<HeatingZone>.of(zones ?? const []),
+       _circuits = List<HeatingCircuit>.of(circuits ?? const []);
 
   @override
   List<Room> get currentRooms => List.unmodifiable(_rooms);
@@ -71,12 +76,14 @@ class _StubCallbacks implements EditorCallbacks {
 
   // ---- Unused stubs ----
   @override
-  List<WallSegment> get currentWalls => const [];
+  List<WallSegment> get currentWalls => List.unmodifiable(_walls);
   @override
   void commitWall(WallSegment wall) {}
   @override
-  WallSegment commitWallWithSplit(WallSegment wall, {bool splitNewWall = true}) =>
-      wall;
+  WallSegment commitWallWithSplit(
+    WallSegment wall, {
+    bool splitNewWall = true,
+  }) => wall;
   @override
   void updateWall(WallSegment wall) {}
   @override
@@ -139,9 +146,7 @@ class _StubCallbacks implements EditorCallbacks {
     required void Function() onReplace,
   }) {}
   @override
-  void requestDistributorDeleteDialog({
-    required void Function() onConfirmed,
-  }) {}
+  void requestDistributorDeleteDialog({required void Function() onConfirmed}) {}
   @override
   void commitCircuit(HeatingCircuit circuit) => _circuits.add(circuit);
   @override
@@ -149,10 +154,12 @@ class _StubCallbacks implements EditorCallbacks {
     final i = _circuits.indexWhere((c) => c.id == circuit.id);
     if (i >= 0) _circuits[i] = circuit;
   }
+
   @override
   void removeCircuit(String circuitId) {
     _circuits.removeWhere((c) => c.id == circuitId);
   }
+
   @override
   void clearAllCircuits() => _circuits.clear();
   @override
@@ -165,6 +172,8 @@ class _StubCallbacks implements EditorCallbacks {
   void updateRoomTransient(Room room) => updateRoom(room);
   @override
   void updateZoneTransient(HeatingZone zone) => updateZone(zone);
+  @override
+  void updateCircuitTransient(HeatingCircuit circuit) => updateCircuit(circuit);
   @override
   void updateWindowTransient(WindowElement window) => updateWindow(window);
   @override
@@ -183,7 +192,11 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   void selectElement(String? type, String? id) {}
   @override
-  void requestRoomDialog(List<Point2D> polygon, List<String> wallIds, {void Function(List<WallSegment>, List<Room>)? onCreated}) {}
+  void requestRoomDialog(
+    List<Point2D> polygon,
+    List<String> wallIds, {
+    void Function(List<WallSegment>, List<Room>)? onCreated,
+  }) {}
   @override
   void requestZoneContextMenu(ZoneContextMenuRequest request) {}
   @override
@@ -238,23 +251,23 @@ void _tapAndClose(ZoneDrawTool tool, List<Point2D> pts) {
 /// inside [_testRoom] (ADR-013 / ADR-014). Used by ZDT-5 and ZDT-6 so
 /// undo/redo is verified identically for every path.
 Map<String, void Function(ZoneDrawTool)> _zoneCreators() => {
-      'polygon': (tool) => _tapAndClose(tool, const [
-            Point2D(x: 1000, y: 1000),
-            Point2D(x: 4000, y: 1000),
-            Point2D(x: 4000, y: 4000),
-          ]),
-      'rectangle': (tool) {
-        // Ctrl held → rect mode; drag corner to corner.
-        tool.updateModifiers(shift: false, ctrl: true, alt: false);
-        tool.onPointerDown(const Point2D(x: 1000, y: 1000), kPrimaryButton);
-        tool.onDragEnd(const Point2D(x: 5000, y: 4000));
-      },
-      'fill-room': (tool) {
-        // Ctrl+Shift held → fill-room on a no-drag pointer-up (ADR-013).
-        tool.updateModifiers(shift: true, ctrl: true, alt: false);
-        tool.onPointerUp(const Point2D(x: 2000, y: 2000));
-      },
-    };
+  'polygon': (tool) => _tapAndClose(tool, const [
+    Point2D(x: 1000, y: 1000),
+    Point2D(x: 4000, y: 1000),
+    Point2D(x: 4000, y: 4000),
+  ]),
+  'rectangle': (tool) {
+    // Ctrl held → rect mode; drag corner to corner.
+    tool.updateModifiers(shift: false, ctrl: true, alt: false);
+    tool.onPointerDown(const Point2D(x: 1000, y: 1000), kPrimaryButton);
+    tool.onDragEnd(const Point2D(x: 5000, y: 4000));
+  },
+  'fill-room': (tool) {
+    // Ctrl+Shift held → fill-room on a no-drag pointer-up (ADR-013).
+    tool.updateModifiers(shift: true, ctrl: true, alt: false);
+    tool.onPointerUp(const Point2D(x: 2000, y: 2000));
+  },
+};
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
 
@@ -268,22 +281,19 @@ void main() {
 
   // ZDT-1 ───────────────────────────────────────────────────────────────────
 
-  test(
-    'ZDT-1: closing a polygon inside the room commits a HeatingZone',
-    () {
-      final cb = _StubCallbacks(rooms: [_testRoom]);
-      final tool = _makeTool(cb);
+  test('ZDT-1: closing a polygon inside the room commits a HeatingZone', () {
+    final cb = _StubCallbacks(rooms: [_testRoom]);
+    final tool = _makeTool(cb);
 
-      // Triangle inside the room.
-      _tapAndClose(tool, const [
-        Point2D(x: 1000, y: 1000),
-        Point2D(x: 4000, y: 1000),
-        Point2D(x: 4000, y: 4000),
-      ]);
+    // Triangle inside the room.
+    _tapAndClose(tool, const [
+      Point2D(x: 1000, y: 1000),
+      Point2D(x: 4000, y: 1000),
+      Point2D(x: 4000, y: 4000),
+    ]);
 
-      expect(cb.currentZones, hasLength(1));
-    },
-  );
+    expect(cb.currentZones, hasLength(1));
+  });
 
   // ZDT-2 ───────────────────────────────────────────────────────────────────
   //
@@ -314,25 +324,22 @@ void main() {
 
   // ZDT-3 ───────────────────────────────────────────────────────────────────
 
-  test(
-    'ZDT-3: tapping outside the active room does not add a vertex '
-    'and produces no zone after closure attempt',
-    () {
-      final cb = _StubCallbacks(rooms: [_testRoom]);
-      final tool = _makeTool(cb);
+  test('ZDT-3: tapping outside the active room does not add a vertex '
+      'and produces no zone after closure attempt', () {
+    final cb = _StubCallbacks(rooms: [_testRoom]);
+    final tool = _makeTool(cb);
 
-      // First tap outside the room → rejected; no primary room established.
-      tool.onTap(const Point2D(x: 20000, y: 20000), PointerDeviceKind.mouse);
+    // First tap outside the room → rejected; no primary room established.
+    tool.onTap(const Point2D(x: 20000, y: 20000), PointerDeviceKind.mouse);
 
-      // Follow-up taps that would form a valid triangle if accepted.
-      tool.onTap(const Point2D(x: 21000, y: 20000), PointerDeviceKind.mouse);
-      tool.onTap(const Point2D(x: 21000, y: 21000), PointerDeviceKind.mouse);
-      // Attempt to close at the (rejected) first point.
-      tool.onTap(const Point2D(x: 20000, y: 20000), PointerDeviceKind.mouse);
+    // Follow-up taps that would form a valid triangle if accepted.
+    tool.onTap(const Point2D(x: 21000, y: 20000), PointerDeviceKind.mouse);
+    tool.onTap(const Point2D(x: 21000, y: 21000), PointerDeviceKind.mouse);
+    // Attempt to close at the (rejected) first point.
+    tool.onTap(const Point2D(x: 20000, y: 20000), PointerDeviceKind.mouse);
 
-      expect(cb.currentZones, isEmpty);
-    },
-  );
+    expect(cb.currentZones, isEmpty);
+  });
 
   // ZDT-4 ───────────────────────────────────────────────────────────────────
 
@@ -378,14 +385,23 @@ void main() {
         final tool = _makeTool(cb, undo);
 
         create(tool);
-        expect(cb.currentZones, hasLength(1),
-            reason: '$name path should commit exactly one zone');
-        expect(undo.canUndo, isTrue,
-            reason: '$name commit should push one undo entry');
+        expect(
+          cb.currentZones,
+          hasLength(1),
+          reason: '$name path should commit exactly one zone',
+        );
+        expect(
+          undo.canUndo,
+          isTrue,
+          reason: '$name commit should push one undo entry',
+        );
 
         undo.undo();
-        expect(cb.currentZones, isEmpty,
-            reason: 'undo should remove the $name zone');
+        expect(
+          cb.currentZones,
+          isEmpty,
+          reason: 'undo should remove the $name zone',
+        );
       });
     });
   });
@@ -409,8 +425,11 @@ void main() {
 
         undo.redo();
         expect(cb.currentZones, hasLength(1));
-        expect(cb.currentZones.single.id, created.id,
-            reason: 'redo should restore the identical $name zone');
+        expect(
+          cb.currentZones.single.id,
+          created.id,
+          reason: 'redo should restore the identical $name zone',
+        );
         expect(cb.currentZones.single.polygon, created.polygon);
       });
     });
@@ -431,110 +450,170 @@ void main() {
 
   // ZDT-7 ───────────────────────────────────────────────────────────────────
 
-  test(
-    'ZDT-7: double-click on a rectangular zone (W > H) splits vertically; '
-    'children share an exact midpoint edge and inherit parent settings',
-    () {
-      // W=4000, H=2000 → longer side is X → vertical bisector at x=3000.
-      const parentZone = HeatingZone(
-        id: 'zone-parent',
-        roomId: 'room-1',
-        polygon: [
-          Point2D(x: 1000, y: 1000),
-          Point2D(x: 5000, y: 1000),
-          Point2D(x: 5000, y: 3000),
-          Point2D(x: 1000, y: 3000),
-        ],
-        tubeSpacingMm: 175,
-        tubeTypeId: 'tube-X',
-        flooringMaterialId: 'mat-X',
-        borderDistanceMm: 120,
-        layoutPattern: LayoutPattern.spiral,
+  test('ZDT-7: double-click on a rectangular zone (W > H) splits vertically; '
+      'children share an exact midpoint edge and inherit parent settings', () {
+    // W=4000, H=2000 → longer side is X → vertical bisector at x=3000.
+    const parentZone = HeatingZone(
+      id: 'zone-parent',
+      roomId: 'room-1',
+      polygon: [
+        Point2D(x: 1000, y: 1000),
+        Point2D(x: 5000, y: 1000),
+        Point2D(x: 5000, y: 3000),
+        Point2D(x: 1000, y: 3000),
+      ],
+      tubeSpacingMm: 175,
+      tubeTypeId: 'tube-X',
+      flooringMaterialId: 'mat-X',
+      borderDistanceMm: 120,
+      layoutPattern: LayoutPattern.spiral,
+    );
+    final cb = _StubCallbacks(rooms: [_testRoom], zones: [parentZone]);
+    final undo = UndoRedoService();
+    final tool = _makeTool(cb, undo);
+
+    // Double-click inside the parent zone.
+    doubleClick(tool, const Point2D(x: 3000, y: 2000));
+
+    // Parent removed, two children inserted.
+    expect(
+      cb.currentZones,
+      hasLength(2),
+      reason: 'split must replace parent with two children',
+    );
+    expect(
+      cb.currentZones.any((z) => z.id == parentZone.id),
+      isFalse,
+      reason: 'parent must be removed by the split',
+    );
+
+    // Children must form left and right halves of the parent rect with
+    // a shared edge at x = 3000.
+    final xsA = cb.currentZones[0].polygon.map((p) => p.x).toSet();
+    final xsB = cb.currentZones[1].polygon.map((p) => p.x).toSet();
+    expect(xsA, equals({1000.0, 3000.0}));
+    expect(xsB, equals({3000.0, 5000.0}));
+
+    // Both children inherit every setting from the parent verbatim
+    // (ADR-018 Rule 5).
+    for (final c in cb.currentZones) {
+      expect(c.tubeSpacingMm, parentZone.tubeSpacingMm);
+      expect(c.tubeTypeId, parentZone.tubeTypeId);
+      expect(c.flooringMaterialId, parentZone.flooringMaterialId);
+      expect(c.borderDistanceMm, parentZone.borderDistanceMm);
+      expect(c.layoutPattern, parentZone.layoutPattern);
+      expect(c.zoneType, parentZone.zoneType);
+      expect(c.roomId, parentZone.roomId);
+      expect(
+        c.id,
+        isNot(parentZone.id),
+        reason: 'each child gets a fresh UUID',
       );
-      final cb =
-          _StubCallbacks(rooms: [_testRoom], zones: [parentZone]);
-      final undo = UndoRedoService();
-      final tool = _makeTool(cb, undo);
+    }
 
-      // Double-click inside the parent zone.
-      doubleClick(tool, const Point2D(x: 3000, y: 2000));
-
-      // Parent removed, two children inserted.
-      expect(cb.currentZones, hasLength(2),
-          reason: 'split must replace parent with two children');
-      expect(cb.currentZones.any((z) => z.id == parentZone.id), isFalse,
-          reason: 'parent must be removed by the split');
-
-      // Children must form left and right halves of the parent rect with
-      // a shared edge at x = 3000.
-      final xsA = cb.currentZones[0].polygon.map((p) => p.x).toSet();
-      final xsB = cb.currentZones[1].polygon.map((p) => p.x).toSet();
-      expect(xsA, equals({1000.0, 3000.0}));
-      expect(xsB, equals({3000.0, 5000.0}));
-
-      // Both children inherit every setting from the parent verbatim
-      // (ADR-018 Rule 5).
-      for (final c in cb.currentZones) {
-        expect(c.tubeSpacingMm, parentZone.tubeSpacingMm);
-        expect(c.tubeTypeId, parentZone.tubeTypeId);
-        expect(c.flooringMaterialId, parentZone.flooringMaterialId);
-        expect(c.borderDistanceMm, parentZone.borderDistanceMm);
-        expect(c.layoutPattern, parentZone.layoutPattern);
-        expect(c.zoneType, parentZone.zoneType);
-        expect(c.roomId, parentZone.roomId);
-        expect(c.id, isNot(parentZone.id),
-            reason: 'each child gets a fresh UUID');
-      }
-
-      // Single undo entry (ADR-018 Rule 7).
-      expect(undo.canUndo, isTrue);
-      undo.undo();
-      expect(cb.currentZones, hasLength(1));
-      expect(cb.currentZones.single.id, parentZone.id,
-          reason: 'undo restores the parent verbatim');
-    },
-  );
+    // Single undo entry (ADR-018 Rule 7).
+    expect(undo.canUndo, isTrue);
+    undo.undo();
+    expect(cb.currentZones, hasLength(1));
+    expect(
+      cb.currentZones.single.id,
+      parentZone.id,
+      reason: 'undo restores the parent verbatim',
+    );
+  });
 
   // ZDT-8 ───────────────────────────────────────────────────────────────────
 
-  test(
-    'ZDT-8: double-click on a non-rectangular zone emits the splittability '
-    'toast and mutates nothing',
-    () {
-      // 5-vertex pentagon — clearly not rectangle-eligible.
-      const pentagonZone = HeatingZone(
-        id: 'zone-penta',
-        roomId: 'room-1',
-        polygon: [
-          Point2D(x: 1000, y: 1000),
-          Point2D(x: 4000, y: 1000),
-          Point2D(x: 5000, y: 2000),
-          Point2D(x: 4000, y: 3000),
-          Point2D(x: 1000, y: 3000),
-        ],
-        tubeTypeId: 'tube-1',
-        flooringMaterialId: 'mat-1',
-      );
-      final cb =
-          _StubCallbacks(rooms: [_testRoom], zones: [pentagonZone]);
-      final undo = UndoRedoService();
-      final tool = _makeTool(cb, undo);
+  test('ZDT-8: double-click on a zone whose shape cannot be cut in two emits '
+      'the splittability toast and mutates nothing', () {
+    // Open ring: every vertical and horizontal equal-area line crosses
+    // the shape twice, so no single cut yields two pieces (ADR-037
+    // Rule 1).
+    const ringZone = HeatingZone(
+      id: 'zone-ring',
+      roomId: 'room-1',
+      polygon: [
+        Point2D(x: 1000, y: 1000),
+        Point2D(x: 4000, y: 1000),
+        Point2D(x: 4000, y: 2200),
+        Point2D(x: 3000, y: 2200),
+        Point2D(x: 3000, y: 2000),
+        Point2D(x: 2000, y: 2000),
+        Point2D(x: 2000, y: 3000),
+        Point2D(x: 3000, y: 3000),
+        Point2D(x: 3000, y: 2400),
+        Point2D(x: 4000, y: 2400),
+        Point2D(x: 4000, y: 4000),
+        Point2D(x: 1000, y: 4000),
+      ],
+      tubeTypeId: 'tube-1',
+      flooringMaterialId: 'mat-1',
+    );
+    final cb = _StubCallbacks(rooms: [_testRoom], zones: [ringZone]);
+    final undo = UndoRedoService();
+    final tool = _makeTool(cb, undo);
 
-      doubleClick(tool, const Point2D(x: 2500, y: 2000));
+    doubleClick(tool, const Point2D(x: 1500, y: 1500));
 
-      // Zone list is unchanged.
-      expect(cb.currentZones, hasLength(1));
-      expect(cb.currentZones.single.id, pentagonZone.id);
-      expect(undo.canUndo, isFalse,
-          reason: 'rejected split must not push an undo entry');
+    // Zone list is unchanged.
+    expect(cb.currentZones, hasLength(1));
+    expect(cb.currentZones.single.id, ringZone.id);
+    expect(
+      undo.canUndo,
+      isFalse,
+      reason: 'rejected split must not push an undo entry',
+    );
 
-      // Toast was emitted.
-      expect(
-        cb.toasts,
-        contains(cb.l10n.zone_splitNonRectangularToast),
-      );
-    },
-  );
+    // Toast was emitted.
+    expect(cb.toasts, contains(cb.l10n.zone_splitNonRectangularToast));
+  });
+
+  // ZDT-8b ──────────────────────────────────────────────────────────────────
+
+  test('ZDT-8b: double-click on a non-rectangular zone splits it into two '
+      'halves of equal area (ADR-037 Rule 2)', () {
+    // L-shape: 4000 × 3000 with the top-right 2000 × 2000 removed.
+    const lZone = HeatingZone(
+      id: 'zone-l',
+      roomId: 'room-1',
+      polygon: [
+        Point2D(x: 1000, y: 1000),
+        Point2D(x: 3000, y: 1000),
+        Point2D(x: 3000, y: 3000),
+        Point2D(x: 5000, y: 3000),
+        Point2D(x: 5000, y: 4000),
+        Point2D(x: 1000, y: 4000),
+      ],
+      tubeTypeId: 'tube-1',
+      flooringMaterialId: 'mat-1',
+      tubeSpacingMm: 200,
+    );
+    final cb = _StubCallbacks(rooms: [_testRoom], zones: [lZone]);
+    final undo = UndoRedoService();
+    final tool = _makeTool(cb, undo);
+
+    doubleClick(tool, const Point2D(x: 1500, y: 1500));
+
+    expect(cb.currentZones, hasLength(2));
+    final areas = cb.currentZones
+        .map((z) => GeometryEngine.polygonAreaM2(z.polygon))
+        .toList();
+    // Parent area 8 m² → 4 m² each.
+    expect(areas[0], closeTo(4.0, 1e-3));
+    expect(areas[1], closeTo(4.0, 1e-3));
+    expect(
+      cb.currentZones.every((z) => z.tubeSpacingMm == 200),
+      isTrue,
+      reason: 'children inherit the parent settings',
+    );
+
+    undo.undo();
+    expect(
+      cb.currentZones.single.id,
+      lZone.id,
+      reason: 'one undo restores the parent',
+    );
+  });
 
   // ZDT-9 ───────────────────────────────────────────────────────────────────
 
@@ -547,8 +626,11 @@ void main() {
       final toolA = _makeTool(cbA);
       toolA.updateModifiers(shift: true, ctrl: true, alt: false);
       toolA.onPointerUp(const Point2D(x: 2000, y: 2000));
-      expect(cbA.currentZones, hasLength(1),
-          reason: 'baseline: fill-room creates one zone');
+      expect(
+        cbA.currentZones,
+        hasLength(1),
+        reason: 'baseline: fill-room creates one zone',
+      );
       final baselinePolygon = cbA.currentZones.single.polygon;
 
       // Now exercise the new double-click fill-room path.
@@ -557,10 +639,16 @@ void main() {
       final toolB = _makeTool(cbB, undoB);
       doubleClick(toolB, const Point2D(x: 2000, y: 2000));
 
-      expect(cbB.currentZones, hasLength(1),
-          reason: 'double-click on empty room interior creates one zone');
-      expect(cbB.currentZones.single.polygon, baselinePolygon,
-          reason: 'polygon equals the fill-room polygon');
+      expect(
+        cbB.currentZones,
+        hasLength(1),
+        reason: 'double-click on empty room interior creates one zone',
+      );
+      expect(
+        cbB.currentZones.single.polygon,
+        baselinePolygon,
+        reason: 'polygon equals the fill-room polygon',
+      );
 
       // Exactly one undo entry — single Ctrl+Z reverts the creation.
       expect(undoB.canUndo, isTrue);
@@ -569,67 +657,151 @@ void main() {
     },
   );
 
+  // ZDT-9b ──────────────────────────────────────────────────────────────────
+
+  test('ZDT-9b: fill-room stops at the inner wall faces, not the wall '
+      'centerlines (ADR-037 Rule 4)', () {
+    // 8 m × 6 m centerline room. Left wall 400 mm thick, the others
+    // 200 mm. The top side is split into two wall segments (ADR-003).
+    WallSegment wall(String id, Point2D a, Point2D b, double thicknessMm) =>
+        WallSegment(
+          id: id,
+          roomId: 'room-1',
+          startPoint: a,
+          endPoint: b,
+          thicknessMm: thicknessMm,
+        );
+    const room = Room(
+      id: 'room-1',
+      floorId: 'floor-1',
+      name: 'Test Room',
+      targetTempC: 20.0,
+      polygon: [
+        Point2D(x: 0, y: 0),
+        Point2D(x: 5000, y: 0),
+        Point2D(x: 8000, y: 0),
+        Point2D(x: 8000, y: 6000),
+        Point2D(x: 0, y: 6000),
+      ],
+    );
+    final cb = _StubCallbacks(
+      rooms: const [room],
+      walls: [
+        wall(
+          't1',
+          const Point2D(x: 0, y: 0),
+          const Point2D(x: 5000, y: 0),
+          200,
+        ),
+        wall(
+          't2',
+          const Point2D(x: 5000, y: 0),
+          const Point2D(x: 8000, y: 0),
+          200,
+        ),
+        wall(
+          'r',
+          const Point2D(x: 8000, y: 0),
+          const Point2D(x: 8000, y: 6000),
+          200,
+        ),
+        wall(
+          'b',
+          const Point2D(x: 8000, y: 6000),
+          const Point2D(x: 0, y: 6000),
+          200,
+        ),
+        // Reversed relative to the polygon edge — still matched.
+        wall('l', const Point2D(x: 0, y: 0), const Point2D(x: 0, y: 6000), 400),
+      ],
+    );
+    final tool = _makeTool(cb);
+
+    doubleClick(tool, const Point2D(x: 4000, y: 3000));
+
+    final polygon = cb.currentZones.single.polygon;
+    expect(
+      polygon,
+      hasLength(4),
+      reason: 'the straight-through vertex of the split wall is dropped',
+    );
+    final xs = polygon.map((p) => p.x).toList()..sort();
+    final ys = polygon.map((p) => p.y).toList()..sort();
+    expect(xs.first, closeTo(200, 1e-6)); // ½ × 400 mm left wall
+    expect(xs.last, closeTo(7900, 1e-6));
+    expect(ys.first, closeTo(100, 1e-6));
+    expect(ys.last, closeTo(5900, 1e-6));
+  });
+
   // ZDT-10 ──────────────────────────────────────────────────────────────────
 
-  test(
-    'ZDT-10: hover preview renders dashed bisector on rectangular zones, '
-    'no preview on non-rectangular zones',
-    () {
-      // Rectangular zone (W=4000, H=2000) → vertical bisector at x=3000.
-      const rectZone = HeatingZone(
-        id: 'zone-rect',
-        roomId: 'room-1',
-        polygon: [
-          Point2D(x: 1000, y: 1000),
-          Point2D(x: 5000, y: 1000),
-          Point2D(x: 5000, y: 3000),
-          Point2D(x: 1000, y: 3000),
-        ],
-        tubeTypeId: 'tube-1',
-        flooringMaterialId: 'mat-1',
-      );
-      final cbRect =
-          _StubCallbacks(rooms: [_testRoom], zones: [rectZone]);
-      final toolRect = _makeTool(cbRect);
+  test('ZDT-10: hover preview renders dashed bisector on rectangular zones, '
+      'no preview on zones that cannot be split', () {
+    // Rectangular zone (W=4000, H=2000) → vertical bisector at x=3000.
+    const rectZone = HeatingZone(
+      id: 'zone-rect',
+      roomId: 'room-1',
+      polygon: [
+        Point2D(x: 1000, y: 1000),
+        Point2D(x: 5000, y: 1000),
+        Point2D(x: 5000, y: 3000),
+        Point2D(x: 1000, y: 3000),
+      ],
+      tubeTypeId: 'tube-1',
+      flooringMaterialId: 'mat-1',
+    );
+    final cbRect = _StubCallbacks(rooms: [_testRoom], zones: [rectZone]);
+    final toolRect = _makeTool(cbRect);
 
-      toolRect.onPointerMove(const Point2D(x: 3000, y: 2000));
-      final data = toolRect.getInteractionData();
-      expect(data, isA<ZoneSplitPreviewData>());
-      final preview = data! as ZoneSplitPreviewData;
-      expect(preview.start.x, 3000.0);
-      expect(preview.end.x, 3000.0);
-      // Y range covers the parent's vertical span.
-      final ys = {preview.start.y, preview.end.y};
-      expect(ys, {1000.0, 3000.0});
+    toolRect.onPointerMove(const Point2D(x: 3000, y: 2000));
+    final data = toolRect.getInteractionData();
+    expect(data, isA<ZoneSplitPreviewData>());
+    final preview = data! as ZoneSplitPreviewData;
+    expect(preview.start.x, 3000.0);
+    expect(preview.end.x, 3000.0);
+    // Y range covers the parent's vertical span.
+    final ys = {preview.start.y, preview.end.y};
+    expect(ys, {1000.0, 3000.0});
 
-      // Non-rectangular zone — no preview.
-      const pentagonZone = HeatingZone(
-        id: 'zone-penta',
-        roomId: 'room-1',
-        polygon: [
-          Point2D(x: 1000, y: 1000),
-          Point2D(x: 4000, y: 1000),
-          Point2D(x: 5000, y: 2000),
-          Point2D(x: 4000, y: 3000),
-          Point2D(x: 1000, y: 3000),
-        ],
-        tubeTypeId: 'tube-1',
-        flooringMaterialId: 'mat-1',
-      );
-      final cbPenta =
-          _StubCallbacks(rooms: [_testRoom], zones: [pentagonZone]);
-      final toolPenta = _makeTool(cbPenta);
+    // A shape that cannot be cut in two — no preview.
+    const ringZone = HeatingZone(
+      id: 'zone-ring',
+      roomId: 'room-1',
+      polygon: [
+        Point2D(x: 1000, y: 1000),
+        Point2D(x: 4000, y: 1000),
+        Point2D(x: 4000, y: 2200),
+        Point2D(x: 3000, y: 2200),
+        Point2D(x: 3000, y: 2000),
+        Point2D(x: 2000, y: 2000),
+        Point2D(x: 2000, y: 3000),
+        Point2D(x: 3000, y: 3000),
+        Point2D(x: 3000, y: 2400),
+        Point2D(x: 4000, y: 2400),
+        Point2D(x: 4000, y: 4000),
+        Point2D(x: 1000, y: 4000),
+      ],
+      tubeTypeId: 'tube-1',
+      flooringMaterialId: 'mat-1',
+    );
+    final cbRing = _StubCallbacks(rooms: [_testRoom], zones: [ringZone]);
+    final toolRing = _makeTool(cbRing);
 
-      toolPenta.onPointerMove(const Point2D(x: 2500, y: 2000));
-      expect(toolPenta.getInteractionData(), isNot(isA<ZoneSplitPreviewData>()),
-          reason: 'non-rectangular zone must not show the bisector preview');
+    toolRing.onPointerMove(const Point2D(x: 1500, y: 1500));
+    expect(
+      toolRing.getInteractionData(),
+      isNot(isA<ZoneSplitPreviewData>()),
+      reason: 'an unsplittable zone must not show the cut preview',
+    );
 
-      // Once a polygon vertex is committed, the preview must disappear even
-      // over a rectangular zone (Rule 8: only when buffer is empty).
-      toolRect.onTap(const Point2D(x: 1500, y: 1500), PointerDeviceKind.mouse);
-      toolRect.onPointerMove(const Point2D(x: 3000, y: 2000));
-      expect(toolRect.getInteractionData(), isNot(isA<ZoneSplitPreviewData>()),
-          reason: 'preview must hide once a polygon is in progress');
-    },
-  );
+    // Once a polygon vertex is committed, the preview must disappear even
+    // over a rectangular zone (Rule 8: only when buffer is empty).
+    toolRect.onTap(const Point2D(x: 1500, y: 1500), PointerDeviceKind.mouse);
+    toolRect.onPointerMove(const Point2D(x: 3000, y: 2000));
+    expect(
+      toolRect.getInteractionData(),
+      isNot(isA<ZoneSplitPreviewData>()),
+      reason: 'preview must hide once a polygon is in progress',
+    );
+  });
 }

@@ -7,10 +7,10 @@ import 'undo_redo_service.dart';
 
 /// Direction of an ADR-018 zone split.
 enum SplitDirection {
-  /// Bisect along the perpendicular to the X axis — left/right halves.
+  /// Cut along a vertical line — left/right halves.
   vertical,
 
-  /// Bisect along the perpendicular to the Y axis — top/bottom halves.
+  /// Cut along a horizontal line — top/bottom halves.
   horizontal,
 }
 
@@ -28,10 +28,11 @@ class SplitBuildOk extends SplitBuildResult {
   final SplitZoneCommand command;
 }
 
-/// The selected zone is not rectangular (ADR-018 Rule 1).
-class SplitBuildRejectedNonRectangular extends SplitBuildResult {
-  /// Creates a [SplitBuildRejectedNonRectangular].
-  const SplitBuildRejectedNonRectangular();
+/// The zone's shape cannot be cut into two pieces along the requested
+/// direction (ADR-037 Rule 1).
+class SplitBuildRejectedShape extends SplitBuildResult {
+  /// Creates a [SplitBuildRejectedShape].
+  const SplitBuildRejectedShape();
 }
 
 /// Either child would be < 100 mm (ADR-018 Rule 4).
@@ -40,9 +41,9 @@ class SplitBuildRejectedTooSmall extends SplitBuildResult {
   const SplitBuildRejectedTooSmall();
 }
 
-/// Command: split a rectangular heating zone in two equal halves.
+/// Command: split a heating zone in two halves of equal area.
 ///
-/// Shared by [ZoneDrawTool] (double-click on a rectangular zone, ADR-018
+/// Shared by [ZoneDrawTool] (double-click on a floor zone, ADR-018
 /// Rule 1.1) and [SelectTool] (right-click context menu, ADR-018 Rule 1.2).
 /// Lives alongside [CreateZoneCommand] / [_MoveZoneCommand] /
 /// [_DeleteZoneCommand]. See `DECISIONS.md` ADR-018 Rule 7.
@@ -146,52 +147,149 @@ class SplitZoneCommand extends Command {
     return xs.length == 2 && ys.length == 2;
   }
 
+  /// Computes the cut that divides [polygon] along [dir] into two halves
+  /// of **equal area** (ADR-037 Rule 2).
+  ///
+  /// For a rectangle this is the ADR-018 midpoint bisector with the
+  /// ADR-018 Rule 2 vertex order. For any other simple polygon the cut
+  /// line is moved until both sides have the same area, so an L-shaped
+  /// zone still yields two equally sized children.
+  ///
+  /// `at` is the cut coordinate (x for [SplitDirection.vertical], y for
+  /// [SplitDirection.horizontal]); `a` is the left/top child, `b` the
+  /// right/bottom child; `start`/`end` are the ends of the cut segment.
+  ///
+  /// Returns null when the shape cannot be cut along [dir] into exactly
+  /// two pieces (e.g. the line would cross a U-shaped zone twice).
+  static ({
+    double at,
+    List<Point2D> a,
+    List<Point2D> b,
+    Point2D start,
+    Point2D end,
+  })? equalAreaCut(List<Point2D> polygon, SplitDirection dir) {
+    if (polygon.length < 3) return null;
+    final alongX = dir == SplitDirection.vertical;
+
+    if (isRectangularZone(polygon)) {
+      final polys = childPolygons(polygon, dir);
+      final xs = polygon.map((p) => p.x).toList()..sort();
+      final ys = polygon.map((p) => p.y).toList()..sort();
+      final at = alongX
+          ? (xs.first + xs.last) / 2
+          : (ys.first + ys.last) / 2;
+      return (
+        at: at,
+        a: polys.a,
+        b: polys.b,
+        start: alongX
+            ? Point2D(x: at, y: ys.first)
+            : Point2D(x: xs.first, y: at),
+        end: alongX
+            ? Point2D(x: at, y: ys.last)
+            : Point2D(x: xs.last, y: at),
+      );
+    }
+
+    if (!GeometryEngine.isSimplePolygon(polygon)) return null;
+    final totalM2 = GeometryEngine.polygonAreaM2(polygon);
+    if (totalM2.isNaN || totalM2 <= 0) return null;
+
+    double coord(Point2D p) => alongX ? p.x : p.y;
+    final coords = polygon.map(coord).toList()..sort();
+    var lo = coords.first;
+    var hi = coords.last;
+    if (hi - lo < 1e-6) return null;
+
+    List<Point2D> side(double at, {required bool lower}) =>
+        GeometryEngine.clipPolygonToHalfPlane(
+          polygon: polygon,
+          alongX: alongX,
+          at: at,
+          keepLower: lower,
+        );
+    double lowerAreaM2(double at) {
+      final clipped = side(at, lower: true);
+      return clipped.isEmpty ? 0.0 : GeometryEngine.polygonAreaM2(clipped);
+    }
+
+    // The lower-side area grows monotonically with the cut coordinate.
+    for (var i = 0; i < 60; i++) {
+      final mid = (lo + hi) / 2;
+      if (lowerAreaM2(mid) < totalM2 / 2) {
+        lo = mid;
+      } else {
+        hi = mid;
+      }
+    }
+    final at = (lo + hi) / 2;
+
+    final a = GeometryEngine.removeCollinearVertices(side(at, lower: true));
+    final b = GeometryEngine.removeCollinearVertices(side(at, lower: false));
+    if (a.length < 3 || b.length < 3) return null;
+    if (!GeometryEngine.isSimplePolygon(a) ||
+        !GeometryEngine.isSimplePolygon(b)) {
+      return null;
+    }
+    // Exactly two vertices on the line per child = one clean cut
+    // segment. More means the line crossed the shape more than once.
+    List<Point2D> onLine(List<Point2D> poly) =>
+        poly.where((p) => (coord(p) - at).abs() < 1e-3).toList();
+    final cutA = onLine(a);
+    if (cutA.length != 2 || onLine(b).length != 2) return null;
+    final areaA = GeometryEngine.polygonAreaM2(a);
+    final areaB = GeometryEngine.polygonAreaM2(b);
+    if ((areaA - areaB).abs() > 1e-3 * totalM2) return null;
+
+    double other(Point2D p) => alongX ? p.y : p.x;
+    cutA.sort((p, q) => other(p).compareTo(other(q)));
+    return (at: at, a: a, b: b, start: cutA.first, end: cutA.last);
+  }
+
+  /// True when [polygon] can be split into two equal halves in at least
+  /// one direction (ADR-037 Rule 1).
+  static bool canSplit(List<Point2D> polygon) =>
+      doubleClickDirection(polygon) != null;
+
   /// Returns the split direction the Zone tool double-click would choose
-  /// for [polygon] (ADR-018 Rule 3 — bisect the longer side; tie → vertical).
-  /// Returns null when [polygon] is not rectangle-eligible.
+  /// for [polygon]: bisect the longer side of its bounding box (tie →
+  /// vertical, ADR-018 Rule 3), falling back to the other direction when
+  /// the shape cannot be cut that way (ADR-037 Rule 3). Returns null when
+  /// neither direction yields two pieces.
   static SplitDirection? doubleClickDirection(List<Point2D> polygon) {
-    if (!isRectangularZone(polygon)) return null;
+    if (polygon.length < 3) return null;
     final xs = polygon.map((p) => p.x).toList()..sort();
     final ys = polygon.map((p) => p.y).toList()..sort();
     final w = xs.last - xs.first;
     final h = ys.last - ys.first;
-    if ((w - h).abs() <= 1.0) return SplitDirection.vertical;
-    return w >= h ? SplitDirection.vertical : SplitDirection.horizontal;
+    final preferred = (w - h).abs() <= 1.0 || w >= h
+        ? SplitDirection.vertical
+        : SplitDirection.horizontal;
+    if (equalAreaCut(polygon, preferred) != null) return preferred;
+    final fallback = preferred == SplitDirection.vertical
+        ? SplitDirection.horizontal
+        : SplitDirection.vertical;
+    return equalAreaCut(polygon, fallback) != null ? fallback : null;
   }
 
-  /// Computes the perpendicular bisector along the longer side of a
-  /// rectangular [polygon] — the line a Zone tool double-click would cut
-  /// along. Returns `(start, end)` in world mm, or null when [polygon] is
-  /// not rectangle-eligible. World coordinates only — no grid snap (ADR-
-  /// 018 Rule 2 final sentence).
+  /// Computes the line a Zone tool double-click would cut [polygon]
+  /// along — the equal-area cut in [doubleClickDirection]. Returns
+  /// `(start, end)` in world mm, or null when [polygon] cannot be split.
+  /// World coordinates only — no grid snap (ADR-018 Rule 2 final
+  /// sentence).
   static ({Point2D start, Point2D end})? bisectorForDoubleClick(
     List<Point2D> polygon,
   ) {
     final dir = doubleClickDirection(polygon);
     if (dir == null) return null;
-    final xs = polygon.map((p) => p.x).toList()..sort();
-    final ys = polygon.map((p) => p.y).toList()..sort();
-    final minX = xs.first;
-    final maxX = xs.last;
-    final minY = ys.first;
-    final maxY = ys.last;
-    if (dir == SplitDirection.vertical) {
-      final mx = (minX + maxX) / 2;
-      return (
-        start: Point2D(x: mx, y: minY),
-        end: Point2D(x: mx, y: maxY),
-      );
-    }
-    final my = (minY + maxY) / 2;
-    return (
-      start: Point2D(x: minX, y: my),
-      end: Point2D(x: maxX, y: my),
-    );
+    final cut = equalAreaCut(polygon, dir);
+    if (cut == null) return null;
+    return (start: cut.start, end: cut.end);
   }
 
-  /// Builds the two child polygons for splitting [polygon] along [dir]
-  /// (ADR-018 Rule 2). Child A is left/top; child B is right/bottom.
-  /// Caller is responsible for the rectangle / size eligibility checks.
+  /// Builds the two child polygons for splitting a **rectangular**
+  /// [polygon] along [dir] (ADR-018 Rule 2). Child A is left/top; child B
+  /// is right/bottom. Non-rectangular zones go through [equalAreaCut].
   static ({List<Point2D> a, List<Point2D> b}) childPolygons(
     List<Point2D> polygon,
     SplitDirection dir,
@@ -235,28 +333,28 @@ class SplitZoneCommand extends Command {
     required void Function(String) remove,
     required void Function(HeatingCircuit) updateCircuit,
   }) {
-    if (!isRectangularZone(parent.polygon)) {
-      return const SplitBuildRejectedNonRectangular();
+    final cut = equalAreaCut(parent.polygon, direction);
+    if (cut == null) {
+      return const SplitBuildRejectedShape();
     }
 
-    final xs = parent.polygon.map((p) => p.x).toList()..sort();
-    final ys = parent.polygon.map((p) => p.y).toList()..sort();
-    final w = xs.last - xs.first;
-    final h = ys.last - ys.first;
-    final bisectedSide = direction == SplitDirection.vertical ? w : h;
-    if (bisectedSide / 2 < minHalfMm) {
+    // Each child must be at least [minHalfMm] deep across the cut.
+    double coord(Point2D p) =>
+        direction == SplitDirection.vertical ? p.x : p.y;
+    final coords = parent.polygon.map(coord).toList()..sort();
+    if (cut.at - coords.first < minHalfMm ||
+        coords.last - cut.at < minHalfMm) {
       return const SplitBuildRejectedTooSmall();
     }
 
-    final polys = childPolygons(parent.polygon, direction);
     final childA = parent.copyWith(
       id: IdGenerator.newId(),
-      polygon: polys.a,
+      polygon: cut.a,
       circuitId: null,
     );
     final childB = parent.copyWith(
       id: IdGenerator.newId(),
-      polygon: polys.b,
+      polygon: cut.b,
       circuitId: null,
     );
 

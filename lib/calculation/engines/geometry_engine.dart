@@ -135,6 +135,194 @@ class GeometryEngine {
     return true;
   }
 
+  /// Clips [polygon] to one side of an axis-aligned line
+  /// (Sutherland–Hodgman).
+  ///
+  /// With [alongX] the line is `x = at`, otherwise `y = at`. [keepLower]
+  /// keeps the side with the smaller coordinate. Consecutive duplicate
+  /// vertices are removed. Returns an empty list when fewer than 3
+  /// vertices remain.
+  ///
+  /// The result is one polygon. When the line cuts a concave polygon
+  /// into several pieces they come back joined by zero-width bridges
+  /// along the line — callers that need a single piece must check for
+  /// that (more than two result vertices on the line).
+  static List<Point2D> clipPolygonToHalfPlane({
+    required List<Point2D> polygon,
+    required bool alongX,
+    required double at,
+    required bool keepLower,
+  }) {
+    final n = polygon.length;
+    if (n < 3) return const [];
+    double coord(Point2D p) => alongX ? p.x : p.y;
+    bool inside(Point2D p) =>
+        keepLower ? coord(p) <= at : coord(p) >= at;
+    Point2D cross(Point2D a, Point2D b) {
+      final t = (at - coord(a)) / (coord(b) - coord(a));
+      return alongX
+          ? Point2D(x: at, y: a.y + (b.y - a.y) * t)
+          : Point2D(x: a.x + (b.x - a.x) * t, y: at);
+    }
+
+    final out = <Point2D>[];
+    void push(Point2D p) {
+      if (out.isNotEmpty && _pointAlmostEq(out.last, p)) return;
+      out.add(p);
+    }
+
+    for (var i = 0; i < n; i++) {
+      final a = polygon[i];
+      final b = polygon[(i + 1) % n];
+      final aIn = inside(a);
+      final bIn = inside(b);
+      if (aIn && bIn) {
+        push(b);
+      } else if (aIn && !bIn) {
+        push(cross(a, b));
+      } else if (!aIn && bIn) {
+        push(cross(a, b));
+        push(b);
+      }
+    }
+    while (out.length > 1 && _pointAlmostEq(out.first, out.last)) {
+      out.removeLast();
+    }
+    return out.length < 3 ? const [] : out;
+  }
+
+  /// Returns [polygon] without vertices that lie on the straight line
+  /// between their neighbours (within [toleranceMm]).
+  ///
+  /// Such ~180° vertices appear where a straight room side is split into
+  /// several wall segments (ADR-003) or where a clip line runs along an
+  /// existing edge. Returns [polygon] unchanged when fewer than 3
+  /// vertices would remain.
+  static List<Point2D> removeCollinearVertices(
+    List<Point2D> polygon, {
+    double toleranceMm = 0.5,
+  }) {
+    if (polygon.length <= 3) return polygon;
+    final out = List<Point2D>.from(polygon);
+    var changed = true;
+    while (changed && out.length > 3) {
+      changed = false;
+      for (var i = 0; i < out.length; i++) {
+        final prev = out[(i + out.length - 1) % out.length];
+        final cur = out[i];
+        final next = out[(i + 1) % out.length];
+        final dx = next.x - prev.x;
+        final dy = next.y - prev.y;
+        final len = sqrt(dx * dx + dy * dy);
+        if (len < 1e-9) continue;
+        final offLine =
+            ((cur.x - prev.x) * dy - (cur.y - prev.y) * dx).abs() / len;
+        final along = (cur.x - prev.x) * dx + (cur.y - prev.y) * dy;
+        if (offLine <= toleranceMm && along >= 0 && along <= len * len) {
+          out.removeAt(i);
+          changed = true;
+          break;
+        }
+      }
+    }
+    return out.length < 3 ? polygon : out;
+  }
+
+  /// Assigns each polygon a colour index in `0 … paletteSize − 1` so
+  /// that polygons lying next to each other never share one (ADR-042
+  /// Rule 3).
+  ///
+  /// Two polygons are neighbours when their outlines come within
+  /// [adjacencyMm] of each other — that covers zones sharing an edge and
+  /// zones on either side of a wall. Polygons are coloured in list
+  /// order: each takes the colour used least so far among those no
+  /// neighbour has, so as long as the palette lasts every polygon gets
+  /// its own colour, and a polygon appended later never changes the
+  /// colours before it. If a polygon has more differently coloured
+  /// neighbours than the palette has colours, it takes the least used
+  /// colour overall.
+  ///
+  /// Returns one index per polygon; an empty list for a non-positive
+  /// [paletteSize].
+  static List<int> distinctColorIndices(
+    List<List<Point2D>> polygons, {
+    required int paletteSize,
+    double adjacencyMm = 600.0,
+  }) {
+    if (paletteSize <= 0) return const [];
+    final count = polygons.length;
+    final result = List<int>.filled(count, 0);
+    final used = List<int>.filled(paletteSize, 0);
+    for (var i = 0; i < count; i++) {
+      final taken = <int>{};
+      for (var j = 0; j < i; j++) {
+        if (_outlinesWithin(polygons[i], polygons[j], adjacencyMm)) {
+          taken.add(result[j]);
+        }
+      }
+      var best = -1;
+      for (var c = 0; c < paletteSize; c++) {
+        if (taken.contains(c)) continue;
+        if (best < 0 || used[c] < used[best]) best = c;
+      }
+      if (best < 0) {
+        best = 0;
+        for (var c = 1; c < paletteSize; c++) {
+          if (used[c] < used[best]) best = c;
+        }
+      }
+      result[i] = best;
+      used[best]++;
+    }
+    return result;
+  }
+
+  /// Whether the outlines of [a] and [b] come within [limitMm] of each
+  /// other (or cross).
+  static bool _outlinesWithin(
+    List<Point2D> a,
+    List<Point2D> b,
+    double limitMm,
+  ) {
+    if (a.isEmpty || b.isEmpty) return false;
+    double lo(List<Point2D> p, bool x) =>
+        p.map((q) => x ? q.x : q.y).reduce((m, v) => v < m ? v : m);
+    double hi(List<Point2D> p, bool x) =>
+        p.map((q) => x ? q.x : q.y).reduce((m, v) => v > m ? v : m);
+    if (lo(a, true) - hi(b, true) > limitMm ||
+        lo(b, true) - hi(a, true) > limitMm ||
+        lo(a, false) - hi(b, false) > limitMm ||
+        lo(b, false) - hi(a, false) > limitMm) {
+      return false;
+    }
+    double pointToSegment(Point2D p, Point2D s, Point2D e) {
+      final dx = e.x - s.x;
+      final dy = e.y - s.y;
+      final len2 = dx * dx + dy * dy;
+      if (len2 < 1e-12) return distanceMm(p, s);
+      final t =
+          (((p.x - s.x) * dx + (p.y - s.y) * dy) / len2).clamp(0.0, 1.0);
+      return distanceMm(p, Point2D(x: s.x + dx * t, y: s.y + dy * t));
+    }
+
+    for (var i = 0; i < a.length; i++) {
+      final a1 = a[i];
+      final a2 = a[(i + 1) % a.length];
+      for (var j = 0; j < b.length; j++) {
+        final b1 = b[j];
+        final b2 = b[(j + 1) % b.length];
+        if (segmentsIntersect(a1, a2, b1, b2) ||
+            pointToSegment(a1, b1, b2) <= limitMm ||
+            pointToSegment(a2, b1, b2) <= limitMm ||
+            pointToSegment(b1, a1, a2) <= limitMm ||
+            pointToSegment(b2, a1, a2) <= limitMm) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
   /// Euclidean distance between two points (mm).
   static double distanceMm(Point2D a, Point2D b) {
     final dx = b.x - a.x;
