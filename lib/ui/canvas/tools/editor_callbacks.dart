@@ -242,6 +242,11 @@ abstract class EditorCallbacks {
   /// Replace an existing heating circuit (same ID).
   void updateCircuit(HeatingCircuit circuit);
 
+  /// In-memory-only circuit update for a drag in progress (ADR-039).
+  /// Mutates editor state only; the committing [updateCircuit] at
+  /// `onDragEnd` persists.
+  void updateCircuitTransient(HeatingCircuit circuit);
+
   /// Remove a heating circuit by ID, persist the delete, and disconnect
   /// any zone whose [circuitId] matches.
   void removeCircuit(String circuitId);

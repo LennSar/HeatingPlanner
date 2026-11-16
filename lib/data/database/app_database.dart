@@ -65,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 19;
+  int get schemaVersion => 21;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -118,6 +118,30 @@ class AppDatabase extends _$AppDatabase {
             await m.database.customStatement(
               'ALTER TABLE rooms '
               'ADD COLUMN is_heated INTEGER NOT NULL DEFAULT 1',
+            );
+          }
+          // ADR-040 (v20): connection-pipe route and its three distances
+          // on `heating_circuits`, plus the insulation type (ADR-008),
+          // which was never persisted before. Existing circuits keep an
+          // empty centerline (two separately drawn pipes).
+          if (from < 20) {
+            for (final column in const [
+              'supply_pipe_insulation_type TEXT',
+              "centerline_path_json TEXT NOT NULL DEFAULT '[]'",
+              'pipe_spacing_mm INTEGER NOT NULL DEFAULT 100',
+              'zone_clearance_mm INTEGER NOT NULL DEFAULT 100',
+              'wall_clearance_mm INTEGER NOT NULL DEFAULT 100',
+            ]) {
+              await m.database.customStatement(
+                'ALTER TABLE heating_circuits ADD COLUMN $column',
+              );
+            }
+          }
+          // ADR-041 (v21): which side of the route the supply pipe runs.
+          if (from < 21) {
+            await m.database.customStatement(
+              'ALTER TABLE heating_circuits ADD COLUMN supply_on_right '
+              'INTEGER NOT NULL DEFAULT 0 CHECK (supply_on_right IN (0, 1))',
             );
           }
         },

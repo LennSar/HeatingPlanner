@@ -1613,6 +1613,18 @@ class EditorStateNotifier extends Notifier<EditorState>
     markProjectDirty();
   }
 
+  /// In-memory-only circuit update for a drag in progress (ADR-023).
+  ///
+  /// Mutates editor state only — no DB write, no dirty flag. The
+  /// committing [updateCircuit] at the end of the drag persists.
+  void updateCircuitTransient(HeatingCircuit circuit) {
+    state = state.copyWith(
+      circuits: state.circuits
+          .map((c) => c.id == circuit.id ? circuit : c)
+          .toList(),
+    );
+  }
+
   // ---- Distributor ----
 
   /// Set (or replace) the floor's distributor.

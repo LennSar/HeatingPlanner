@@ -153,7 +153,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get toolDistributor => 'Verteiler';
 
   @override
-  String get toolPipe => 'Rohr';
+  String get toolPipe => 'Anbindeleitungen';
 
   @override
   String get toolMeasure => 'Messen';
@@ -297,7 +297,7 @@ class AppLocalizationsDe extends AppLocalizations {
   String get menuPlaceDistributor => 'Verteiler platzieren';
 
   @override
-  String get menuRoutePipe => 'Rohr verlegen';
+  String get menuRoutePipe => 'Anbindeleitungen verlegen';
 
   @override
   String get menuHelp => 'Hilfe';
@@ -1256,6 +1256,47 @@ class AppLocalizationsDe extends AppLocalizations {
   String get undo_splitZone => 'Heizzone teilen';
 
   @override
+  String get undo_moveZoneBoundary => 'Zonengrenze verschieben';
+
+  @override
+  String get undo_drawConnectionPipe => 'Anbindeleitungen zeichnen';
+
+  @override
+  String get undo_editConnectionPipe => 'Anbindeleitung bearbeiten';
+
+  @override
+  String get circuit_routeMustEndInZoneToast =>
+      'Die Anbindeleitung muss in ihrer Heizzone enden.';
+
+  @override
+  String get route_doubleClickInZoneToast =>
+      'Zum Anschließen innerhalb einer Heizzone doppelklicken.';
+
+  @override
+  String get route_zoneAlreadyConnectedToast =>
+      'Diese Heizzone ist bereits angeschlossen.';
+
+  @override
+  String get connectionPipes => 'Anbindeleitungen';
+
+  @override
+  String get circuit_pipeSpacing => 'Abstand zwischen Vor- und Rücklauf';
+
+  @override
+  String get circuit_zoneClearance => 'Abstand zu Heizzonen';
+
+  @override
+  String get circuit_wallClearance => 'Abstand zu Wänden';
+
+  @override
+  String get circuit_swapSupplyReturn => 'Vor- und Rücklauf tauschen';
+
+  @override
+  String circuit_distanceRange(int min, int max) {
+    return '$min–$max mm';
+  }
+
+  @override
   String get zoneContextMenu_delete => 'Löschen';
 
   @override
@@ -1266,11 +1307,11 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get zoneContextMenu_splitDisabledTooltip =>
-      'Teilen ist nur für rechteckige Zonen verfügbar.';
+      'Die Form dieser Zone lässt sich nicht in zwei Hälften teilen.';
 
   @override
   String get zone_splitNonRectangularToast =>
-      'Teilen ist nur für rechteckige Zonen verfügbar.';
+      'Die Form dieser Zone lässt sich in dieser Richtung nicht in zwei Hälften teilen.';
 
   @override
   String get zone_splitTooSmallToast =>

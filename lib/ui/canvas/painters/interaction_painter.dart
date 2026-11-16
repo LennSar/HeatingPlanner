@@ -3,6 +3,7 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
+import '../../../calculation/engines/pipe_layout_engine.dart';
 import '../../../data/models/point2d.dart';
 import 'interaction_data.dart';
 
@@ -20,6 +21,7 @@ class InteractionPainter extends CustomPainter {
     this.interactionData,
     this.supplyPipeColor = const Color(0xFFEF4444),
     this.returnPipeColor = const Color(0xFF3B82F6),
+    this.routeBendRadiusMm = 80.0,
   });
 
   /// Current hover position in world coordinates, if any.
@@ -37,6 +39,10 @@ class InteractionPainter extends CustomPainter {
 
   /// Return pipe colour used when drawing a route ghost.
   final Color returnPipeColor;
+
+  /// Bend radius in mm applied to the corners of a connection pipe
+  /// while it is being drawn (ADR-039 Rule 3).
+  final double routeBendRadiusMm;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -135,6 +141,16 @@ class InteractionPainter extends CustomPainter {
           if (handles.isNotEmpty) {
             _drawWallHandles(canvas, handles, activeHandleIndex);
           }
+        case CircuitSelectionData(
+              :final supplyPoints,
+              :final returnPoints,
+              :final handles,
+              :final activeHandleIndex,
+            ):
+          _drawCircuitSelection(canvas, supplyPoints, returnPoints);
+          if (handles.isNotEmpty) {
+            _drawWallHandles(canvas, handles, activeHandleIndex);
+          }
         case ZoneSplitPreviewData(:final start, :final end):
           _drawZoneSplitPreview(
             canvas,
@@ -199,17 +215,17 @@ class InteractionPainter extends CustomPainter {
         case RoomMoveGhostData(:final wallLines, :final zonePolygons):
           _drawRoomMoveGhost(canvas, wallLines, zonePolygons);
         case RouteDrawData(
-              :final phase,
               :final supplyPoints,
               :final returnPoints,
+              :final waypoints,
               :final currentPoint,
               :final hoveredZoneAlreadyConnected,
             ):
           _drawRouteGhost(
             canvas,
-            phase,
             supplyPoints,
             returnPoints,
+            waypoints,
             currentPoint,
             hoveredZoneAlreadyConnected,
           );
@@ -1087,60 +1103,33 @@ class InteractionPainter extends CustomPainter {
 
   // ── Route drawing ghost ──────────────────────────────────
 
-  /// Draws the in-progress circuit route ghost.
-  ///
-  /// Renders:
-  ///  - committed supply waypoints as a solid [supplyPipeColor]
-  ///    polyline with directional arrows
-  ///  - committed return waypoints as a solid [returnPipeColor]
-  ///    polyline with directional arrows
-  ///  - a dashed ghost edge from the last committed point to
-  ///    the cursor in the active phase colour
-  ///  - small vertex dots at each waypoint
+  /// Draws the live preview of a pair of connection pipes being drawn
+  /// (ADR-040 Rule 5):
+  ///  - the supply pipe in [supplyPipeColor] and the return pipe in
+  ///    [returnPipeColor], both with bend radii and directional arrows,
+  ///    exactly as they would be committed at the cursor position
+  ///  - a dot at each placed route point
   ///  - an amber warning indicator when [hoveredZoneConnected]
   void _drawRouteGhost(
     Canvas canvas,
-    RoutePhase phase,
     List<Point2D> supplyPoints,
     List<Point2D> returnPoints,
+    List<Point2D> waypoints,
     Point2D? currentPoint,
     bool hoveredZoneConnected,
   ) {
-    // Committed supply path.
     if (supplyPoints.length >= 2) {
       _drawRoutePath(canvas, supplyPoints, supplyPipeColor);
     }
-
-    // Committed return path.
     if (returnPoints.length >= 2) {
       _drawRoutePath(canvas, returnPoints, returnPipeColor);
     }
 
-    // Ghost edge from the last committed point to cursor.
-    if (currentPoint != null) {
-      final isSupply = phase == RoutePhase.supply;
-      final activeColor =
-          isSupply ? supplyPipeColor : returnPipeColor;
-      final activePoints =
-          isSupply ? supplyPoints : returnPoints;
-      if (activePoints.isNotEmpty) {
-        final last = activePoints.last;
-        _drawDashedLine(
-          canvas,
-          Offset(last.x, last.y),
-          Offset(currentPoint.x, currentPoint.y),
-          Paint()
-            ..color = activeColor.withValues(alpha: 0.55)
-            ..strokeWidth = 3.0
-            ..style = PaintingStyle.stroke,
-          30.0,
-        );
-      }
-    }
-
-    // Waypoint dots.
-    _drawWaypointDots(canvas, supplyPoints, supplyPipeColor);
-    _drawWaypointDots(canvas, returnPoints, returnPipeColor);
+    _drawWaypointDots(
+      canvas,
+      waypoints,
+      selectionHighlightColor ?? Colors.blue,
+    );
 
     // Warning when zone already has a circuit.
     if (hoveredZoneConnected && currentPoint != null) {
@@ -1148,13 +1137,41 @@ class InteractionPainter extends CustomPainter {
     }
   }
 
-  /// Draws [points] as a solid polyline in [color] with
-  /// directional arrows every 500 mm.
+  /// Draws the corner polygon of a selected circuit (ADR-039 Rule 1):
+  /// a dashed line through the corner points of both connection pipes,
+  /// so the editable corners are visible next to the rounded pipe.
+  void _drawCircuitSelection(
+    Canvas canvas,
+    List<Point2D> supplyPoints,
+    List<Point2D> returnPoints,
+  ) {
+    final paint = Paint()
+      ..color = (selectionHighlightColor ?? Colors.blue)
+      ..strokeWidth = 4.0
+      ..style = PaintingStyle.stroke;
+    for (final points in [supplyPoints, returnPoints]) {
+      for (var i = 0; i + 1 < points.length; i++) {
+        _drawDashedLine(
+          canvas,
+          Offset(points[i].x, points[i].y),
+          Offset(points[i + 1].x, points[i + 1].y),
+          paint,
+          40.0,
+        );
+      }
+    }
+  }
+
+  /// Draws [corners] as a solid polyline in [color] with directional
+  /// arrows every 500 mm. Corners are rounded with [routeBendRadiusMm]
+  /// (ADR-039 Rule 3).
   void _drawRoutePath(
     Canvas canvas,
-    List<Point2D> points,
+    List<Point2D> corners,
     Color color,
   ) {
+    final points =
+        PipeLayoutEngine.filletPolyline(corners, routeBendRadiusMm);
     final paint = Paint()
       ..color = color
       ..strokeWidth = 3.0

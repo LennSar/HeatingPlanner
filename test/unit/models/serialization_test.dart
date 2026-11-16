@@ -108,47 +108,55 @@ void main() {
   // ── WallSegment ───────────────────────────────────────────────────────────
 
   group('WallSegment serialization', () {
-    test('round-trip: fully populated (all optionals set, mirrorId non-null)',
-        () {
-      const original = WallSegment(
-        id: 'wall-1',
-        roomId: 'room-1',
-        startPoint: Point2D(x: 0, y: 0),
-        endPoint: Point2D(x: 5000, y: 0),
-        wallType: WallType.interior,
-        constructionId: 'constr-1',
-        adjacentRoomId: 'room-2',
-        orientation: CardinalDirection.south,
-        mirrorId: 'wall-mirror-1',
-      );
+    test(
+      'round-trip: fully populated (all optionals set, mirrorId non-null)',
+      () {
+        const original = WallSegment(
+          id: 'wall-1',
+          roomId: 'room-1',
+          startPoint: Point2D(x: 0, y: 0),
+          endPoint: Point2D(x: 5000, y: 0),
+          wallType: WallType.interior,
+          constructionId: 'constr-1',
+          adjacentRoomId: 'room-2',
+          orientation: CardinalDirection.south,
+          mirrorId: 'wall-mirror-1',
+        );
 
-      final restored = WallSegment.fromJson(_fullRoundTrip(original.toJson()));
+        final restored = WallSegment.fromJson(
+          _fullRoundTrip(original.toJson()),
+        );
 
-      expect(restored, equals(original));
-      expect(restored.wallType, WallType.interior);
-      expect(restored.constructionId, 'constr-1');
-      expect(restored.adjacentRoomId, 'room-2');
-      // ADR-011: mirrorId must survive the JSON round-trip.
-      expect(restored.mirrorId, 'wall-mirror-1');
-    });
+        expect(restored, equals(original));
+        expect(restored.wallType, WallType.interior);
+        expect(restored.constructionId, 'constr-1');
+        expect(restored.adjacentRoomId, 'room-2');
+        // ADR-011: mirrorId must survive the JSON round-trip.
+        expect(restored.mirrorId, 'wall-mirror-1');
+      },
+    );
 
-    test('round-trip: minimal (no construction, no adjacent room, mirrorId null)',
-        () {
-      const original = WallSegment(
-        id: 'wall-min',
-        roomId: 'room-1',
-        startPoint: Point2D(x: 0, y: 0),
-        endPoint: Point2D(x: 3000, y: 0),
-      );
+    test(
+      'round-trip: minimal (no construction, no adjacent room, mirrorId null)',
+      () {
+        const original = WallSegment(
+          id: 'wall-min',
+          roomId: 'room-1',
+          startPoint: Point2D(x: 0, y: 0),
+          endPoint: Point2D(x: 3000, y: 0),
+        );
 
-      final restored = WallSegment.fromJson(_fullRoundTrip(original.toJson()));
+        final restored = WallSegment.fromJson(
+          _fullRoundTrip(original.toJson()),
+        );
 
-      expect(restored, equals(original));
-      expect(restored.constructionId, isNull);
-      expect(restored.adjacentRoomId, isNull);
-      // ADR-011: mirrorId must deserialize to null when absent.
-      expect(restored.mirrorId, isNull);
-    });
+        expect(restored, equals(original));
+        expect(restored.constructionId, isNull);
+        expect(restored.adjacentRoomId, isNull);
+        // ADR-011: mirrorId must deserialize to null when absent.
+        expect(restored.mirrorId, isNull);
+      },
+    );
   });
 
   // ── WindowElement ─────────────────────────────────────────────────────────
@@ -246,10 +254,7 @@ void main() {
     });
 
     test('round-trip: minimal (defaults: isPreset = false)', () {
-      const original = WallConstruction(
-        id: 'constr-min',
-        name: 'Simple Wall',
-      );
+      const original = WallConstruction(id: 'constr-min', name: 'Simple Wall');
 
       final restored = WallConstruction.fromJson(original.toJson());
 
@@ -333,26 +338,31 @@ void main() {
       expect(restored.customFlooringResistance, 0.05);
     });
 
-    test('round-trip: wall zone (wallSegmentId, heightMm, positionOnWallMm, widthMm set)', () {
-      const original = HeatingZone(
-        id: 'zone-wall',
-        roomId: 'room-1',
-        zoneType: ZoneType.wallHeating,
-        tubeTypeId: 'tube-1',
-        flooringMaterialId: 'floor-mat-1',
-        wallSegmentId: 'wall-1',
-        heightMm: 2400,
-        positionOnWallMm: 200.0,
-        widthMm: 3000,
-      );
+    test(
+      'round-trip: wall zone (wallSegmentId, heightMm, positionOnWallMm, widthMm set)',
+      () {
+        const original = HeatingZone(
+          id: 'zone-wall',
+          roomId: 'room-1',
+          zoneType: ZoneType.wallHeating,
+          tubeTypeId: 'tube-1',
+          flooringMaterialId: 'floor-mat-1',
+          wallSegmentId: 'wall-1',
+          heightMm: 2400,
+          positionOnWallMm: 200.0,
+          widthMm: 3000,
+        );
 
-      final restored = HeatingZone.fromJson(_fullRoundTrip(original.toJson()));
+        final restored = HeatingZone.fromJson(
+          _fullRoundTrip(original.toJson()),
+        );
 
-      expect(restored, equals(original));
-      expect(restored.zoneType, ZoneType.wallHeating);
-      expect(restored.wallSegmentId, 'wall-1');
-      expect(restored.heightMm, 2400);
-    });
+        expect(restored, equals(original));
+        expect(restored.zoneType, ZoneType.wallHeating);
+        expect(restored.wallSegmentId, 'wall-1');
+        expect(restored.heightMm, 2400);
+      },
+    );
 
     test('round-trip: minimal (required fields only)', () {
       const original = HeatingZone(
@@ -415,14 +425,8 @@ void main() {
         id: 'circuit-1',
         distributorId: 'dist-1',
         heatingZoneId: 'zone-1',
-        supplyRoutePath: [
-          Point2D(x: 500, y: 800),
-          Point2D(x: 1000, y: 800),
-        ],
-        returnRoutePath: [
-          Point2D(x: 1000, y: 800),
-          Point2D(x: 500, y: 800),
-        ],
+        supplyRoutePath: [Point2D(x: 500, y: 800), Point2D(x: 1000, y: 800)],
+        returnRoutePath: [Point2D(x: 1000, y: 800), Point2D(x: 500, y: 800)],
         tubeLengthM: 42.5,
         flowRateKgH: 18.3,
         pressureLossPa: 3200.0,
@@ -430,13 +434,60 @@ void main() {
         supplyPipeInsulationType: SupplyPipeInsulationType.corrugatedConduit,
       );
 
-      final restored =
-          HeatingCircuit.fromJson(_fullRoundTrip(original.toJson()));
+      final restored = HeatingCircuit.fromJson(
+        _fullRoundTrip(original.toJson()),
+      );
 
       expect(restored, equals(original));
       expect(restored.tubeLengthM, 42.5);
-      expect(restored.supplyPipeInsulationType,
-          SupplyPipeInsulationType.corrugatedConduit);
+      expect(
+        restored.supplyPipeInsulationType,
+        SupplyPipeInsulationType.corrugatedConduit,
+      );
+    });
+
+    test('round-trip: route and connection-pipe distances (ADR-040)', () {
+      const original = HeatingCircuit(
+        id: 'circuit-2',
+        distributorId: 'dist-1',
+        heatingZoneId: 'zone-1',
+        centerlinePath: [Point2D(x: 500, y: 800), Point2D(x: 1000, y: 800)],
+        pipeSpacingMm: 120,
+        zoneClearanceMm: 180,
+        wallClearanceMm: 60,
+        supplyOnRight: true,
+      );
+
+      final restored = HeatingCircuit.fromJson(
+        _fullRoundTrip(original.toJson()),
+      );
+
+      expect(restored, equals(original));
+    });
+
+    test('a file written before ADR-040 loads with the default distances '
+        'and no route', () {
+      final json =
+          _fullRoundTrip(
+              const HeatingCircuit(
+                id: 'circuit-old',
+                distributorId: 'dist-1',
+                heatingZoneId: 'zone-1',
+              ).toJson(),
+            )
+            ..remove('centerlinePath')
+            ..remove('pipeSpacingMm')
+            ..remove('zoneClearanceMm')
+            ..remove('wallClearanceMm')
+            ..remove('supplyOnRight');
+
+      final restored = HeatingCircuit.fromJson(json);
+
+      expect(restored.centerlinePath, isEmpty);
+      expect(restored.pipeSpacingMm, 100);
+      expect(restored.zoneClearanceMm, 100);
+      expect(restored.wallClearanceMm, 100);
+      expect(restored.supplyOnRight, isFalse);
     });
 
     test('round-trip: minimal (empty routes, insulation absent)', () {
@@ -471,7 +522,10 @@ void main() {
 
       expect(restored, equals(original));
       expect(restored.severity, WarningSeverity.error);
-      expect(restored.suggestedFix, 'Split the zone into two smaller circuits.');
+      expect(
+        restored.suggestedFix,
+        'Split the zone into two smaller circuits.',
+      );
     });
 
     test('round-trip: minimal (suggestedFix absent)', () {

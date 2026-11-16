@@ -175,9 +175,9 @@
   "@toolDistributor": {
     "description": "Toolbar tooltip for the distributor placement tool"
   },
-  "toolPipe": "Pipe",
+  "toolPipe": "Connection pipes",
   "@toolPipe": {
-    "description": "Toolbar tooltip for the pipe routing tool"
+    "description": "Toolbar label for the tool that draws the supply and return connection pipes from the distributor to a heating zone"
   },
   "toolMeasure": "Measure",
   "@toolMeasure": {
@@ -353,9 +353,9 @@
   "@menuPlaceDistributor": {
     "description": "Tools > Place Distributor menu item"
   },
-  "menuRoutePipe": "Route Pipe",
+  "menuRoutePipe": "Route Connection Pipes",
   "@menuRoutePipe": {
-    "description": "Tools > Route Pipe menu item"
+    "description": "Tools menu item for the tool that draws the supply and return connection pipes from the distributor to a heating zone"
   },
   "menuHelp": "Help",
   "@menuHelp": {
@@ -1047,7 +1047,31 @@
   "undo_createWallZone": "Create wall zone",
   "@undo_createWallZone": { "description": "Undo/redo label — creating a wall heating zone" },
   "undo_splitZone": "Split zone",
-  "@undo_splitZone": { "description": "Undo/redo label — splitting a rectangular heating zone (ADR-018)" },
+  "@undo_splitZone": { "description": "Undo/redo label — splitting a heating zone into two equal halves (ADR-018, ADR-037)" },
+  "undo_moveZoneBoundary": "Move zone boundary",
+  "@undo_moveZoneBoundary": { "description": "Undo/redo label — dragging an edge of a heating zone; zones sharing that edge follow (ADR-037 Rule 5)" },
+  "undo_drawConnectionPipe": "Draw connection pipes",
+  "@undo_drawConnectionPipe": { "description": "Undo/redo label — connecting a heating zone to the distributor with a newly drawn pair of connection pipes (ADR-042)" },
+  "undo_editConnectionPipe": "Edit connection pipe",
+  "@undo_editConnectionPipe": { "description": "Undo/redo label — dragging a corner or a section of a circuit's supply/return connection pipe (ADR-039)" },
+  "circuit_routeMustEndInZoneToast": "The connection pipe must end inside its heating zone.",
+  "@circuit_routeMustEndInZoneToast": { "description": "Transient toast shown when an edited connection pipe would no longer end inside the zone it serves (ADR-039 Rule 1)" },
+  "route_doubleClickInZoneToast": "Double-click inside a heating zone to connect the pipes.",
+  "@route_doubleClickInZoneToast": { "description": "Transient toast shown when the connection-pipe tool is double-clicked outside any heating zone (ADR-040 Rule 1)" },
+  "route_zoneAlreadyConnectedToast": "This heating zone is already connected.",
+  "@route_zoneAlreadyConnectedToast": { "description": "Transient toast shown when the connection-pipe tool is double-clicked in a zone that already has a circuit (ADR-040 Rule 1)" },
+  "connectionPipes": "Connection pipes",
+  "@connectionPipes": { "description": "Circuit properties — section label for the distances of the supply/return connection pipes (ADR-040)" },
+  "circuit_pipeSpacing": "Distance between supply and return",
+  "@circuit_pipeSpacing": { "description": "Circuit properties — centre-to-centre distance between the supply and the return connection pipe, in mm" },
+  "circuit_zoneClearance": "Distance to heating zones",
+  "@circuit_zoneClearance": { "description": "Circuit properties — distance kept between a connection pipe and the tubes of a heating zone it runs through, in mm" },
+  "circuit_wallClearance": "Distance to walls",
+  "@circuit_wallClearance": { "description": "Circuit properties — distance kept between the outer connection pipe and the face of a wall the route runs along, in mm" },
+  "circuit_swapSupplyReturn": "Swap supply and return",
+  "@circuit_swapSupplyReturn": { "description": "Circuit properties — button that swaps which connection pipe is the supply and which is the return; the zone's tube layout follows (ADR-041)" },
+  "circuit_distanceRange": "{min}–{max} mm",
+  "@circuit_distanceRange": { "description": "Validation message under a connection-pipe distance field", "placeholders": { "min": { "type": "int" }, "max": { "type": "int" } } },
 
   "zoneContextMenu_delete": "Delete",
   "@zoneContextMenu_delete": { "description": "Zone right-click context menu — delete item (ADR-018 Rule 9)" },
@@ -1055,10 +1079,10 @@
   "@zoneContextMenu_splitVertically": { "description": "Zone right-click context menu — split the rectangular zone with a vertical bisector (ADR-018)" },
   "zoneContextMenu_splitHorizontally": "Split horizontally",
   "@zoneContextMenu_splitHorizontally": { "description": "Zone right-click context menu — split the rectangular zone with a horizontal bisector (ADR-018)" },
-  "zoneContextMenu_splitDisabledTooltip": "Splitting is only available for rectangular zones.",
-  "@zoneContextMenu_splitDisabledTooltip": { "description": "Tooltip on the disabled split items when the right-clicked zone is non-rectangular (ADR-018 Rule 9)" },
-  "zone_splitNonRectangularToast": "Splitting is only available for rectangular zones.",
-  "@zone_splitNonRectangularToast": { "description": "Transient toast shown when the Zone tool double-click lands on a non-rectangular zone (ADR-018 Rule 1.1)" },
+  "zoneContextMenu_splitDisabledTooltip": "This zone's shape cannot be split into two halves.",
+  "@zoneContextMenu_splitDisabledTooltip": { "description": "Tooltip on the disabled split items when the right-clicked zone's shape cannot be cut into two pieces (ADR-037 Rule 1)" },
+  "zone_splitNonRectangularToast": "This zone's shape cannot be split into two halves in that direction.",
+  "@zone_splitNonRectangularToast": { "description": "Transient toast shown when a zone's shape cannot be cut into two pieces along the requested direction (ADR-037 Rule 1)" },
   "zone_splitTooSmallToast": "Zone too small to split (each half must be ≥ 100 mm).",
   "@zone_splitTooSmallToast": { "description": "Transient toast shown when a split would produce a half thinner than 100 mm (ADR-018 Rule 4)" },
 

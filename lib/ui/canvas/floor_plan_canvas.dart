@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:vector_math/vector_math_64.dart' show Vector3;
 
 import '../../calculation/engines/geometry_engine.dart';
+import '../../calculation/providers/pipe_layout_providers.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/id_generator.dart';
 import '../../data/models/distributor.dart';
@@ -393,6 +394,7 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
     _tools[DrawingTool.routePipe] = RouteDrawTool(
       callbacks: this,
       onStateChanged: onChanged,
+      undoRedo: undoRedo,
     );
     _tools[DrawingTool.measure] = MeasureTool(
       callbacks: this,
@@ -591,6 +593,11 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
   @override
   void commitCircuit(HeatingCircuit circuit) {
     ref.read(editorStateProvider.notifier).addCircuit(circuit);
+  }
+
+  @override
+  void updateCircuitTransient(HeatingCircuit circuit) {
+    ref.read(editorStateProvider.notifier).updateCircuitTransient(circuit);
   }
 
   @override
@@ -992,6 +999,16 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
     // dependencies change.
     final zoneStates = ref.watch(zoneColorStatesProvider);
 
+    // ADR-038 tube layout per zone (meander path + transit corridors).
+    final zoneLayouts = ref.watch(zonePipeLayoutsProvider);
+    // ADR-042 Rule 3: identity colour per zone.
+    final zoneColorIndices = ref.watch(zoneColorIndicesProvider);
+
+    // ADR-039 Rule 3: tube bend radius per zone, and the one used while a
+    // connection pipe is still being drawn.
+    final bendRadii = ref.watch(zoneBendRadiiMmProvider);
+    final defaultBendRadius = ref.watch(defaultBendRadiusMmProvider);
+
     // Watch selected tool to react to tool switches.
     ref.watch(selectedToolProvider);
 
@@ -1269,7 +1286,8 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
                     final lenM = idata.cumulativeLengthMm / 1000.0;
                     hint =
                         'Pipe length: '
-                        '${lenM.toStringAsFixed(1)} m';
+                        '${lenM.toStringAsFixed(1)} m — '
+                        'double-click inside a heating zone to connect';
                   } else if (idata is MeasureData) {
                     final lenMm = GeometryEngine.distanceMm(
                       idata.start,
@@ -1330,6 +1348,8 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
                               doors: editorState.doors,
                               zones: editorState.zones,
                               zoneStates: zoneStates,
+                              zoneLayouts: zoneLayouts,
+                              zoneColorIndices: zoneColorIndices,
                             ),
                           ),
                         ),
@@ -1340,6 +1360,9 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
                               transform: canvasState.transform,
                               colors: colors,
                               circuits: editorState.circuits,
+                              zones: editorState.zones,
+                              bendRadiiMm: bendRadii,
+                              defaultBendRadiusMm: defaultBendRadius,
                               distributor: editorState.distributor,
                             ),
                           ),
@@ -1391,6 +1414,7 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
                                   colors.selectionHighlight,
                               supplyPipeColor: colors.supplyPipe,
                               returnPipeColor: colors.returnPipe,
+                              routeBendRadiusMm: defaultBendRadius,
                             ),
                           ),
                         ),
@@ -1415,6 +1439,13 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
       if (st is SelectTool) {
         if (st.shouldUseRectCrosshair) {
           return SystemMouseCursors.precise;
+        }
+        // ADR-037 Rule 5: resize cursor across a draggable zone boundary.
+        final edgeNormal = st.zoneEdgeResizeNormal;
+        if (edgeNormal != null) {
+          return edgeNormal.x.abs() >= edgeNormal.y.abs()
+              ? SystemMouseCursors.resizeLeftRight
+              : SystemMouseCursors.resizeUpDown;
         }
         // ADR-016 / UI/UX §6.2: grab when hovering a room interior;
         // grabbing while the move drag is active.
@@ -1654,6 +1685,7 @@ class _InteractionLayerPainter extends CustomPainter {
     required this.selectionHighlightColor,
     required this.supplyPipeColor,
     required this.returnPipeColor,
+    required this.routeBendRadiusMm,
   }) : super(repaint: state);
 
   final Matrix4 transform;
@@ -1661,6 +1693,7 @@ class _InteractionLayerPainter extends CustomPainter {
   final Color selectionHighlightColor;
   final Color supplyPipeColor;
   final Color returnPipeColor;
+  final double routeBendRadiusMm;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1672,6 +1705,7 @@ class _InteractionLayerPainter extends CustomPainter {
       selectionHighlightColor: selectionHighlightColor,
       supplyPipeColor: supplyPipeColor,
       returnPipeColor: returnPipeColor,
+      routeBendRadiusMm: routeBendRadiusMm,
       interactionData: s.data,
     ).paint(canvas, size);
     canvas.restore();
@@ -1686,7 +1720,8 @@ class _InteractionLayerPainter extends CustomPainter {
         !identical(state, oldDelegate.state) ||
         selectionHighlightColor != oldDelegate.selectionHighlightColor ||
         supplyPipeColor != oldDelegate.supplyPipeColor ||
-        returnPipeColor != oldDelegate.returnPipeColor;
+        returnPipeColor != oldDelegate.returnPipeColor ||
+        routeBendRadiusMm != oldDelegate.routeBendRadiusMm;
   }
 }
 

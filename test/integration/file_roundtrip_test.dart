@@ -64,7 +64,9 @@ class _FakePathProvider extends PathProviderPlatform
 /// material table) instead of loading `assets/materials.json` via `rootBundle`,
 /// which does not resolve under the fake test clock.
 Future<void> _seedMaterialNoOp($db.AppDatabase db) async {
-  await db.into(db.materialEntries).insert(
+  await db
+      .into(db.materialEntries)
+      .insert(
         $db.MaterialEntriesCompanion.insert(
           id: 'builtin-stub',
           name: 'Stub',
@@ -93,8 +95,7 @@ void main() {
       db = $db.AppDatabase.forTesting(NativeDatabase.memory());
       seed = await createFullTestProject(db);
 
-      tempDir =
-          await Directory.systemTemp.createTemp('hsp_roundtrip_test_');
+      tempDir = await Directory.systemTemp.createTemp('hsp_roundtrip_test_');
       tempPath = '${tempDir.path}/export.hsp';
 
       container = ProviderContainer(
@@ -114,8 +115,11 @@ void main() {
       await container.read(saveStateProvider.notifier).saveAs(tempPath);
 
       final saveState = container.read(saveStateProvider);
-      expect(saveState.isDirty, isFalse,
-          reason: 'isDirty must be cleared after a successful export');
+      expect(
+        saveState.isDirty,
+        isFalse,
+        reason: 'isDirty must be cleared after a successful export',
+      );
       expect(saveState.lastExportedAt, isNotNull);
 
       final bytes = await File(tempPath).readAsBytes();
@@ -126,8 +130,11 @@ void main() {
       await container.read(saveStateProvider.notifier).saveAs(tempPath);
 
       final snapshot = await _decodeHsp(tempPath);
-      expect(snapshot.containsKey('version'), isTrue,
-          reason: 'snapshot must contain a "version" key');
+      expect(
+        snapshot.containsKey('version'),
+        isTrue,
+        reason: 'snapshot must contain a "version" key',
+      );
     });
 
     test('snapshot contains correct entity counts', () async {
@@ -135,16 +142,31 @@ void main() {
 
       final snapshot = await _decodeHsp(tempPath);
 
-      expect((snapshot['floors'] as List).length, equals(1),
-          reason: 'one floor expected');
-      expect((snapshot['rooms'] as List).length, equals(2),
-          reason: 'two rooms expected');
-      expect((snapshot['wallSegments'] as List).length, equals(8),
-          reason: 'eight wall segments expected (4 per room)');
-      expect((snapshot['heatingZones'] as List).length, equals(2),
-          reason: 'two heating zones expected');
-      expect((snapshot['heatingCircuits'] as List).length, equals(2),
-          reason: 'two heating circuits expected');
+      expect(
+        (snapshot['floors'] as List).length,
+        equals(1),
+        reason: 'one floor expected',
+      );
+      expect(
+        (snapshot['rooms'] as List).length,
+        equals(2),
+        reason: 'two rooms expected',
+      );
+      expect(
+        (snapshot['wallSegments'] as List).length,
+        equals(8),
+        reason: 'eight wall segments expected (4 per room)',
+      );
+      expect(
+        (snapshot['heatingZones'] as List).length,
+        equals(2),
+        reason: 'two heating zones expected',
+      );
+      expect(
+        (snapshot['heatingCircuits'] as List).length,
+        equals(2),
+        reason: 'two heating circuits expected',
+      );
     });
 
     test('re-imported project preserves entity values', () async {
@@ -175,8 +197,11 @@ void main() {
       // Polygon vertex count for each room (must be 4 for 5 m × 4 m rect)
       for (final r in rooms) {
         final polygon = jsonDecode(r.polygonJson) as List;
-        expect(polygon.length, equals(4),
-            reason: 'room "${r.name}" polygon must have 4 vertices');
+        expect(
+          polygon.length,
+          equals(4),
+          reason: 'room "${r.name}" polygon must have 4 vertices',
+        );
       }
 
       // Tube spacings
@@ -192,90 +217,164 @@ void main() {
       expect(dists.first.returnTempC, closeTo(28.0, 0.001));
     });
 
-    test('importing the same snapshot twice yields two separate projects',
-        () async {
+    test('connection-pipe route, distances and insulation type survive a '
+        'save and re-import (ADR-040)', () async {
+      // Give one seeded circuit a drawn route and non-default distances.
+      final source = (await db.select(db.heatingCircuits).get()).first;
+      const route = '[{"x":500.0,"y":500.0},{"x":2000.0,"y":500.0}]';
+      await (db.update(
+        db.heatingCircuits,
+      )..where((t) => t.id.equals(source.id))).write(
+        const $db.HeatingCircuitsCompanion(
+          centerlinePathJson: Value(route),
+          pipeSpacingMm: Value(140),
+          zoneClearanceMm: Value(220),
+          wallClearanceMm: Value(60),
+          supplyPipeInsulationType: Value('insulationLayer'),
+          supplyOnRight: Value(true),
+        ),
+      );
+
       await container.read(saveStateProvider.notifier).saveAs(tempPath);
       final snapshot = await _decodeHsp(tempPath);
 
       final db2 = $db.AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db2.close);
-
-      final id1 = await HspImporter(db2).importSnapshot(snapshot);
-      final id2 = await HspImporter(db2).importSnapshot(snapshot);
-
-      expect(id1, isNot(equals(id2)),
-          reason: 'each import must produce a unique project ID');
-
-      final projects = await db2.select(db2.projects).get();
-      expect(projects.length, equals(2),
-          reason: 'both imported projects must coexist in the database');
-    });
-
-    test('shared-wall mirrorId survives import (remapped, reciprocal)',
-        () async {
-      // Minimal snapshot: one floor, two adjacent rooms, and the ADR-001
-      // shared wall as two coincident segments cross-linked by mirrorId.
-      // Regression for the importer dropping mirrorId — which made GE-01
-      // mis-flag legitimate shared walls as overlapping after a reload.
-      Map<String, dynamic> wall(String id, String roomId, String mirror) => {
-            'id': id,
-            'roomId': roomId,
-            'startPoint': {'x': 0.0, 'y': 0.0},
-            'endPoint': {'x': 5000.0, 'y': 0.0},
-            'wallType': 'interior',
-            'thicknessMm': 120.0,
-            'anchorMode': 0,
-            'orientation': 'south',
-            'mirrorId': mirror,
-          };
-      final now = DateTime.now().toIso8601String();
-      final snapshot = <String, dynamic>{
-        'version': 1,
-        'project': {
-          'id': 'p1',
-          'name': 'Mirror Test',
-          'createdAt': now,
-          'modifiedAt': now,
-          'designOutdoorTempC': -12.0,
-          'defaultIndoorTempC': 20.0,
-        },
-        'floors': [
-          {'id': 'f1', 'projectId': 'p1', 'name': 'GF', 'level': 0,
-              'heightMm': 2600},
-        ],
-        'rooms': [
-          {'id': 'r1', 'floorId': 'f1', 'name': 'Living',
-              'targetTempC': 20.0, 'airChangeRate': 0.5, 'polygon': <dynamic>[]},
-          {'id': 'r2', 'floorId': 'f1', 'name': 'Hall',
-              'targetTempC': 20.0, 'airChangeRate': 0.5, 'polygon': <dynamic>[]},
-        ],
-        'wallSegments': [
-          wall('wa', 'r1', 'wb'),
-          wall('wb', 'r2', 'wa'),
-        ],
-      };
-
-      final db2 = $db.AppDatabase.forTesting(NativeDatabase.memory());
-      addTearDown(db2.close);
-
       await HspImporter(db2).importSnapshot(snapshot);
 
-      final walls = await db2.select(db2.wallSegments).get();
-      expect(walls.length, equals(2));
+      final circuits = await db2.select(db2.heatingCircuits).get();
+      final edited = circuits.firstWhere((c) => c.pipeSpacingMm == 140);
+      expect(jsonDecode(edited.centerlinePathJson), jsonDecode(route));
+      expect(edited.zoneClearanceMm, 220);
+      expect(edited.wallClearanceMm, 60);
+      expect(edited.supplyPipeInsulationType, 'insulationLayer');
+      expect(edited.supplyOnRight, isTrue);
 
-      // Both walls keep a mirror link, and the links point at each other's
-      // (remapped) ids — i.e. the reciprocal pair GE-01 recognises as valid.
-      final byId = {for (final w in walls) w.id: w};
-      for (final w in walls) {
-        expect(w.mirrorId, isNotNull,
-            reason: 'mirrorId must round-trip through import');
-        final partner = byId[w.mirrorId];
-        expect(partner, isNotNull,
-            reason: 'mirrorId must resolve to the imported partner wall');
-        expect(partner!.mirrorId, equals(w.id),
-            reason: 'the mirror link must be reciprocal');
-      }
+      // The untouched circuit keeps the defaults and no route.
+      final other = circuits.firstWhere((c) => c.id != edited.id);
+      expect(jsonDecode(other.centerlinePathJson), isEmpty);
+      expect(other.pipeSpacingMm, 100);
+      expect(other.supplyPipeInsulationType, isNull);
+      expect(other.supplyOnRight, isFalse);
     });
+
+    test(
+      'importing the same snapshot twice yields two separate projects',
+      () async {
+        await container.read(saveStateProvider.notifier).saveAs(tempPath);
+        final snapshot = await _decodeHsp(tempPath);
+
+        final db2 = $db.AppDatabase.forTesting(NativeDatabase.memory());
+        addTearDown(db2.close);
+
+        final id1 = await HspImporter(db2).importSnapshot(snapshot);
+        final id2 = await HspImporter(db2).importSnapshot(snapshot);
+
+        expect(
+          id1,
+          isNot(equals(id2)),
+          reason: 'each import must produce a unique project ID',
+        );
+
+        final projects = await db2.select(db2.projects).get();
+        expect(
+          projects.length,
+          equals(2),
+          reason: 'both imported projects must coexist in the database',
+        );
+      },
+    );
+
+    test(
+      'shared-wall mirrorId survives import (remapped, reciprocal)',
+      () async {
+        // Minimal snapshot: one floor, two adjacent rooms, and the ADR-001
+        // shared wall as two coincident segments cross-linked by mirrorId.
+        // Regression for the importer dropping mirrorId — which made GE-01
+        // mis-flag legitimate shared walls as overlapping after a reload.
+        Map<String, dynamic> wall(String id, String roomId, String mirror) => {
+          'id': id,
+          'roomId': roomId,
+          'startPoint': {'x': 0.0, 'y': 0.0},
+          'endPoint': {'x': 5000.0, 'y': 0.0},
+          'wallType': 'interior',
+          'thicknessMm': 120.0,
+          'anchorMode': 0,
+          'orientation': 'south',
+          'mirrorId': mirror,
+        };
+        final now = DateTime.now().toIso8601String();
+        final snapshot = <String, dynamic>{
+          'version': 1,
+          'project': {
+            'id': 'p1',
+            'name': 'Mirror Test',
+            'createdAt': now,
+            'modifiedAt': now,
+            'designOutdoorTempC': -12.0,
+            'defaultIndoorTempC': 20.0,
+          },
+          'floors': [
+            {
+              'id': 'f1',
+              'projectId': 'p1',
+              'name': 'GF',
+              'level': 0,
+              'heightMm': 2600,
+            },
+          ],
+          'rooms': [
+            {
+              'id': 'r1',
+              'floorId': 'f1',
+              'name': 'Living',
+              'targetTempC': 20.0,
+              'airChangeRate': 0.5,
+              'polygon': <dynamic>[],
+            },
+            {
+              'id': 'r2',
+              'floorId': 'f1',
+              'name': 'Hall',
+              'targetTempC': 20.0,
+              'airChangeRate': 0.5,
+              'polygon': <dynamic>[],
+            },
+          ],
+          'wallSegments': [wall('wa', 'r1', 'wb'), wall('wb', 'r2', 'wa')],
+        };
+
+        final db2 = $db.AppDatabase.forTesting(NativeDatabase.memory());
+        addTearDown(db2.close);
+
+        await HspImporter(db2).importSnapshot(snapshot);
+
+        final walls = await db2.select(db2.wallSegments).get();
+        expect(walls.length, equals(2));
+
+        // Both walls keep a mirror link, and the links point at each other's
+        // (remapped) ids — i.e. the reciprocal pair GE-01 recognises as valid.
+        final byId = {for (final w in walls) w.id: w};
+        for (final w in walls) {
+          expect(
+            w.mirrorId,
+            isNotNull,
+            reason: 'mirrorId must round-trip through import',
+          );
+          final partner = byId[w.mirrorId];
+          expect(
+            partner,
+            isNotNull,
+            reason: 'mirrorId must resolve to the imported partner wall',
+          );
+          expect(
+            partner!.mirrorId,
+            equals(w.id),
+            reason: 'the mirror link must be reciprocal',
+          );
+        }
+      },
+    );
   });
 
   // ── Session restore ─────────────────────────────────────────────────────────
@@ -292,13 +391,12 @@ void main() {
     late Directory tempDir;
 
     setUp(() async {
-      tempDir =
-          await Directory.systemTemp.createTemp('session_restore_test_');
+      tempDir = await Directory.systemTemp.createTemp('session_restore_test_');
       PathProviderPlatform.instance = _FakePathProvider(tempDir.path);
       SharedPreferencesAsyncPlatform.instance =
           InMemorySharedPreferencesAsync.withData({
-        'materialDbVersion': materialDbVersion,
-      });
+            'materialDbVersion': materialDbVersion,
+          });
     });
 
     tearDown(() async {
@@ -339,8 +437,9 @@ void main() {
       await tester.pump(const Duration(milliseconds: 500));
     }
 
-    testWidgets('routes to EditorScreen when a valid document path is stored',
-        (tester) async {
+    testWidgets('routes to EditorScreen when a valid document path is stored', (
+      tester,
+    ) async {
       // Intercept Flutter layout errors so that PropertiesPanel overflow does
       // not fail this routing test.
       final capturedErrors = <FlutterErrorDetails>[];
@@ -380,16 +479,13 @@ void main() {
       await cleanup(tester);
     });
 
-    testWidgets('routes to ProjectListScreen when no document path is stored',
-        (tester) async {
+    testWidgets('routes to ProjectListScreen when no document path is stored', (
+      tester,
+    ) async {
       final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
       addTearDown(db.close);
 
-      await bootApp(
-        tester,
-        db,
-        beforePump: () => _seedMaterialNoOp(db),
-      );
+      await bootApp(tester, db, beforePump: () => _seedMaterialNoOp(db));
 
       expect(
         find.byType(ProjectListScreen),
@@ -402,31 +498,34 @@ void main() {
     });
 
     testWidgets(
-        'routes to ProjectListScreen when the stored document file is missing',
-        (tester) async {
-      final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
-      addTearDown(db.close);
+      'routes to ProjectListScreen when the stored document file is missing',
+      (tester) async {
+        final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
+        addTearDown(db.close);
 
-      await bootApp(
-        tester,
-        db,
-        beforePump: () async {
-          await _seedMaterialNoOp(db);
-          // Path points at a file that does not exist.
-          await AppPreferences()
-              .setLastOpenedDocumentPath('${tempDir.path}/gone.hsp');
-        },
-      );
+        await bootApp(
+          tester,
+          db,
+          beforePump: () async {
+            await _seedMaterialNoOp(db);
+            // Path points at a file that does not exist.
+            await AppPreferences().setLastOpenedDocumentPath(
+              '${tempDir.path}/gone.hsp',
+            );
+          },
+        );
 
-      expect(
-        find.byType(ProjectListScreen),
-        findsOneWidget,
-        reason: 'ProjectListScreen must be shown when the stored document '
-            'file no longer exists',
-      );
+        expect(
+          find.byType(ProjectListScreen),
+          findsOneWidget,
+          reason:
+              'ProjectListScreen must be shown when the stored document '
+              'file no longer exists',
+        );
 
-      await cleanup(tester);
-    });
+        await cleanup(tester);
+      },
+    );
   });
 }
 

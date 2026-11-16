@@ -154,7 +154,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get toolDistributor => 'Distributor';
 
   @override
-  String get toolPipe => 'Pipe';
+  String get toolPipe => 'Connection pipes';
 
   @override
   String get toolMeasure => 'Measure';
@@ -298,7 +298,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get menuPlaceDistributor => 'Place Distributor';
 
   @override
-  String get menuRoutePipe => 'Route Pipe';
+  String get menuRoutePipe => 'Route Connection Pipes';
 
   @override
   String get menuHelp => 'Help';
@@ -1253,6 +1253,47 @@ class AppLocalizationsEn extends AppLocalizations {
   String get undo_splitZone => 'Split zone';
 
   @override
+  String get undo_moveZoneBoundary => 'Move zone boundary';
+
+  @override
+  String get undo_drawConnectionPipe => 'Draw connection pipes';
+
+  @override
+  String get undo_editConnectionPipe => 'Edit connection pipe';
+
+  @override
+  String get circuit_routeMustEndInZoneToast =>
+      'The connection pipe must end inside its heating zone.';
+
+  @override
+  String get route_doubleClickInZoneToast =>
+      'Double-click inside a heating zone to connect the pipes.';
+
+  @override
+  String get route_zoneAlreadyConnectedToast =>
+      'This heating zone is already connected.';
+
+  @override
+  String get connectionPipes => 'Connection pipes';
+
+  @override
+  String get circuit_pipeSpacing => 'Distance between supply and return';
+
+  @override
+  String get circuit_zoneClearance => 'Distance to heating zones';
+
+  @override
+  String get circuit_wallClearance => 'Distance to walls';
+
+  @override
+  String get circuit_swapSupplyReturn => 'Swap supply and return';
+
+  @override
+  String circuit_distanceRange(int min, int max) {
+    return '$min–$max mm';
+  }
+
+  @override
   String get zoneContextMenu_delete => 'Delete';
 
   @override
@@ -1263,11 +1304,11 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get zoneContextMenu_splitDisabledTooltip =>
-      'Splitting is only available for rectangular zones.';
+      'This zone\'s shape cannot be split into two halves.';
 
   @override
   String get zone_splitNonRectangularToast =>
-      'Splitting is only available for rectangular zones.';
+      'This zone\'s shape cannot be split into two halves in that direction.';
 
   @override
   String get zone_splitTooSmallToast =>

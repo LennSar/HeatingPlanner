@@ -313,6 +313,15 @@ class HspExporter {
         flowRateKgH: row.flowRateKgH,
         pressureLossPa: row.pressureLossPa,
         valveSetting: row.valveSetting,
+        supplyPipeInsulationType: row.supplyPipeInsulationType == null
+            ? null
+            : SupplyPipeInsulationType.values
+                .asNameMap()[row.supplyPipeInsulationType],
+        centerlinePath: _decodePoints(row.centerlinePathJson),
+        pipeSpacingMm: row.pipeSpacingMm,
+        zoneClearanceMm: row.zoneClearanceMm,
+        wallClearanceMm: row.wallClearanceMm,
+        supplyOnRight: row.supplyOnRight,
       ).toJson();
 
   // ── JSON helpers ───────────────────────────────────────────────────────────

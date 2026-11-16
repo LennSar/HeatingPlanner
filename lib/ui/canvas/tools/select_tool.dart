@@ -5,6 +5,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/services.dart';
 
 import '../../../calculation/engines/geometry_engine.dart';
+import '../../../calculation/providers/pipe_layout_providers.dart';
 import '../../../core/utils/geometry_utils.dart';
 import '../../../core/utils/id_generator.dart';
 import '../../../data/models/distributor.dart';
@@ -17,6 +18,7 @@ import '../../../data/models/room.dart';
 import '../../../data/models/wall_segment.dart';
 import '../../../data/models/window_element.dart';
 import '../painters/interaction_data.dart';
+import 'circuit_commands.dart';
 import 'editor_callbacks.dart';
 import 'snap_service.dart';
 import 'split_zone_command.dart';
@@ -277,6 +279,46 @@ class SelectTool extends CanvasTool {
   /// Zone snapshot captured at the start of a zone drag (for revert/undo).
   HeatingZone? _zoneAtDragStart;
 
+  // -- Connection pipe edit state (ADR-039 Rule 1) --
+
+  /// Circuit as it was before the drag — restored on cancel and kept
+  /// as the undo snapshot. Null when no pipe drag is armed.
+  HeatingCircuit? _circuitDragOriginal;
+
+  /// Circuit the drag offsets are applied to: [_circuitDragOriginal],
+  /// plus the corner inserted when a section next to the distributor
+  /// is grabbed.
+  HeatingCircuit? _circuitDragBase;
+
+  /// Route points that follow the pointer during the drag.
+  List<_RoutePointRef> _circuitDragTargets = const [];
+
+  /// World point where the pointer went down on the pipe.
+  Point2D? _circuitDragAnchor;
+
+  /// True once the pointer has moved past the drag threshold.
+  bool _circuitDragActive = false;
+
+  /// True when a single corner is dragged (snaps to the grid itself);
+  /// false when a section is translated (its offset snaps).
+  bool _circuitDragIsCorner = false;
+
+  // -- Zone edge drag state (linked boundary, ADR-037 Rule 5) --
+
+  /// Zones taking part in the active edge drag, captured at pointer-down
+  /// together with the polygon vertex indices that lie on the dragged
+  /// boundary line. Empty when no edge drag is armed.
+  List<({HeatingZone zone, List<int> indices})> _zoneEdgeDragParts =
+      const [];
+
+  /// Unit normal of the dragged boundary line (the only direction the
+  /// boundary moves in).
+  Point2D? _zoneEdgeDragNormal;
+
+  /// Unit normal of the zone boundary under the hovering pointer, or
+  /// null. Drives the resize cursor.
+  Point2D? _hoverZoneEdgeNormal;
+
   // -- Zone rect-reshape state (Ctrl + corner drag, ADR-013) --
 
   /// True when the current zone vertex drag is a rectangle reshape.
@@ -481,6 +523,13 @@ class SelectTool extends CanvasTool {
   /// §6.2). `grab` while hovering an unhandled room interior; flips to
   /// `grabbing` once the pointer is actively dragging the room.
   bool _hoverOnRoomInterior = false;
+
+  /// Unit normal of the draggable zone boundary under the pointer (or
+  /// of the boundary being dragged), or null when there is none
+  /// (ADR-037 Rule 5). The canvas shows a resize cursor along it.
+  Point2D? get zoneEdgeResizeNormal => _zoneEdgeDragParts.isNotEmpty
+      ? _zoneEdgeDragNormal
+      : _hoverZoneEdgeNormal;
 
   /// True when the room-move drag is active (past threshold). The
   /// canvas reads this to switch from "grab" to "grabbing".
@@ -809,6 +858,20 @@ class SelectTool extends CanvasTool {
       return;
     }
 
+    // ADR-039 Rule 1: a press on a corner or a section of the selected
+    // circuit's connection pipes drags it.
+    if (_tryBeginCircuitDrag(worldPoint)) {
+      onStateChanged();
+      return;
+    }
+
+    // ADR-037 Rule 5: a press on a zone boundary drags that boundary;
+    // every zone sharing it follows.
+    if (_tryBeginZoneEdgeDrag(worldPoint)) {
+      onStateChanged();
+      return;
+    }
+
     // Zone handle / fill hit-test (when a zone is selected).
     if (_selectedZone != null) {
       final zone = callbacks.currentZones
@@ -1099,6 +1162,24 @@ class SelectTool extends CanvasTool {
       return;
     }
 
+    // Connection pipe corner / section drag (ADR-039 Rule 1).
+    if (_circuitDragAnchor != null) {
+      if (!_circuitDragActive) {
+        final thresholdMm =
+            _zoneDragThresholdPx / callbacks.currentZoom;
+        if (GeometryEngine.distanceMm(worldPoint, _circuitDragAnchor!) >=
+            thresholdMm) {
+          _circuitDragActive = true;
+          _deferredTap = null; // definitely a drag
+        }
+      }
+      if (_circuitDragActive) {
+        _applyCircuitDrag(worldPoint);
+        onStateChanged();
+      }
+      return;
+    }
+
     // Wall zone handle drag.
     if (_wallZoneDragHandle != null) {
       _applyWallZoneDrag(worldPoint);
@@ -1121,7 +1202,9 @@ class SelectTool extends CanvasTool {
         }
       }
       if (_zoneDragActive) {
-        if (_zoneRectReshapeMode) {
+        if (_zoneEdgeDragParts.isNotEmpty) {
+          _applyZoneEdgeDrag(worldPoint);
+        } else if (_zoneRectReshapeMode) {
           // Ghost only — no state mutation until onDragEnd. Uses the
           // raw cursor for a responsive preview; the grid snap is
           // applied at commit (mirrors ADR-012 rect-reshape).
@@ -1252,6 +1335,27 @@ class SelectTool extends CanvasTool {
       return;
     }
 
+    // Connection pipe drag end (ADR-039 Rule 1).
+    if (_circuitDragAnchor != null) {
+      if (_circuitDragActive) {
+        _commitCircuitDrag();
+      } else if (_deferredTap != null) {
+        // Stayed under the drag threshold — treat as a click.
+        final tap = _deferredTap!;
+        _clearCircuitDragState();
+        _deferredTap = null;
+        _zonePointerOnZone = false;
+        _doTap(tap.point, tap.kind);
+        onStateChanged();
+        return;
+      }
+      _clearCircuitDragState();
+      _deferredTap = null;
+      _zonePointerOnZone = false;
+      onStateChanged();
+      return;
+    }
+
     // Wall zone handle drag end.
     if (_wallZoneDragHandle != null) {
       _commitWallZoneDrag();
@@ -1263,7 +1367,9 @@ class SelectTool extends CanvasTool {
     // Zone drag end.
     if (_zoneDragAnchorPoint != null) {
       if (_zoneDragActive) {
-        if (_zoneRectReshapeMode) {
+        if (_zoneEdgeDragParts.isNotEmpty) {
+          _commitZoneEdgeDrag();
+        } else if (_zoneRectReshapeMode) {
           _commitZoneRectReshape(worldPoint);
         } else {
           _commitZoneDrag();
@@ -1472,7 +1578,18 @@ class SelectTool extends CanvasTool {
     final wasOnRoom = _hoverOnRoomInterior;
     final onRoom = _isRoomInteriorHit(worldPoint);
     _hoverOnRoomInterior = onRoom;
-    if (wasHover != hovering || wasOnRoom != onRoom) onStateChanged();
+
+    // ADR-037 Rule 5: resize cursor over a draggable zone boundary.
+    final wasEdge = _hoverZoneEdgeNormal;
+    _hoverZoneEdgeNormal = _zoneDragAnchorPoint == null
+        ? _zoneEdgeDragCandidate(worldPoint)?.normal
+        : null;
+
+    if (wasHover != hovering ||
+        wasOnRoom != onRoom ||
+        wasEdge != _hoverZoneEdgeNormal) {
+      onStateChanged();
+    }
   }
 
   @override
@@ -1485,6 +1602,8 @@ class SelectTool extends CanvasTool {
     if (_dragHandle != null) _clearDragState();
     if (_openingDragHandle != null) _clearOpeningDragState();
     if (_wallZoneDragHandle != null) _clearWallZoneDragState();
+    // ADR-039: same for an armed-but-undragged pipe grab.
+    if (_circuitDragAnchor != null) _clearCircuitDragState();
     // ADR-034: drop an armed-but-undragged group grab so it can't leak.
     if (_groupDragAnchor != null && !_groupDragActive) {
       _clearGroupDragState();
@@ -1527,6 +1646,20 @@ class SelectTool extends CanvasTool {
       return;
     }
 
+    // Revert connection pipe drag (transient only — nothing persisted).
+    if (_circuitDragAnchor != null) {
+      final original = _circuitDragOriginal;
+      if (original != null) {
+        callbacks.updateCircuitTransient(original);
+        _selectedCircuit = original;
+      }
+      _clearCircuitDragState();
+      _deferredTap = null;
+      _zonePointerOnZone = false;
+      onStateChanged();
+      return;
+    }
+
     // Revert wall zone drag.
     if (_wallZoneDragHandle != null) {
       if (_zoneAtDragStart != null) {
@@ -1540,6 +1673,7 @@ class SelectTool extends CanvasTool {
 
     // Revert zone drag.
     if (_zoneDragAnchorPoint != null) {
+      if (_zoneEdgeDragParts.isNotEmpty) _revertZoneEdgeDrag();
       if (_zoneAtDragStart != null) {
         callbacks.updateZoneTransient(_zoneAtDragStart!);
         _selectedZone = _zoneAtDragStart;
@@ -1656,8 +1790,29 @@ class SelectTool extends CanvasTool {
       );
     }
 
-    // Circuit selection — no handles needed.
-    if (_selectedCircuit != null) return null;
+    // Circuit selection: corner polygon + corner handles (ADR-039).
+    if (_selectedCircuit != null) {
+      final circuit = _currentSelectedCircuit();
+      if (circuit == null) return null;
+      final handles = _circuitHandles(circuit);
+      int? active;
+      if (_circuitDragActive && _circuitDragIsCorner) {
+        final target = _circuitDragTargets.first;
+        final idx = handles.indexWhere(
+          (h) => h.supply == target.supply && h.index == target.index,
+        );
+        if (idx >= 0) active = idx;
+      }
+      return CircuitSelectionData(
+        supplyPoints: _leadPath(circuit),
+        returnPoints:
+            _hasRoute(circuit) ? const [] : circuit.returnRoutePath,
+        handles: [
+          for (final h in handles) _routePoint(circuit, h),
+        ],
+        activeHandleIndex: active,
+      );
+    }
 
     // Opening selection takes priority over everything.
     if (_selectedWindow != null || _selectedDoor != null) {
@@ -1909,6 +2064,546 @@ class SelectTool extends CanvasTool {
     _zoneRectReshapeMode = false;
     _zoneRectAnchor = null;
     _zoneRectCursor = null;
+    _zoneEdgeDragParts = const [];
+    _zoneEdgeDragNormal = null;
+  }
+
+  // ================================================================
+  // Connection pipe editing (ADR-039 Rule 1)
+  // ================================================================
+
+  /// The selected circuit as it currently is in editor state, or null
+  /// when it no longer exists.
+  HeatingCircuit? _currentSelectedCircuit() {
+    final id = _selectedCircuit?.id;
+    if (id == null) return null;
+    return callbacks.currentCircuits.where((c) => c.id == id).firstOrNull;
+  }
+
+  /// True when [c] was drawn as one route with a derived pipe pair
+  /// (ADR-040). Its route — not the two pipes — is what gets edited; a
+  /// [_RoutePointRef] with `supply: true` then addresses the route.
+  static bool _hasRoute(HeatingCircuit c) => c.centerlinePath.length >= 2;
+
+  /// The polyline a `supply: true` reference addresses on [c].
+  static List<Point2D> _leadPath(HeatingCircuit c) =>
+      _hasRoute(c) ? c.centerlinePath : c.supplyRoutePath;
+
+  static Point2D _routePoint(HeatingCircuit c, _RoutePointRef ref) =>
+      ref.supply ? _leadPath(c)[ref.index] : c.returnRoutePath[ref.index];
+
+  /// True when the supply pipe ends where the return pipe starts — the
+  /// turning point inside the zone, which both pipes share.
+  static bool _sharesZoneEnd(HeatingCircuit c) =>
+      !_hasRoute(c) &&
+      c.supplyRoutePath.isNotEmpty &&
+      c.returnRoutePath.isNotEmpty &&
+      GeometryEngine.distanceMm(
+            c.supplyRoutePath.last,
+            c.returnRoutePath.first,
+          ) <=
+          1.0;
+
+  /// Draggable corners of [c]. The supply start and the return end sit
+  /// on the distributor and are fixed. The shared zone end appears once
+  /// (as the last supply point).
+  static List<_RoutePointRef> _circuitHandles(HeatingCircuit c) {
+    if (_hasRoute(c)) {
+      return [
+        for (var i = 1; i < c.centerlinePath.length; i++)
+          (supply: true, index: i),
+      ];
+    }
+    final shared = _sharesZoneEnd(c);
+    return [
+      for (var i = 1; i < c.supplyRoutePath.length; i++)
+        (supply: true, index: i),
+      for (var i = shared ? 1 : 0; i < c.returnRoutePath.length - 1; i++)
+        (supply: false, index: i),
+    ];
+  }
+
+  /// Arms a corner or section drag on the selected circuit when
+  /// [worldPoint] is on one of its handles or pipes.
+  bool _tryBeginCircuitDrag(Point2D worldPoint) {
+    final circuit = _currentSelectedCircuit();
+    if (circuit == null) return false;
+    _selectedCircuit = circuit;
+    final shared = _sharesZoneEnd(circuit);
+    final zoom = callbacks.currentZoom;
+    final handleMm =
+        zoom > 0 ? _handleHitRadiusPx / zoom : _handleRadiusMm;
+
+    // 1. Corner handle.
+    for (final h in _circuitHandles(circuit)) {
+      if (GeometryEngine.distanceMm(worldPoint, _routePoint(circuit, h)) >
+          handleMm) {
+        continue;
+      }
+      final isZoneEnd = shared &&
+          h.supply &&
+          h.index == _leadPath(circuit).length - 1;
+      _circuitDragOriginal = circuit;
+      _circuitDragBase = circuit;
+      _circuitDragTargets = [
+        h,
+        if (isZoneEnd) (supply: false, index: 0),
+      ];
+      _circuitDragIsCorner = true;
+      _circuitDragAnchor = worldPoint;
+      _circuitDragActive = false;
+      _zonePointerOnZone = true; // defer the tap
+      return true;
+    }
+
+    // 2. Section (the nearest segment within the pipe hit band).
+    ({bool supply, int index})? segment;
+    var best = _circuitHitThresholdMm;
+    void scan(List<Point2D> path, {required bool supply}) {
+      for (var i = 0; i + 1 < path.length; i++) {
+        final d = _distanceToSegmentMm(worldPoint, path[i], path[i + 1]);
+        if (d <= best) {
+          best = d;
+          segment = (supply: supply, index: i);
+        }
+      }
+    }
+
+    final hasRoute = _hasRoute(circuit);
+    scan(_leadPath(circuit), supply: true);
+    if (hasRoute) {
+      // The two pipes run either side of the route; a press on either
+      // of them grabs the route section it belongs to.
+      final onPipe = _polylineHit(circuit.supplyRoutePath, worldPoint) ||
+          _polylineHit(circuit.returnRoutePath, worldPoint);
+      if (!onPipe) segment = null;
+    } else {
+      scan(circuit.returnRoutePath, supply: false);
+    }
+    final seg = segment;
+    if (seg == null) return false;
+
+    var supply = List<Point2D>.from(_leadPath(circuit));
+    var back = List<Point2D>.from(circuit.returnRoutePath);
+    var first = seg.index;
+    // An end on the distributor stays put: grabbing the section next to
+    // it inserts a corner there, so the section can still be moved.
+    if (seg.supply && first == 0) {
+      supply = [supply.first, ...supply];
+      first = 1;
+    } else if (!seg.supply && first == back.length - 2) {
+      back = [...back, back.last];
+    }
+    final targets = <_RoutePointRef>[
+      (supply: seg.supply, index: first),
+      (supply: seg.supply, index: first + 1),
+    ];
+    // The shared zone end moves on both pipes.
+    if (shared) {
+      if (seg.supply && first + 1 == supply.length - 1) {
+        targets.add((supply: false, index: 0));
+      } else if (!seg.supply && first == 0) {
+        targets.add((supply: true, index: supply.length - 1));
+      }
+    }
+
+    _circuitDragOriginal = circuit;
+    _circuitDragBase = hasRoute
+        ? circuit.copyWith(centerlinePath: supply)
+        : circuit.copyWith(
+            supplyRoutePath: supply,
+            returnRoutePath: back,
+          );
+    _circuitDragTargets = targets;
+    _circuitDragIsCorner = false;
+    _circuitDragAnchor = worldPoint;
+    _circuitDragActive = false;
+    _zonePointerOnZone = true; // defer the tap
+    return true;
+  }
+
+  /// Moves the dragged corner or section to follow [worldPoint].
+  ///
+  /// A corner snaps to the grid; a section keeps its shape and its
+  /// offset is chosen so its first point lands on the grid.
+  void _applyCircuitDrag(Point2D worldPoint) {
+    final base = _circuitDragBase;
+    final anchor = _circuitDragAnchor;
+    if (base == null || anchor == null || _circuitDragTargets.isEmpty) {
+      return;
+    }
+    final grid = callbacks.currentGridSpacingMm;
+    final lead = _routePoint(base, _circuitDragTargets.first);
+    final Point2D snapped;
+    if (_circuitDragIsCorner) {
+      snapped = SnapService.snapToGrid(worldPoint, grid);
+    } else {
+      snapped = SnapService.snapToGrid(
+        Point2D(
+          x: lead.x + worldPoint.x - anchor.x,
+          y: lead.y + worldPoint.y - anchor.y,
+        ),
+        grid,
+      );
+    }
+    final dx = snapped.x - lead.x;
+    final dy = snapped.y - lead.y;
+
+    final supply = List<Point2D>.from(_leadPath(base));
+    final back = List<Point2D>.from(base.returnRoutePath);
+    for (final t in _circuitDragTargets) {
+      final list = t.supply ? supply : back;
+      list[t.index] =
+          Point2D(x: list[t.index].x + dx, y: list[t.index].y + dy);
+    }
+    // ADR-040: a route is laid out again on every move — both pipes
+    // follow, parallel and at the set distance from walls.
+    final updated = _hasRoute(base)
+        ? relaidConnectionPipes(
+            base,
+            callbacks.currentWalls,
+            centerline: supply,
+          )
+        : base.copyWith(
+            supplyRoutePath: supply,
+            returnRoutePath: back,
+          );
+    callbacks.updateCircuitTransient(updated);
+    _selectedCircuit = updated;
+  }
+
+  /// Validates and commits the pipe drag as one undo entry.
+  ///
+  /// Points that ended up on top of their neighbour are merged — that
+  /// is also how a corner is removed. The pipe must still end inside
+  /// the zone it serves; otherwise the drag is reverted with a toast.
+  void _commitCircuitDrag() {
+    final original = _circuitDragOriginal;
+    final dragged = _currentSelectedCircuit();
+    if (original == null || dragged == null) return;
+
+    List<Point2D> dedupe(List<Point2D> path) {
+      final out = <Point2D>[];
+      for (final p in path) {
+        if (out.isEmpty || GeometryEngine.distanceMm(out.last, p) > 1.0) {
+          out.add(p);
+        }
+      }
+      return out.length >= 2 ? out : path;
+    }
+
+    // A route was already laid out (and de-duplicated) during the drag.
+    final result = _hasRoute(dragged)
+        ? dragged
+        : dragged.copyWith(
+            supplyRoutePath: dedupe(dragged.supplyRoutePath),
+            returnRoutePath: dedupe(dragged.returnRoutePath),
+          );
+    final zoneEnd = _leadPath(result);
+
+    final zone = callbacks.currentZones
+        .where((z) => z.id == result.heatingZoneId)
+        .firstOrNull;
+    final endsInZone = zone == null ||
+        zone.polygon.length < 3 ||
+        zoneEnd.isEmpty ||
+        GeometryEngine.isPointInPolygon(zoneEnd.last, zone.polygon);
+    if (!endsInZone) {
+      callbacks.updateCircuitTransient(original);
+      _selectedCircuit = original;
+      callbacks.showToast(callbacks.l10n.circuit_routeMustEndInZoneToast);
+      return;
+    }
+
+    if (result == original) {
+      callbacks.updateCircuitTransient(original);
+      _selectedCircuit = original;
+      return;
+    }
+    undoRedo.execute(UpdateCircuitCommand(
+      oldCircuit: original,
+      newCircuit: result,
+      update: callbacks.updateCircuit,
+      label: callbacks.l10n.undo_editConnectionPipe,
+    ));
+    _selectedCircuit = result;
+  }
+
+  void _clearCircuitDragState() {
+    _circuitDragOriginal = null;
+    _circuitDragBase = null;
+    _circuitDragTargets = const [];
+    _circuitDragAnchor = null;
+    _circuitDragActive = false;
+    _circuitDragIsCorner = false;
+  }
+
+  // ================================================================
+  // Zone edge drag — linked boundaries (ADR-037 Rule 5)
+  // ================================================================
+
+  /// Finds the zone boundary a press at [worldPoint] would drag.
+  ///
+  /// A boundary is the maximal straight line made of overlapping,
+  /// collinear floor-zone edges — so the divider between a full-height
+  /// zone and two stacked neighbours is one boundary. It is draggable
+  /// when it is shared by two or more zones (no selection needed), or
+  /// when it is an edge of the currently selected zone.
+  ///
+  /// Returns the unit [normal] of the boundary and, per affected zone,
+  /// the vertex indices that lie on it; null when nothing qualifies or
+  /// another handle has priority at this point.
+  ({
+    Point2D normal,
+    List<({HeatingZone zone, List<int> indices})> parts,
+  })? _zoneEdgeDragCandidate(Point2D worldPoint) {
+    final zoom = callbacks.currentZoom;
+    final thresholdMm =
+        zoom > 0 ? _handleHitRadiusPx / zoom : _handleRadiusMm;
+
+    // Priority: vertex handles of the selected zone, handles of the
+    // selected wall, the selected distributor and a multi-wall group
+    // all win over a boundary drag.
+    if (_selectedWindow != null || _selectedDoor != null) return null;
+    if (_selectedZone != null && _hitTestZoneHandle(worldPoint) != null) {
+      return null;
+    }
+    if (_selectedWall != null && _hitTestHandle(worldPoint) != null) {
+      return null;
+    }
+    if (_selectedDistributor) {
+      final d = callbacks.currentDistributor;
+      if (d != null && _isPointOnDistributor(worldPoint, d)) return null;
+    }
+    if (_multiWalls.length >= 2 && _isPointOnAnyGroupWall(worldPoint)) {
+      return null;
+    }
+
+    final zones = callbacks.currentZones
+        .where(
+          (z) =>
+              z.zoneType == ZoneType.floorHeating && z.polygon.length >= 3,
+        )
+        .toList();
+
+    // Nearest zone edge under the pointer.
+    Point2D? a;
+    Point2D? b;
+    var bestDist = thresholdMm;
+    for (final z in zones) {
+      final n = z.polygon.length;
+      for (var i = 0; i < n; i++) {
+        final p = z.polygon[i];
+        final q = z.polygon[(i + 1) % n];
+        final d = _distanceToSegmentMm(worldPoint, p, q);
+        if (d <= bestDist) {
+          bestDist = d;
+          a = p;
+          b = q;
+        }
+      }
+    }
+    if (a == null || b == null) return null;
+
+    final len = GeometryEngine.distanceMm(a, b);
+    if (len < 1.0) return null;
+    final ux = (b.x - a.x) / len;
+    final uy = (b.y - a.y) / len;
+    const tol = 1.0;
+    double along(Point2D p) => (p.x - a!.x) * ux + (p.y - a.y) * uy;
+    double across(Point2D p) => (p.x - a!.x) * -uy + (p.y - a.y) * ux;
+
+    // Grow the boundary over every collinear zone edge that overlaps it.
+    var lo = 0.0;
+    var hi = len;
+    var grew = true;
+    while (grew) {
+      grew = false;
+      for (final z in zones) {
+        final n = z.polygon.length;
+        for (var i = 0; i < n; i++) {
+          final p = z.polygon[i];
+          final q = z.polygon[(i + 1) % n];
+          if (across(p).abs() > tol || across(q).abs() > tol) continue;
+          final e0 = math.min(along(p), along(q));
+          final e1 = math.max(along(p), along(q));
+          if (math.min(e1, hi) - math.max(e0, lo) <= tol) continue;
+          if (e0 < lo - tol) {
+            lo = e0;
+            grew = true;
+          }
+          if (e1 > hi + tol) {
+            hi = e1;
+            grew = true;
+          }
+        }
+      }
+    }
+
+    // Vertices on the boundary, per zone. A zone that only touches the
+    // boundary with a single corner is not part of it.
+    final parts = <({HeatingZone zone, List<int> indices})>[];
+    for (final z in zones) {
+      final indices = <int>[
+        for (var i = 0; i < z.polygon.length; i++)
+          if (across(z.polygon[i]).abs() <= tol &&
+              along(z.polygon[i]) >= lo - tol &&
+              along(z.polygon[i]) <= hi + tol)
+            i,
+      ];
+      if (indices.length >= 2) parts.add((zone: z, indices: indices));
+    }
+    if (parts.isEmpty) return null;
+    final involvesSelected = _selectedZone != null &&
+        parts.any((p) => p.zone.id == _selectedZone!.id);
+    if (parts.length < 2 && !involvesSelected) return null;
+
+    return (normal: Point2D(x: -uy, y: ux), parts: parts);
+  }
+
+  /// Arms a boundary drag when [worldPoint] is on a draggable zone
+  /// boundary. The tap is deferred exactly like a zone-body press, so a
+  /// press without movement still selects.
+  bool _tryBeginZoneEdgeDrag(Point2D worldPoint) {
+    final hit = _zoneEdgeDragCandidate(worldPoint);
+    if (hit == null) return false;
+    _zoneEdgeDragParts = hit.parts;
+    _zoneEdgeDragNormal = hit.normal;
+    _zoneHandleDragIndex = null;
+    _zoneDragAnchorPoint = worldPoint;
+    _zoneAtDragStart = null;
+    _zoneRectReshapeMode = false;
+    _zonePointerOnZone = true;
+    return true;
+  }
+
+  /// Moves the dragged boundary to follow [worldPoint] along its normal.
+  ///
+  /// An axis-aligned boundary snaps to the grid. Every zone on the
+  /// boundary is reshaped together, so growing one zone shrinks its
+  /// neighbour by the same amount. A position that would invert a zone,
+  /// leave an edge shorter than 100 mm or push a vertex out of its valid
+  /// rooms (ADR-006) is ignored — the boundary stays at its last valid
+  /// position.
+  void _applyZoneEdgeDrag(Point2D worldPoint) {
+    final normal = _zoneEdgeDragNormal;
+    final anchor = _zoneDragAnchorPoint;
+    if (normal == null || anchor == null || _zoneEdgeDragParts.isEmpty) {
+      return;
+    }
+    var shift = (worldPoint.x - anchor.x) * normal.x +
+        (worldPoint.y - anchor.y) * normal.y;
+
+    final first = _zoneEdgeDragParts.first;
+    final onLine = first.zone.polygon[first.indices.first];
+    final axisAligned = normal.x.abs() < 1e-6 || normal.y.abs() < 1e-6;
+    if (axisAligned) {
+      final moved = Point2D(
+        x: onLine.x + normal.x * shift,
+        y: onLine.y + normal.y * shift,
+      );
+      final snapped = SnapService.snapToGrid(
+        moved,
+        callbacks.currentGridSpacingMm,
+      );
+      shift = (snapped.x - onLine.x) * normal.x +
+          (snapped.y - onLine.y) * normal.y;
+    }
+
+    final updated = <HeatingZone>[];
+    for (final part in _zoneEdgeDragParts) {
+      final polygon = List<Point2D>.from(part.zone.polygon);
+      for (final i in part.indices) {
+        polygon[i] = Point2D(
+          x: polygon[i].x + normal.x * shift,
+          y: polygon[i].y + normal.y * shift,
+        );
+      }
+      if (!_isZoneEdgeDragResultValid(part.zone, polygon)) return;
+      updated.add(part.zone.copyWith(polygon: polygon));
+    }
+    for (final zone in updated) {
+      callbacks.updateZoneTransient(zone);
+      if (_selectedZone?.id == zone.id) _selectedZone = zone;
+    }
+  }
+
+  /// Whether [polygon] is an acceptable new shape for [original] during
+  /// a boundary drag.
+  bool _isZoneEdgeDragResultValid(
+    HeatingZone original,
+    List<Point2D> polygon,
+  ) {
+    double signedArea(List<Point2D> pts) {
+      var sum = 0.0;
+      for (var i = 0; i < pts.length; i++) {
+        final p = pts[i];
+        final q = pts[(i + 1) % pts.length];
+        sum += p.x * q.y - q.x * p.y;
+      }
+      return sum;
+    }
+
+    final before = signedArea(original.polygon);
+    final after = signedArea(polygon);
+    if (before * after <= 0) return false;
+    for (var i = 0; i < polygon.length; i++) {
+      final len = GeometryEngine.distanceMm(
+        polygon[i],
+        polygon[(i + 1) % polygon.length],
+      );
+      if (len < _minLengthMm) return false;
+    }
+    if (!GeometryEngine.isSimplePolygon(polygon)) return false;
+    return polygon.every((v) => _isZonePointValid(v, original));
+  }
+
+  /// Commits the boundary drag as one undo entry covering every zone
+  /// that changed.
+  void _commitZoneEdgeDrag() {
+    final oldZones = <HeatingZone>[];
+    final newZones = <HeatingZone>[];
+    for (final part in _zoneEdgeDragParts) {
+      final current = callbacks.currentZones
+          .where((z) => z.id == part.zone.id)
+          .firstOrNull;
+      if (current == null || current == part.zone) continue;
+      oldZones.add(part.zone);
+      newZones.add(current);
+    }
+    if (newZones.isEmpty) return;
+    undoRedo.execute(_MoveZonesCommand(
+      oldZones: oldZones,
+      newZones: newZones,
+      update: callbacks.updateZone,
+      label: callbacks.l10n.undo_moveZoneBoundary,
+    ));
+    for (final zone in newZones) {
+      if (_selectedZone?.id == zone.id) _selectedZone = zone;
+    }
+  }
+
+  /// Restores every zone of the boundary drag to its pre-drag shape.
+  /// The drag only wrote transient state, so no persist is needed.
+  void _revertZoneEdgeDrag() {
+    for (final part in _zoneEdgeDragParts) {
+      callbacks.updateZoneTransient(part.zone);
+      if (_selectedZone?.id == part.zone.id) _selectedZone = part.zone;
+    }
+  }
+
+  /// Distance from [p] to segment [a]→[b] in mm.
+  static double _distanceToSegmentMm(Point2D p, Point2D a, Point2D b) {
+    final dx = b.x - a.x;
+    final dy = b.y - a.y;
+    final len2 = dx * dx + dy * dy;
+    if (len2 < 1e-9) return GeometryEngine.distanceMm(p, a);
+    final t =
+        (((p.x - a.x) * dx + (p.y - a.y) * dy) / len2).clamp(0.0, 1.0);
+    return GeometryEngine.distanceMm(
+      p,
+      Point2D(x: a.x + dx * t, y: a.y + dy * t),
+    );
   }
 
   /// Valid rooms for a zone drag: primary room + door-adjacent rooms (ADR-006).
@@ -2537,7 +3232,7 @@ class SelectTool extends CanvasTool {
     final connectedZone = callbacks.currentZones
         .where((z) => z.circuitId == circuit.id)
         .firstOrNull;
-    undoRedo.execute(_DeleteCircuitCommand(
+    undoRedo.execute(DeleteCircuitCommand(
       circuit: circuit,
       connectedZone: connectedZone,
       remove: callbacks.removeCircuit,
@@ -3167,11 +3862,12 @@ class SelectTool extends CanvasTool {
 
   /// Builds a [ZoneContextMenuRequest] for [zone] and hands it to the
   /// canvas widget. Floor zones get split items (disabled with a tooltip
-  /// when the polygon isn't rectangular); wall zones hide split items.
+  /// when the shape cannot be cut in two, ADR-037 Rule 1); wall zones
+  /// hide split items.
   void _openZoneContextMenu(Point2D worldPoint, HeatingZone zone) {
     final isFloor = zone.zoneType == ZoneType.floorHeating;
-    final splitEnabled = isFloor &&
-        SplitZoneCommand.isRectangularZone(zone.polygon);
+    final splitEnabled =
+        isFloor && SplitZoneCommand.canSplit(zone.polygon);
     callbacks.requestZoneContextMenu(
       ZoneContextMenuRequest(
         worldPoint: worldPoint,
@@ -3231,7 +3927,7 @@ class SelectTool extends CanvasTool {
         onStateChanged();
       case SplitBuildRejectedTooSmall():
         callbacks.showToast(callbacks.l10n.zone_splitTooSmallToast);
-      case SplitBuildRejectedNonRectangular():
+      case SplitBuildRejectedShape():
         callbacks.showToast(
           callbacks.l10n.zone_splitNonRectangularToast,
         );
@@ -4825,38 +5521,6 @@ class _DeleteDoorCommand extends Command {
   void undo() => add(door);
 }
 
-/// Command: delete a heating circuit and disconnect its zone.
-class _DeleteCircuitCommand extends Command {
-  _DeleteCircuitCommand({
-    required this.circuit,
-    required this.connectedZone,
-    required this.remove,
-    required this.add,
-    required this.updateZone,
-    required this.label,
-  });
-
-  final HeatingCircuit circuit;
-  final HeatingZone? connectedZone;
-  final void Function(String) remove;
-  final void Function(HeatingCircuit) add;
-  final void Function(HeatingZone) updateZone;
-
-  @override
-  final String label;
-
-  @override
-  void execute() => remove(circuit.id);
-
-  @override
-  void undo() {
-    add(circuit);
-    if (connectedZone != null) {
-      updateZone(connectedZone!);
-    }
-  }
-}
-
 /// Command: delete a heating zone.
 class _DeleteZoneCommand extends Command {
   _DeleteZoneCommand({
@@ -5060,6 +5724,33 @@ class _MoveRoomCommand extends Command {
 }
 
 /// Command: move a zone polygon (vertex drag or body drag).
+/// One corner point of a circuit's supply or return route.
+typedef _RoutePointRef = ({bool supply, int index});
+
+/// Command: reshape several zones at once — one boundary drag
+/// (ADR-037 Rule 5). [oldZones] and [newZones] are index-aligned.
+class _MoveZonesCommand extends Command {
+  _MoveZonesCommand({
+    required this.oldZones,
+    required this.newZones,
+    required this.update,
+    required this.label,
+  });
+
+  final List<HeatingZone> oldZones;
+  final List<HeatingZone> newZones;
+  final void Function(HeatingZone) update;
+
+  @override
+  final String label;
+
+  @override
+  void execute() => newZones.forEach(update);
+
+  @override
+  void undo() => oldZones.forEach(update);
+}
+
 class _MoveZoneCommand extends Command {
   _MoveZoneCommand({
     required this.oldZone,

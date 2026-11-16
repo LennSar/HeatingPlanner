@@ -8,6 +8,11 @@ part 'heating_circuit.g.dart';
 
 /// A single pipe loop that connects a [Distributor] to a [HeatingZone].
 ///
+/// The connection pipes are drawn as one route: [centerlinePath]. The
+/// supply and return pipes run parallel to it, [pipeSpacingMm] apart, and
+/// are stored in [supplyRoutePath] / [returnRoutePath] so every consumer
+/// (lengths, zone entry, painters) reads plain polylines (ADR-040).
+///
 /// Calculated fields ([tubeLengthM], [flowRateKgH], [pressureLossPa],
 /// [valveSetting]) are derived by the hydraulic engine and stored here
 /// as a snapshot for reporting and export.
@@ -43,6 +48,28 @@ abstract class HeatingCircuit with _$HeatingCircuit {
 
     /// Supply/return run insulation strategy (ADR-008). Null = not yet chosen.
     SupplyPipeInsulationType? supplyPipeInsulationType,
+
+    /// Route the connection pipes follow, distributor → zone, in mm
+    /// coords (ADR-040). The supply and return pipes are derived from it.
+    /// Empty for circuits whose two pipes were drawn separately.
+    @Default([]) List<Point2D> centerlinePath,
+
+    /// Centre-to-centre distance between the supply and the return
+    /// connection pipe in millimetres. Range: 30–500.
+    @Default(100) int pipeSpacingMm,
+
+    /// Distance kept between a connection pipe and the nearest tube of a
+    /// heating zone it runs through, in millimetres. Range: 0–1000.
+    @Default(100) int zoneClearanceMm,
+
+    /// Distance kept between the outer connection pipe and the face of a
+    /// wall the route runs along, in millimetres. Range: 0–1000.
+    @Default(100) int wallClearanceMm,
+
+    /// True when the supply pipe runs on the right of [centerlinePath]
+    /// (seen from the distributor) and the return on the left; false for
+    /// the default, supply on the left (ADR-041).
+    @Default(false) bool supplyOnRight,
   }) = _HeatingCircuit;
 
   factory HeatingCircuit.fromJson(Map<String, dynamic> json) =>

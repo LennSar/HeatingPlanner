@@ -63,7 +63,10 @@ class _StubCallbacks implements EditorCallbacks {
   void commitWall(WallSegment wall) => _walls.add(wall);
 
   @override
-  WallSegment commitWallWithSplit(WallSegment wall, {bool splitNewWall = true}) {
+  WallSegment commitWallWithSplit(
+    WallSegment wall, {
+    bool splitNewWall = true,
+  }) {
     _walls.add(wall);
     return wall;
   }
@@ -139,9 +142,7 @@ class _StubCallbacks implements EditorCallbacks {
     required void Function() onReplace,
   }) {}
   @override
-  void requestDistributorDeleteDialog({
-    required void Function() onConfirmed,
-  }) {}
+  void requestDistributorDeleteDialog({required void Function() onConfirmed}) {}
   @override
   void commitCircuit(HeatingCircuit circuit) {}
   @override
@@ -163,6 +164,8 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   void updateZoneTransient(HeatingZone zone) => updateZone(zone);
   @override
+  void updateCircuitTransient(HeatingCircuit circuit) => updateCircuit(circuit);
+  @override
   void updateWindowTransient(WindowElement window) => updateWindow(window);
   @override
   void updateDoorTransient(Door door) => updateDoor(door);
@@ -180,7 +183,11 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   void selectElement(String? type, String? id) {}
   @override
-  void requestRoomDialog(List<Point2D> polygon, List<String> wallIds, {void Function(List<WallSegment>, List<Room>)? onCreated}) {}
+  void requestRoomDialog(
+    List<Point2D> polygon,
+    List<String> wallIds, {
+    void Function(List<WallSegment>, List<Room>)? onCreated,
+  }) {}
   @override
   void requestZoneContextMenu(ZoneContextMenuRequest request) {}
   @override
@@ -239,7 +246,10 @@ class _RoomAwareStubCallbacks implements EditorCallbacks {
   @override
   void commitWall(WallSegment wall) => _walls.add(wall);
   @override
-  WallSegment commitWallWithSplit(WallSegment wall, {bool splitNewWall = true}) {
+  WallSegment commitWallWithSplit(
+    WallSegment wall, {
+    bool splitNewWall = true,
+  }) {
     _walls.add(wall);
     return wall;
   }
@@ -364,9 +374,7 @@ class _RoomAwareStubCallbacks implements EditorCallbacks {
     required void Function() onReplace,
   }) {}
   @override
-  void requestDistributorDeleteDialog({
-    required void Function() onConfirmed,
-  }) {}
+  void requestDistributorDeleteDialog({required void Function() onConfirmed}) {}
   @override
   void commitCircuit(HeatingCircuit circuit) {}
   @override
@@ -387,6 +395,8 @@ class _RoomAwareStubCallbacks implements EditorCallbacks {
   void updateRoomTransient(Room room) => updateRoom(room);
   @override
   void updateZoneTransient(HeatingZone zone) => updateZone(zone);
+  @override
+  void updateCircuitTransient(HeatingCircuit circuit) => updateCircuit(circuit);
   @override
   void updateWindowTransient(WindowElement window) => updateWindow(window);
   @override
@@ -439,8 +449,7 @@ class _ProviderWallDrawCallbacks implements EditorCallbacks {
 
   final ProviderContainer _container;
 
-  EditorStateNotifier get _n =>
-      _container.read(editorStateProvider.notifier);
+  EditorStateNotifier get _n => _container.read(editorStateProvider.notifier);
 
   @override
   final AppLocalizations l10n = AppLocalizationsEn();
@@ -449,8 +458,7 @@ class _ProviderWallDrawCallbacks implements EditorCallbacks {
   List<WallSegment> get currentWalls =>
       _container.read(editorStateProvider).walls;
   @override
-  List<Room> get currentRooms =>
-      _container.read(editorStateProvider).rooms;
+  List<Room> get currentRooms => _container.read(editorStateProvider).rooms;
   @override
   List<HeatingZone> get currentZones =>
       _container.read(editorStateProvider).zones;
@@ -458,8 +466,7 @@ class _ProviderWallDrawCallbacks implements EditorCallbacks {
   List<WindowElement> get currentWindows =>
       _container.read(editorStateProvider).windows;
   @override
-  List<Door> get currentDoors =>
-      _container.read(editorStateProvider).doors;
+  List<Door> get currentDoors => _container.read(editorStateProvider).doors;
   @override
   List<HeatingCircuit> get currentCircuits =>
       _container.read(editorStateProvider).circuits;
@@ -470,9 +477,10 @@ class _ProviderWallDrawCallbacks implements EditorCallbacks {
   @override
   void commitWall(WallSegment wall) => _n.addWall(wall);
   @override
-  WallSegment commitWallWithSplit(WallSegment wall,
-          {bool splitNewWall = true}) =>
-      _n.commitWallWithSplit(wall, splitNewWall: splitNewWall);
+  WallSegment commitWallWithSplit(
+    WallSegment wall, {
+    bool splitNewWall = true,
+  }) => _n.commitWallWithSplit(wall, splitNewWall: splitNewWall);
   @override
   void updateWall(WallSegment wall) => _n.updateWall(wall);
   @override
@@ -485,8 +493,7 @@ class _ProviderWallDrawCallbacks implements EditorCallbacks {
   }
 
   @override
-  void destroyRoomCascade(String roomId) =>
-      _n.destroyRoomCascade(roomId);
+  void destroyRoomCascade(String roomId) => _n.destroyRoomCascade(roomId);
 
   @override
   void replaceAllForRoomCascade(
@@ -495,8 +502,7 @@ class _ProviderWallDrawCallbacks implements EditorCallbacks {
     List<HeatingZone> zones,
     List<WindowElement> windows,
     List<Door> doors,
-  ) =>
-      _n.replaceAllForRoomCascade(walls, rooms, zones, windows, doors);
+  ) => _n.replaceAllForRoomCascade(walls, rooms, zones, windows, doors);
 
   @override
   void restoreRoom(Room room, List<String> wallIds) {
@@ -508,32 +514,26 @@ class _ProviderWallDrawCallbacks implements EditorCallbacks {
   void updateRoom(Room room) => _n.updateRoom(room);
 
   @override
-  void replaceAllWalls(List<WallSegment> walls) =>
-      _n.replaceAllWalls(walls);
+  void replaceAllWalls(List<WallSegment> walls) => _n.replaceAllWalls(walls);
   @override
-  void replaceAllWallsAndRooms(
-    List<WallSegment> walls,
-    List<Room> rooms,
-  ) =>
+  void replaceAllWallsAndRooms(List<WallSegment> walls, List<Room> rooms) =>
       _n.replaceAllWallsAndRooms(walls, rooms);
   @override
   void replaceAllWallsRoomsZones(
     List<WallSegment> walls,
     List<Room> rooms,
     List<HeatingZone> zones,
-  ) =>
-      _n.replaceAllWallsRoomsZones(walls, rooms, zones);
+  ) => _n.replaceAllWallsRoomsZones(walls, rooms, zones);
   @override
   void addRoomFromDetection({
     required Room room,
     required List<String> wallIds,
     Map<String, WallSegment>? movedSideProperties,
-  }) =>
-      _n.addRoomFromDetection(
-        room: room,
-        wallIds: wallIds,
-        movedSideProperties: movedSideProperties,
-      );
+  }) => _n.addRoomFromDetection(
+    room: room,
+    wallIds: wallIds,
+    movedSideProperties: movedSideProperties,
+  );
 
   @override
   void commitWindow(WindowElement window) => _n.addWindow(window);
@@ -561,9 +561,7 @@ class _ProviderWallDrawCallbacks implements EditorCallbacks {
     required void Function() onReplace,
   }) {}
   @override
-  void requestDistributorDeleteDialog({
-    required void Function() onConfirmed,
-  }) {}
+  void requestDistributorDeleteDialog({required void Function() onConfirmed}) {}
 
   @override
   void commitCircuit(HeatingCircuit circuit) => _n.addCircuit(circuit);
@@ -579,13 +577,13 @@ class _ProviderWallDrawCallbacks implements EditorCallbacks {
   @override
   void updateZone(HeatingZone zone) => _n.updateZone(zone);
   @override
-  void updateWallTransient(WallSegment wall) =>
-      _n.updateWallTransient(wall);
+  void updateWallTransient(WallSegment wall) => _n.updateWallTransient(wall);
   @override
   void updateRoomTransient(Room room) => _n.updateRoomTransient(room);
   @override
-  void updateZoneTransient(HeatingZone zone) =>
-      _n.updateZoneTransient(zone);
+  void updateZoneTransient(HeatingZone zone) => _n.updateZoneTransient(zone);
+  @override
+  void updateCircuitTransient(HeatingCircuit circuit) => updateCircuit(circuit);
   @override
   void updateWindowTransient(WindowElement window) =>
       _n.updateWindowTransient(window);
@@ -671,38 +669,33 @@ void main() {
 
   // WDT-21 ───────────────────────────────────────────────────────────────────
 
-  test(
-    'WDT-21: onTap re-syncs a stranded rectMode flag from live hardware '
-    'so click-click drawing recovers when the Ctrl key-up was lost',
-    () {
-      // Reproduces the stuck-modifier bug: the canvas keyboard handler
-      // dropped a Ctrl key-up (e.g. focus moved to a properties field),
-      // leaving rectMode cached "on". With no Ctrl actually held, the
-      // hardware re-sync must clear it so taps fall back to click-click.
-      ModifierDrawTool.debugDisableHardwareSync = false;
-      addTearDown(
-        () => ModifierDrawTool.debugDisableHardwareSync = true,
-      );
+  test('WDT-21: onTap re-syncs a stranded rectMode flag from live hardware '
+      'so click-click drawing recovers when the Ctrl key-up was lost', () {
+    // Reproduces the stuck-modifier bug: the canvas keyboard handler
+    // dropped a Ctrl key-up (e.g. focus moved to a properties field),
+    // leaving rectMode cached "on". With no Ctrl actually held, the
+    // hardware re-sync must clear it so taps fall back to click-click.
+    ModifierDrawTool.debugDisableHardwareSync = false;
+    addTearDown(() => ModifierDrawTool.debugDisableHardwareSync = true);
 
-      final cb = _StubCallbacks();
-      final tool = _makeTool(cb);
+    final cb = _StubCallbacks();
+    final tool = _makeTool(cb);
 
-      // Strand rectMode "on" — no hardware key is pressed in the test.
-      tool.updateModifiers(shift: false, ctrl: true, alt: false);
-      expect(tool.rectMode, isTrue);
+    // Strand rectMode "on" — no hardware key is pressed in the test.
+    tool.updateModifiers(shift: false, ctrl: true, alt: false);
+    expect(tool.rectMode, isTrue);
 
-      const start = Point2D(x: 0, y: 0);
-      const end = Point2D(x: 5000, y: 0);
+    const start = Point2D(x: 0, y: 0);
+    const end = Point2D(x: 5000, y: 0);
 
-      // Pre-fix: onTap would return early (rect mode uses drag) and no
-      // wall would ever be drawn. Post-fix: the sync clears rectMode.
-      tool.onTap(start, PointerDeviceKind.mouse);
-      expect(tool.rectMode, isFalse);
-      tool.onTap(end, PointerDeviceKind.mouse);
+    // Pre-fix: onTap would return early (rect mode uses drag) and no
+    // wall would ever be drawn. Post-fix: the sync clears rectMode.
+    tool.onTap(start, PointerDeviceKind.mouse);
+    expect(tool.rectMode, isFalse);
+    tool.onTap(end, PointerDeviceKind.mouse);
 
-      expect(cb.currentWalls, hasLength(1));
-    },
-  );
+    expect(cb.currentWalls, hasLength(1));
+  });
 
   // WDT-1 ────────────────────────────────────────────────────────────────────
 
@@ -757,21 +750,18 @@ void main() {
 
   // WDT-3 ────────────────────────────────────────────────────────────────────
 
-  test(
-    'WDT-3: cancel() after first tap clears state and leaves no wall',
-    () {
-      final cb = _StubCallbacks();
-      final tool = _makeTool(cb);
+  test('WDT-3: cancel() after first tap clears state and leaves no wall', () {
+    final cb = _StubCallbacks();
+    final tool = _makeTool(cb);
 
-      tool.onTap(const Point2D(x: 0, y: 0), PointerDeviceKind.mouse);
-      tool.cancel(); // simulates Escape
+    tool.onTap(const Point2D(x: 0, y: 0), PointerDeviceKind.mouse);
+    tool.cancel(); // simulates Escape
 
-      // A second tap now acts as a fresh first click, not a commit.
-      tool.onTap(const Point2D(x: 5000, y: 0), PointerDeviceKind.mouse);
+    // A second tap now acts as a fresh first click, not a commit.
+    tool.onTap(const Point2D(x: 5000, y: 0), PointerDeviceKind.mouse);
 
-      expect(cb.currentWalls, isEmpty);
-    },
-  );
+    expect(cb.currentWalls, isEmpty);
+  });
 
   // WDT-4 ────────────────────────────────────────────────────────────────────
 
@@ -861,23 +851,20 @@ void main() {
 
   // WDT-7 ────────────────────────────────────────────────────────────────────
 
-  test(
-    'WDT-7: Ctrl+drag both dims < 100 mm → no walls and toast shown',
-    () {
-      final cb = _StubCallbacks();
-      final tool = _makeTool(cb);
+  test('WDT-7: Ctrl+drag both dims < 100 mm → no walls and toast shown', () {
+    final cb = _StubCallbacks();
+    final tool = _makeTool(cb);
 
-      // Alt disables grid snap so the raw 50×50 mm is preserved.
-      tool.updateModifiers(shift: false, ctrl: true, alt: true);
+    // Alt disables grid snap so the raw 50×50 mm is preserved.
+    tool.updateModifiers(shift: false, ctrl: true, alt: true);
 
-      // 50 × 50 mm (raw) — both below 100 mm threshold.
-      tool.onPointerDown(const Point2D(x: 0, y: 0), 1);
-      tool.onDragEnd(const Point2D(x: 50, y: 50));
+    // 50 × 50 mm (raw) — both below 100 mm threshold.
+    tool.onPointerDown(const Point2D(x: 0, y: 0), 1);
+    tool.onDragEnd(const Point2D(x: 50, y: 50));
 
-      expect(cb.currentWalls, isEmpty);
-      expect(cb._toasts, isNotEmpty);
-    },
-  );
+    expect(cb.currentWalls, isEmpty);
+    expect(cb._toasts, isNotEmpty);
+  });
 
   // WDT-8 ────────────────────────────────────────────────────────────────────
 
@@ -939,8 +926,11 @@ void main() {
 
       // The stub's requestRoomDialog ran synchronously and tagged all four
       // walls with roomId='room-1'.
-      expect(cb.currentWalls, hasLength(4),
-          reason: 'Room 1 should produce exactly 4 walls');
+      expect(
+        cb.currentWalls,
+        hasLength(4),
+        reason: 'Room 1 should produce exactly 4 walls',
+      );
 
       // ── Room 2: (3000,0) → (6000,3000) ───────────────────────────────────
       // Same 3000×3000 mm size, starting at Room 1's top-right corner.
@@ -951,8 +941,11 @@ void main() {
       tool.onDragEnd(const Point2D(x: 6000, y: 3000));
 
       // 4 (Room 1) + 3 (Room 2 new) = 7 total; NOT 8.
-      expect(cb.currentWalls, hasLength(7),
-          reason: 'Shared edge must not produce a duplicate wall');
+      expect(
+        cb.currentWalls,
+        hasLength(7),
+        reason: 'Shared edge must not produce a duplicate wall',
+      );
 
       // ── Shared-edge assertion ─────────────────────────────────────────────
       // Exactly one wall should have both endpoints at x ≈ 3000
@@ -994,12 +987,14 @@ void main() {
     () {
       final cb = _StubCallbacks();
       // Pre-populate a wall whose right endpoint is the anchor at (3000, 0).
-      cb.commitWall(const WallSegment(
-        id: 'w-anchor',
-        roomId: '',
-        startPoint: Point2D(x: 0, y: 0),
-        endPoint: Point2D(x: 3000, y: 0),
-      ));
+      cb.commitWall(
+        const WallSegment(
+          id: 'w-anchor',
+          roomId: '',
+          startPoint: Point2D(x: 0, y: 0),
+          endPoint: Point2D(x: 3000, y: 0),
+        ),
+      );
 
       final tool = _makeTool(cb);
 
@@ -1071,10 +1066,8 @@ void main() {
       tool.onDragEnd(const Point2D(x: 3000, y: 3000));
 
       expect(cb.currentRooms, hasLength(1), reason: 'Room 1 must be created');
-      final room1Width =
-          _polySpan(cb.currentRooms.first.polygon, (p) => p.x);
-      final room1Height =
-          _polySpan(cb.currentRooms.first.polygon, (p) => p.y);
+      final room1Width = _polySpan(cb.currentRooms.first.polygon, (p) => p.x);
+      final room1Height = _polySpan(cb.currentRooms.first.polygon, (p) => p.y);
 
       // ── Room 2: start near (3000,0), drag diagonally ────────────────────
       // (3060, 80) is 100 mm from (3000,0); endpoint snap overrides grid.
@@ -1084,10 +1077,8 @@ void main() {
       tool.onDragEnd(const Point2D(x: 5970, y: 2980));
 
       expect(cb.currentRooms, hasLength(2), reason: 'Room 2 must be created');
-      final room2Width =
-          _polySpan(cb.currentRooms.last.polygon, (p) => p.x);
-      final room2Height =
-          _polySpan(cb.currentRooms.last.polygon, (p) => p.y);
+      final room2Width = _polySpan(cb.currentRooms.last.polygon, (p) => p.x);
+      final room2Height = _polySpan(cb.currentRooms.last.polygon, (p) => p.y);
 
       // (a) Room 2 dimensions match Room 1.
       expect(
@@ -1158,76 +1149,75 @@ void main() {
   // tests above intentionally bypass the notifier so they remain unit
   // tests of WallDrawTool's gesture logic.
 
-  test(
-    'WDT-13: single wall drawn click-click carries default exterior '
-    'thickness (240 mm) and anchorMode = innerFace',
-    () {
-      final container = ProviderContainer(overrides: [
+  test('WDT-13: single wall drawn click-click carries default exterior '
+      'thickness (240 mm) and anchorMode = innerFace', () {
+    final container = ProviderContainer(
+      overrides: [
         appDatabaseProvider.overrideWith((ref) {
           final db = AppDatabase.forTesting(NativeDatabase.memory());
           ref.onDispose(db.close);
           return db;
         }),
-      ]);
-      addTearDown(container.dispose);
-      final cb = _ProviderWallDrawCallbacks(container);
-      final tool = WallDrawTool(
-        callbacks: cb,
-        onStateChanged: () {},
-        undoRedo: UndoRedoService(),
-      );
+      ],
+    );
+    addTearDown(container.dispose);
+    final cb = _ProviderWallDrawCallbacks(container);
+    final tool = WallDrawTool(
+      callbacks: cb,
+      onStateChanged: () {},
+      undoRedo: UndoRedoService(),
+    );
 
-      tool.onTap(const Point2D(x: 0, y: 0), PointerDeviceKind.mouse);
-      tool.onTap(const Point2D(x: 5000, y: 0), PointerDeviceKind.mouse);
+    tool.onTap(const Point2D(x: 0, y: 0), PointerDeviceKind.mouse);
+    tool.onTap(const Point2D(x: 5000, y: 0), PointerDeviceKind.mouse);
 
-      expect(cb.currentWalls, hasLength(1));
-      final wall = cb.currentWalls.single;
-      // Rule 1: default exterior thickness from ProjectSettings (240 mm).
-      expect(wall.thicknessMm, 240.0);
-      // Rule 2: exterior + no mirror → innerFace.
-      expect(wall.anchorMode, WallAnchorMode.innerFace);
-    },
-  );
+    expect(cb.currentWalls, hasLength(1));
+    final wall = cb.currentWalls.single;
+    // Rule 1: default exterior thickness from ProjectSettings (240 mm).
+    expect(wall.thicknessMm, 240.0);
+    // Rule 2: exterior + no mirror → innerFace.
+    expect(wall.anchorMode, WallAnchorMode.innerFace);
+  });
 
-  test(
-    'WDT-14: Ctrl+drag rectangle commits 4 walls, all carrying default '
-    'exterior thickness and innerFace anchor per ADR-017 Rules 1 & 2',
-    () {
-      final container = ProviderContainer(overrides: [
+  test('WDT-14: Ctrl+drag rectangle commits 4 walls, all carrying default '
+      'exterior thickness and innerFace anchor per ADR-017 Rules 1 & 2', () {
+    final container = ProviderContainer(
+      overrides: [
         appDatabaseProvider.overrideWith((ref) {
           final db = AppDatabase.forTesting(NativeDatabase.memory());
           ref.onDispose(db.close);
           return db;
         }),
-      ]);
-      addTearDown(container.dispose);
-      final cb = _ProviderWallDrawCallbacks(container);
-      final tool = WallDrawTool(
-        callbacks: cb,
-        onStateChanged: () {},
-        undoRedo: UndoRedoService(),
+      ],
+    );
+    addTearDown(container.dispose);
+    final cb = _ProviderWallDrawCallbacks(container);
+    final tool = WallDrawTool(
+      callbacks: cb,
+      onStateChanged: () {},
+      undoRedo: UndoRedoService(),
+    );
+
+    tool.updateModifiers(shift: false, ctrl: true, alt: false);
+    tool.onPointerDown(const Point2D(x: 0, y: 0), 1);
+    tool.onDragEnd(const Point2D(x: 4000, y: 3000));
+
+    expect(cb.currentWalls, hasLength(4));
+    for (final w in cb.currentWalls) {
+      expect(
+        w.thicknessMm,
+        240.0,
+        reason:
+            'every freshly drawn wall must inherit the project '
+            "exterior default thickness, not the freezed fallback of 0",
       );
-
-      tool.updateModifiers(shift: false, ctrl: true, alt: false);
-      tool.onPointerDown(const Point2D(x: 0, y: 0), 1);
-      tool.onDragEnd(const Point2D(x: 4000, y: 3000));
-
-      expect(cb.currentWalls, hasLength(4));
-      for (final w in cb.currentWalls) {
-        expect(
-          w.thicknessMm,
-          240.0,
-          reason: 'every freshly drawn wall must inherit the project '
-              "exterior default thickness, not the freezed fallback of 0",
-        );
-        expect(
-          w.anchorMode,
-          WallAnchorMode.innerFace,
-          reason: 'ADR-017 Rule 2: exterior + no mirror → innerFace',
-        );
-      }
-    },
-  );
+      expect(
+        w.anchorMode,
+        WallAnchorMode.innerFace,
+        reason: 'ADR-017 Rule 2: exterior + no mirror → innerFace',
+      );
+    }
+  });
 
   // WDT-15 ───────────────────────────────────────────────────────────────────
   //
@@ -1238,98 +1228,98 @@ void main() {
   // so we expect four auto-default constructions, each with exactly one
   // layer using the default exterior material id and thickness.
 
-  test(
-    'WDT-15: Ctrl+drag rectangle gives every wall an auto-default '
-    'construction (ADR-020 Rule 3)',
-    () {
-      final container = ProviderContainer(overrides: [
+  test('WDT-15: Ctrl+drag rectangle gives every wall an auto-default '
+      'construction (ADR-020 Rule 3)', () {
+    final container = ProviderContainer(
+      overrides: [
         appDatabaseProvider.overrideWith((ref) {
           final db = AppDatabase.forTesting(NativeDatabase.memory());
           ref.onDispose(db.close);
           return db;
         }),
-      ]);
-      addTearDown(container.dispose);
-      final cb = _ProviderWallDrawCallbacks(container);
-      final tool = WallDrawTool(
-        callbacks: cb,
-        onStateChanged: () {},
-        undoRedo: UndoRedoService(),
-      );
+      ],
+    );
+    addTearDown(container.dispose);
+    final cb = _ProviderWallDrawCallbacks(container);
+    final tool = WallDrawTool(
+      callbacks: cb,
+      onStateChanged: () {},
+      undoRedo: UndoRedoService(),
+    );
 
-      tool.updateModifiers(shift: false, ctrl: true, alt: false);
-      tool.onPointerDown(const Point2D(x: 0, y: 0), 1);
-      tool.onDragEnd(const Point2D(x: 4000, y: 3000));
+    tool.updateModifiers(shift: false, ctrl: true, alt: false);
+    tool.onPointerDown(const Point2D(x: 0, y: 0), 1);
+    tool.onDragEnd(const Point2D(x: 4000, y: 3000));
 
-      final state = container.read(editorStateProvider);
-      expect(state.walls, hasLength(4));
-      for (final w in state.walls) {
-        expect(
-          w.constructionId,
-          isNotNull,
-          reason:
-              'ADR-020 Rule 3: every freshly drawn wall must carry a '
-              'construction id',
-        );
-        final c = state.constructions
-            .where((c) => c.id == w.constructionId)
-            .single;
-        expect(c.isAutoDefault, isTrue);
-        expect(c.isPreset, isFalse);
-        final layers = state.materialLayers
-            .where((l) => l.constructionId == c.id)
-            .toList();
-        expect(
-          layers,
-          hasLength(1),
-          reason: 'auto-default construction must have exactly one layer',
-        );
-        expect(layers.single.materialId, 'mat-016');
-        expect(layers.single.thicknessMm, 240.0);
-      }
-    },
-  );
-
-  test(
-    'WDT-12: drag-end within 100 mm of shared-wall height snaps y to match '
-    'adjacent room dimension',
-    () {
-      final cb = _RoomAwareStubCallbacks();
-      final tool = WallDrawTool(
-        callbacks: cb,
-        onStateChanged: () {},
-        undoRedo: UndoRedoService(),
-      );
-
-      tool.updateModifiers(shift: false, ctrl: true, alt: false);
-
-      // ── Room 1: (-2000,0) → (0,2000) — right wall at x=0 ────────────────
-      tool.onPointerDown(const Point2D(x: -2000, y: 0), 1);
-      tool.onDragEnd(const Point2D(x: 0, y: 2000));
-
-      expect(cb.currentRooms, hasLength(1), reason: 'Room 1 must be created');
-      final room1Height = _polySpan(cb.currentRooms.first.polygon, (p) => p.y);
-      expect(room1Height, closeTo(2000, 0.5),
-          reason: 'Room 1 height sanity check');
-
-      // ── Room 2: start near (0,0), drag to (1000,2050) ────────────────────
-      //
-      // Without dimension snap: grid gives (1000,2100) → Room 2 is 2100 mm tall.
-      // With dimension snap:    y snaps to 2000       → Room 2 is 2000 mm tall.
-      tool.onPointerDown(const Point2D(x: 10, y: 20), 1);
-      tool.onDragEnd(const Point2D(x: 1000, y: 2050));
-
-      expect(cb.currentRooms, hasLength(2), reason: 'Room 2 must be created');
-
-      final room2Height = _polySpan(cb.currentRooms.last.polygon, (p) => p.y);
+    final state = container.read(editorStateProvider);
+    expect(state.walls, hasLength(4));
+    for (final w in state.walls) {
       expect(
-        room2Height,
-        closeTo(room1Height, 0.5),
-        reason: 'Room 2 height must match Room 1 shared-wall height (2000 mm); '
-            'grid snap alone gives 2100 mm',
+        w.constructionId,
+        isNotNull,
+        reason:
+            'ADR-020 Rule 3: every freshly drawn wall must carry a '
+            'construction id',
       );
-    },
-  );
+      final c = state.constructions
+          .where((c) => c.id == w.constructionId)
+          .single;
+      expect(c.isAutoDefault, isTrue);
+      expect(c.isPreset, isFalse);
+      final layers = state.materialLayers
+          .where((l) => l.constructionId == c.id)
+          .toList();
+      expect(
+        layers,
+        hasLength(1),
+        reason: 'auto-default construction must have exactly one layer',
+      );
+      expect(layers.single.materialId, 'mat-016');
+      expect(layers.single.thicknessMm, 240.0);
+    }
+  });
+
+  test('WDT-12: drag-end within 100 mm of shared-wall height snaps y to match '
+      'adjacent room dimension', () {
+    final cb = _RoomAwareStubCallbacks();
+    final tool = WallDrawTool(
+      callbacks: cb,
+      onStateChanged: () {},
+      undoRedo: UndoRedoService(),
+    );
+
+    tool.updateModifiers(shift: false, ctrl: true, alt: false);
+
+    // ── Room 1: (-2000,0) → (0,2000) — right wall at x=0 ────────────────
+    tool.onPointerDown(const Point2D(x: -2000, y: 0), 1);
+    tool.onDragEnd(const Point2D(x: 0, y: 2000));
+
+    expect(cb.currentRooms, hasLength(1), reason: 'Room 1 must be created');
+    final room1Height = _polySpan(cb.currentRooms.first.polygon, (p) => p.y);
+    expect(
+      room1Height,
+      closeTo(2000, 0.5),
+      reason: 'Room 1 height sanity check',
+    );
+
+    // ── Room 2: start near (0,0), drag to (1000,2050) ────────────────────
+    //
+    // Without dimension snap: grid gives (1000,2100) → Room 2 is 2100 mm tall.
+    // With dimension snap:    y snaps to 2000       → Room 2 is 2000 mm tall.
+    tool.onPointerDown(const Point2D(x: 10, y: 20), 1);
+    tool.onDragEnd(const Point2D(x: 1000, y: 2050));
+
+    expect(cb.currentRooms, hasLength(2), reason: 'Room 2 must be created');
+
+    final room2Height = _polySpan(cb.currentRooms.last.polygon, (p) => p.y);
+    expect(
+      room2Height,
+      closeTo(room1Height, 0.5),
+      reason:
+          'Room 2 height must match Room 1 shared-wall height (2000 mm); '
+          'grid snap alone gives 2100 mm',
+    );
+  });
 
   // WDT-16 ───────────────────────────────────────────────────────────────────
   //
@@ -1338,29 +1328,26 @@ void main() {
   // press-hold alternative to click-click. No modifier is active, so this
   // is the plain free-wall case (also covers Shift via applyOrtho).
 
-  test(
-    'WDT-16: press-hold-drag commits a single wall on release',
-    () async {
-      final cb = _StubCallbacks();
-      final tool = _makeTool(cb);
+  test('WDT-16: press-hold-drag commits a single wall on release', () async {
+    final cb = _StubCallbacks();
+    final tool = _makeTool(cb);
 
-      const start = Point2D(x: 0, y: 0);
-      const end = Point2D(x: 3000, y: 0);
+    const start = Point2D(x: 0, y: 0);
+    const end = Point2D(x: 3000, y: 0);
 
-      tool.onPointerDown(start, 1);
-      // Hold past the deliberate-hold threshold (200 ms) before releasing.
-      await Future<void>.delayed(const Duration(milliseconds: 220));
-      tool.onDragUpdate(end);
-      tool.onDragEnd(end);
+    tool.onPointerDown(start, 1);
+    // Hold past the deliberate-hold threshold (200 ms) before releasing.
+    await Future<void>.delayed(const Duration(milliseconds: 220));
+    tool.onDragUpdate(end);
+    tool.onDragEnd(end);
 
-      expect(cb.currentWalls, hasLength(1));
-      final wall = cb.currentWalls.single;
-      expect(wall.startPoint.x, closeTo(0, 0.5));
-      expect(wall.startPoint.y, closeTo(0, 0.5));
-      expect(wall.endPoint.x, closeTo(3000, 0.5));
-      expect(wall.endPoint.y, closeTo(0, 0.5));
-    },
-  );
+    expect(cb.currentWalls, hasLength(1));
+    final wall = cb.currentWalls.single;
+    expect(wall.startPoint.x, closeTo(0, 0.5));
+    expect(wall.startPoint.y, closeTo(0, 0.5));
+    expect(wall.endPoint.x, closeTo(3000, 0.5));
+    expect(wall.endPoint.y, closeTo(0, 0.5));
+  });
 
   // WDT-17 ───────────────────────────────────────────────────────────────────
   //
@@ -1395,40 +1382,45 @@ void main() {
   // in X, grid snap alone would land the endpoint at y=2000; the Y-alignment
   // must override it to y=1930 and report alignYAnchor (and no X anchor).
 
-  test(
-    'WDT-18: free draw — endpoint Y snaps to an off-grid corner and reports '
-    'the alignment anchor',
-    () {
-      final cb = _StubCallbacks();
-      cb.commitWall(const WallSegment(
+  test('WDT-18: free draw — endpoint Y snaps to an off-grid corner and reports '
+      'the alignment anchor', () {
+    final cb = _StubCallbacks();
+    cb.commitWall(
+      const WallSegment(
         id: 'w-anchor',
         roomId: '',
         startPoint: Point2D(x: 3000, y: 0),
         endPoint: Point2D(x: 3000, y: 1930),
-      ));
-      final tool = _makeTool(cb);
+      ),
+    );
+    final tool = _makeTool(cb);
 
-      // Start point well away from the existing wall.
-      tool.onTap(const Point2D(x: 0, y: 0), PointerDeviceKind.mouse);
-      // Cursor: X far from x=3000, Y near 1930 (grid would snap to 2000).
-      tool.onPointerMove(const Point2D(x: 500, y: 1950));
+    // Start point well away from the existing wall.
+    tool.onTap(const Point2D(x: 0, y: 0), PointerDeviceKind.mouse);
+    // Cursor: X far from x=3000, Y near 1930 (grid would snap to 2000).
+    tool.onPointerMove(const Point2D(x: 500, y: 1950));
 
-      final data = tool.getInteractionData();
-      expect(data, isA<GhostLineData>());
-      final ghost = data! as GhostLineData;
-      expect(ghost.currentPoint.y, closeTo(1930, 0.5),
-          reason: 'Y must align to the corner (1930), overriding grid 2000');
-      expect(ghost.alignYAnchor, isNotNull);
-      expect(ghost.alignYAnchor!.y, closeTo(1930, 0.5));
-      expect(ghost.alignXAnchor, isNull,
-          reason: 'X is far from the corner — no X guide');
+    final data = tool.getInteractionData();
+    expect(data, isA<GhostLineData>());
+    final ghost = data! as GhostLineData;
+    expect(
+      ghost.currentPoint.y,
+      closeTo(1930, 0.5),
+      reason: 'Y must align to the corner (1930), overriding grid 2000',
+    );
+    expect(ghost.alignYAnchor, isNotNull);
+    expect(ghost.alignYAnchor!.y, closeTo(1930, 0.5));
+    expect(
+      ghost.alignXAnchor,
+      isNull,
+      reason: 'X is far from the corner — no X guide',
+    );
 
-      // Committing the second tap uses the aligned endpoint.
-      tool.onTap(const Point2D(x: 500, y: 1950), PointerDeviceKind.mouse);
-      expect(cb.currentWalls, hasLength(2));
-      expect(cb.currentWalls.last.endPoint.y, closeTo(1930, 0.5));
-    },
-  );
+    // Committing the second tap uses the aligned endpoint.
+    tool.onTap(const Point2D(x: 500, y: 1950), PointerDeviceKind.mouse);
+    expect(cb.currentWalls, hasLength(2));
+    expect(cb.currentWalls.last.endPoint.y, closeTo(1930, 0.5));
+  });
 
   // WDT-19 ───────────────────────────────────────────────────────────────────
   //
@@ -1444,12 +1436,14 @@ void main() {
     'ortho-locked',
     () {
       final cb = _StubCallbacks();
-      cb.commitWall(const WallSegment(
-        id: 'w-anchor',
-        roomId: '',
-        startPoint: Point2D(x: 3000, y: 0),
-        endPoint: Point2D(x: 3000, y: 1930),
-      ));
+      cb.commitWall(
+        const WallSegment(
+          id: 'w-anchor',
+          roomId: '',
+          startPoint: Point2D(x: 3000, y: 0),
+          endPoint: Point2D(x: 3000, y: 1930),
+        ),
+      );
       final tool = _makeTool(cb);
 
       tool.onTap(const Point2D(x: 5000, y: 0), PointerDeviceKind.mouse);
@@ -1458,13 +1452,22 @@ void main() {
       tool.onPointerMove(const Point2D(x: 5040, y: 1950));
 
       final ghost = tool.getInteractionData()! as GhostLineData;
-      expect(ghost.currentPoint.x, closeTo(5000, 0.5),
-          reason: 'ortho keeps X locked to the start');
-      expect(ghost.currentPoint.y, closeTo(1930, 0.5),
-          reason: 'free Y axis aligns to the corner height');
+      expect(
+        ghost.currentPoint.x,
+        closeTo(5000, 0.5),
+        reason: 'ortho keeps X locked to the start',
+      );
+      expect(
+        ghost.currentPoint.y,
+        closeTo(1930, 0.5),
+        reason: 'free Y axis aligns to the corner height',
+      );
       expect(ghost.alignYAnchor, isNotNull);
-      expect(ghost.alignXAnchor, isNull,
-          reason: 'X is ortho-locked, so it is not re-aligned');
+      expect(
+        ghost.alignXAnchor,
+        isNull,
+        reason: 'X is ortho-locked, so it is not re-aligned',
+      );
     },
   );
 
@@ -1472,29 +1475,28 @@ void main() {
   //
   // Outside the 150 mm alignment tolerance on both axes → no snap, no anchors.
 
-  test(
-    'WDT-20: endpoint beyond alignment tolerance reports no guides',
-    () {
-      final cb = _StubCallbacks();
-      cb.commitWall(const WallSegment(
+  test('WDT-20: endpoint beyond alignment tolerance reports no guides', () {
+    final cb = _StubCallbacks();
+    cb.commitWall(
+      const WallSegment(
         id: 'w-anchor',
         roomId: '',
         startPoint: Point2D(x: 3000, y: 0),
         endPoint: Point2D(x: 3000, y: 1930),
-      ));
-      final tool = _makeTool(cb);
+      ),
+    );
+    final tool = _makeTool(cb);
 
-      tool.onTap(const Point2D(x: 0, y: 0), PointerDeviceKind.mouse);
-      // X 2500 mm from corner; Y 230 mm from corner — both > 150 mm.
-      tool.onPointerMove(const Point2D(x: 500, y: 1700));
+    tool.onTap(const Point2D(x: 0, y: 0), PointerDeviceKind.mouse);
+    // X 2500 mm from corner; Y 230 mm from corner — both > 150 mm.
+    tool.onPointerMove(const Point2D(x: 500, y: 1700));
 
-      final ghost = tool.getInteractionData()! as GhostLineData;
-      expect(ghost.alignXAnchor, isNull);
-      expect(ghost.alignYAnchor, isNull);
-      expect(ghost.currentPoint.x, closeTo(500, 0.5));
-      expect(ghost.currentPoint.y, closeTo(1700, 0.5));
-    },
-  );
+    final ghost = tool.getInteractionData()! as GhostLineData;
+    expect(ghost.alignXAnchor, isNull);
+    expect(ghost.alignYAnchor, isNull);
+    expect(ghost.currentPoint.x, closeTo(500, 0.5));
+    expect(ghost.currentPoint.y, closeTo(1700, 0.5));
+  });
 
   // WDT-22 ───────────────────────────────────────────────────────────────────
   //
@@ -1508,59 +1510,69 @@ void main() {
   // wedge/notch (the reported bug). This path is what the app runs; the direct
   // provider tests in adjacent_room_corner_test.dart bypass the command.
 
-  test(
-    'WDT-22: attaching a smaller room via Ctrl+drag keeps the host room '
-    'polygon split so no wall loses its mitred face',
-    () {
-      final container = ProviderContainer(overrides: [
+  test('WDT-22: attaching a smaller room via Ctrl+drag keeps the host room '
+      'polygon split so no wall loses its mitred face', () {
+    final container = ProviderContainer(
+      overrides: [
         appDatabaseProvider.overrideWith((ref) {
           final db = AppDatabase.forTesting(NativeDatabase.memory());
           ref.onDispose(db.close);
           return db;
         }),
-      ]);
-      addTearDown(container.dispose);
-      final cb = _RoomCreatingProviderCallbacks(container);
-      final tool = WallDrawTool(
-        callbacks: cb,
-        onStateChanged: () {},
-        undoRedo: UndoRedoService(),
-      );
-      tool.updateModifiers(shift: false, ctrl: true, alt: false);
+      ],
+    );
+    addTearDown(container.dispose);
+    final cb = _RoomCreatingProviderCallbacks(container);
+    final tool = WallDrawTool(
+      callbacks: cb,
+      onStateChanged: () {},
+      undoRedo: UndoRedoService(),
+    );
+    tool.updateModifiers(shift: false, ctrl: true, alt: false);
 
-      // Big room 4000×4000.
-      tool.onPointerDown(const Point2D(x: 0, y: 0), 1);
-      tool.onDragEnd(const Point2D(x: 4000, y: 4000));
+    // Big room 4000×4000.
+    tool.onPointerDown(const Point2D(x: 0, y: 0), 1);
+    tool.onDragEnd(const Point2D(x: 4000, y: 4000));
 
-      // Smaller room 2000×2000 below-left, sharing part of the big room's
-      // bottom wall (splits it at (2000,4000)).
-      tool.onPointerDown(const Point2D(x: 0, y: 4000), 1);
-      tool.onDragEnd(const Point2D(x: 2000, y: 6000));
+    // Smaller room 2000×2000 below-left, sharing part of the big room's
+    // bottom wall (splits it at (2000,4000)).
+    tool.onPointerDown(const Point2D(x: 0, y: 4000), 1);
+    tool.onDragEnd(const Point2D(x: 2000, y: 6000));
 
-      final st = container.read(editorStateProvider);
-      expect(st.rooms, hasLength(2));
+    final st = container.read(editorStateProvider);
+    expect(st.rooms, hasLength(2));
 
-      final big = st.rooms.firstWhere((r) => r.name == 'Room 1');
-      // The host wall was split at (2000,4000); the vertex must survive in the
-      // polygon (5 vertices) rather than being reverted by execute().
-      expect(
-        big.polygon,
-        hasLength(5),
-        reason: 'host room polygon must keep the ADR-003 split vertex',
-      );
+    final big = st.rooms.firstWhere((r) => r.name == 'Room 1');
+    // The host wall was split at (2000,4000); the vertex must survive in the
+    // polygon (5 vertices) rather than being reverted by execute().
+    expect(
+      big.polygon,
+      hasLength(5),
+      reason: 'host room polygon must keep the ADR-003 split vertex',
+    );
 
-      // Every big-room wall must resolve a mitred inner + outer face; a missing
-      // face means an unmatched polygon edge → fallback rendering → wedge.
-      final bigWalls =
-          st.walls.where((w) => w.roomId == big.id).toList();
-      final inner = GeometryEngine.roomFaceEdges(
-          walls: bigWalls, roomPolygon: big.polygon, side: RoomFaceSide.inner);
-      final outer = GeometryEngine.roomFaceEdges(
-          walls: bigWalls, roomPolygon: big.polygon, side: RoomFaceSide.outer);
-      expect(inner.length, bigWalls.length,
-          reason: 'no big-room wall may lose its inner face');
-      expect(outer.length, bigWalls.length,
-          reason: 'no big-room wall may lose its outer face');
-    },
-  );
+    // Every big-room wall must resolve a mitred inner + outer face; a missing
+    // face means an unmatched polygon edge → fallback rendering → wedge.
+    final bigWalls = st.walls.where((w) => w.roomId == big.id).toList();
+    final inner = GeometryEngine.roomFaceEdges(
+      walls: bigWalls,
+      roomPolygon: big.polygon,
+      side: RoomFaceSide.inner,
+    );
+    final outer = GeometryEngine.roomFaceEdges(
+      walls: bigWalls,
+      roomPolygon: big.polygon,
+      side: RoomFaceSide.outer,
+    );
+    expect(
+      inner.length,
+      bigWalls.length,
+      reason: 'no big-room wall may lose its inner face',
+    );
+    expect(
+      outer.length,
+      bigWalls.length,
+      reason: 'no big-room wall may lose its outer face',
+    );
+  });
 }

@@ -318,6 +318,15 @@ HeatingCircuit _circuitFromRow($db.HeatingCircuit row) {
     flowRateKgH: row.flowRateKgH,
     pressureLossPa: row.pressureLossPa,
     valveSetting: row.valveSetting,
+    supplyPipeInsulationType: row.supplyPipeInsulationType == null
+        ? null
+        : SupplyPipeInsulationType.values
+            .asNameMap()[row.supplyPipeInsulationType],
+    centerlinePath: _decodePointList(row.centerlinePathJson),
+    pipeSpacingMm: row.pipeSpacingMm,
+    zoneClearanceMm: row.zoneClearanceMm,
+    wallClearanceMm: row.wallClearanceMm,
+    supplyOnRight: row.supplyOnRight,
   );
 }
 
@@ -403,6 +412,13 @@ $db.HeatingCircuitsCompanion _circuitToCompanion(
     flowRateKgH: Value(circuit.flowRateKgH),
     pressureLossPa: Value(circuit.pressureLossPa),
     valveSetting: Value(circuit.valveSetting),
+    supplyPipeInsulationType:
+        Value(circuit.supplyPipeInsulationType?.name),
+    centerlinePathJson: Value(_encodePointList(circuit.centerlinePath)),
+    pipeSpacingMm: Value(circuit.pipeSpacingMm),
+    zoneClearanceMm: Value(circuit.zoneClearanceMm),
+    wallClearanceMm: Value(circuit.wallClearanceMm),
+    supplyOnRight: Value(circuit.supplyOnRight),
   );
 }
 

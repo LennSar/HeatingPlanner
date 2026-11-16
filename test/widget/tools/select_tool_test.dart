@@ -27,6 +27,8 @@ import 'package:drift/native.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:heating_planner/calculation/engines/pipe_layout_engine.dart';
+import 'package:heating_planner/calculation/providers/pipe_layout_providers.dart';
 // Drift generates data classes that collide with our freezed models.
 // Hide every name we use from the freezed/model side.
 import 'package:heating_planner/data/database/app_database.dart'
@@ -78,10 +80,10 @@ class _StubCallbacks implements EditorCallbacks {
     List<Room>? rooms,
     List<HeatingZone>? zones,
     List<HeatingCircuit>? circuits,
-  })  : _walls = List<WallSegment>.of(walls ?? const []),
-        _rooms = List<Room>.of(rooms ?? const []),
-        _zones = List<HeatingZone>.of(zones ?? const []),
-        _circuits = List<HeatingCircuit>.of(circuits ?? const []);
+  }) : _walls = List<WallSegment>.of(walls ?? const []),
+       _rooms = List<Room>.of(rooms ?? const []),
+       _zones = List<HeatingZone>.of(zones ?? const []),
+       _circuits = List<HeatingCircuit>.of(circuits ?? const []);
 
   @override
   List<WallSegment> get currentWalls => List.unmodifiable(_walls);
@@ -125,6 +127,8 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   void updateZoneTransient(HeatingZone zone) => updateZone(zone);
   @override
+  void updateCircuitTransient(HeatingCircuit circuit) => updateCircuit(circuit);
+  @override
   void updateWindowTransient(WindowElement window) => updateWindow(window);
   @override
   void updateDoorTransient(Door door) => updateDoor(door);
@@ -159,8 +163,10 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   void commitWall(WallSegment wall) {}
   @override
-  WallSegment commitWallWithSplit(WallSegment wall, {bool splitNewWall = true}) =>
-      wall;
+  WallSegment commitWallWithSplit(
+    WallSegment wall, {
+    bool splitNewWall = true,
+  }) => wall;
   @override
   void updateWall(WallSegment wall) {}
   @override
@@ -199,6 +205,7 @@ class _StubCallbacks implements EditorCallbacks {
       ..clear()
       ..addAll(zones);
   }
+
   @override
   void addRoomFromDetection({
     required Room room,
@@ -231,9 +238,7 @@ class _StubCallbacks implements EditorCallbacks {
     required void Function() onReplace,
   }) {}
   @override
-  void requestDistributorDeleteDialog({
-    required void Function() onConfirmed,
-  }) {}
+  void requestDistributorDeleteDialog({required void Function() onConfirmed}) {}
   @override
   void commitCircuit(HeatingCircuit circuit) => _circuits.add(circuit);
   @override
@@ -241,6 +246,7 @@ class _StubCallbacks implements EditorCallbacks {
     final i = _circuits.indexWhere((c) => c.id == circuit.id);
     if (i >= 0) _circuits[i] = circuit;
   }
+
   @override
   void clearAllCircuits() => _circuits.clear();
   @override
@@ -254,7 +260,11 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   String get defaultFlooringMaterialId => 'mat-1';
   @override
-  void requestRoomDialog(List<Point2D> polygon, List<String> wallIds, {void Function(List<WallSegment>, List<Room>)? onCreated}) {}
+  void requestRoomDialog(
+    List<Point2D> polygon,
+    List<String> wallIds, {
+    void Function(List<WallSegment>, List<Room>)? onCreated,
+  }) {}
   @override
   List<WindowElement> get currentWindows => const [];
   @override
@@ -268,10 +278,10 @@ class _StubCallbacks implements EditorCallbacks {
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 SelectTool _makeTool(EditorCallbacks cb) => SelectTool(
-      callbacks: cb,
-      onStateChanged: () {},
-      undoRedo: UndoRedoService(),
-    );
+  callbacks: cb,
+  onStateChanged: () {},
+  undoRedo: UndoRedoService(),
+);
 
 // A horizontal wall from (0,0) to (5000,0).
 const _testWall = WallSegment(
@@ -303,10 +313,7 @@ const _testCircuit = HeatingCircuit(
   id: 'circuit-1',
   distributorId: 'dist-1',
   heatingZoneId: 'zone-1',
-  supplyRoutePath: [
-    Point2D(x: 3000, y: 3000),
-    Point2D(x: 4000, y: 3000),
-  ],
+  supplyRoutePath: [Point2D(x: 3000, y: 3000), Point2D(x: 4000, y: 3000)],
 );
 
 // ── Tests ─────────────────────────────────────────────────────────────────────
@@ -320,111 +327,81 @@ void main() {
 
   // ST-1 ────────────────────────────────────────────────────────────────────
 
-  test(
-    'ST-1: tapping a wall calls selectElement("wall", wallId)',
-    () {
-      final cb = _StubCallbacks(walls: [_testWall]);
-      final tool = _makeTool(cb);
+  test('ST-1: tapping a wall calls selectElement("wall", wallId)', () {
+    final cb = _StubCallbacks(walls: [_testWall]);
+    final tool = _makeTool(cb);
 
-      // Tap on the wall's midpoint (2500, 0) — within the 100 mm threshold.
-      tool.onTap(
-        const Point2D(x: 2500, y: 0),
-        PointerDeviceKind.mouse,
-      );
+    // Tap on the wall's midpoint (2500, 0) — within the 100 mm threshold.
+    tool.onTap(const Point2D(x: 2500, y: 0), PointerDeviceKind.mouse);
 
-      expect(cb.lastSelectedType, 'wall');
-      expect(cb.lastSelectedId, 'wall-1');
-    },
-  );
+    expect(cb.lastSelectedType, 'wall');
+    expect(cb.lastSelectedId, 'wall-1');
+  });
 
   // ST-2 ────────────────────────────────────────────────────────────────────
 
-  test(
-    'ST-2: tapping empty space calls selectElement(null, null)',
-    () {
-      final cb = _StubCallbacks(walls: [_testWall]);
-      final tool = _makeTool(cb);
+  test('ST-2: tapping empty space calls selectElement(null, null)', () {
+    final cb = _StubCallbacks(walls: [_testWall]);
+    final tool = _makeTool(cb);
 
-      // Far from any wall (10 m away from the wall at y=0).
-      tool.onTap(
-        const Point2D(x: 2500, y: 10000),
-        PointerDeviceKind.mouse,
-      );
+    // Far from any wall (10 m away from the wall at y=0).
+    tool.onTap(const Point2D(x: 2500, y: 10000), PointerDeviceKind.mouse);
 
-      expect(cb.selectCalledWithNull, isTrue);
-    },
-  );
+    expect(cb.selectCalledWithNull, isTrue);
+  });
 
   // ST-3 ────────────────────────────────────────────────────────────────────
 
-  test(
-    'ST-3: tapping inside a zone calls selectElement("zone", zoneId)',
-    () {
-      // Also provide the room so the room polygon does not shadow the zone.
-      const roomPolygon = [
-        Point2D(x: 0, y: 0),
-        Point2D(x: 5000, y: 0),
-        Point2D(x: 5000, y: 5000),
-        Point2D(x: 0, y: 5000),
-      ];
-      const room = Room(
-        id: 'room-1',
-        floorId: 'floor-1',
-        name: 'Test Room',
-        targetTempC: 20.0,
-        polygon: roomPolygon,
-      );
-      final cb = _StubCallbacks(
-        zones: [_testZone],
-        rooms: [room],
-      );
-      final tool = _makeTool(cb);
+  test('ST-3: tapping inside a zone calls selectElement("zone", zoneId)', () {
+    // Also provide the room so the room polygon does not shadow the zone.
+    const roomPolygon = [
+      Point2D(x: 0, y: 0),
+      Point2D(x: 5000, y: 0),
+      Point2D(x: 5000, y: 5000),
+      Point2D(x: 0, y: 5000),
+    ];
+    const room = Room(
+      id: 'room-1',
+      floorId: 'floor-1',
+      name: 'Test Room',
+      targetTempC: 20.0,
+      polygon: roomPolygon,
+    );
+    final cb = _StubCallbacks(zones: [_testZone], rooms: [room]);
+    final tool = _makeTool(cb);
 
-      // Tap the zone centre (1500, 1500).
-      tool.onTap(
-        const Point2D(x: 1500, y: 1500),
-        PointerDeviceKind.mouse,
-      );
+    // Tap the zone centre (1500, 1500).
+    tool.onTap(const Point2D(x: 1500, y: 1500), PointerDeviceKind.mouse);
 
-      expect(cb.lastSelectedType, 'zone');
-      expect(cb.lastSelectedId, 'zone-1');
-    },
-  );
+    expect(cb.lastSelectedType, 'zone');
+    expect(cb.lastSelectedId, 'zone-1');
+  });
 
   // ST-4 ────────────────────────────────────────────────────────────────────
 
-  test(
-    'ST-4: Delete with a circuit selected removes the circuit',
-    () {
-      final cb = _StubCallbacks(circuits: [_testCircuit]);
-      final tool = _makeTool(cb);
+  test('ST-4: Delete with a circuit selected removes the circuit', () {
+    final cb = _StubCallbacks(circuits: [_testCircuit]);
+    final tool = _makeTool(cb);
 
-      // Tap a point on the circuit's supply route (midpoint 3500, 3000).
-      tool.onTap(
-        const Point2D(x: 3500, y: 3000),
-        PointerDeviceKind.mouse,
-      );
-      expect(cb.lastSelectedType, 'circuit');
+    // Tap a point on the circuit's supply route (midpoint 3500, 3000).
+    tool.onTap(const Point2D(x: 3500, y: 3000), PointerDeviceKind.mouse);
+    expect(cb.lastSelectedType, 'circuit');
 
-      // Fire onDelete — simulates the Delete key via toolDeleteProvider.
-      tool.onDelete();
+    // Fire onDelete — simulates the Delete key via toolDeleteProvider.
+    tool.onDelete();
 
-      expect(cb.currentCircuits, isEmpty);
-    },
-  );
+    expect(cb.currentCircuits, isEmpty);
+  });
 
   // ST-5 ────────────────────────────────────────────────────────────────────
 
-  test(
-    'ST-5: Delete with nothing selected does not throw',
-    () {
-      final cb = _StubCallbacks();
-      final tool = _makeTool(cb);
+  test('ST-5: Delete with nothing selected does not throw', () {
+    final cb = _StubCallbacks();
+    final tool = _makeTool(cb);
 
-      // No selection → onDelete is a no-op.
-      expect(() => tool.onDelete(), returnsNormally);
-    },
-  );
+    // No selection → onDelete is a no-op.
+    expect(() => tool.onDelete(), returnsNormally);
+  });
 
   // ────────────────────────────────────────────────────────────────────────────
   // ADR-012 — Ctrl + endpoint-handle rectangle reshape
@@ -508,8 +485,7 @@ void main() {
     final corners = [tl, tr, br, bl];
 
     test('ST-RR-4a: dragging top-left → diagonal anchor is bottom-right', () {
-      final r =
-          SelectTool.identifyRectCornersAroundDrag(corners, tl);
+      final r = SelectTool.identifyRectCornersAroundDrag(corners, tl);
       expect(r, isNotNull);
       expect(r!.anchor, br);
       // xAdj shares dragCorner's x (= tl.x = 0) → bl (0, 2000).
@@ -519,28 +495,23 @@ void main() {
     });
 
     test('ST-RR-4b: dragging top-right → diagonal anchor is bottom-left', () {
-      final r =
-          SelectTool.identifyRectCornersAroundDrag(corners, tr);
+      final r = SelectTool.identifyRectCornersAroundDrag(corners, tr);
       expect(r, isNotNull);
       expect(r!.anchor, bl);
       expect(r.xAdj, br); // shares x=3000
       expect(r.yAdj, tl); // shares y=0
     });
 
-    test(
-        'ST-RR-4c: dragging bottom-right → diagonal anchor is top-left', () {
-      final r =
-          SelectTool.identifyRectCornersAroundDrag(corners, br);
+    test('ST-RR-4c: dragging bottom-right → diagonal anchor is top-left', () {
+      final r = SelectTool.identifyRectCornersAroundDrag(corners, br);
       expect(r, isNotNull);
       expect(r!.anchor, tl);
       expect(r.xAdj, tr); // shares x=3000
       expect(r.yAdj, bl); // shares y=2000
     });
 
-    test(
-        'ST-RR-4d: dragging bottom-left → diagonal anchor is top-right', () {
-      final r =
-          SelectTool.identifyRectCornersAroundDrag(corners, bl);
+    test('ST-RR-4d: dragging bottom-left → diagonal anchor is top-right', () {
+      final r = SelectTool.identifyRectCornersAroundDrag(corners, bl);
       expect(r, isNotNull);
       expect(r!.anchor, tr);
       expect(r.xAdj, tl); // shares x=0
@@ -560,83 +531,64 @@ void main() {
     const bl = Point2D(x: 0, y: 2000);
 
     List<WallSegment> buildRectWalls(String roomId) => [
-          WallSegment(
-            id: 'w-top',
-            roomId: roomId,
-            startPoint: tl,
-            endPoint: tr,
-          ),
-          WallSegment(
-            id: 'w-right',
-            roomId: roomId,
-            startPoint: tr,
-            endPoint: br,
-          ),
-          WallSegment(
-            id: 'w-bottom',
-            roomId: roomId,
-            startPoint: br,
-            endPoint: bl,
-          ),
-          WallSegment(
-            id: 'w-left',
-            roomId: roomId,
-            startPoint: bl,
-            endPoint: tl,
-          ),
-        ];
+      WallSegment(id: 'w-top', roomId: roomId, startPoint: tl, endPoint: tr),
+      WallSegment(id: 'w-right', roomId: roomId, startPoint: tr, endPoint: br),
+      WallSegment(id: 'w-bottom', roomId: roomId, startPoint: br, endPoint: bl),
+      WallSegment(id: 'w-left', roomId: roomId, startPoint: bl, endPoint: tl),
+    ];
 
     Room buildRoom(String id) => Room(
-          id: id,
-          floorId: 'floor-1',
-          name: 'R',
-          polygon: const [tl, tr, br, bl],
-        );
+      id: id,
+      floorId: 'floor-1',
+      name: 'R',
+      polygon: const [tl, tr, br, bl],
+    );
 
     test(
-        'ST-RR-5: Ctrl-drag of top-left corner reshapes all 4 walls atomically',
-        () {
-      const roomId = 'room-1';
-      final cb = _ReshapeStubCallbacks(
-        walls: buildRectWalls(roomId),
-        rooms: [buildRoom(roomId)],
-      );
-      final tool = _makeTool(cb);
+      'ST-RR-5: Ctrl-drag of top-left corner reshapes all 4 walls atomically',
+      () {
+        const roomId = 'room-1';
+        final cb = _ReshapeStubCallbacks(
+          walls: buildRectWalls(roomId),
+          rooms: [buildRoom(roomId)],
+        );
+        final tool = _makeTool(cb);
 
-      // Select the top wall by tapping on its midpoint.
-      tool.onTap(const Point2D(x: 1500, y: 0), PointerDeviceKind.mouse);
-      expect(cb.lastSelectedType, 'wall');
+        // Select the top wall by tapping on its midpoint.
+        tool.onTap(const Point2D(x: 1500, y: 0), PointerDeviceKind.mouse);
+        expect(cb.lastSelectedType, 'wall');
 
-      // Enter rect-reshape mode: Ctrl held, then pointer down on the
-      // top-left endpoint handle of the selected top wall.
-      tool.debugCtrlHeldOverride = true;
-      tool.onPointerDown(tl, 1);
+        // Enter rect-reshape mode: Ctrl held, then pointer down on the
+        // top-left endpoint handle of the selected top wall.
+        tool.debugCtrlHeldOverride = true;
+        tool.onPointerDown(tl, 1);
 
-      // Drag the corner to (-1000, -500) — on-grid, no snap surprise.
-      const newCorner = Point2D(x: -1000, y: -500);
-      tool.onDragUpdate(newCorner);
-      tool.onDragEnd(newCorner);
+        // Drag the corner to (-1000, -500) — on-grid, no snap surprise.
+        const newCorner = Point2D(x: -1000, y: -500);
+        tool.onDragUpdate(newCorner);
+        tool.onDragEnd(newCorner);
 
-      // All 4 walls must still be present.
-      expect(cb._walls, hasLength(4));
+        // All 4 walls must still be present.
+        expect(cb._walls, hasLength(4));
 
-      // Collect distinct corner points across the 4 walls.
-      final pts = <Point2D>{};
-      for (final w in cb._walls) {
-        pts.add(w.startPoint);
-        pts.add(w.endPoint);
-      }
-      // Should now be the new rectangle: (-1000,-500), (3000,-500),
-      // (3000,2000), (-1000,2000).
-      expect(pts, hasLength(4));
-      expect(pts.map((p) => p.x).toSet(), {-1000.0, 3000.0});
-      expect(pts.map((p) => p.y).toSet(), {-500.0, 2000.0});
+        // Collect distinct corner points across the 4 walls.
+        final pts = <Point2D>{};
+        for (final w in cb._walls) {
+          pts.add(w.startPoint);
+          pts.add(w.endPoint);
+        }
+        // Should now be the new rectangle: (-1000,-500), (3000,-500),
+        // (3000,2000), (-1000,2000).
+        expect(pts, hasLength(4));
+        expect(pts.map((p) => p.x).toSet(), {-1000.0, 3000.0});
+        expect(pts.map((p) => p.y).toSet(), {-500.0, 2000.0});
 
-      // Room polygon must reflect the new rectangle.
-      final room = cb._rooms.firstWhere((r) => r.id == roomId);
-      expect(room.polygon.map((p) => p.x).toSet(), {-1000.0, 3000.0});
-      expect(room.polygon.map((p) => p.y).toSet(), {-500.0, 2000.0});
-    });
+        // Room polygon must reflect the new rectangle.
+        final room = cb._rooms.firstWhere((r) => r.id == roomId);
+        expect(room.polygon.map((p) => p.x).toSet(), {-1000.0, 3000.0});
+        expect(room.polygon.map((p) => p.y).toSet(), {-500.0, 2000.0});
+      },
+    );
 
     test('ST-RR-6: snap pipeline snaps the cursor to the world grid', () {
       const roomId = 'room-2';
@@ -669,32 +621,33 @@ void main() {
     });
 
     test(
-        'ST-RR-7: collapsing the rectangle below 100 mm rejects the commit',
-        () {
-      const roomId = 'room-3';
-      final initialWalls = buildRectWalls(roomId);
-      final cb = _ReshapeStubCallbacks(
-        walls: initialWalls,
-        rooms: [buildRoom(roomId)],
-      );
-      final tool = _makeTool(cb);
+      'ST-RR-7: collapsing the rectangle below 100 mm rejects the commit',
+      () {
+        const roomId = 'room-3';
+        final initialWalls = buildRectWalls(roomId);
+        final cb = _ReshapeStubCallbacks(
+          walls: initialWalls,
+          rooms: [buildRoom(roomId)],
+        );
+        final tool = _makeTool(cb);
 
-      tool.onTap(const Point2D(x: 1500, y: 0), PointerDeviceKind.mouse);
-      tool.debugCtrlHeldOverride = true;
-      tool.onPointerDown(tl, 1);
-      // Drag to nearly coincide with the diagonal anchor — height/width
-      // collapse below the 100 mm threshold.
-      tool.onDragEnd(const Point2D(x: 2950, y: 1950));
+        tool.onTap(const Point2D(x: 1500, y: 0), PointerDeviceKind.mouse);
+        tool.debugCtrlHeldOverride = true;
+        tool.onPointerDown(tl, 1);
+        // Drag to nearly coincide with the diagonal anchor — height/width
+        // collapse below the 100 mm threshold.
+        tool.onDragEnd(const Point2D(x: 2950, y: 1950));
 
-      // Walls must be unchanged (snapshot comparison via id+coords).
-      for (final orig in initialWalls) {
-        final cur = cb._walls.firstWhere((w) => w.id == orig.id);
-        expect(cur.startPoint, orig.startPoint);
-        expect(cur.endPoint, orig.endPoint);
-      }
-      // The rejection toast must have fired.
-      expect(cb._toasts.last, contains('100'));
-    });
+        // Walls must be unchanged (snapshot comparison via id+coords).
+        for (final orig in initialWalls) {
+          final cur = cb._walls.firstWhere((w) => w.id == orig.id);
+          expect(cur.startPoint, orig.startPoint);
+          expect(cur.endPoint, orig.endPoint);
+        }
+        // The rejection toast must have fired.
+        expect(cb._toasts.last, contains('100'));
+      },
+    );
 
     test('ST-RR-8: mid-drag Ctrl-release still commits as rect-reshape', () {
       const roomId = 'room-4';
@@ -718,16 +671,18 @@ void main() {
       final xs = <double>{};
       final ys = <double>{};
       for (final w in cb._walls) {
-        xs..add(w.startPoint.x)..add(w.endPoint.x);
-        ys..add(w.startPoint.y)..add(w.endPoint.y);
+        xs
+          ..add(w.startPoint.x)
+          ..add(w.endPoint.x);
+        ys
+          ..add(w.startPoint.y)
+          ..add(w.endPoint.y);
       }
       expect(xs, {-1000.0, 3000.0});
       expect(ys, {-500.0, 2000.0});
     });
 
-    test(
-        'ST-RR-9: Shift is a no-op — no new code path activated for it',
-        () {
+    test('ST-RR-9: Shift is a no-op — no new code path activated for it', () {
       // Shift has no API in SelectTool (no updateModifiers param). Verify
       // that absent Ctrl, a corner drag falls back to default endpoint
       // pivot — the diagonally opposite endpoint must NOT move.
@@ -761,10 +716,8 @@ void main() {
       expect(blStillPresent, isTrue);
     });
 
-    test(
-        'ST-RR-11: rect-reshape + undo + rect-reshape — second drag still '
-        'engages rect-reshape (refreshes stale _selectedWall after undo)',
-        () {
+    test('ST-RR-11: rect-reshape + undo + rect-reshape — second drag still '
+        'engages rect-reshape (refreshes stale _selectedWall after undo)', () {
       // Regression for the "wall detaches after undo" bug. Sequence:
       //   1. Select top wall, Ctrl-drag top-left to a new corner — commits
       //      rect-reshape, pushes _RectReshapeCommand.
@@ -801,8 +754,12 @@ void main() {
       final xsAfterFirst = <double>{};
       final ysAfterFirst = <double>{};
       for (final w in cb._walls) {
-        xsAfterFirst..add(w.startPoint.x)..add(w.endPoint.x);
-        ysAfterFirst..add(w.startPoint.y)..add(w.endPoint.y);
+        xsAfterFirst
+          ..add(w.startPoint.x)
+          ..add(w.endPoint.x);
+        ysAfterFirst
+          ..add(w.startPoint.y)
+          ..add(w.endPoint.y);
       }
       expect(xsAfterFirst, {-1000.0, 3000.0});
       expect(ysAfterFirst, {-500.0, 2000.0});
@@ -813,8 +770,12 @@ void main() {
       final xsAfterUndo = <double>{};
       final ysAfterUndo = <double>{};
       for (final w in cb._walls) {
-        xsAfterUndo..add(w.startPoint.x)..add(w.endPoint.x);
-        ysAfterUndo..add(w.startPoint.y)..add(w.endPoint.y);
+        xsAfterUndo
+          ..add(w.startPoint.x)
+          ..add(w.endPoint.x);
+        ysAfterUndo
+          ..add(w.startPoint.y)
+          ..add(w.endPoint.y);
       }
       expect(xsAfterUndo, {0.0, 3000.0});
       expect(ysAfterUndo, {0.0, 2000.0});
@@ -832,15 +793,18 @@ void main() {
       final xsAfterSecond = <double>{};
       final ysAfterSecond = <double>{};
       for (final w in cb._walls) {
-        xsAfterSecond..add(w.startPoint.x)..add(w.endPoint.x);
-        ysAfterSecond..add(w.startPoint.y)..add(w.endPoint.y);
+        xsAfterSecond
+          ..add(w.startPoint.x)
+          ..add(w.endPoint.x);
+        ysAfterSecond
+          ..add(w.startPoint.y)
+          ..add(w.endPoint.y);
       }
       expect(xsAfterSecond, {-500.0, 3000.0});
       expect(ysAfterSecond, {-300.0, 2000.0});
     });
 
-    test(
-        'ST-RR-12: user scenario — non-Ctrl corner drag deforms the room; '
+    test('ST-RR-12: user scenario — non-Ctrl corner drag deforms the room; '
         'Ctrl+Z restores rectangle; subsequent Ctrl-drag rect-reshapes', () {
       // Reproduces the exact sequence the user described:
       //   1. Have a rectangular room.
@@ -867,13 +831,21 @@ void main() {
         final xs = <double>{};
         final ys = <double>{};
         for (final w in cb._walls) {
-          xs..add(w.startPoint.x)..add(w.endPoint.x);
-          ys..add(w.startPoint.y)..add(w.endPoint.y);
+          xs
+            ..add(w.startPoint.x)
+            ..add(w.endPoint.x);
+          ys
+            ..add(w.startPoint.y)
+            ..add(w.endPoint.y);
         }
-        expect(xs, {0.0, 3000.0},
-            reason: 'starting room must be a 3000×2000 rectangle');
-        expect(ys, {0.0, 2000.0},
-            reason: 'starting room must be a 3000×2000 rectangle');
+        expect(xs, {
+          0.0,
+          3000.0,
+        }, reason: 'starting room must be a 3000×2000 rectangle');
+        expect(ys, {
+          0.0,
+          2000.0,
+        }, reason: 'starting room must be a 3000×2000 rectangle');
       }
 
       // Step 2: select the top wall, then drag the top-left corner WITHOUT
@@ -894,38 +866,56 @@ void main() {
         cornersAfterDeform.add(w.startPoint);
         cornersAfterDeform.add(w.endPoint);
       }
-      expect(cornersAfterDeform.length, 4,
-          reason: 'room must still have exactly 4 distinct corners');
-      expect(cornersAfterDeform, contains(const Point2D(x: -500, y: -300)),
-          reason: 'the dragged corner must be at the new position');
+      expect(
+        cornersAfterDeform.length,
+        4,
+        reason: 'room must still have exactly 4 distinct corners',
+      );
+      expect(
+        cornersAfterDeform,
+        contains(const Point2D(x: -500, y: -300)),
+        reason: 'the dragged corner must be at the new position',
+      );
 
       // The other three corners must be the original ones — the three
       // walls NOT connected to the moved endpoint stay in place.
-      expect(cornersAfterDeform, contains(tr),
-          reason: '(3000,0) must remain — top wall endPoint unchanged');
-      expect(cornersAfterDeform, contains(br),
-          reason: '(3000,2000) must remain — diagonally opposite corner');
-      expect(cornersAfterDeform, contains(bl),
-          reason: '(0,2000) must remain — left wall startPoint unchanged');
+      expect(
+        cornersAfterDeform,
+        contains(tr),
+        reason: '(3000,0) must remain — top wall endPoint unchanged',
+      );
+      expect(
+        cornersAfterDeform,
+        contains(br),
+        reason: '(3000,2000) must remain — diagonally opposite corner',
+      );
+      expect(
+        cornersAfterDeform,
+        contains(bl),
+        reason: '(0,2000) must remain — left wall startPoint unchanged',
+      );
 
       // The deformed room must NOT be a rectangle — three distinct
       // y-values is the signature of the diagonal corner break.
-      final ysAfterDeform =
-          cornersAfterDeform.map((p) => p.y).toSet();
-      expect(ysAfterDeform.length, greaterThan(2),
-          reason: 'after non-Ctrl drag the room must NOT be rectangular');
+      final ysAfterDeform = cornersAfterDeform.map((p) => p.y).toSet();
+      expect(
+        ysAfterDeform.length,
+        greaterThan(2),
+        reason: 'after non-Ctrl drag the room must NOT be rectangular',
+      );
 
       // The 4 walls must still form a closed chain (room remains a room).
       // We verify this by checking that every corner is touched by exactly
       // two distinct walls' endpoints.
       for (final corner in cornersAfterDeform) {
         final touching = cb._walls
-            .where(
-              (w) => w.startPoint == corner || w.endPoint == corner,
-            )
+            .where((w) => w.startPoint == corner || w.endPoint == corner)
             .toList();
-        expect(touching, hasLength(2),
-            reason: 'each corner $corner must connect exactly 2 walls');
+        expect(
+          touching,
+          hasLength(2),
+          reason: 'each corner $corner must connect exactly 2 walls',
+        );
       }
 
       // Step 3: Ctrl+Z. The original rectangle must be restored.
@@ -935,12 +925,13 @@ void main() {
         cornersAfterUndo.add(w.startPoint);
         cornersAfterUndo.add(w.endPoint);
       }
-      expect(cornersAfterUndo, equals({tl, tr, br, bl}),
-          reason: 'undo must restore the original four corners');
-      final xsAfterUndo =
-          cornersAfterUndo.map((p) => p.x).toSet();
-      final ysAfterUndo =
-          cornersAfterUndo.map((p) => p.y).toSet();
+      expect(
+        cornersAfterUndo,
+        equals({tl, tr, br, bl}),
+        reason: 'undo must restore the original four corners',
+      );
+      final xsAfterUndo = cornersAfterUndo.map((p) => p.x).toSet();
+      final ysAfterUndo = cornersAfterUndo.map((p) => p.y).toSet();
       expect(xsAfterUndo, {0.0, 3000.0});
       expect(ysAfterUndo, {0.0, 2000.0});
 
@@ -958,14 +949,19 @@ void main() {
       // Rect-reshape: the room must still be an axis-aligned rectangle
       // with corners (-500,-300), (3000,-300), (3000,2000), (-500,2000).
       expect(cornersAfterReshape, hasLength(4));
-      expect(cornersAfterReshape.map((p) => p.x).toSet(), {-500.0, 3000.0},
-          reason: 'rect-reshape must leave exactly 2 distinct x-values');
-      expect(cornersAfterReshape.map((p) => p.y).toSet(), {-300.0, 2000.0},
-          reason: 'rect-reshape must leave exactly 2 distinct y-values');
+      expect(
+        cornersAfterReshape.map((p) => p.x).toSet(),
+        {-500.0, 3000.0},
+        reason: 'rect-reshape must leave exactly 2 distinct x-values',
+      );
+      expect(
+        cornersAfterReshape.map((p) => p.y).toSet(),
+        {-300.0, 2000.0},
+        reason: 'rect-reshape must leave exactly 2 distinct y-values',
+      );
     });
 
-    test(
-        'ST-RR-13: a stranded cached _ctrlHeld (no override, no hardware key) '
+    test('ST-RR-13: a stranded cached _ctrlHeld (no override, no hardware key) '
         'does NOT engage rect-reshape — drag-start re-syncs from hardware', () {
       // This guards the exact symptom the user reported ("now it always
       // moves as a rectangular"): the cached `_ctrlHeld` flag is stuck
@@ -1004,18 +1000,34 @@ void main() {
           ..add(w.startPoint)
           ..add(w.endPoint);
       }
-      expect(corners, contains(const Point2D(x: -500, y: -300)),
-          reason: 'dragged corner must have moved');
-      expect(corners, contains(tr),
-          reason: 'far top-right corner must stay put');
-      expect(corners, contains(br),
-          reason: 'diagonally opposite corner must stay put');
-      expect(corners, contains(bl),
-          reason: 'far bottom-left corner must stay put');
+      expect(
+        corners,
+        contains(const Point2D(x: -500, y: -300)),
+        reason: 'dragged corner must have moved',
+      );
+      expect(
+        corners,
+        contains(tr),
+        reason: 'far top-right corner must stay put',
+      );
+      expect(
+        corners,
+        contains(br),
+        reason: 'diagonally opposite corner must stay put',
+      );
+      expect(
+        corners,
+        contains(bl),
+        reason: 'far bottom-left corner must stay put',
+      );
       // Non-rectangular signature.
-      expect(corners.map((p) => p.y).toSet().length, greaterThan(2),
-          reason: 'stuck _ctrlHeld must NOT engage rect-reshape — '
-              'the room must end up non-rectangular');
+      expect(
+        corners.map((p) => p.y).toSet().length,
+        greaterThan(2),
+        reason:
+            'stuck _ctrlHeld must NOT engage rect-reshape — '
+            'the room must end up non-rectangular',
+      );
     });
   });
 
@@ -1031,57 +1043,59 @@ void main() {
     const bl = Point2D(x: 0, y: 2000);
 
     List<WallSegment> buildRectWalls(String roomId) => [
-          WallSegment(
-              id: 'w-top', roomId: roomId, startPoint: tl, endPoint: tr),
-          WallSegment(
-              id: 'w-right', roomId: roomId, startPoint: tr, endPoint: br),
-          WallSegment(
-              id: 'w-bottom', roomId: roomId, startPoint: br, endPoint: bl),
-          WallSegment(
-              id: 'w-left', roomId: roomId, startPoint: bl, endPoint: tl),
-        ];
+      WallSegment(id: 'w-top', roomId: roomId, startPoint: tl, endPoint: tr),
+      WallSegment(id: 'w-right', roomId: roomId, startPoint: tr, endPoint: br),
+      WallSegment(id: 'w-bottom', roomId: roomId, startPoint: br, endPoint: bl),
+      WallSegment(id: 'w-left', roomId: roomId, startPoint: bl, endPoint: tl),
+    ];
 
     Room buildRoom(String id) => const Room(
-          id: 'room-1',
-          floorId: 'floor-1',
-          name: 'R',
-          polygon: [tl, tr, br, bl],
-        );
+      id: 'room-1',
+      floorId: 'floor-1',
+      name: 'R',
+      polygon: [tl, tr, br, bl],
+    );
 
     Set<Point2D> cornersOf(List<WallSegment> walls) {
       final pts = <Point2D>{};
       for (final w in walls) {
-        pts..add(w.startPoint)..add(w.endPoint);
+        pts
+          ..add(w.startPoint)
+          ..add(w.endPoint);
       }
       return pts;
     }
 
     test(
-        'ADR-027-1: Ctrl + mid drag of the top wall keeps the room rectangular',
-        () {
-      final cb = _ReshapeStubCallbacks(
-        walls: buildRectWalls('room-1'),
-        rooms: [buildRoom('room-1')],
-      );
-      final tool = _makeTool(cb);
+      'ADR-027-1: Ctrl + mid drag of the top wall keeps the room rectangular',
+      () {
+        final cb = _ReshapeStubCallbacks(
+          walls: buildRectWalls('room-1'),
+          rooms: [buildRoom('room-1')],
+        );
+        final tool = _makeTool(cb);
 
-      // Select the top wall, then grab its mid handle (its midpoint).
-      tool.onTap(const Point2D(x: 1500, y: 0), PointerDeviceKind.mouse);
-      tool.debugCtrlHeldOverride = true;
-      tool.onPointerDown(const Point2D(x: 1500, y: 0), 1);
+        // Select the top wall, then grab its mid handle (its midpoint).
+        tool.onTap(const Point2D(x: 1500, y: 0), PointerDeviceKind.mouse);
+        tool.debugCtrlHeldOverride = true;
+        tool.onPointerDown(const Point2D(x: 1500, y: 0), 1);
 
-      // Drag diagonally: a 500 mm sideways component that MUST be ignored
-      // and a 500 mm upward (perpendicular) component that moves the wall.
-      tool.onDragUpdate(const Point2D(x: 2000, y: -500));
-      tool.onDragEnd(const Point2D(x: 2000, y: -500));
+        // Drag diagonally: a 500 mm sideways component that MUST be ignored
+        // and a 500 mm upward (perpendicular) component that moves the wall.
+        tool.onDragUpdate(const Point2D(x: 2000, y: -500));
+        tool.onDragEnd(const Point2D(x: 2000, y: -500));
 
-      // Still an axis-aligned rectangle: only the top edge's y moved.
-      final corners = cornersOf(cb._walls);
-      expect(corners, hasLength(4));
-      expect(corners.map((p) => p.x).toSet(), {0.0, 3000.0},
-          reason: 'the sideways drag component must not slant the sides');
-      expect(corners.map((p) => p.y).toSet(), {-500.0, 2000.0});
-    });
+        // Still an axis-aligned rectangle: only the top edge's y moved.
+        final corners = cornersOf(cb._walls);
+        expect(corners, hasLength(4));
+        expect(
+          corners.map((p) => p.x).toSet(),
+          {0.0, 3000.0},
+          reason: 'the sideways drag component must not slant the sides',
+        );
+        expect(corners.map((p) => p.y).toSet(), {-500.0, 2000.0});
+      },
+    );
 
     test('ADR-027-2: Shift alone also engages keep-orientation', () {
       final cb = _ReshapeStubCallbacks(
@@ -1102,25 +1116,29 @@ void main() {
     });
 
     test(
-        'ADR-027-3: without a modifier the same drag slants the side walls',
-        () {
-      final cb = _ReshapeStubCallbacks(
-        walls: buildRectWalls('room-1'),
-        rooms: [buildRoom('room-1')],
-      );
-      final tool = _makeTool(cb);
+      'ADR-027-3: without a modifier the same drag slants the side walls',
+      () {
+        final cb = _ReshapeStubCallbacks(
+          walls: buildRectWalls('room-1'),
+          rooms: [buildRoom('room-1')],
+        );
+        final tool = _makeTool(cb);
 
-      // No Ctrl / Shift override → plain translate (both axes applied).
-      tool.onTap(const Point2D(x: 1500, y: 0), PointerDeviceKind.mouse);
-      tool.onPointerDown(const Point2D(x: 1500, y: 0), 1);
-      tool.onDragUpdate(const Point2D(x: 2000, y: -500));
-      tool.onDragEnd(const Point2D(x: 2000, y: -500));
+        // No Ctrl / Shift override → plain translate (both axes applied).
+        tool.onTap(const Point2D(x: 1500, y: 0), PointerDeviceKind.mouse);
+        tool.onPointerDown(const Point2D(x: 1500, y: 0), 1);
+        tool.onDragUpdate(const Point2D(x: 2000, y: -500));
+        tool.onDragEnd(const Point2D(x: 2000, y: -500));
 
-      // The left wall is no longer vertical — the room is non-rectangular.
-      final left = cb._walls.firstWhere((w) => w.id == 'w-left');
-      expect((left.startPoint.x - left.endPoint.x).abs(), greaterThan(1.0),
-          reason: 'default mid drag translates both axes, slanting the side');
-    });
+        // The left wall is no longer vertical — the room is non-rectangular.
+        final left = cb._walls.firstWhere((w) => w.id == 'w-left');
+        expect(
+          (left.startPoint.x - left.endPoint.x).abs(),
+          greaterThan(1.0),
+          reason: 'default mid drag translates both axes, slanting the side',
+        );
+      },
+    );
   });
 
   // ────────────────────────────────────────────────────────────────────────────
@@ -1161,57 +1179,75 @@ void main() {
           tubeTypeId: 'tube-1',
           flooringMaterialId: 'mat-1',
         );
-        final cb = _StubCallbacks(
-          rooms: const [parentRoom],
-          zones: [rectZone],
-        );
+        final cb = _StubCallbacks(rooms: const [parentRoom], zones: [rectZone]);
         final tool = _makeTool(cb);
 
         tool.onSecondaryTap(const Point2D(x: 3000, y: 2000));
 
         final req = cb.lastContextMenuRequest;
-        expect(req, isNotNull,
-            reason: 'right-click on a zone must request the menu');
-        expect(req!.showSplitItems, isTrue,
-            reason: 'floor zones expose the split items');
-        expect(req.splitEnabled, isTrue,
-            reason: 'rectangular zones enable the split items');
+        expect(
+          req,
+          isNotNull,
+          reason: 'right-click on a zone must request the menu',
+        );
+        expect(
+          req!.showSplitItems,
+          isTrue,
+          reason: 'floor zones expose the split items',
+        );
+        expect(
+          req.splitEnabled,
+          isTrue,
+          reason: 'rectangular zones enable the split items',
+        );
       },
     );
 
     // ST-S2 ────────────────────────────────────────────────────────────────
 
     test(
-      'ST-S2: right-click on a non-rectangular zone shows disabled split items',
+      'ST-S2: right-click on a zone that cannot be cut in two shows disabled '
+      'split items',
       () {
-        // 5-vertex pentagon — non-rect.
-        const pentagonZone = HeatingZone(
-          id: 'zone-penta',
+        // Open ring: no single vertical or horizontal cut yields two
+        // pieces (ADR-037 Rule 1).
+        const ringZone = HeatingZone(
+          id: 'zone-ring',
           roomId: 'room-1',
           polygon: [
             Point2D(x: 1000, y: 1000),
             Point2D(x: 4000, y: 1000),
-            Point2D(x: 5000, y: 2000),
-            Point2D(x: 4000, y: 3000),
-            Point2D(x: 1000, y: 3000),
+            Point2D(x: 4000, y: 2200),
+            Point2D(x: 3000, y: 2200),
+            Point2D(x: 3000, y: 2000),
+            Point2D(x: 2000, y: 2000),
+            Point2D(x: 2000, y: 3000),
+            Point2D(x: 3000, y: 3000),
+            Point2D(x: 3000, y: 2400),
+            Point2D(x: 4000, y: 2400),
+            Point2D(x: 4000, y: 4000),
+            Point2D(x: 1000, y: 4000),
           ],
           tubeTypeId: 'tube-1',
           flooringMaterialId: 'mat-1',
         );
-        final cb = _StubCallbacks(
-          rooms: const [parentRoom],
-          zones: [pentagonZone],
-        );
+        final cb = _StubCallbacks(rooms: const [parentRoom], zones: [ringZone]);
         final tool = _makeTool(cb);
 
-        tool.onSecondaryTap(const Point2D(x: 2500, y: 2000));
+        tool.onSecondaryTap(const Point2D(x: 1500, y: 1500));
 
         final req = cb.lastContextMenuRequest;
         expect(req, isNotNull);
-        expect(req!.showSplitItems, isTrue,
-            reason: 'floor zones still expose the items, just disabled');
-        expect(req.splitEnabled, isFalse,
-            reason: 'non-rectangular zones disable the split items');
+        expect(
+          req!.showSplitItems,
+          isTrue,
+          reason: 'floor zones still expose the items, just disabled',
+        );
+        expect(
+          req.splitEnabled,
+          isFalse,
+          reason: 'unsplittable shapes disable the split items',
+        );
       },
     );
 
@@ -1240,10 +1276,7 @@ void main() {
           id: 'circuit-1',
           distributorId: 'dist-1',
           heatingZoneId: 'zone-rect',
-          supplyRoutePath: [
-            Point2D(x: 0, y: 2000),
-            Point2D(x: 4500, y: 2000),
-          ],
+          supplyRoutePath: [Point2D(x: 0, y: 2000), Point2D(x: 4500, y: 2000)],
         );
         final cb = _StubCallbacks(
           rooms: const [parentRoom],
@@ -1265,10 +1298,16 @@ void main() {
           (z) => z.polygon.any((p) => p.x == 5000),
         );
         final left = cb.currentZones.firstWhere((z) => z.id != right.id);
-        expect(right.circuitId, 'circuit-1',
-            reason: 'child containing the pipe terminus inherits the circuit');
-        expect(left.circuitId, isNull,
-            reason: 'the other child renders as unconnected');
+        expect(
+          right.circuitId,
+          'circuit-1',
+          reason: 'child containing the pipe terminus inherits the circuit',
+        );
+        expect(
+          left.circuitId,
+          isNull,
+          reason: 'the other child renders as unconnected',
+        );
 
         // Circuit's zone-FK now points at the inheriting child.
         expect(cb.currentCircuits.single.heatingZoneId, right.id);
@@ -1294,10 +1333,7 @@ void main() {
           tubeTypeId: 'tube-1',
           flooringMaterialId: 'mat-1',
         );
-        final cb = _StubCallbacks(
-          rooms: const [parentRoom],
-          zones: [tinyZone],
-        );
+        final cb = _StubCallbacks(rooms: const [parentRoom], zones: [tinyZone]);
         final tool = _makeTool(cb);
 
         tool.onSecondaryTap(const Point2D(x: 1050, y: 1500));
@@ -1313,63 +1349,546 @@ void main() {
 
     // ST-S5 ────────────────────────────────────────────────────────────────
 
-    test(
-      'ST-S5: Ctrl+Z after split restores the parent zone with its original '
-      'circuitId and the circuit zone-FK',
-      () {
-        const rectZone = HeatingZone(
-          id: 'zone-rect',
+    test('ST-S5: Ctrl+Z after split restores the parent zone with its original '
+        'circuitId and the circuit zone-FK', () {
+      const rectZone = HeatingZone(
+        id: 'zone-rect',
+        roomId: 'room-1',
+        polygon: [
+          Point2D(x: 1000, y: 1000),
+          Point2D(x: 5000, y: 1000),
+          Point2D(x: 5000, y: 3000),
+          Point2D(x: 1000, y: 3000),
+        ],
+        tubeTypeId: 'tube-1',
+        flooringMaterialId: 'mat-1',
+        circuitId: 'circuit-1',
+      );
+      const circuit = HeatingCircuit(
+        id: 'circuit-1',
+        distributorId: 'dist-1',
+        heatingZoneId: 'zone-rect',
+        supplyRoutePath: [Point2D(x: 0, y: 2000), Point2D(x: 4500, y: 2000)],
+      );
+      final cb = _StubCallbacks(
+        rooms: const [parentRoom],
+        zones: [rectZone],
+        circuits: const [circuit],
+      );
+      final undoRedo = UndoRedoService();
+      final tool = SelectTool(
+        callbacks: cb,
+        onStateChanged: () {},
+        undoRedo: undoRedo,
+      );
+
+      tool.onSecondaryTap(const Point2D(x: 3000, y: 2000));
+      cb.lastContextMenuRequest!.onSplitVertically();
+
+      // Sanity: split happened.
+      expect(cb.currentZones, hasLength(2));
+      expect(cb.currentCircuits.single.heatingZoneId, isNot('zone-rect'));
+
+      // Undo.
+      expect(undoRedo.canUndo, isTrue);
+      undoRedo.undo();
+
+      expect(cb.currentZones, hasLength(1));
+      expect(cb.currentZones.single.id, 'zone-rect');
+      expect(
+        cb.currentZones.single.circuitId,
+        'circuit-1',
+        reason: 'parent restored with its original circuitId',
+      );
+      expect(
+        cb.currentCircuits.single.heatingZoneId,
+        'zone-rect',
+        reason: 'circuit zone-FK restored to the parent',
+      );
+    });
+  });
+
+  // ── ADR-037 Rule 5: linked zone-boundary drag ─────────────────────────────
+
+  group('ADR-037 linked zone-boundary drag', () {
+    const room = Room(
+      id: 'room-1',
+      floorId: 'floor-1',
+      name: 'Test Room',
+      targetTempC: 20.0,
+      polygon: [
+        Point2D(x: 0, y: 0),
+        Point2D(x: 8000, y: 0),
+        Point2D(x: 8000, y: 6000),
+        Point2D(x: 0, y: 6000),
+      ],
+    );
+
+    HeatingZone rect(String id, double x0, double y0, double x1, double y1) =>
+        HeatingZone(
+          id: id,
           roomId: 'room-1',
           polygon: [
-            Point2D(x: 1000, y: 1000),
-            Point2D(x: 5000, y: 1000),
-            Point2D(x: 5000, y: 3000),
-            Point2D(x: 1000, y: 3000),
+            Point2D(x: x0, y: y0),
+            Point2D(x: x1, y: y0),
+            Point2D(x: x1, y: y1),
+            Point2D(x: x0, y: y1),
           ],
           tubeTypeId: 'tube-1',
           flooringMaterialId: 'mat-1',
-          circuitId: 'circuit-1',
-        );
-        const circuit = HeatingCircuit(
-          id: 'circuit-1',
-          distributorId: 'dist-1',
-          heatingZoneId: 'zone-rect',
-          supplyRoutePath: [
-            Point2D(x: 0, y: 2000),
-            Point2D(x: 4500, y: 2000),
-          ],
-        );
-        final cb = _StubCallbacks(
-          rooms: const [parentRoom],
-          zones: [rectZone],
-          circuits: const [circuit],
-        );
-        final undoRedo = UndoRedoService();
-        final tool = SelectTool(
-          callbacks: cb,
-          onStateChanged: () {},
-          undoRedo: undoRedo,
         );
 
-        tool.onSecondaryTap(const Point2D(x: 3000, y: 2000));
-        cb.lastContextMenuRequest!.onSplitVertically();
+    double minX(HeatingZone z) =>
+        z.polygon.map((p) => p.x).reduce((a, b) => a < b ? a : b);
+    double maxX(HeatingZone z) =>
+        z.polygon.map((p) => p.x).reduce((a, b) => a > b ? a : b);
+    HeatingZone zone(_StubCallbacks cb, String id) =>
+        cb.currentZones.firstWhere((z) => z.id == id);
 
-        // Sanity: split happened.
-        expect(cb.currentZones, hasLength(2));
-        expect(cb.currentCircuits.single.heatingZoneId, isNot('zone-rect'));
+    test('ST-B1: dragging the shared edge of two unselected zones grows one '
+        'and shrinks the other; one undo restores both', () {
+      final cb = _StubCallbacks(
+        rooms: const [room],
+        zones: [
+          rect('left', 1000, 1000, 3000, 3000),
+          rect('right', 3000, 1000, 5000, 3000),
+        ],
+      );
+      final undoRedo = UndoRedoService();
+      final tool = SelectTool(
+        callbacks: cb,
+        onStateChanged: () {},
+        undoRedo: undoRedo,
+      );
 
-        // Undo.
-        expect(undoRedo.canUndo, isTrue);
-        undoRedo.undo();
+      // No selection, no modifier: press on the divider and drag right.
+      tool.onPointerDown(const Point2D(x: 3000, y: 2000), kPrimaryButton);
+      tool.onDragUpdate(const Point2D(x: 3520, y: 2100));
+      tool.onDragEnd(const Point2D(x: 3520, y: 2100));
 
-        expect(cb.currentZones, hasLength(1));
-        expect(cb.currentZones.single.id, 'zone-rect');
-        expect(cb.currentZones.single.circuitId, 'circuit-1',
-            reason: 'parent restored with its original circuitId');
-        expect(cb.currentCircuits.single.heatingZoneId, 'zone-rect',
-            reason: 'circuit zone-FK restored to the parent');
-      },
+      // Grid-snapped to 3500; both zones follow the same line.
+      expect(maxX(zone(cb, 'left')), 3500.0);
+      expect(minX(zone(cb, 'right')), 3500.0);
+      expect(minX(zone(cb, 'left')), 1000.0);
+      expect(maxX(zone(cb, 'right')), 5000.0);
+
+      expect(undoRedo.canUndo, isTrue);
+      undoRedo.undo();
+      expect(maxX(zone(cb, 'left')), 3000.0);
+      expect(minX(zone(cb, 'right')), 3000.0);
+      expect(
+        undoRedo.canUndo,
+        isFalse,
+        reason: 'the whole boundary move is one undo entry',
+      );
+    });
+
+    test('ST-B2: the boundary stops before a zone would get thinner than '
+        '100 mm', () {
+      final cb = _StubCallbacks(
+        rooms: const [room],
+        zones: [
+          rect('left', 1000, 1000, 3000, 3000),
+          rect('right', 3000, 1000, 5000, 3000),
+        ],
+      );
+      final tool = _makeTool(cb);
+
+      tool.onPointerDown(const Point2D(x: 3000, y: 2000), kPrimaryButton);
+      tool.onDragUpdate(const Point2D(x: 4800, y: 2000));
+      // 4950 would leave the right zone 50 mm wide — ignored.
+      tool.onDragUpdate(const Point2D(x: 4960, y: 2000));
+      tool.onDragEnd(const Point2D(x: 4960, y: 2000));
+
+      expect(maxX(zone(cb, 'left')), 4800.0);
+      expect(minX(zone(cb, 'right')), 4800.0);
+    });
+
+    test('ST-B3: a divider shared with two stacked neighbours moves all three '
+        'zones, whichever edge is grabbed', () {
+      final cb = _StubCallbacks(
+        rooms: const [room],
+        zones: [
+          rect('left', 1000, 1000, 3000, 5000),
+          rect('top-right', 3000, 1000, 5000, 3000),
+          rect('bottom-right', 3000, 3000, 5000, 5000),
+        ],
+      );
+      final tool = _makeTool(cb);
+
+      // Grab the short edge of the top-right zone.
+      tool.onPointerDown(const Point2D(x: 3000, y: 1500), kPrimaryButton);
+      tool.onDragUpdate(const Point2D(x: 2500, y: 1500));
+      tool.onDragEnd(const Point2D(x: 2500, y: 1500));
+
+      expect(maxX(zone(cb, 'left')), 2500.0);
+      expect(minX(zone(cb, 'top-right')), 2500.0);
+      expect(minX(zone(cb, 'bottom-right')), 2500.0);
+    });
+
+    test('ST-B4: an edge of a lone unselected zone is not a drag target, but '
+        'becomes one once the zone is selected', () {
+      final cb = _StubCallbacks(
+        rooms: const [room],
+        zones: [rect('only', 1000, 1000, 3000, 3000)],
+      );
+      final tool = _makeTool(cb);
+
+      tool.onPointerMove(const Point2D(x: 3000, y: 2000));
+      expect(tool.zoneEdgeResizeNormal, isNull);
+
+      // Select the zone with a click in its interior.
+      tool.onPointerDown(const Point2D(x: 2000, y: 2000), kPrimaryButton);
+      tool.onTap(const Point2D(x: 2000, y: 2000), PointerDeviceKind.mouse);
+      tool.onPointerUp(const Point2D(x: 2000, y: 2000));
+      expect(cb.lastSelectedId, 'only');
+
+      tool.onPointerMove(const Point2D(x: 3000, y: 2000));
+      expect(tool.zoneEdgeResizeNormal, isNotNull);
+
+      tool.onPointerDown(const Point2D(x: 3000, y: 2000), kPrimaryButton);
+      tool.onDragUpdate(const Point2D(x: 3400, y: 2000));
+      tool.onDragEnd(const Point2D(x: 3400, y: 2000));
+      expect(maxX(zone(cb, 'only')), 3400.0);
+      expect(minX(zone(cb, 'only')), 1000.0);
+    });
+
+    test('ST-B5: Escape during a boundary drag restores every zone', () {
+      final cb = _StubCallbacks(
+        rooms: const [room],
+        zones: [
+          rect('left', 1000, 1000, 3000, 3000),
+          rect('right', 3000, 1000, 5000, 3000),
+        ],
+      );
+      final tool = _makeTool(cb);
+
+      tool.onPointerDown(const Point2D(x: 3000, y: 2000), kPrimaryButton);
+      tool.onDragUpdate(const Point2D(x: 3500, y: 2000));
+      expect(maxX(zone(cb, 'left')), 3500.0);
+      tool.cancel();
+
+      expect(maxX(zone(cb, 'left')), 3000.0);
+      expect(minX(zone(cb, 'right')), 3000.0);
+    });
+  });
+
+  // ── ADR-039 Rule 1: editing connection pipes ──────────────────────────────
+
+  group('ADR-039 connection pipe editing', () {
+    const room = Room(
+      id: 'room-1',
+      floorId: 'floor-1',
+      name: 'Test Room',
+      targetTempC: 20.0,
+      polygon: [
+        Point2D(x: 0, y: 0),
+        Point2D(x: 8000, y: 0),
+        Point2D(x: 8000, y: 6000),
+        Point2D(x: 0, y: 6000),
+      ],
     );
+    const zone = HeatingZone(
+      id: 'zone-1',
+      roomId: 'room-1',
+      polygon: [
+        Point2D(x: 4000, y: 2000),
+        Point2D(x: 7000, y: 2000),
+        Point2D(x: 7000, y: 5000),
+        Point2D(x: 4000, y: 5000),
+      ],
+      tubeTypeId: 'tube-1',
+      flooringMaterialId: 'mat-1',
+      circuitId: 'circuit-1',
+    );
+    // Distributor at (500, 500). Supply: right, then down into the zone.
+    // Return: back up a parallel lane to the distributor.
+    const circuit = HeatingCircuit(
+      id: 'circuit-1',
+      distributorId: 'dist-1',
+      heatingZoneId: 'zone-1',
+      supplyRoutePath: [
+        Point2D(x: 500, y: 500),
+        Point2D(x: 5000, y: 500),
+        Point2D(x: 5000, y: 3000),
+      ],
+      returnRoutePath: [
+        Point2D(x: 5000, y: 3000),
+        Point2D(x: 5000, y: 1000),
+        Point2D(x: 500, y: 1000),
+        Point2D(x: 500, y: 500),
+      ],
+    );
+
+    ({_StubCallbacks cb, SelectTool tool, UndoRedoService undo}) setUpTool() {
+      final cb = _StubCallbacks(
+        rooms: const [room],
+        zones: const [zone],
+        circuits: const [circuit],
+      );
+      final undo = UndoRedoService();
+      final tool = SelectTool(
+        callbacks: cb,
+        onStateChanged: () {},
+        undoRedo: undo,
+      );
+      // Select the circuit with a click on its supply pipe.
+      const on = Point2D(x: 2500, y: 500);
+      tool.onPointerDown(on, kPrimaryButton);
+      tool.onTap(on, PointerDeviceKind.mouse);
+      tool.onPointerUp(on);
+      expect(cb.lastSelectedType, 'circuit');
+      return (cb: cb, tool: tool, undo: undo);
+    }
+
+    test('ST-P1: a selected circuit shows a handle on every corner except '
+        'the two ends on the distributor', () {
+      final t = setUpTool();
+      final data = t.tool.getInteractionData();
+      expect(data, isA<CircuitSelectionData>());
+      final handles = (data! as CircuitSelectionData).handles;
+      expect(handles, const [
+        Point2D(x: 5000, y: 500), // supply corner
+        Point2D(x: 5000, y: 3000), // shared end inside the zone (once)
+        Point2D(x: 5000, y: 1000), // return corners
+        Point2D(x: 500, y: 1000),
+      ]);
+    });
+
+    test('ST-P2: dragging a corner moves that point only; one undo '
+        'restores it', () {
+      final t = setUpTool();
+      t.tool.onPointerDown(const Point2D(x: 5000, y: 500), kPrimaryButton);
+      t.tool.onDragUpdate(const Point2D(x: 5230, y: 310));
+      t.tool.onDragEnd(const Point2D(x: 5230, y: 310));
+
+      final c = t.cb.currentCircuits.single;
+      expect(c.supplyRoutePath, const [
+        Point2D(x: 500, y: 500),
+        Point2D(x: 5200, y: 300), // grid-snapped
+        Point2D(x: 5000, y: 3000),
+      ]);
+      expect(c.returnRoutePath, circuit.returnRoutePath);
+
+      t.undo.undo();
+      expect(t.cb.currentCircuits.single, circuit);
+    });
+
+    test('ST-P3: dragging the end inside the zone moves supply and return '
+        'together', () {
+      final t = setUpTool();
+      t.tool.onPointerDown(const Point2D(x: 5000, y: 3000), kPrimaryButton);
+      t.tool.onDragUpdate(const Point2D(x: 5500, y: 3500));
+      t.tool.onDragEnd(const Point2D(x: 5500, y: 3500));
+
+      final c = t.cb.currentCircuits.single;
+      expect(c.supplyRoutePath.last, const Point2D(x: 5500, y: 3500));
+      expect(c.returnRoutePath.first, const Point2D(x: 5500, y: 3500));
+    });
+
+    test('ST-P4: dragging a section moves both of its corners and keeps '
+        'its direction', () {
+      final t = setUpTool();
+      // Middle section of the return pipe: (5000,1000) → (500,1000).
+      t.tool.onPointerDown(const Point2D(x: 2500, y: 1000), kPrimaryButton);
+      t.tool.onDragUpdate(const Point2D(x: 2500, y: 1400));
+      t.tool.onDragEnd(const Point2D(x: 2500, y: 1400));
+
+      final c = t.cb.currentCircuits.single;
+      expect(c.returnRoutePath, const [
+        Point2D(x: 5000, y: 3000),
+        Point2D(x: 5000, y: 1400),
+        Point2D(x: 500, y: 1400),
+        Point2D(x: 500, y: 500),
+      ]);
+      expect(c.supplyRoutePath, circuit.supplyRoutePath);
+    });
+
+    test('ST-P5: moving the section next to the distributor keeps the '
+        'distributor end fixed by inserting a corner', () {
+      final t = setUpTool();
+      // First supply section: (500,500) → (5000,500).
+      t.tool.onPointerDown(const Point2D(x: 2500, y: 500), kPrimaryButton);
+      t.tool.onDragUpdate(const Point2D(x: 2500, y: 200));
+      t.tool.onDragEnd(const Point2D(x: 2500, y: 200));
+
+      final c = t.cb.currentCircuits.single;
+      expect(c.supplyRoutePath, const [
+        Point2D(x: 500, y: 500), // still on the distributor
+        Point2D(x: 500, y: 200),
+        Point2D(x: 5000, y: 200),
+        Point2D(x: 5000, y: 3000),
+      ]);
+    });
+
+    test('ST-P6: a drag that takes the pipe end out of its zone is '
+        'reverted with a toast', () {
+      final t = setUpTool();
+      t.tool.onPointerDown(const Point2D(x: 5000, y: 3000), kPrimaryButton);
+      t.tool.onDragUpdate(const Point2D(x: 2000, y: 3000));
+      t.tool.onDragEnd(const Point2D(x: 2000, y: 3000));
+
+      expect(t.cb.currentCircuits.single, circuit);
+      expect(t.cb.toasts, contains(t.cb.l10n.circuit_routeMustEndInZoneToast));
+      expect(t.undo.canUndo, isFalse);
+    });
+
+    test('ST-P7: dropping a corner onto its neighbour removes it', () {
+      final t = setUpTool();
+      // Return corner (500,1000) onto the distributor end (500,500).
+      t.tool.onPointerDown(const Point2D(x: 500, y: 1000), kPrimaryButton);
+      t.tool.onDragUpdate(const Point2D(x: 500, y: 500));
+      t.tool.onDragEnd(const Point2D(x: 500, y: 500));
+
+      expect(t.cb.currentCircuits.single.returnRoutePath, const [
+        Point2D(x: 5000, y: 3000),
+        Point2D(x: 5000, y: 1000),
+        Point2D(x: 500, y: 500),
+      ]);
+    });
+
+    test('ST-P8: Escape during a drag restores the pipe', () {
+      final t = setUpTool();
+      t.tool.onPointerDown(const Point2D(x: 5000, y: 500), kPrimaryButton);
+      t.tool.onDragUpdate(const Point2D(x: 5400, y: 300));
+      expect(t.cb.currentCircuits.single, isNot(circuit));
+      t.tool.cancel();
+      expect(t.cb.currentCircuits.single, circuit);
+    });
+  });
+
+  // ── ADR-040: editing a pair of connection pipes drawn as one route ───────
+
+  group('ADR-040 editing a drawn pipe pair', () {
+    const room = Room(
+      id: 'room-1',
+      floorId: 'floor-1',
+      name: 'Test Room',
+      targetTempC: 20.0,
+      polygon: [
+        Point2D(x: 0, y: 0),
+        Point2D(x: 8000, y: 0),
+        Point2D(x: 8000, y: 6000),
+        Point2D(x: 0, y: 6000),
+      ],
+    );
+    const zone = HeatingZone(
+      id: 'zone-1',
+      roomId: 'room-1',
+      polygon: [
+        Point2D(x: 4000, y: 2000),
+        Point2D(x: 7000, y: 2000),
+        Point2D(x: 7000, y: 5000),
+        Point2D(x: 4000, y: 5000),
+      ],
+      tubeTypeId: 'tube-1',
+      flooringMaterialId: 'mat-1',
+      circuitId: 'circuit-1',
+    );
+    const route = [
+      Point2D(x: 500, y: 500),
+      Point2D(x: 5000, y: 500),
+      Point2D(x: 5000, y: 3000),
+    ];
+    final circuit = relaidConnectionPipes(
+      const HeatingCircuit(
+        id: 'circuit-1',
+        distributorId: 'dist-1',
+        heatingZoneId: 'zone-1',
+      ),
+      const [],
+      centerline: route,
+    );
+
+    ({_StubCallbacks cb, SelectTool tool, UndoRedoService undo}) setUpTool() {
+      final cb = _StubCallbacks(
+        rooms: const [room],
+        zones: const [zone],
+        circuits: [circuit],
+      );
+      final undo = UndoRedoService();
+      final tool = SelectTool(
+        callbacks: cb,
+        onStateChanged: () {},
+        undoRedo: undo,
+      );
+      // Select by clicking on the supply pipe (50 mm off the route).
+      const on = Point2D(x: 2500, y: 550);
+      tool.onPointerDown(on, kPrimaryButton);
+      tool.onTap(on, PointerDeviceKind.mouse);
+      tool.onPointerUp(on);
+      expect(cb.lastSelectedType, 'circuit');
+      return (cb: cb, tool: tool, undo: undo);
+    }
+
+    void expectPairOf(HeatingCircuit c) {
+      final pair = PipeLayoutEngine.connectionPipePair(
+        centerline: c.centerlinePath,
+        pipeSpacingMm: c.pipeSpacingMm.toDouble(),
+      );
+      expect(c.supplyRoutePath, pair.supply);
+      expect(c.returnRoutePath, pair.back);
+    }
+
+    test('ST-R1: the handles sit on the route — one per corner, none on '
+        'the distributor end', () {
+      final t = setUpTool();
+      final data = t.tool.getInteractionData()! as CircuitSelectionData;
+      expect(data.supplyPoints, route);
+      expect(data.returnPoints, isEmpty);
+      expect(data.handles, const [
+        Point2D(x: 5000, y: 500),
+        Point2D(x: 5000, y: 3000),
+      ]);
+    });
+
+    test('ST-R2: dragging a route corner moves both pipes together; one '
+        'undo restores them', () {
+      final t = setUpTool();
+      t.tool.onPointerDown(const Point2D(x: 5000, y: 500), kPrimaryButton);
+      t.tool.onDragUpdate(const Point2D(x: 5200, y: 300));
+      // Live: already laid out during the drag.
+      expectPairOf(t.cb.currentCircuits.single);
+      t.tool.onDragEnd(const Point2D(x: 5200, y: 300));
+
+      final c = t.cb.currentCircuits.single;
+      expect(c.centerlinePath, const [
+        Point2D(x: 500, y: 500),
+        Point2D(x: 5200, y: 300),
+        Point2D(x: 5000, y: 3000),
+      ]);
+      expectPairOf(c);
+
+      t.undo.undo();
+      expect(t.cb.currentCircuits.single, circuit);
+    });
+
+    test('ST-R3: a section grabbed on either pipe moves the route section '
+        'and keeps the pair parallel', () {
+      final t = setUpTool();
+      // Press on the return pipe of the second section (x = 5050).
+      t.tool.onPointerDown(const Point2D(x: 5050, y: 1500), kPrimaryButton);
+      t.tool.onDragUpdate(const Point2D(x: 5450, y: 1500));
+      t.tool.onDragEnd(const Point2D(x: 5450, y: 1500));
+
+      final c = t.cb.currentCircuits.single;
+      expect(c.centerlinePath, const [
+        Point2D(x: 500, y: 500),
+        Point2D(x: 5400, y: 500),
+        Point2D(x: 5400, y: 3000),
+      ]);
+      expectPairOf(c);
+    });
+
+    test('ST-R4: the route must still end inside its zone', () {
+      final t = setUpTool();
+      t.tool.onPointerDown(const Point2D(x: 5000, y: 3000), kPrimaryButton);
+      t.tool.onDragUpdate(const Point2D(x: 2000, y: 3000));
+      t.tool.onDragEnd(const Point2D(x: 2000, y: 3000));
+
+      expect(t.cb.currentCircuits.single, circuit);
+      expect(t.cb.toasts, contains(t.cb.l10n.circuit_routeMustEndInZoneToast));
+    });
   });
 
   // ── Mirror-sync test (real EditorStateNotifier) ───────────────────────────
@@ -1401,138 +1920,140 @@ void main() {
     });
 
     test(
-        'ST-RR-10: shared wall in 4-wall reshape syncs to the mirror partner',
-        () {
-      final container = ProviderContainer(overrides: [override]);
-      addTearDown(container.dispose);
-      final notifier = container.read(editorStateProvider.notifier);
+      'ST-RR-10: shared wall in 4-wall reshape syncs to the mirror partner',
+      () {
+        final container = ProviderContainer(overrides: [override]);
+        addTearDown(container.dispose);
+        final notifier = container.read(editorStateProvider.notifier);
 
-      // Room A walls.
-      const aTL = Point2D(x: 0, y: 0);
-      const aTR = Point2D(x: 3000, y: 0);
-      const aBR = Point2D(x: 3000, y: 2000);
-      const aBL = Point2D(x: 0, y: 2000);
+        // Room A walls.
+        const aTL = Point2D(x: 0, y: 0);
+        const aTR = Point2D(x: 3000, y: 0);
+        const aBR = Point2D(x: 3000, y: 2000);
+        const aBL = Point2D(x: 0, y: 2000);
 
-      // Room B walls (mirrors A's right edge).
-      const bTL = aTR; // (3000, 0)
-      const bTR = Point2D(x: 6000, y: 0);
-      const bBR = Point2D(x: 6000, y: 2000);
-      const bBL = aBR; // (3000, 2000)
+        // Room B walls (mirrors A's right edge).
+        const bTL = aTR; // (3000, 0)
+        const bTR = Point2D(x: 6000, y: 0);
+        const bBR = Point2D(x: 6000, y: 2000);
+        const bBL = aBR; // (3000, 2000)
 
-      final walls = <WallSegment>[
-        // Room A: top, right (shared), bottom, left.
-        const WallSegment(
-          id: 'w-A-top',
-          roomId: 'room-A',
-          startPoint: aTL,
-          endPoint: aTR,
-        ),
-        const WallSegment(
-          id: 'w-A-right',
-          roomId: 'room-A',
-          startPoint: aTR,
-          endPoint: aBR,
-          wallType: WallType.interior,
-          adjacentRoomId: 'room-B',
-          mirrorId: 'w-B-left',
-        ),
-        const WallSegment(
-          id: 'w-A-bottom',
-          roomId: 'room-A',
-          startPoint: aBR,
-          endPoint: aBL,
-        ),
-        const WallSegment(
-          id: 'w-A-left',
-          roomId: 'room-A',
-          startPoint: aBL,
-          endPoint: aTL,
-        ),
-        // Room B's left wall (the mirror partner — reversed geometry).
-        const WallSegment(
-          id: 'w-B-left',
-          roomId: 'room-B',
-          startPoint: aBR,
-          endPoint: aTR,
-          wallType: WallType.interior,
-          adjacentRoomId: 'room-A',
-          mirrorId: 'w-A-right',
-        ),
-        // The rest of Room B (not strictly needed but completes the picture).
-        const WallSegment(
-          id: 'w-B-top',
-          roomId: 'room-B',
-          startPoint: bTL,
-          endPoint: bTR,
-        ),
-        const WallSegment(
-          id: 'w-B-right',
-          roomId: 'room-B',
-          startPoint: bTR,
-          endPoint: bBR,
-        ),
-        const WallSegment(
-          id: 'w-B-bottom',
-          roomId: 'room-B',
-          startPoint: bBR,
-          endPoint: bBL,
-        ),
-      ];
-      notifier.replaceAllWalls(walls);
+        final walls = <WallSegment>[
+          // Room A: top, right (shared), bottom, left.
+          const WallSegment(
+            id: 'w-A-top',
+            roomId: 'room-A',
+            startPoint: aTL,
+            endPoint: aTR,
+          ),
+          const WallSegment(
+            id: 'w-A-right',
+            roomId: 'room-A',
+            startPoint: aTR,
+            endPoint: aBR,
+            wallType: WallType.interior,
+            adjacentRoomId: 'room-B',
+            mirrorId: 'w-B-left',
+          ),
+          const WallSegment(
+            id: 'w-A-bottom',
+            roomId: 'room-A',
+            startPoint: aBR,
+            endPoint: aBL,
+          ),
+          const WallSegment(
+            id: 'w-A-left',
+            roomId: 'room-A',
+            startPoint: aBL,
+            endPoint: aTL,
+          ),
+          // Room B's left wall (the mirror partner — reversed geometry).
+          const WallSegment(
+            id: 'w-B-left',
+            roomId: 'room-B',
+            startPoint: aBR,
+            endPoint: aTR,
+            wallType: WallType.interior,
+            adjacentRoomId: 'room-A',
+            mirrorId: 'w-A-right',
+          ),
+          // The rest of Room B (not strictly needed but completes the picture).
+          const WallSegment(
+            id: 'w-B-top',
+            roomId: 'room-B',
+            startPoint: bTL,
+            endPoint: bTR,
+          ),
+          const WallSegment(
+            id: 'w-B-right',
+            roomId: 'room-B',
+            startPoint: bTR,
+            endPoint: bBR,
+          ),
+          const WallSegment(
+            id: 'w-B-bottom',
+            roomId: 'room-B',
+            startPoint: bBR,
+            endPoint: bBL,
+          ),
+        ];
+        notifier.replaceAllWalls(walls);
 
-      // Build a minimal callbacks shim that delegates to the real
-      // notifier so updateWall triggers ADR-011 mirror sync.
-      final cb = _ProviderBridgeCallbacks(container);
+        // Build a minimal callbacks shim that delegates to the real
+        // notifier so updateWall triggers ADR-011 mirror sync.
+        final cb = _ProviderBridgeCallbacks(container);
 
-      // Select Room A's top wall.
-      final tool = _makeTool(cb);
-      tool.onTap(const Point2D(x: 1500, y: 0), PointerDeviceKind.mouse);
+        // Select Room A's top wall.
+        final tool = _makeTool(cb);
+        tool.onTap(const Point2D(x: 1500, y: 0), PointerDeviceKind.mouse);
 
-      // Ctrl-drag from top-left to (-1000, -500).
-      tool.debugCtrlHeldOverride = true;
-      tool.onPointerDown(aTL, 1);
-      tool.onDragEnd(const Point2D(x: -1000, y: -500));
+        // Ctrl-drag from top-left to (-1000, -500).
+        tool.debugCtrlHeldOverride = true;
+        tool.onPointerDown(aTL, 1);
+        tool.onDragEnd(const Point2D(x: -1000, y: -500));
 
-      final updated = container.read(editorStateProvider).walls;
+        final updated = container.read(editorStateProvider).walls;
 
-      // Room A's right wall (shared) must now span y = -500 → 2000 at x = 3000.
-      final aRight = updated.firstWhere((w) => w.id == 'w-A-right');
-      expect(aRight.startPoint, const Point2D(x: 3000, y: -500));
-      expect(aRight.endPoint, const Point2D(x: 3000, y: 2000));
+        // Room A's right wall (shared) must now span y = -500 → 2000 at x = 3000.
+        final aRight = updated.firstWhere((w) => w.id == 'w-A-right');
+        expect(aRight.startPoint, const Point2D(x: 3000, y: -500));
+        expect(aRight.endPoint, const Point2D(x: 3000, y: 2000));
 
-      // The mirror partner must have the reversed geometry.
-      final bLeft = updated.firstWhere((w) => w.id == 'w-B-left');
-      expect(bLeft.startPoint, aRight.endPoint);
-      expect(bLeft.endPoint, aRight.startPoint);
+        // The mirror partner must have the reversed geometry.
+        final bLeft = updated.firstWhere((w) => w.id == 'w-B-left');
+        expect(bLeft.startPoint, aRight.endPoint);
+        expect(bLeft.endPoint, aRight.startPoint);
 
-      // All 4 of Room A's walls must reflect the reshape.
-      final aTop = updated.firstWhere((w) => w.id == 'w-A-top');
-      final aBottom = updated.firstWhere((w) => w.id == 'w-A-bottom');
-      final aLeft = updated.firstWhere((w) => w.id == 'w-A-left');
-      // Top wall: y = -500 from x = -1000 to x = 3000.
-      expect(aTop.startPoint.y, -500);
-      expect(aTop.endPoint.y, -500);
-      // Bottom wall y unchanged (= 2000).
-      expect(aBottom.startPoint.y, 2000);
-      expect(aBottom.endPoint.y, 2000);
-      // Left wall x = -1000.
-      expect(aLeft.startPoint.x, -1000);
-      expect(aLeft.endPoint.x, -1000);
-    });
+        // All 4 of Room A's walls must reflect the reshape.
+        final aTop = updated.firstWhere((w) => w.id == 'w-A-top');
+        final aBottom = updated.firstWhere((w) => w.id == 'w-A-bottom');
+        final aLeft = updated.firstWhere((w) => w.id == 'w-A-left');
+        // Top wall: y = -500 from x = -1000 to x = 3000.
+        expect(aTop.startPoint.y, -500);
+        expect(aTop.endPoint.y, -500);
+        // Bottom wall y unchanged (= 2000).
+        expect(aBottom.startPoint.y, 2000);
+        expect(aBottom.endPoint.y, 2000);
+        // Left wall x = -1000.
+        expect(aLeft.startPoint.x, -1000);
+        expect(aLeft.endPoint.x, -1000);
+      },
+    );
   });
 
   // ── Debounced persistence: a mid-handle wall drag must not write to
   // SQLite every frame; the commit at onDragEnd persists each element once.
   group('Debounced persistence (transient drag)', () {
-    test(
-        'no DB upsert during a multi-frame wall drag; one upsert per element '
+    test('no DB upsert during a multi-frame wall drag; one upsert per element '
         'on drop', () {
       final bDao = _CountingDragBuildingDao();
       final hDao = _CountingDragHeatingDao();
-      final container = ProviderContainer(overrides: [
-        buildingDaoProvider.overrideWithValue(bDao),
-        heatingDaoProvider.overrideWithValue(hDao),
-      ]);
+      final container = ProviderContainer(
+        overrides: [
+          buildingDaoProvider.overrideWithValue(bDao),
+          heatingDaoProvider.overrideWithValue(hDao),
+        ],
+      );
       addTearDown(container.dispose);
       final notifier = container.read(editorStateProvider.notifier);
 
@@ -1587,18 +2108,27 @@ void main() {
       for (var dy = -100; dy >= -500; dy -= 100) {
         tool.onDragUpdate(Point2D(x: 1500, y: dy.toDouble()));
       }
-      expect(bDao.wallUpserts, 0,
-          reason: 'no wall upsert during a multi-frame drag');
-      expect(bDao.roomUpserts, 0,
-          reason: 'no room upsert during a multi-frame drag');
+      expect(
+        bDao.wallUpserts,
+        0,
+        reason: 'no wall upsert during a multi-frame drag',
+      );
+      expect(
+        bDao.roomUpserts,
+        0,
+        reason: 'no room upsert during a multi-frame drag',
+      );
 
       // Drop: commits the final geometry exactly once per element.
       tool.onDragEnd(const Point2D(x: 1500, y: -500));
 
       expect(bDao.roomUpserts, 1, reason: 'room persisted once on commit');
       expect(bDao.upsertedRoomIds, ['room-1']);
-      expect(bDao.wallUpserts, greaterThan(0),
-          reason: 'the moved walls are persisted on commit');
+      expect(
+        bDao.wallUpserts,
+        greaterThan(0),
+        reason: 'the moved walls are persisted on commit',
+      );
       expect(bDao.upsertedWallIds, contains('wall-top'));
       expect(
         bDao.upsertedWallIds.toSet().length,
@@ -1613,53 +2143,56 @@ void main() {
   // state armed, or a later click teleports the wall to the cursor.
   // ────────────────────────────────────────────────────────────────────────────
 
-  test(
-    'ST-STALE-1: selecting a wall, clicking it again (no drag), then '
-    'clicking elsewhere does NOT move the wall',
-    () {
-      // Horizontal wall (0,0)→(5000,0); standalone (no room).
-      const wall = WallSegment(
-        id: 'w',
-        roomId: '',
-        startPoint: Point2D(x: 0, y: 0),
-        endPoint: Point2D(x: 5000, y: 0),
-      );
-      final cb = _ReshapeStubCallbacks(walls: [wall], rooms: const []);
-      final tool = SelectTool(
-        callbacks: cb,
-        onStateChanged: () {},
-        undoRedo: UndoRedoService(),
-      );
+  test('ST-STALE-1: selecting a wall, clicking it again (no drag), then '
+      'clicking elsewhere does NOT move the wall', () {
+    // Horizontal wall (0,0)→(5000,0); standalone (no room).
+    const wall = WallSegment(
+      id: 'w',
+      roomId: '',
+      startPoint: Point2D(x: 0, y: 0),
+      endPoint: Point2D(x: 5000, y: 0),
+    );
+    final cb = _ReshapeStubCallbacks(walls: [wall], rooms: const []);
+    final tool = SelectTool(
+      callbacks: cb,
+      onStateChanged: () {},
+      undoRedo: UndoRedoService(),
+    );
 
-      // Click 1 — select the wall (down → tap → up on the wall body).
-      tool.onPointerDown(const Point2D(x: 2500, y: 0), kPrimaryButton);
-      tool.onTap(const Point2D(x: 2500, y: 0), PointerDeviceKind.mouse);
-      tool.onPointerUp(const Point2D(x: 2500, y: 0));
-      expect(cb.lastSelectedType, 'wall');
+    // Click 1 — select the wall (down → tap → up on the wall body).
+    tool.onPointerDown(const Point2D(x: 2500, y: 0), kPrimaryButton);
+    tool.onTap(const Point2D(x: 2500, y: 0), PointerDeviceKind.mouse);
+    tool.onPointerUp(const Point2D(x: 2500, y: 0));
+    expect(cb.lastSelectedType, 'wall');
 
-      // Click 2 — a second, separate click that also lands on the wall
-      // body, with NO drag. This arms a wall-body (mid) drag in
-      // onPointerDown that onPointerUp must clear.
-      tool.onPointerDown(const Point2D(x: 1000, y: 0), kPrimaryButton);
-      tool.onTap(const Point2D(x: 1000, y: 0), PointerDeviceKind.mouse);
-      tool.onPointerUp(const Point2D(x: 1000, y: 0));
+    // Click 2 — a second, separate click that also lands on the wall
+    // body, with NO drag. This arms a wall-body (mid) drag in
+    // onPointerDown that onPointerUp must clear.
+    tool.onPointerDown(const Point2D(x: 1000, y: 0), kPrimaryButton);
+    tool.onTap(const Point2D(x: 1000, y: 0), PointerDeviceKind.mouse);
+    tool.onPointerUp(const Point2D(x: 1000, y: 0));
 
-      // Click 3 — click far from the wall. A real pointer always reports a
-      // little movement, so the canvas treats it as a drag (onDragUpdate /
-      // onDragEnd). With stale wall-drag state this ran _applyMidDrag and
-      // teleported the wall to the cursor; it must now stay put.
-      tool.onPointerDown(const Point2D(x: 1000, y: 3000), kPrimaryButton);
-      tool.onTap(const Point2D(x: 1000, y: 3000), PointerDeviceKind.mouse);
-      tool.onDragUpdate(const Point2D(x: 1000, y: 3000));
-      tool.onDragEnd(const Point2D(x: 1000, y: 3000));
+    // Click 3 — click far from the wall. A real pointer always reports a
+    // little movement, so the canvas treats it as a drag (onDragUpdate /
+    // onDragEnd). With stale wall-drag state this ran _applyMidDrag and
+    // teleported the wall to the cursor; it must now stay put.
+    tool.onPointerDown(const Point2D(x: 1000, y: 3000), kPrimaryButton);
+    tool.onTap(const Point2D(x: 1000, y: 3000), PointerDeviceKind.mouse);
+    tool.onDragUpdate(const Point2D(x: 1000, y: 3000));
+    tool.onDragEnd(const Point2D(x: 1000, y: 3000));
 
-      final moved = cb.currentWalls.firstWhere((w) => w.id == 'w');
-      expect(moved.startPoint, const Point2D(x: 0, y: 0),
-          reason: 'wall start must not move on a separate click');
-      expect(moved.endPoint, const Point2D(x: 5000, y: 0),
-          reason: 'wall end must not move on a separate click');
-    },
-  );
+    final moved = cb.currentWalls.firstWhere((w) => w.id == 'w');
+    expect(
+      moved.startPoint,
+      const Point2D(x: 0, y: 0),
+      reason: 'wall start must not move on a separate click',
+    );
+    expect(
+      moved.endPoint,
+      const Point2D(x: 5000, y: 0),
+      reason: 'wall end must not move on a separate click',
+    );
+  });
 
   // ADR-034 — multi-wall select + rigid group translate ──────────────────────
   group('ADR-034 multi-wall select + group drag', () {
@@ -1668,25 +2201,25 @@ void main() {
     // them up must translate both rigidly and drag the divider's top
     // corner along (keeping it vertical) — without re-angling anything.
     List<WallSegment> freshWalls() => const [
-          WallSegment(
-            id: 'top-l',
-            roomId: '',
-            startPoint: Point2D(x: 0, y: 0),
-            endPoint: Point2D(x: 5000, y: 0),
-          ),
-          WallSegment(
-            id: 'top-r',
-            roomId: '',
-            startPoint: Point2D(x: 5000, y: 0),
-            endPoint: Point2D(x: 10000, y: 0),
-          ),
-          WallSegment(
-            id: 'divider',
-            roomId: '',
-            startPoint: Point2D(x: 5000, y: 0),
-            endPoint: Point2D(x: 5000, y: 3000),
-          ),
-        ];
+      WallSegment(
+        id: 'top-l',
+        roomId: '',
+        startPoint: Point2D(x: 0, y: 0),
+        endPoint: Point2D(x: 5000, y: 0),
+      ),
+      WallSegment(
+        id: 'top-r',
+        roomId: '',
+        startPoint: Point2D(x: 5000, y: 0),
+        endPoint: Point2D(x: 10000, y: 0),
+      ),
+      WallSegment(
+        id: 'divider',
+        roomId: '',
+        startPoint: Point2D(x: 5000, y: 0),
+        endPoint: Point2D(x: 5000, y: 3000),
+      ),
+    ];
 
     /// Ctrl/Cmd-tap both top walls into the multi-selection.
     void selectBothTop(SelectTool tool) {
@@ -1703,8 +2236,11 @@ void main() {
       selectBothTop(tool);
       final data = tool.getInteractionData()! as SelectionHighlightData;
       expect(data.selectedWalls.map((w) => w.id), ['top-l', 'top-r']);
-      expect(data.handles, isEmpty,
-          reason: 'group selection shows no endpoint handles');
+      expect(
+        data.handles,
+        isEmpty,
+        reason: 'group selection shows no endpoint handles',
+      );
 
       // Ctrl-tap top-r again → removed → collapses to single selection.
       tool.debugCtrlHeldOverride = true;
@@ -1737,8 +2273,11 @@ void main() {
       // Divider's top corner follows; bottom stays — still vertical.
       expect(d.startPoint, const Point2D(x: 5000, y: -1000));
       expect(d.endPoint, const Point2D(x: 5000, y: 3000));
-      expect(d.startPoint.x, d.endPoint.x,
-          reason: 'divider must stay axis-aligned (vertical)');
+      expect(
+        d.startPoint.x,
+        d.endPoint.x,
+        reason: 'divider must stay axis-aligned (vertical)',
+      );
     });
 
     test('Ctrl held → keep-orientation: parallel slide dropped, '
@@ -1785,24 +2324,36 @@ void main() {
       tool.onPointerDown(const Point2D(x: 2500, y: 0), kPrimaryButton);
       tool.onDragUpdate(const Point2D(x: 2500, y: -1000));
       tool.onDragEnd(const Point2D(x: 2500, y: -1000));
-      expect(cb.currentWalls.firstWhere((w) => w.id == 'top-l').startPoint,
-          const Point2D(x: 0, y: -1000));
+      expect(
+        cb.currentWalls.firstWhere((w) => w.id == 'top-l').startPoint,
+        const Point2D(x: 0, y: -1000),
+      );
 
       undo.undo();
-      expect(cb.currentWalls.firstWhere((w) => w.id == 'top-l').startPoint,
-          const Point2D(x: 0, y: 0));
-      expect(cb.currentWalls.firstWhere((w) => w.id == 'top-r').endPoint,
-          const Point2D(x: 10000, y: 0));
-      expect(cb.currentWalls.firstWhere((w) => w.id == 'divider').startPoint,
-          const Point2D(x: 5000, y: 0));
+      expect(
+        cb.currentWalls.firstWhere((w) => w.id == 'top-l').startPoint,
+        const Point2D(x: 0, y: 0),
+      );
+      expect(
+        cb.currentWalls.firstWhere((w) => w.id == 'top-r').endPoint,
+        const Point2D(x: 10000, y: 0),
+      );
+      expect(
+        cb.currentWalls.firstWhere((w) => w.id == 'divider').startPoint,
+        const Point2D(x: 5000, y: 0),
+      );
     });
 
     test('Plain (non-Ctrl) click collapses a multi-selection to one', () {
       final cb = _MutatingStub(walls: freshWalls());
       final tool = _makeTool(cb);
       selectBothTop(tool);
-      expect((tool.getInteractionData()! as SelectionHighlightData)
-          .selectedWalls.length, 2);
+      expect(
+        (tool.getInteractionData()! as SelectionHighlightData)
+            .selectedWalls
+            .length,
+        2,
+      );
 
       tool.onTap(const Point2D(x: 2500, y: 0), PointerDeviceKind.mouse);
       final data = tool.getInteractionData()! as SelectionHighlightData;
@@ -1852,8 +2403,8 @@ class _ReshapeStubCallbacks implements EditorCallbacks {
   _ReshapeStubCallbacks({
     required List<WallSegment> walls,
     required List<Room> rooms,
-  })  : _walls = List<WallSegment>.of(walls),
-        _rooms = List<Room>.of(rooms);
+  }) : _walls = List<WallSegment>.of(walls),
+       _rooms = List<Room>.of(rooms);
 
   final List<WallSegment> _walls;
   final List<Room> _rooms;
@@ -1891,6 +2442,8 @@ class _ReshapeStubCallbacks implements EditorCallbacks {
   @override
   void updateZoneTransient(HeatingZone zone) => updateZone(zone);
   @override
+  void updateCircuitTransient(HeatingCircuit circuit) => updateCircuit(circuit);
+  @override
   void updateWindowTransient(WindowElement window) => updateWindow(window);
   @override
   void updateDoorTransient(Door door) => updateDoor(door);
@@ -1906,10 +2459,7 @@ class _ReshapeStubCallbacks implements EditorCallbacks {
   }
 
   @override
-  void replaceAllWallsAndRooms(
-    List<WallSegment> walls,
-    List<Room> rooms,
-  ) {
+  void replaceAllWallsAndRooms(List<WallSegment> walls, List<Room> rooms) {
     _walls
       ..clear()
       ..addAll(walls);
@@ -1959,8 +2509,10 @@ class _ReshapeStubCallbacks implements EditorCallbacks {
   @override
   void commitWall(WallSegment wall) {}
   @override
-  WallSegment commitWallWithSplit(WallSegment wall, {bool splitNewWall = true}) =>
-      wall;
+  WallSegment commitWallWithSplit(
+    WallSegment wall, {
+    bool splitNewWall = true,
+  }) => wall;
   @override
   void removeWall(String wallId) {}
   @override
@@ -2003,9 +2555,7 @@ class _ReshapeStubCallbacks implements EditorCallbacks {
     required void Function() onReplace,
   }) {}
   @override
-  void requestDistributorDeleteDialog({
-    required void Function() onConfirmed,
-  }) {}
+  void requestDistributorDeleteDialog({required void Function() onConfirmed}) {}
   @override
   void commitCircuit(HeatingCircuit circuit) {}
   @override
@@ -2067,8 +2617,7 @@ class _ProviderBridgeCallbacks implements EditorCallbacks {
       _container.read(editorStateProvider).walls;
 
   @override
-  List<Room> get currentRooms =>
-      _container.read(editorStateProvider).rooms;
+  List<Room> get currentRooms => _container.read(editorStateProvider).rooms;
 
   @override
   void updateWall(WallSegment wall) => _notifier.updateWall(wall);
@@ -2080,17 +2629,17 @@ class _ProviderBridgeCallbacks implements EditorCallbacks {
   void updateWallTransient(WallSegment wall) =>
       _notifier.updateWallTransient(wall);
   @override
-  void updateRoomTransient(Room room) =>
-      _notifier.updateRoomTransient(room);
+  void updateRoomTransient(Room room) => _notifier.updateRoomTransient(room);
   @override
   void updateZoneTransient(HeatingZone zone) =>
       _notifier.updateZoneTransient(zone);
   @override
+  void updateCircuitTransient(HeatingCircuit circuit) => updateCircuit(circuit);
+  @override
   void updateWindowTransient(WindowElement window) =>
       _notifier.updateWindowTransient(window);
   @override
-  void updateDoorTransient(Door door) =>
-      _notifier.updateDoorTransient(door);
+  void updateDoorTransient(Door door) => _notifier.updateDoorTransient(door);
   @override
   void updateDistributorTransient(Distributor distributor) =>
       _notifier.updateDistributorTransient(distributor);
@@ -2100,10 +2649,7 @@ class _ProviderBridgeCallbacks implements EditorCallbacks {
       _notifier.replaceAllWalls(walls);
 
   @override
-  void replaceAllWallsAndRooms(
-    List<WallSegment> walls,
-    List<Room> rooms,
-  ) =>
+  void replaceAllWallsAndRooms(List<WallSegment> walls, List<Room> rooms) =>
       _notifier.replaceAllWallsAndRooms(walls, rooms);
 
   @override
@@ -2111,20 +2657,18 @@ class _ProviderBridgeCallbacks implements EditorCallbacks {
     List<WallSegment> walls,
     List<Room> rooms,
     List<HeatingZone> zones,
-  ) =>
-      _notifier.replaceAllWallsRoomsZones(walls, rooms, zones);
+  ) => _notifier.replaceAllWallsRoomsZones(walls, rooms, zones);
 
   @override
   void addRoomFromDetection({
     required Room room,
     required List<String> wallIds,
     Map<String, WallSegment>? movedSideProperties,
-  }) =>
-      _notifier.addRoomFromDetection(
-        room: room,
-        wallIds: wallIds,
-        movedSideProperties: movedSideProperties,
-      );
+  }) => _notifier.addRoomFromDetection(
+    room: room,
+    wallIds: wallIds,
+    movedSideProperties: movedSideProperties,
+  );
 
   @override
   void showToast(String message) {}
@@ -2136,8 +2680,10 @@ class _ProviderBridgeCallbacks implements EditorCallbacks {
   @override
   void commitWall(WallSegment wall) {}
   @override
-  WallSegment commitWallWithSplit(WallSegment wall, {bool splitNewWall = true}) =>
-      wall;
+  WallSegment commitWallWithSplit(
+    WallSegment wall, {
+    bool splitNewWall = true,
+  }) => wall;
   @override
   void removeWall(String wallId) {}
   @override
@@ -2180,9 +2726,7 @@ class _ProviderBridgeCallbacks implements EditorCallbacks {
     required void Function() onReplace,
   }) {}
   @override
-  void requestDistributorDeleteDialog({
-    required void Function() onConfirmed,
-  }) {}
+  void requestDistributorDeleteDialog({required void Function() onConfirmed}) {}
   @override
   void commitCircuit(HeatingCircuit circuit) {}
   @override

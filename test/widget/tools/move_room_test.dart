@@ -57,8 +57,7 @@ class _ProviderCallbacks implements EditorCallbacks {
 
   final ProviderContainer _container;
 
-  EditorStateNotifier get _n =>
-      _container.read(editorStateProvider.notifier);
+  EditorStateNotifier get _n => _container.read(editorStateProvider.notifier);
 
   @override
   final AppLocalizations l10n = AppLocalizationsEn();
@@ -70,8 +69,7 @@ class _ProviderCallbacks implements EditorCallbacks {
   List<WallSegment> get currentWalls =>
       _container.read(editorStateProvider).walls;
   @override
-  List<Room> get currentRooms =>
-      _container.read(editorStateProvider).rooms;
+  List<Room> get currentRooms => _container.read(editorStateProvider).rooms;
   @override
   List<HeatingZone> get currentZones =>
       _container.read(editorStateProvider).zones;
@@ -79,8 +77,7 @@ class _ProviderCallbacks implements EditorCallbacks {
   List<WindowElement> get currentWindows =>
       _container.read(editorStateProvider).windows;
   @override
-  List<Door> get currentDoors =>
-      _container.read(editorStateProvider).doors;
+  List<Door> get currentDoors => _container.read(editorStateProvider).doors;
   @override
   List<HeatingCircuit> get currentCircuits =>
       _container.read(editorStateProvider).circuits;
@@ -91,9 +88,10 @@ class _ProviderCallbacks implements EditorCallbacks {
   @override
   void commitWall(WallSegment wall) => _n.addWall(wall);
   @override
-  WallSegment commitWallWithSplit(WallSegment wall,
-          {bool splitNewWall = true}) =>
-      _n.commitWallWithSplit(wall, splitNewWall: splitNewWall);
+  WallSegment commitWallWithSplit(
+    WallSegment wall, {
+    bool splitNewWall = true,
+  }) => _n.commitWallWithSplit(wall, splitNewWall: splitNewWall);
   @override
   void updateWall(WallSegment wall) => _n.updateWall(wall);
   @override
@@ -106,8 +104,7 @@ class _ProviderCallbacks implements EditorCallbacks {
   }
 
   @override
-  void destroyRoomCascade(String roomId) =>
-      _n.destroyRoomCascade(roomId);
+  void destroyRoomCascade(String roomId) => _n.destroyRoomCascade(roomId);
 
   @override
   void replaceAllForRoomCascade(
@@ -116,8 +113,7 @@ class _ProviderCallbacks implements EditorCallbacks {
     List<HeatingZone> zones,
     List<WindowElement> windows,
     List<Door> doors,
-  ) =>
-      _n.replaceAllForRoomCascade(walls, rooms, zones, windows, doors);
+  ) => _n.replaceAllForRoomCascade(walls, rooms, zones, windows, doors);
 
   @override
   void restoreRoom(Room room, List<String> wallIds) {
@@ -129,32 +125,26 @@ class _ProviderCallbacks implements EditorCallbacks {
   void updateRoom(Room room) => _n.updateRoom(room);
 
   @override
-  void replaceAllWalls(List<WallSegment> walls) =>
-      _n.replaceAllWalls(walls);
+  void replaceAllWalls(List<WallSegment> walls) => _n.replaceAllWalls(walls);
   @override
-  void replaceAllWallsAndRooms(
-    List<WallSegment> walls,
-    List<Room> rooms,
-  ) =>
+  void replaceAllWallsAndRooms(List<WallSegment> walls, List<Room> rooms) =>
       _n.replaceAllWallsAndRooms(walls, rooms);
   @override
   void replaceAllWallsRoomsZones(
     List<WallSegment> walls,
     List<Room> rooms,
     List<HeatingZone> zones,
-  ) =>
-      _n.replaceAllWallsRoomsZones(walls, rooms, zones);
+  ) => _n.replaceAllWallsRoomsZones(walls, rooms, zones);
   @override
   void addRoomFromDetection({
     required Room room,
     required List<String> wallIds,
     Map<String, WallSegment>? movedSideProperties,
-  }) =>
-      _n.addRoomFromDetection(
-        room: room,
-        wallIds: wallIds,
-        movedSideProperties: movedSideProperties,
-      );
+  }) => _n.addRoomFromDetection(
+    room: room,
+    wallIds: wallIds,
+    movedSideProperties: movedSideProperties,
+  );
 
   @override
   void commitWindow(WindowElement window) => _n.addWindow(window);
@@ -182,9 +172,7 @@ class _ProviderCallbacks implements EditorCallbacks {
     required void Function() onReplace,
   }) {}
   @override
-  void requestDistributorDeleteDialog({
-    required void Function() onConfirmed,
-  }) {}
+  void requestDistributorDeleteDialog({required void Function() onConfirmed}) {}
 
   @override
   void commitCircuit(HeatingCircuit circuit) => _n.addCircuit(circuit);
@@ -200,13 +188,13 @@ class _ProviderCallbacks implements EditorCallbacks {
   @override
   void updateZone(HeatingZone zone) => _n.updateZone(zone);
   @override
-  void updateWallTransient(WallSegment wall) =>
-      _n.updateWallTransient(wall);
+  void updateWallTransient(WallSegment wall) => _n.updateWallTransient(wall);
   @override
   void updateRoomTransient(Room room) => _n.updateRoomTransient(room);
   @override
-  void updateZoneTransient(HeatingZone zone) =>
-      _n.updateZoneTransient(zone);
+  void updateZoneTransient(HeatingZone zone) => _n.updateZoneTransient(zone);
+  @override
+  void updateCircuitTransient(HeatingCircuit circuit) => updateCircuit(circuit);
   @override
   void updateWindowTransient(WindowElement window) =>
       _n.updateWindowTransient(window);
@@ -258,8 +246,7 @@ final _dbOverride = appDatabaseProvider.overrideWith((ref) {
   return db;
 });
 
-(_ProviderCallbacks, SelectTool, UndoRedoService, ProviderContainer)
-    _setup() {
+(_ProviderCallbacks, SelectTool, UndoRedoService, ProviderContainer) _setup() {
   final container = ProviderContainer(overrides: [_dbOverride]);
   final cb = _ProviderCallbacks(container);
   final undoRedo = UndoRedoService();
@@ -291,30 +278,10 @@ const _room1 = Room(
 );
 
 const _r1Walls = [
-  WallSegment(
-    id: 'r1-ab',
-    roomId: 'room-1',
-    startPoint: _ptA,
-    endPoint: _ptB,
-  ),
-  WallSegment(
-    id: 'r1-bc',
-    roomId: 'room-1',
-    startPoint: _ptB,
-    endPoint: _ptC,
-  ),
-  WallSegment(
-    id: 'r1-cd',
-    roomId: 'room-1',
-    startPoint: _ptC,
-    endPoint: _ptD,
-  ),
-  WallSegment(
-    id: 'r1-da',
-    roomId: 'room-1',
-    startPoint: _ptD,
-    endPoint: _ptA,
-  ),
+  WallSegment(id: 'r1-ab', roomId: 'room-1', startPoint: _ptA, endPoint: _ptB),
+  WallSegment(id: 'r1-bc', roomId: 'room-1', startPoint: _ptB, endPoint: _ptC),
+  WallSegment(id: 'r1-cd', roomId: 'room-1', startPoint: _ptC, endPoint: _ptD),
+  WallSegment(id: 'r1-da', roomId: 'room-1', startPoint: _ptD, endPoint: _ptA),
 ];
 
 // A 1 × 1 m zone in the centre of room-1 (1500,1500 → 2500,2500).
@@ -334,17 +301,11 @@ const _r1Zone = HeatingZone(
 
 // Helper: drive a pointer-down → drag-update(s) → drag-end sequence
 // through the SelectTool.
-void _drag(
-  SelectTool tool, {
-  required Point2D from,
-  required Point2D to,
-}) {
+void _drag(SelectTool tool, {required Point2D from, required Point2D to}) {
   tool.onPointerDown(from, kPrimaryButton);
   // Two updates: the first crosses the 5 px threshold (zoom = 1.0
   // means 5 mm in world space); the second carries the final cursor.
-  tool.onDragUpdate(
-    Point2D(x: from.x + 100, y: from.y + 100),
-  );
+  tool.onDragUpdate(Point2D(x: from.x + 100, y: from.y + 100));
   tool.onDragUpdate(to);
   tool.onDragEnd(to);
 }
@@ -384,11 +345,11 @@ void main() {
       final walls = cb.currentWalls;
       expect(walls, hasLength(4));
       for (final w in _r1Walls) {
-        final moved =
-            walls.firstWhere((cur) => cur.startPoint == Point2D(
-                  x: w.startPoint.x + delta.x,
-                  y: w.startPoint.y + delta.y,
-                ));
+        final moved = walls.firstWhere(
+          (cur) =>
+              cur.startPoint ==
+              Point2D(x: w.startPoint.x + delta.x, y: w.startPoint.y + delta.y),
+        );
         expect(
           moved.endPoint,
           Point2D(x: w.endPoint.x + delta.x, y: w.endPoint.y + delta.y),
@@ -430,131 +391,128 @@ void main() {
   // equals the redraw graph (ADR-016 Rule 6 acceptance).
   // ────────────────────────────────────────────────────────────────────────
 
-  test(
-    'MR-2: moving next to another room creates a shared wall matching the '
-    'redraw graph (interior + mirrorId + adjacentRoomId on both sides)',
-    () {
-      // Layout: room-2 is a 4×4 room directly to the right of room-1,
-      // **but** with a 4000 mm gap between them so they start
-      // non-adjacent. Room-1 will be moved right by exactly 4000 mm to
-      // make its east edge (x=4000 after move = 8000) coincide with
-      // room-2's west edge (x=8000).
-      const r2Walls = [
-        WallSegment(
-          id: 'r2-ef',
-          roomId: 'room-2',
-          startPoint: Point2D(x: 8000, y: 0),
-          endPoint: Point2D(x: 12000, y: 0),
-        ),
-        WallSegment(
-          id: 'r2-fg',
-          roomId: 'room-2',
-          startPoint: Point2D(x: 12000, y: 0),
-          endPoint: Point2D(x: 12000, y: 4000),
-        ),
-        WallSegment(
-          id: 'r2-gh',
-          roomId: 'room-2',
-          startPoint: Point2D(x: 12000, y: 4000),
-          endPoint: Point2D(x: 8000, y: 4000),
-        ),
-        WallSegment(
-          id: 'r2-he',
-          roomId: 'room-2',
-          startPoint: Point2D(x: 8000, y: 4000),
-          endPoint: Point2D(x: 8000, y: 0),
-        ),
-      ];
-      const room2 = Room(
-        id: 'room-2',
-        floorId: 'floor-1',
-        name: 'Room 2',
-        targetTempC: 20.0,
-        polygon: [
-          Point2D(x: 8000, y: 0),
-          Point2D(x: 12000, y: 0),
-          Point2D(x: 12000, y: 4000),
-          Point2D(x: 8000, y: 4000),
-        ],
-      );
+  test('MR-2: moving next to another room creates a shared wall matching the '
+      'redraw graph (interior + mirrorId + adjacentRoomId on both sides)', () {
+    // Layout: room-2 is a 4×4 room directly to the right of room-1,
+    // **but** with a 4000 mm gap between them so they start
+    // non-adjacent. Room-1 will be moved right by exactly 4000 mm to
+    // make its east edge (x=4000 after move = 8000) coincide with
+    // room-2's west edge (x=8000).
+    const r2Walls = [
+      WallSegment(
+        id: 'r2-ef',
+        roomId: 'room-2',
+        startPoint: Point2D(x: 8000, y: 0),
+        endPoint: Point2D(x: 12000, y: 0),
+      ),
+      WallSegment(
+        id: 'r2-fg',
+        roomId: 'room-2',
+        startPoint: Point2D(x: 12000, y: 0),
+        endPoint: Point2D(x: 12000, y: 4000),
+      ),
+      WallSegment(
+        id: 'r2-gh',
+        roomId: 'room-2',
+        startPoint: Point2D(x: 12000, y: 4000),
+        endPoint: Point2D(x: 8000, y: 4000),
+      ),
+      WallSegment(
+        id: 'r2-he',
+        roomId: 'room-2',
+        startPoint: Point2D(x: 8000, y: 4000),
+        endPoint: Point2D(x: 8000, y: 0),
+      ),
+    ];
+    const room2 = Room(
+      id: 'room-2',
+      floorId: 'floor-1',
+      name: 'Room 2',
+      targetTempC: 20.0,
+      polygon: [
+        Point2D(x: 8000, y: 0),
+        Point2D(x: 12000, y: 0),
+        Point2D(x: 12000, y: 4000),
+        Point2D(x: 8000, y: 4000),
+      ],
+    );
 
-      final (cb, tool, _, container) = _setup();
-      addTearDown(container.dispose);
-      final notifier = container.read(editorStateProvider.notifier);
-      notifier.replaceAllWallsAndRooms(
-        [..._r1Walls, ...r2Walls],
-        [_room1, room2],
-      );
+    final (cb, tool, _, container) = _setup();
+    addTearDown(container.dispose);
+    final notifier = container.read(editorStateProvider.notifier);
+    notifier.replaceAllWallsAndRooms(
+      [..._r1Walls, ...r2Walls],
+      [_room1, room2],
+    );
 
-      tool.onTap(const Point2D(x: 2000, y: 2000), PointerDeviceKind.mouse);
+    tool.onTap(const Point2D(x: 2000, y: 2000), PointerDeviceKind.mouse);
 
-      // Move room-1 right by 4000 mm so its east wall coincides with
-      // room-2's west wall.
-      _drag(
-        tool,
-        from: const Point2D(x: 2000, y: 2000),
-        to: const Point2D(x: 6000, y: 2000),
-      );
+    // Move room-1 right by 4000 mm so its east wall coincides with
+    // room-2's west wall.
+    _drag(
+      tool,
+      from: const Point2D(x: 2000, y: 2000),
+      to: const Point2D(x: 6000, y: 2000),
+    );
 
-      // After the move there should be a shared wall between room-1
-      // and room-2 along x = 8000, y in [0, 4000].
-      final walls = cb.currentWalls;
-      // Find the wall belonging to room-2 along x=8000.
-      final r2ShareCandidates = walls
-          .where((w) =>
+    // After the move there should be a shared wall between room-1
+    // and room-2 along x = 8000, y in [0, 4000].
+    final walls = cb.currentWalls;
+    // Find the wall belonging to room-2 along x=8000.
+    final r2ShareCandidates = walls
+        .where(
+          (w) =>
               w.roomId == 'room-2' &&
               w.startPoint.x == 8000 &&
-              w.endPoint.x == 8000)
-          .toList();
-      expect(
-        r2ShareCandidates,
-        hasLength(1),
-        reason: 'room-2 must keep exactly one wall along the shared edge '
-            '(promoted in place, not duplicated)',
-      );
-      final r2Share = r2ShareCandidates.single;
-      expect(
-        r2Share.wallType,
-        WallType.interior,
-        reason: 'shared wall must be promoted to interior on room-2 side',
-      );
-      expect(r2Share.adjacentRoomId, 'room-1');
-      expect(r2Share.mirrorId, isNotNull);
+              w.endPoint.x == 8000,
+        )
+        .toList();
+    expect(
+      r2ShareCandidates,
+      hasLength(1),
+      reason:
+          'room-2 must keep exactly one wall along the shared edge '
+          '(promoted in place, not duplicated)',
+    );
+    final r2Share = r2ShareCandidates.single;
+    expect(
+      r2Share.wallType,
+      WallType.interior,
+      reason: 'shared wall must be promoted to interior on room-2 side',
+    );
+    expect(r2Share.adjacentRoomId, 'room-1');
+    expect(r2Share.mirrorId, isNotNull);
 
-      // Find the mirror partner on room-1's side.
-      final r1Share = walls.firstWhere((w) => w.id == r2Share.mirrorId);
-      expect(r1Share.roomId, 'room-1');
-      expect(r1Share.wallType, WallType.interior);
-      expect(r1Share.adjacentRoomId, 'room-2');
-      expect(
-        r1Share.mirrorId,
-        r2Share.id,
-        reason: 'ADR-011: both walls must cross-reference each other',
-      );
-      // Geometry: room-1's copy is reversed relative to room-2's copy
-      // (ADR-001 mirror pair).
-      expect(r1Share.startPoint, r2Share.endPoint);
-      expect(r1Share.endPoint, r2Share.startPoint);
+    // Find the mirror partner on room-1's side.
+    final r1Share = walls.firstWhere((w) => w.id == r2Share.mirrorId);
+    expect(r1Share.roomId, 'room-1');
+    expect(r1Share.wallType, WallType.interior);
+    expect(r1Share.adjacentRoomId, 'room-2');
+    expect(
+      r1Share.mirrorId,
+      r2Share.id,
+      reason: 'ADR-011: both walls must cross-reference each other',
+    );
+    // Geometry: room-1's copy is reversed relative to room-2's copy
+    // (ADR-001 mirror pair).
+    expect(r1Share.startPoint, r2Share.endPoint);
+    expect(r1Share.endPoint, r2Share.startPoint);
 
-      // Room-2's other three walls remain untouched (neighbour stays put).
-      for (final id in ['r2-ef', 'r2-fg', 'r2-gh']) {
-        expect(
-          walls.any((w) => w.id == id),
-          isTrue,
-          reason: 'neighbour wall $id must survive the move unchanged',
-        );
-      }
-
-      // Room-1 now has exactly four walls (three exterior + one shared
-      // mirror copy).
-      final r1Walls = walls.where((w) => w.roomId == 'room-1').toList();
-      expect(r1Walls, hasLength(4));
+    // Room-2's other three walls remain untouched (neighbour stays put).
+    for (final id in ['r2-ef', 'r2-fg', 'r2-gh']) {
       expect(
-        r1Walls.where((w) => w.wallType == WallType.interior).length,
-        1,
+        walls.any((w) => w.id == id),
+        isTrue,
+        reason: 'neighbour wall $id must survive the move unchanged',
       );
-    },
-  );
+    }
+
+    // Room-1 now has exactly four walls (three exterior + one shared
+    // mirror copy).
+    final r1Walls = walls.where((w) => w.roomId == 'room-1').toList();
+    expect(r1Walls, hasLength(4));
+    expect(r1Walls.where((w) => w.wallType == WallType.interior).length, 1);
+  });
 
   // ────────────────────────────────────────────────────────────────────────
   // MR-3: Moving a shared room away detaches the shared partner —
@@ -562,192 +520,184 @@ void main() {
   // exterior, neighbour geometry unchanged (ADR-016 Rule 3).
   // ────────────────────────────────────────────────────────────────────────
 
-  test(
-    'MR-3: moving a shared room away detaches both walls to exterior '
-    'with mirrorId / adjacentRoomId cleared',
-    () {
-      // Start: room-1 and room-2 already share the wall along x=4000.
-      // Build the shared pair the same way addRoomFromDetection would.
-      const sharedR1 = WallSegment(
-        id: 'shared-r1',
+  test('MR-3: moving a shared room away detaches both walls to exterior '
+      'with mirrorId / adjacentRoomId cleared', () {
+    // Start: room-1 and room-2 already share the wall along x=4000.
+    // Build the shared pair the same way addRoomFromDetection would.
+    const sharedR1 = WallSegment(
+      id: 'shared-r1',
+      roomId: 'room-1',
+      startPoint: Point2D(x: 4000, y: 0),
+      endPoint: Point2D(x: 4000, y: 4000),
+      wallType: WallType.interior,
+      adjacentRoomId: 'room-2',
+      mirrorId: 'shared-r2',
+    );
+    const sharedR2 = WallSegment(
+      id: 'shared-r2',
+      roomId: 'room-2',
+      startPoint: Point2D(x: 4000, y: 4000),
+      endPoint: Point2D(x: 4000, y: 0),
+      wallType: WallType.interior,
+      adjacentRoomId: 'room-1',
+      mirrorId: 'shared-r1',
+    );
+    // Replace r1-bc (the original eastern wall) with sharedR1; the
+    // other three room-1 walls keep their original ids.
+    const r1WallsShared = [
+      WallSegment(
+        id: 'r1-ab',
         roomId: 'room-1',
-        startPoint: Point2D(x: 4000, y: 0),
-        endPoint: Point2D(x: 4000, y: 4000),
-        wallType: WallType.interior,
-        adjacentRoomId: 'room-2',
-        mirrorId: 'shared-r2',
-      );
-      const sharedR2 = WallSegment(
-        id: 'shared-r2',
+        startPoint: _ptA,
+        endPoint: _ptB,
+      ),
+      sharedR1,
+      WallSegment(
+        id: 'r1-cd',
+        roomId: 'room-1',
+        startPoint: _ptC,
+        endPoint: _ptD,
+      ),
+      WallSegment(
+        id: 'r1-da',
+        roomId: 'room-1',
+        startPoint: _ptD,
+        endPoint: _ptA,
+      ),
+    ];
+    const r2OtherWalls = [
+      WallSegment(
+        id: 'r2-ef',
         roomId: 'room-2',
-        startPoint: Point2D(x: 4000, y: 4000),
-        endPoint: Point2D(x: 4000, y: 0),
-        wallType: WallType.interior,
-        adjacentRoomId: 'room-1',
-        mirrorId: 'shared-r1',
-      );
-      // Replace r1-bc (the original eastern wall) with sharedR1; the
-      // other three room-1 walls keep their original ids.
-      const r1WallsShared = [
-        WallSegment(
-          id: 'r1-ab',
-          roomId: 'room-1',
-          startPoint: _ptA,
-          endPoint: _ptB,
-        ),
-        sharedR1,
-        WallSegment(
-          id: 'r1-cd',
-          roomId: 'room-1',
-          startPoint: _ptC,
-          endPoint: _ptD,
-        ),
-        WallSegment(
-          id: 'r1-da',
-          roomId: 'room-1',
-          startPoint: _ptD,
-          endPoint: _ptA,
-        ),
-      ];
-      const r2OtherWalls = [
-        WallSegment(
-          id: 'r2-ef',
-          roomId: 'room-2',
-          startPoint: Point2D(x: 4000, y: 0),
-          endPoint: Point2D(x: 8000, y: 0),
-        ),
-        WallSegment(
-          id: 'r2-fg',
-          roomId: 'room-2',
-          startPoint: Point2D(x: 8000, y: 0),
-          endPoint: Point2D(x: 8000, y: 4000),
-        ),
-        WallSegment(
-          id: 'r2-gh',
-          roomId: 'room-2',
-          startPoint: Point2D(x: 8000, y: 4000),
-          endPoint: Point2D(x: 4000, y: 4000),
-        ),
-        sharedR2,
-      ];
-      const room2 = Room(
-        id: 'room-2',
-        floorId: 'floor-1',
-        name: 'Room 2',
-        targetTempC: 20.0,
-        polygon: [
-          Point2D(x: 4000, y: 0),
-          Point2D(x: 8000, y: 0),
-          Point2D(x: 8000, y: 4000),
-          Point2D(x: 4000, y: 4000),
-        ],
-      );
+        startPoint: Point2D(x: 4000, y: 0),
+        endPoint: Point2D(x: 8000, y: 0),
+      ),
+      WallSegment(
+        id: 'r2-fg',
+        roomId: 'room-2',
+        startPoint: Point2D(x: 8000, y: 0),
+        endPoint: Point2D(x: 8000, y: 4000),
+      ),
+      WallSegment(
+        id: 'r2-gh',
+        roomId: 'room-2',
+        startPoint: Point2D(x: 8000, y: 4000),
+        endPoint: Point2D(x: 4000, y: 4000),
+      ),
+      sharedR2,
+    ];
+    const room2 = Room(
+      id: 'room-2',
+      floorId: 'floor-1',
+      name: 'Room 2',
+      targetTempC: 20.0,
+      polygon: [
+        Point2D(x: 4000, y: 0),
+        Point2D(x: 8000, y: 0),
+        Point2D(x: 8000, y: 4000),
+        Point2D(x: 4000, y: 4000),
+      ],
+    );
 
-      final (cb, tool, _, container) = _setup();
-      addTearDown(container.dispose);
-      final notifier = container.read(editorStateProvider.notifier);
-      notifier.replaceAllWallsAndRooms(
-        [...r1WallsShared, ...r2OtherWalls],
-        [_room1, room2],
-      );
+    final (cb, tool, _, container) = _setup();
+    addTearDown(container.dispose);
+    final notifier = container.read(editorStateProvider.notifier);
+    notifier.replaceAllWallsAndRooms(
+      [...r1WallsShared, ...r2OtherWalls],
+      [_room1, room2],
+    );
 
-      // Capture room-2's wall geometry pre-move for the "stays put" check.
-      final r2WallsBefore = cb.currentWalls
-          .where((w) => w.roomId == 'room-2')
-          .toList();
+    // Capture room-2's wall geometry pre-move for the "stays put" check.
+    final r2WallsBefore = cb.currentWalls
+        .where((w) => w.roomId == 'room-2')
+        .toList();
 
-      // Select and move room-1 left by 5000 mm (well clear of room-2).
-      tool.onTap(const Point2D(x: 2000, y: 2000), PointerDeviceKind.mouse);
-      _drag(
-        tool,
-        from: const Point2D(x: 2000, y: 2000),
-        to: const Point2D(x: -3000, y: 2000),
-      );
+    // Select and move room-1 left by 5000 mm (well clear of room-2).
+    tool.onTap(const Point2D(x: 2000, y: 2000), PointerDeviceKind.mouse);
+    _drag(
+      tool,
+      from: const Point2D(x: 2000, y: 2000),
+      to: const Point2D(x: -3000, y: 2000),
+    );
 
-      // Room-2's former shared wall reverted to exterior, no mirrorId,
-      // no adjacentRoomId, and its geometry is unchanged.
-      final r2After = cb.currentWalls.firstWhere((w) => w.id == 'shared-r2');
-      expect(r2After.wallType, WallType.exterior);
-      expect(r2After.mirrorId, isNull);
-      expect(r2After.adjacentRoomId, isNull);
-      expect(r2After.startPoint, sharedR2.startPoint);
-      expect(r2After.endPoint, sharedR2.endPoint);
+    // Room-2's former shared wall reverted to exterior, no mirrorId,
+    // no adjacentRoomId, and its geometry is unchanged.
+    final r2After = cb.currentWalls.firstWhere((w) => w.id == 'shared-r2');
+    expect(r2After.wallType, WallType.exterior);
+    expect(r2After.mirrorId, isNull);
+    expect(r2After.adjacentRoomId, isNull);
+    expect(r2After.startPoint, sharedR2.startPoint);
+    expect(r2After.endPoint, sharedR2.endPoint);
 
-      // Room-2's other walls are untouched.
-      for (final w in r2WallsBefore) {
-        if (w.id == 'shared-r2') continue;
-        final after = cb.currentWalls.firstWhere((cur) => cur.id == w.id);
-        expect(after.startPoint, w.startPoint);
-        expect(after.endPoint, w.endPoint);
-        expect(after.wallType, w.wallType);
-        expect(after.mirrorId, w.mirrorId);
-      }
+    // Room-2's other walls are untouched.
+    for (final w in r2WallsBefore) {
+      if (w.id == 'shared-r2') continue;
+      final after = cb.currentWalls.firstWhere((cur) => cur.id == w.id);
+      expect(after.startPoint, w.startPoint);
+      expect(after.endPoint, w.endPoint);
+      expect(after.wallType, w.wallType);
+      expect(after.mirrorId, w.mirrorId);
+    }
 
-      // Moved room-1's walls are all exterior (no remaining mirror link).
-      final r1After =
-          cb.currentWalls.where((w) => w.roomId == 'room-1').toList();
-      expect(r1After, hasLength(4));
-      for (final w in r1After) {
-        expect(w.wallType, WallType.exterior);
-        expect(w.mirrorId, isNull);
-        expect(w.adjacentRoomId, isNull);
-      }
-    },
-  );
+    // Moved room-1's walls are all exterior (no remaining mirror link).
+    final r1After = cb.currentWalls.where((w) => w.roomId == 'room-1').toList();
+    expect(r1After, hasLength(4));
+    for (final w in r1After) {
+      expect(w.wallType, WallType.exterior);
+      expect(w.mirrorId, isNull);
+      expect(w.adjacentRoomId, isNull);
+    }
+  });
 
   // ────────────────────────────────────────────────────────────────────────
   // MR-4: One Ctrl+Z reverts the whole move (including the regenerated
   // shared wall and zone translations).
   // ────────────────────────────────────────────────────────────────────────
 
-  test(
-    'MR-4: one undo reverts the entire move — walls, rooms, zones, '
-    'shared-wall regeneration',
-    () {
-      final (cb, tool, undoRedo, container) = _setup();
-      addTearDown(container.dispose);
-      final notifier = container.read(editorStateProvider.notifier);
-      notifier.replaceAllWallsAndRooms(_r1Walls, [_room1]);
-      notifier.addZone(_r1Zone);
+  test('MR-4: one undo reverts the entire move — walls, rooms, zones, '
+      'shared-wall regeneration', () {
+    final (cb, tool, undoRedo, container) = _setup();
+    addTearDown(container.dispose);
+    final notifier = container.read(editorStateProvider.notifier);
+    notifier.replaceAllWallsAndRooms(_r1Walls, [_room1]);
+    notifier.addZone(_r1Zone);
 
-      // Snapshot the pre-move state for comparison.
-      final beforeWalls = cb.currentWalls.toList();
-      final beforeRooms = cb.currentRooms.toList();
-      final beforeZones = cb.currentZones.toList();
+    // Snapshot the pre-move state for comparison.
+    final beforeWalls = cb.currentWalls.toList();
+    final beforeRooms = cb.currentRooms.toList();
+    final beforeZones = cb.currentZones.toList();
 
-      // Press outside the zone so room-move (not zone body drag) arms.
-      tool.onTap(const Point2D(x: 500, y: 500), PointerDeviceKind.mouse);
-      _drag(
-        tool,
-        from: const Point2D(x: 500, y: 500),
-        to: const Point2D(x: 2500, y: 1500),
-      );
+    // Press outside the zone so room-move (not zone body drag) arms.
+    tool.onTap(const Point2D(x: 500, y: 500), PointerDeviceKind.mouse);
+    _drag(
+      tool,
+      from: const Point2D(x: 500, y: 500),
+      to: const Point2D(x: 2500, y: 1500),
+    );
 
-      // Sanity-check: the move did happen.
-      // Walls list grew/shuffled and at least one wall now sits at a
-      // translated position absent from the pre-move state.
-      final beforeStartPoints = {
-        for (final w in beforeWalls) w.startPoint,
-      };
-      final movedSome = cb.currentWalls
-          .any((w) => !beforeStartPoints.contains(w.startPoint));
-      expect(
-        movedSome,
-        isTrue,
-        reason: 'expected at least one wall to be at a translated position',
-      );
+    // Sanity-check: the move did happen.
+    // Walls list grew/shuffled and at least one wall now sits at a
+    // translated position absent from the pre-move state.
+    final beforeStartPoints = {for (final w in beforeWalls) w.startPoint};
+    final movedSome = cb.currentWalls.any(
+      (w) => !beforeStartPoints.contains(w.startPoint),
+    );
+    expect(
+      movedSome,
+      isTrue,
+      reason: 'expected at least one wall to be at a translated position',
+    );
 
-      // Undo. Stack must have exactly one entry — "Move room".
-      expect(undoRedo.canUndo, isTrue);
-      undoRedo.undo();
-      expect(undoRedo.canUndo, isFalse);
+    // Undo. Stack must have exactly one entry — "Move room".
+    expect(undoRedo.canUndo, isTrue);
+    undoRedo.undo();
+    expect(undoRedo.canUndo, isFalse);
 
-      // After undo: walls / rooms / zones identical to before.
-      expect(cb.currentWalls, equals(beforeWalls));
-      expect(cb.currentRooms, equals(beforeRooms));
-      expect(cb.currentZones, equals(beforeZones));
-    },
-  );
+    // After undo: walls / rooms / zones identical to before.
+    expect(cb.currentWalls, equals(beforeWalls));
+    expect(cb.currentRooms, equals(beforeRooms));
+    expect(cb.currentZones, equals(beforeZones));
+  });
 
   // ────────────────────────────────────────────────────────────────────────
   // MR-6: ADR-017 field preservation on a standalone move.
@@ -757,87 +707,85 @@ void main() {
   // `thicknessMm`, `anchorMode`, and `constructionId` — the recreated
   // wall is the same physical wall the user configured pre-move.
 
-  test(
-    'MR-6: standalone move preserves thicknessMm, anchorMode, and '
-    'constructionId on every wall',
-    () {
-      final (cb, tool, _, container) = _setup();
-      addTearDown(container.dispose);
-      final notifier = container.read(editorStateProvider.notifier);
-      // Configure walls with the rule-respecting anchorMode that
-      // production paths would set (exterior + no-mirror → innerFace
-      // per ADR-017 Rule 2). ADR-020: walls with a custom thickness
-      // must carry a `constructionId` for that thickness to survive
-      // through any wall-creation path (move reconstruction included).
-      // Walls without a `constructionId` reset to the project default
-      // when re-created.
-      final configured = [
-        _r1Walls[0].copyWith(
-          thicknessMm: 300,
-          constructionId: 'ext-B',
-          anchorMode: WallAnchorMode.outerFace,
-        ),
-        _r1Walls[1].copyWith(
-          thicknessMm: 280,
-          constructionId: 'ext-A',
-          anchorMode: WallAnchorMode.innerFace,
-        ),
-        _r1Walls[2].copyWith(
-          thicknessMm: 240,
-          anchorMode: WallAnchorMode.innerFace,
-        ),
-        _r1Walls[3].copyWith(
-          thicknessMm: 240,
-          anchorMode: WallAnchorMode.innerFace,
-        ),
-      ];
-      notifier.replaceAllWallsAndRooms(configured, [_room1]);
+  test('MR-6: standalone move preserves thicknessMm, anchorMode, and '
+      'constructionId on every wall', () {
+    final (cb, tool, _, container) = _setup();
+    addTearDown(container.dispose);
+    final notifier = container.read(editorStateProvider.notifier);
+    // Configure walls with the rule-respecting anchorMode that
+    // production paths would set (exterior + no-mirror → innerFace
+    // per ADR-017 Rule 2). ADR-020: walls with a custom thickness
+    // must carry a `constructionId` for that thickness to survive
+    // through any wall-creation path (move reconstruction included).
+    // Walls without a `constructionId` reset to the project default
+    // when re-created.
+    final configured = [
+      _r1Walls[0].copyWith(
+        thicknessMm: 300,
+        constructionId: 'ext-B',
+        anchorMode: WallAnchorMode.outerFace,
+      ),
+      _r1Walls[1].copyWith(
+        thicknessMm: 280,
+        constructionId: 'ext-A',
+        anchorMode: WallAnchorMode.innerFace,
+      ),
+      _r1Walls[2].copyWith(
+        thicknessMm: 240,
+        anchorMode: WallAnchorMode.innerFace,
+      ),
+      _r1Walls[3].copyWith(
+        thicknessMm: 240,
+        anchorMode: WallAnchorMode.innerFace,
+      ),
+    ];
+    notifier.replaceAllWallsAndRooms(configured, [_room1]);
 
-      tool.onTap(const Point2D(x: 500, y: 500), PointerDeviceKind.mouse);
-      _drag(
-        tool,
-        from: const Point2D(x: 500, y: 500),
-        to: const Point2D(x: 1500, y: 1000),
+    tool.onTap(const Point2D(x: 500, y: 500), PointerDeviceKind.mouse);
+    _drag(
+      tool,
+      from: const Point2D(x: 500, y: 500),
+      to: const Point2D(x: 1500, y: 1000),
+    );
+
+    const delta = Point2D(x: 1000, y: 500);
+    for (final original in configured) {
+      // Find the recreated wall by its translated startPoint.
+      final translated = Point2D(
+        x: original.startPoint.x + delta.x,
+        y: original.startPoint.y + delta.y,
       );
-
-      const delta = Point2D(x: 1000, y: 500);
-      for (final original in configured) {
-        // Find the recreated wall by its translated startPoint.
-        final translated = Point2D(
-          x: original.startPoint.x + delta.x,
-          y: original.startPoint.y + delta.y,
-        );
-        final moved = cb.currentWalls
-            .firstWhere((w) => w.startPoint == translated);
+      final moved = cb.currentWalls.firstWhere(
+        (w) => w.startPoint == translated,
+      );
+      expect(
+        moved.thicknessMm,
+        original.thicknessMm,
+        reason: 'thicknessMm must be preserved through the move',
+      );
+      expect(
+        moved.anchorMode,
+        original.anchorMode,
+        reason: 'anchorMode must be preserved through the move',
+      );
+      if (original.constructionId != null) {
+        // ADR-020: walls carrying an explicit construction (e.g. a
+        // user-set assembly) keep the same `constructionId` through
+        // the move — preservation as before.
         expect(
-          moved.thicknessMm,
-          original.thicknessMm,
-          reason: 'thicknessMm must be preserved through the move',
+          moved.constructionId,
+          original.constructionId,
+          reason: 'constructionId must be preserved through the move',
         );
-        expect(
-          moved.anchorMode,
-          original.anchorMode,
-          reason: 'anchorMode must be preserved through the move',
-        );
-        if (original.constructionId != null) {
-          // ADR-020: walls carrying an explicit construction (e.g. a
-          // user-set assembly) keep the same `constructionId` through
-          // the move — preservation as before.
-          expect(
-            moved.constructionId,
-            original.constructionId,
-            reason: 'constructionId must be preserved through the move',
-          );
-        } else {
-          // ADR-020 Rule 3: walls without a construction now spawn an
-          // auto-default one when re-created (e.g. via the move
-          // reconstruction path). The new id must be non-null and point
-          // at an `isAutoDefault = true` construction.
-          expect(moved.constructionId, isNotNull);
-        }
+      } else {
+        // ADR-020 Rule 3: walls without a construction now spawn an
+        // auto-default one when re-created (e.g. via the move
+        // reconstruction path). The new id must be non-null and point
+        // at an `isAutoDefault = true` construction.
+        expect(moved.constructionId, isNotNull);
       }
-    },
-  );
+    }
+  });
 
   // ────────────────────────────────────────────────────────────────────────
   // MR-7 — ADR-017 Rule 8 cases a–d on shared-wall promotion at drop.
@@ -859,19 +807,11 @@ void main() {
   //   8d  both non-default, different   → adopt host (existing) wall
 
   ({_ProviderCallbacks cb, SelectTool tool, ProviderContainer container})
-      setupTwoRooms({
-    required WallSegment r1East,
-    required WallSegment r2West,
-  }) {
+  setupTwoRooms({required WallSegment r1East, required WallSegment r2West}) {
     final (cb, tool, _, container) = _setup();
     addTearDown(container.dispose);
 
-    final r1Walls = [
-      _r1Walls[0],
-      r1East,
-      _r1Walls[2],
-      _r1Walls[3],
-    ];
+    final r1Walls = [_r1Walls[0], r1East, _r1Walls[2], _r1Walls[3]];
     final r2Walls = [
       const WallSegment(
         id: 'r2-ef',
@@ -906,10 +846,9 @@ void main() {
       ],
     );
 
-    container.read(editorStateProvider.notifier).replaceAllWallsAndRooms(
-      [...r1Walls, ...r2Walls],
-      [_room1, room2],
-    );
+    container
+        .read(editorStateProvider.notifier)
+        .replaceAllWallsAndRooms([...r1Walls, ...r2Walls], [_room1, room2]);
 
     tool.onTap(const Point2D(x: 2000, y: 2000), PointerDeviceKind.mouse);
     _drag(
@@ -961,129 +900,117 @@ void main() {
     },
   );
 
-  test(
-    'MR-7b-host: Rule 8b (host non-default) — shared wall adopts the host '
-    'wall thickness/construction',
-    () {
-      final ctx = setupTwoRooms(
-        r1East: _r1Walls[1].copyWith(thicknessMm: 240),
-        r2West: const WallSegment(
-          id: 'r2-he',
-          roomId: 'room-2',
-          startPoint: Point2D(x: 8000, y: 4000),
-          endPoint: Point2D(x: 8000, y: 0),
-          thicknessMm: 360,
-          constructionId: 'ext-host',
-        ),
-      );
-      final shared = ctx.cb.currentWalls.firstWhere(
-        (w) =>
-            w.roomId == 'room-2' &&
-            w.startPoint.x == 8000 &&
-            w.endPoint.x == 8000,
-      );
-      expect(shared.wallType, WallType.interior);
-      expect(shared.thicknessMm, 360.0);
-      expect(shared.constructionId, 'ext-host');
-      expect(shared.anchorMode, WallAnchorMode.centerline);
-    },
-  );
+  test('MR-7b-host: Rule 8b (host non-default) — shared wall adopts the host '
+      'wall thickness/construction', () {
+    final ctx = setupTwoRooms(
+      r1East: _r1Walls[1].copyWith(thicknessMm: 240),
+      r2West: const WallSegment(
+        id: 'r2-he',
+        roomId: 'room-2',
+        startPoint: Point2D(x: 8000, y: 4000),
+        endPoint: Point2D(x: 8000, y: 0),
+        thicknessMm: 360,
+        constructionId: 'ext-host',
+      ),
+    );
+    final shared = ctx.cb.currentWalls.firstWhere(
+      (w) =>
+          w.roomId == 'room-2' &&
+          w.startPoint.x == 8000 &&
+          w.endPoint.x == 8000,
+    );
+    expect(shared.wallType, WallType.interior);
+    expect(shared.thicknessMm, 360.0);
+    expect(shared.constructionId, 'ext-host');
+    expect(shared.anchorMode, WallAnchorMode.centerline);
+  });
 
-  test(
-    'MR-7b-moved: Rule 8b (moved side non-default) — shared wall adopts the '
-    'moved-side wall thickness/construction',
-    () {
-      final ctx = setupTwoRooms(
-        r1East: _r1Walls[1].copyWith(
-          thicknessMm: 420,
-          constructionId: 'ext-moved',
-        ),
-        r2West: const WallSegment(
-          id: 'r2-he',
-          roomId: 'room-2',
-          startPoint: Point2D(x: 8000, y: 4000),
-          endPoint: Point2D(x: 8000, y: 0),
-          thicknessMm: 240,
-        ),
-      );
-      final shared = ctx.cb.currentWalls.firstWhere(
-        (w) =>
-            w.roomId == 'room-2' &&
-            w.startPoint.x == 8000 &&
-            w.endPoint.x == 8000,
-      );
-      expect(shared.wallType, WallType.interior);
-      expect(shared.thicknessMm, 420.0);
-      expect(shared.constructionId, 'ext-moved');
-      expect(shared.anchorMode, WallAnchorMode.centerline);
-    },
-  );
+  test('MR-7b-moved: Rule 8b (moved side non-default) — shared wall adopts the '
+      'moved-side wall thickness/construction', () {
+    final ctx = setupTwoRooms(
+      r1East: _r1Walls[1].copyWith(
+        thicknessMm: 420,
+        constructionId: 'ext-moved',
+      ),
+      r2West: const WallSegment(
+        id: 'r2-he',
+        roomId: 'room-2',
+        startPoint: Point2D(x: 8000, y: 4000),
+        endPoint: Point2D(x: 8000, y: 0),
+        thicknessMm: 240,
+      ),
+    );
+    final shared = ctx.cb.currentWalls.firstWhere(
+      (w) =>
+          w.roomId == 'room-2' &&
+          w.startPoint.x == 8000 &&
+          w.endPoint.x == 8000,
+    );
+    expect(shared.wallType, WallType.interior);
+    expect(shared.thicknessMm, 420.0);
+    expect(shared.constructionId, 'ext-moved');
+    expect(shared.anchorMode, WallAnchorMode.centerline);
+  });
 
-  test(
-    'MR-7c: Rule 8c — both walls non-default and equal → shared wall '
-    'preserves the construction',
-    () {
-      final ctx = setupTwoRooms(
-        r1East: _r1Walls[1].copyWith(
-          thicknessMm: 300,
-          constructionId: 'ext-shared',
-        ),
-        r2West: const WallSegment(
-          id: 'r2-he',
-          roomId: 'room-2',
-          startPoint: Point2D(x: 8000, y: 4000),
-          endPoint: Point2D(x: 8000, y: 0),
-          thicknessMm: 300,
-          constructionId: 'ext-shared',
-        ),
-      );
-      final shared = ctx.cb.currentWalls.firstWhere(
-        (w) =>
-            w.roomId == 'room-2' &&
-            w.startPoint.x == 8000 &&
-            w.endPoint.x == 8000,
-      );
-      expect(shared.thicknessMm, 300.0);
-      expect(shared.constructionId, 'ext-shared');
-    },
-  );
+  test('MR-7c: Rule 8c — both walls non-default and equal → shared wall '
+      'preserves the construction', () {
+    final ctx = setupTwoRooms(
+      r1East: _r1Walls[1].copyWith(
+        thicknessMm: 300,
+        constructionId: 'ext-shared',
+      ),
+      r2West: const WallSegment(
+        id: 'r2-he',
+        roomId: 'room-2',
+        startPoint: Point2D(x: 8000, y: 4000),
+        endPoint: Point2D(x: 8000, y: 0),
+        thicknessMm: 300,
+        constructionId: 'ext-shared',
+      ),
+    );
+    final shared = ctx.cb.currentWalls.firstWhere(
+      (w) =>
+          w.roomId == 'room-2' &&
+          w.startPoint.x == 8000 &&
+          w.endPoint.x == 8000,
+    );
+    expect(shared.thicknessMm, 300.0);
+    expect(shared.constructionId, 'ext-shared');
+  });
 
-  test(
-    'MR-7d: Rule 8d — both walls non-default and different → shared wall '
-    'adopts the existing (host) wall',
-    () {
-      final ctx = setupTwoRooms(
-        r1East: _r1Walls[1].copyWith(
-          thicknessMm: 420,
-          constructionId: 'ext-moved',
-        ),
-        r2West: const WallSegment(
-          id: 'r2-he',
-          roomId: 'room-2',
-          startPoint: Point2D(x: 8000, y: 4000),
-          endPoint: Point2D(x: 8000, y: 0),
-          thicknessMm: 360,
-          constructionId: 'ext-host',
-        ),
-      );
-      final shared = ctx.cb.currentWalls.firstWhere(
-        (w) =>
-            w.roomId == 'room-2' &&
-            w.startPoint.x == 8000 &&
-            w.endPoint.x == 8000,
-      );
-      expect(
-        shared.thicknessMm,
-        360.0,
-        reason: 'Case 8d → adopt existing (host) wall thickness',
-      );
-      expect(
-        shared.constructionId,
-        'ext-host',
-        reason: 'Case 8d → adopt existing (host) construction',
-      );
-    },
-  );
+  test('MR-7d: Rule 8d — both walls non-default and different → shared wall '
+      'adopts the existing (host) wall', () {
+    final ctx = setupTwoRooms(
+      r1East: _r1Walls[1].copyWith(
+        thicknessMm: 420,
+        constructionId: 'ext-moved',
+      ),
+      r2West: const WallSegment(
+        id: 'r2-he',
+        roomId: 'room-2',
+        startPoint: Point2D(x: 8000, y: 4000),
+        endPoint: Point2D(x: 8000, y: 0),
+        thicknessMm: 360,
+        constructionId: 'ext-host',
+      ),
+    );
+    final shared = ctx.cb.currentWalls.firstWhere(
+      (w) =>
+          w.roomId == 'room-2' &&
+          w.startPoint.x == 8000 &&
+          w.endPoint.x == 8000,
+    );
+    expect(
+      shared.thicknessMm,
+      360.0,
+      reason: 'Case 8d → adopt existing (host) wall thickness',
+    );
+    expect(
+      shared.constructionId,
+      'ext-host',
+      reason: 'Case 8d → adopt existing (host) construction',
+    );
+  });
 
   // ────────────────────────────────────────────────────────────────────────
   // MR-5: Click without drag past threshold still only selects
@@ -1111,10 +1038,9 @@ void main() {
 
       // Nothing mutated.
       expect(cb.currentWalls, equals(beforeWalls));
-      expect(
-        [for (final r in cb.currentRooms) r.polygon],
-        equals(beforeRoomPolys),
-      );
+      expect([
+        for (final r in cb.currentRooms) r.polygon,
+      ], equals(beforeRoomPolys));
       // Selection landed on room-1.
       expect(cb.lastSelectType, 'room');
       expect(cb.lastSelectId, 'room-1');

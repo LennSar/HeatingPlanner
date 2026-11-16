@@ -272,6 +272,36 @@ class ZoneSelectionData extends InteractionData {
   final int? activeHandleIndex;
 }
 
+/// Selection data for a selected heating circuit (ADR-039).
+///
+/// Produced by [SelectTool] when a circuit is selected. Conveys the
+/// corner points of its supply and return connection pipes and the drag
+/// handles on them so [InteractionPainter] can draw the editable corner
+/// polygon over the rounded pipe.
+@immutable
+class CircuitSelectionData extends InteractionData {
+  /// Creates [CircuitSelectionData].
+  const CircuitSelectionData({
+    required this.supplyPoints,
+    required this.returnPoints,
+    this.handles = const [],
+    this.activeHandleIndex,
+  });
+
+  /// Corner points of the supply pipe, distributor → zone (world mm).
+  final List<Point2D> supplyPoints;
+
+  /// Corner points of the return pipe, zone → distributor (world mm).
+  final List<Point2D> returnPoints;
+
+  /// Positions of the draggable corner handles (world mm). The two
+  /// ends on the distributor are fixed and carry no handle.
+  final List<Point2D> handles;
+
+  /// Index within [handles] of the handle being dragged, or null.
+  final int? activeHandleIndex;
+}
+
 /// Selection data for a selected wall heating zone.
 ///
 /// Produced by [SelectTool] when a [ZoneType.wallHeating] zone is
@@ -345,18 +375,6 @@ class WallZoneHoverData extends InteractionData {
   final Point2D wallEnd;
 }
 
-/// Phase of a pipe circuit routing operation.
-///
-/// Used by [RouteDrawData] to indicate which segment of
-/// the circuit is currently being drawn.
-enum RoutePhase {
-  /// Drawing the supply line from the distributor to the zone.
-  supply,
-
-  /// Drawing the return line from the zone back to the distributor.
-  returnLine,
-}
-
 /// Ghost preview shown while moving an entire room (ADR-016).
 ///
 /// Produced by [SelectTool] during a room-interior drag. The
@@ -398,33 +416,35 @@ class RectDrawData extends InteractionData {
   final Point2D corner2;
 }
 
-/// Data produced by [RouteDrawTool] during circuit routing.
+/// Data produced by [RouteDrawTool] while a pair of connection pipes is
+/// being drawn (ADR-040).
 ///
-/// Emitted each frame so [InteractionPainter] can render:
-///  - committed supply and return waypoints as solid polylines
-///  - a dashed ghost edge from the last waypoint to the cursor
-///  - directional arrows every 500 mm along each committed path
-///  - a warning indicator when hovering over an already-connected zone
+/// Emitted on every pointer move so [InteractionPainter] can render the
+/// outcome live: the supply and the return pipe as they would be
+/// committed if the route ended at the cursor — parallel, at the set
+/// distance from walls, with bend radii.
 @immutable
 class RouteDrawData extends InteractionData {
   /// Creates [RouteDrawData].
   const RouteDrawData({
-    required this.phase,
     required this.supplyPoints,
     this.returnPoints = const [],
+    this.waypoints = const [],
     this.currentPoint,
     this.hoveredZoneAlreadyConnected = false,
+    this.hoveredZoneConnectable = false,
     this.cumulativeLengthMm = 0.0,
   });
 
-  /// Current routing phase.
-  final RoutePhase phase;
-
-  /// Supply route waypoints committed so far (world mm).
+  /// Corner points of the supply pipe, distributor → cursor (world mm).
   final List<Point2D> supplyPoints;
 
-  /// Return route waypoints committed so far (world mm).
+  /// Corner points of the return pipe, cursor → distributor (world mm).
   final List<Point2D> returnPoints;
+
+  /// Route points placed so far, after the wall distance was applied
+  /// (world mm). Drawn as dots.
+  final List<Point2D> waypoints;
 
   /// Current cursor position (world mm), null when off-canvas.
   final Point2D? currentPoint;
@@ -433,7 +453,11 @@ class RouteDrawData extends InteractionData {
   /// an assigned circuit — triggers the warning indicator.
   final bool hoveredZoneAlreadyConnected;
 
-  /// Cumulative pipe length in mm (supply + return + ghost edge).
+  /// True when the cursor hovers over a zone a double-click would
+  /// connect.
+  final bool hoveredZoneConnectable;
+
+  /// Length of both pipes together in mm, up to the cursor.
   ///
   /// Shown in the status bar as the user draws the route.
   final double cumulativeLengthMm;

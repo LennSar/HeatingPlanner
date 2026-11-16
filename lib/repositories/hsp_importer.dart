@@ -552,6 +552,18 @@ class HspImporter {
           Value(_double(d, 'pressureLossPa')),
       valveSetting:
           Value(_double(d, 'valveSetting')),
+      // Added with ADR-040 — absent in files written before it.
+      supplyPipeInsulationType:
+          Value(d['supplyPipeInsulationType'] as String?),
+      centerlinePathJson:
+          Value(jsonEncode(d['centerlinePath'] ?? const <dynamic>[])),
+      pipeSpacingMm: Value((d['pipeSpacingMm'] as num?)?.toInt() ?? 100),
+      zoneClearanceMm:
+          Value((d['zoneClearanceMm'] as num?)?.toInt() ?? 100),
+      wallClearanceMm:
+          Value((d['wallClearanceMm'] as num?)?.toInt() ?? 100),
+      // Added with ADR-041 — absent in older files.
+      supplyOnRight: Value(d['supplyOnRight'] as bool? ?? false),
     );
   }
 

@@ -42,7 +42,7 @@ import 'package:heating_planner/ui/canvas/tools/measure_tool.dart';
 
 class _StubCallbacks implements EditorCallbacks {
   _StubCallbacks([List<WallSegment> walls = const []])
-      : _walls = List.of(walls);
+    : _walls = List.of(walls);
 
   final List<WallSegment> _walls;
 
@@ -58,8 +58,10 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   void commitWall(WallSegment wall) {}
   @override
-  WallSegment commitWallWithSplit(WallSegment wall, {bool splitNewWall = true}) =>
-      wall;
+  WallSegment commitWallWithSplit(
+    WallSegment wall, {
+    bool splitNewWall = true,
+  }) => wall;
   @override
   void updateWall(WallSegment wall) {}
   @override
@@ -132,9 +134,7 @@ class _StubCallbacks implements EditorCallbacks {
     required void Function() onReplace,
   }) {}
   @override
-  void requestDistributorDeleteDialog({
-    required void Function() onConfirmed,
-  }) {}
+  void requestDistributorDeleteDialog({required void Function() onConfirmed}) {}
   @override
   void commitCircuit(HeatingCircuit circuit) {}
   @override
@@ -151,6 +151,8 @@ class _StubCallbacks implements EditorCallbacks {
   void updateZone(HeatingZone zone) {}
   @override
   void updateZoneTransient(HeatingZone zone) {}
+  @override
+  void updateCircuitTransient(HeatingCircuit circuit) => updateCircuit(circuit);
   @override
   void removeZone(String zoneId) {}
   @override
@@ -273,22 +275,25 @@ void main() {
     expect(tool.getInteractionData(), isNull);
   });
 
-  test('MT-7: Shift held — end snaps to a wall endpoint, reports indicator', () {
-    const wall = WallSegment(
-      id: 'w1',
-      roomId: '',
-      startPoint: Point2D(x: 5000, y: 5000),
-      endPoint: Point2D(x: 8000, y: 5000),
-    );
-    final tool = _makeTool(_StubCallbacks([wall]))..updateSnapEnabled(true);
-    tool.onTap(const Point2D(x: 0, y: 0), _mouse);
-    // Within endpoint threshold (200 mm) of the wall's start corner.
-    tool.onPointerMove(const Point2D(x: 5050, y: 5050));
+  test(
+    'MT-7: Shift held — end snaps to a wall endpoint, reports indicator',
+    () {
+      const wall = WallSegment(
+        id: 'w1',
+        roomId: '',
+        startPoint: Point2D(x: 5000, y: 5000),
+        endPoint: Point2D(x: 8000, y: 5000),
+      );
+      final tool = _makeTool(_StubCallbacks([wall]))..updateSnapEnabled(true);
+      tool.onTap(const Point2D(x: 0, y: 0), _mouse);
+      // Within endpoint threshold (200 mm) of the wall's start corner.
+      tool.onPointerMove(const Point2D(x: 5050, y: 5050));
 
-    final d = _data(tool)!;
-    expect(d.end, const Point2D(x: 5000, y: 5000));
-    expect(d.snapIndicator, const Point2D(x: 5000, y: 5000));
-  });
+      final d = _data(tool)!;
+      expect(d.end, const Point2D(x: 5000, y: 5000));
+      expect(d.snapIndicator, const Point2D(x: 5000, y: 5000));
+    },
+  );
 
   test('MT-8: without Shift, the end does not snap to a nearby endpoint', () {
     const wall = WallSegment(

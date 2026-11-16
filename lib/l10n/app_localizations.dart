@@ -314,10 +314,10 @@ abstract class AppLocalizations {
   /// **'Distributor'**
   String get toolDistributor;
 
-  /// Toolbar tooltip for the pipe routing tool
+  /// Toolbar label for the tool that draws the supply and return connection pipes from the distributor to a heating zone
   ///
   /// In en, this message translates to:
-  /// **'Pipe'**
+  /// **'Connection pipes'**
   String get toolPipe;
 
   /// Toolbar tooltip for the measurement tool
@@ -566,10 +566,10 @@ abstract class AppLocalizations {
   /// **'Place Distributor'**
   String get menuPlaceDistributor;
 
-  /// Tools > Route Pipe menu item
+  /// Tools menu item for the tool that draws the supply and return connection pipes from the distributor to a heating zone
   ///
   /// In en, this message translates to:
-  /// **'Route Pipe'**
+  /// **'Route Connection Pipes'**
   String get menuRoutePipe;
 
   /// Top-level Help menu label
@@ -2336,11 +2336,83 @@ abstract class AppLocalizations {
   /// **'Create wall zone'**
   String get undo_createWallZone;
 
-  /// Undo/redo label — splitting a rectangular heating zone (ADR-018)
+  /// Undo/redo label — splitting a heating zone into two equal halves (ADR-018, ADR-037)
   ///
   /// In en, this message translates to:
   /// **'Split zone'**
   String get undo_splitZone;
+
+  /// Undo/redo label — dragging an edge of a heating zone; zones sharing that edge follow (ADR-037 Rule 5)
+  ///
+  /// In en, this message translates to:
+  /// **'Move zone boundary'**
+  String get undo_moveZoneBoundary;
+
+  /// Undo/redo label — connecting a heating zone to the distributor with a newly drawn pair of connection pipes (ADR-042)
+  ///
+  /// In en, this message translates to:
+  /// **'Draw connection pipes'**
+  String get undo_drawConnectionPipe;
+
+  /// Undo/redo label — dragging a corner or a section of a circuit's supply/return connection pipe (ADR-039)
+  ///
+  /// In en, this message translates to:
+  /// **'Edit connection pipe'**
+  String get undo_editConnectionPipe;
+
+  /// Transient toast shown when an edited connection pipe would no longer end inside the zone it serves (ADR-039 Rule 1)
+  ///
+  /// In en, this message translates to:
+  /// **'The connection pipe must end inside its heating zone.'**
+  String get circuit_routeMustEndInZoneToast;
+
+  /// Transient toast shown when the connection-pipe tool is double-clicked outside any heating zone (ADR-040 Rule 1)
+  ///
+  /// In en, this message translates to:
+  /// **'Double-click inside a heating zone to connect the pipes.'**
+  String get route_doubleClickInZoneToast;
+
+  /// Transient toast shown when the connection-pipe tool is double-clicked in a zone that already has a circuit (ADR-040 Rule 1)
+  ///
+  /// In en, this message translates to:
+  /// **'This heating zone is already connected.'**
+  String get route_zoneAlreadyConnectedToast;
+
+  /// Circuit properties — section label for the distances of the supply/return connection pipes (ADR-040)
+  ///
+  /// In en, this message translates to:
+  /// **'Connection pipes'**
+  String get connectionPipes;
+
+  /// Circuit properties — centre-to-centre distance between the supply and the return connection pipe, in mm
+  ///
+  /// In en, this message translates to:
+  /// **'Distance between supply and return'**
+  String get circuit_pipeSpacing;
+
+  /// Circuit properties — distance kept between a connection pipe and the tubes of a heating zone it runs through, in mm
+  ///
+  /// In en, this message translates to:
+  /// **'Distance to heating zones'**
+  String get circuit_zoneClearance;
+
+  /// Circuit properties — distance kept between the outer connection pipe and the face of a wall the route runs along, in mm
+  ///
+  /// In en, this message translates to:
+  /// **'Distance to walls'**
+  String get circuit_wallClearance;
+
+  /// Circuit properties — button that swaps which connection pipe is the supply and which is the return; the zone's tube layout follows (ADR-041)
+  ///
+  /// In en, this message translates to:
+  /// **'Swap supply and return'**
+  String get circuit_swapSupplyReturn;
+
+  /// Validation message under a connection-pipe distance field
+  ///
+  /// In en, this message translates to:
+  /// **'{min}–{max} mm'**
+  String circuit_distanceRange(int min, int max);
 
   /// Zone right-click context menu — delete item (ADR-018 Rule 9)
   ///
@@ -2360,16 +2432,16 @@ abstract class AppLocalizations {
   /// **'Split horizontally'**
   String get zoneContextMenu_splitHorizontally;
 
-  /// Tooltip on the disabled split items when the right-clicked zone is non-rectangular (ADR-018 Rule 9)
+  /// Tooltip on the disabled split items when the right-clicked zone's shape cannot be cut into two pieces (ADR-037 Rule 1)
   ///
   /// In en, this message translates to:
-  /// **'Splitting is only available for rectangular zones.'**
+  /// **'This zone\'s shape cannot be split into two halves.'**
   String get zoneContextMenu_splitDisabledTooltip;
 
-  /// Transient toast shown when the Zone tool double-click lands on a non-rectangular zone (ADR-018 Rule 1.1)
+  /// Transient toast shown when a zone's shape cannot be cut into two pieces along the requested direction (ADR-037 Rule 1)
   ///
   /// In en, this message translates to:
-  /// **'Splitting is only available for rectangular zones.'**
+  /// **'This zone\'s shape cannot be split into two halves in that direction.'**
   String get zone_splitNonRectangularToast;
 
   /// Transient toast shown when a split would produce a half thinner than 100 mm (ADR-018 Rule 4)
