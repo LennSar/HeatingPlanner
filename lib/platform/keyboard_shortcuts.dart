@@ -152,6 +152,20 @@ final Map<ShortcutActivator, Intent> editorShortcuts = {
     LogicalKeyboardKey.keyY,
     control: true,
   ): const RedoIntent(),
+  // The same three with Cmd, which Flutter reports as "meta" on macOS.
+  const SingleActivator(
+    LogicalKeyboardKey.keyZ,
+    meta: true,
+  ): const UndoIntent(),
+  const SingleActivator(
+    LogicalKeyboardKey.keyZ,
+    meta: true,
+    shift: true,
+  ): const RedoIntent(),
+  const SingleActivator(
+    LogicalKeyboardKey.keyY,
+    meta: true,
+  ): const RedoIntent(),
   const SingleActivator(LogicalKeyboardKey.delete):
       const DeleteIntent(),
   const SingleActivator(LogicalKeyboardKey.backspace):
