@@ -23,8 +23,7 @@ import 'package:heating_planner/ui/providers/editor_state_provider.dart';
 import '../../helpers/test_factories.dart';
 
 void main() {
-  test(
-      'at rest the annotation geometry mirrors editorState live '
+  test('at rest the annotation geometry mirrors editorState live '
       '(labels relayout immediately on an edit)', () {
     final container = ProviderContainer();
     addTearDown(container.dispose);
@@ -41,8 +40,7 @@ void main() {
     );
   });
 
-  test(
-      'during a drag, transient edits within one sample window do NOT change '
+  test('during a drag, transient edits within one sample window do NOT change '
       'the emitted geometry; a sample interval later it catches up; drag end '
       'snaps to the settled geometry', () async {
     final container = ProviderContainer();

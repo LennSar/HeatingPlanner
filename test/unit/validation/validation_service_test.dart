@@ -39,8 +39,7 @@ class _StubEditorStateNotifier extends EditorStateNotifier {
 ProviderContainer _containerWith(EditorState state) {
   return ProviderContainer(
     overrides: [
-      editorStateProvider
-          .overrideWith(() => _StubEditorStateNotifier(state)),
+      editorStateProvider.overrideWith(() => _StubEditorStateNotifier(state)),
       // VR-06 reads real heat demand; stub to 0.0 (never NaN) so it stays
       // silent unless a test opts into the demand-overriding container.
       roomHeatDemandProvider.overrideWith((ref, _) => 0.0),
@@ -59,8 +58,7 @@ ProviderContainer _containerWithZoneTemps(
 ) {
   return ProviderContainer(
     overrides: [
-      editorStateProvider
-          .overrideWith(() => _StubEditorStateNotifier(state)),
+      editorStateProvider.overrideWith(() => _StubEditorStateNotifier(state)),
       // VR-06 reads real heat demand; stub to 0.0 (never NaN) so it stays
       // silent unless a test opts into the demand-overriding container.
       roomHeatDemandProvider.overrideWith((ref, _) => 0.0),
@@ -81,14 +79,11 @@ ProviderContainer _containerWithTubeLengths(
 ) {
   return ProviderContainer(
     overrides: [
-      editorStateProvider
-          .overrideWith(() => _StubEditorStateNotifier(state)),
+      editorStateProvider.overrideWith(() => _StubEditorStateNotifier(state)),
       // VR-06 reads real heat demand; stub to 0.0 (never NaN) so it stays
       // silent unless a test opts into the demand-overriding container.
       roomHeatDemandProvider.overrideWith((ref, _) => 0.0),
-      tubeLengthProvider.overrideWith(
-        (ref, id) => lengths[id] ?? double.nan,
-      ),
+      tubeLengthProvider.overrideWith((ref, id) => lengths[id] ?? double.nan),
       zoneSurfaceTempProvider.overrideWith((ref, _) => double.nan),
       hydraulicBalanceProvider.overrideWith((ref, _) async => {}),
     ],
@@ -108,8 +103,7 @@ ProviderContainer _containerForHB01(
 }) {
   return ProviderContainer(
     overrides: [
-      editorStateProvider
-          .overrideWith(() => _StubEditorStateNotifier(state)),
+      editorStateProvider.overrideWith(() => _StubEditorStateNotifier(state)),
       // VR-06 reads real heat demand; stub to 0.0 (never NaN) so it stays
       // silent unless a test opts into the demand-overriding container.
       roomHeatDemandProvider.overrideWith((ref, _) => 0.0),
@@ -132,8 +126,7 @@ ProviderContainer _containerWithDemands(
 ) {
   return ProviderContainer(
     overrides: [
-      editorStateProvider
-          .overrideWith(() => _StubEditorStateNotifier(state)),
+      editorStateProvider.overrideWith(() => _StubEditorStateNotifier(state)),
       roomHeatDemandProvider.overrideWith(
         (ref, id) => demands[id] ?? double.nan,
       ),
@@ -224,8 +217,9 @@ void main() {
           id: 'w-int-no-constr',
           wallType: WallType.interior,
         );
-        final state =
-            EditorState(walls: [extNoConstr, extWithConstr, intNoConstr]);
+        final state = EditorState(
+          walls: [extNoConstr, extWithConstr, intNoConstr],
+        );
         final container = _containerWith(state);
         addTearDown(container.dispose);
 
@@ -239,52 +233,46 @@ void main() {
       },
     );
 
-    test(
-      'VR01-5: exterior wall of an unheated room without construction -> '
-      'no error (ADR-036)',
-      () {
-        final room = createTestRoom(id: 'room-unheated', isHeated: false);
-        final wall = createTestWall(
-          id: 'w-unheated-ext',
-          roomId: room.id,
-          wallType: WallType.exterior,
-        );
-        final state = EditorState(rooms: [room], walls: [wall]);
-        final container = _containerWith(state);
-        addTearDown(container.dispose);
+    test('VR01-5: exterior wall of an unheated room without construction -> '
+        'no error (ADR-036)', () {
+      final room = createTestRoom(id: 'room-unheated', isHeated: false);
+      final wall = createTestWall(
+        id: 'w-unheated-ext',
+        roomId: room.id,
+        wallType: WallType.exterior,
+      );
+      final state = EditorState(rooms: [room], walls: [wall]);
+      final container = _containerWith(state);
+      addTearDown(container.dispose);
 
-        final results = container
-            .read(validationResultsProvider(''))
-            .where((r) => r.message.contains('has no construction assigned'))
-            .toList();
+      final results = container
+          .read(validationResultsProvider(''))
+          .where((r) => r.message.contains('has no construction assigned'))
+          .toList();
 
-        expect(results, isEmpty);
-      },
-    );
+      expect(results, isEmpty);
+    });
 
-    test(
-      'VR01-6: exterior wall of a heated room without construction still '
-      'errors (ADR-036 guard)',
-      () {
-        final room = createTestRoom(id: 'room-heated');
-        final wall = createTestWall(
-          id: 'w-heated-ext',
-          roomId: room.id,
-          wallType: WallType.exterior,
-        );
-        final state = EditorState(rooms: [room], walls: [wall]);
-        final container = _containerWith(state);
-        addTearDown(container.dispose);
+    test('VR01-6: exterior wall of a heated room without construction still '
+        'errors (ADR-036 guard)', () {
+      final room = createTestRoom(id: 'room-heated');
+      final wall = createTestWall(
+        id: 'w-heated-ext',
+        roomId: room.id,
+        wallType: WallType.exterior,
+      );
+      final state = EditorState(rooms: [room], walls: [wall]);
+      final container = _containerWith(state);
+      addTearDown(container.dispose);
 
-        final results = container
-            .read(validationResultsProvider(''))
-            .where((r) => r.message.contains('has no construction assigned'))
-            .toList();
+      final results = container
+          .read(validationResultsProvider(''))
+          .where((r) => r.message.contains('has no construction assigned'))
+          .toList();
 
-        expect(results, hasLength(1));
-        expect(results.first.elementId, equals('w-heated-ext'));
-      },
-    );
+      expect(results, hasLength(1));
+      expect(results.first.elementId, equals('w-heated-ext'));
+    });
   });
 
   // ── VR-06: Room heat demand cannot be calculated ───────────────────────────
@@ -295,8 +283,7 @@ void main() {
     test('VR06-1: room with NaN demand -> room-level error', () {
       final room = createTestRoom(id: 'room-nan');
       final state = EditorState(rooms: [room]);
-      final container =
-          _containerWithDemands(state, {'room-nan': double.nan});
+      final container = _containerWithDemands(state, {'room-nan': double.nan});
       addTearDown(container.dispose);
 
       final results = container
@@ -313,8 +300,7 @@ void main() {
     test('VR06-2: room with a real demand -> no error', () {
       final room = createTestRoom(id: 'room-ok');
       final state = EditorState(rooms: [room]);
-      final container =
-          _containerWithDemands(state, {'room-ok': 850.0});
+      final container = _containerWithDemands(state, {'room-ok': 850.0});
       addTearDown(container.dispose);
 
       final results = container
@@ -330,8 +316,7 @@ void main() {
       // unheated room, so VR-06 must stay silent.
       final room = createTestRoom(id: 'room-unheated', isHeated: false);
       final state = EditorState(rooms: [room]);
-      final container =
-          _containerWithDemands(state, {'room-unheated': 0.0});
+      final container = _containerWithDemands(state, {'room-unheated': 0.0});
       addTearDown(container.dispose);
 
       final results = container
@@ -354,10 +339,9 @@ void main() {
           wallType: WallType.exterior,
         );
         final state = EditorState(rooms: [room], walls: [wall]);
-        final container = _containerWithDemands(
-          state,
-          {'room-missing-constr': double.nan},
-        );
+        final container = _containerWithDemands(state, {
+          'room-missing-constr': double.nan,
+        });
         addTearDown(container.dispose);
 
         final vr06 = container
@@ -386,10 +370,9 @@ void main() {
           wallType: WallType.interior,
         );
         final state = EditorState(rooms: [room], walls: [wall]);
-        final container = _containerWithDemands(
-          state,
-          {'room-interior': double.nan},
-        );
+        final container = _containerWithDemands(state, {
+          'room-interior': double.nan,
+        });
         addTearDown(container.dispose);
 
         final results = container
@@ -409,8 +392,7 @@ void main() {
     test('VR02-1: zone surface temp is NaN -> no warning', () {
       final zone = createTestZone(circuitId: 'circuit-1');
       final state = EditorState(zones: [zone]);
-      final container =
-          _containerWithZoneTemps(state, {zone.id: double.nan});
+      final container = _containerWithZoneTemps(state, {zone.id: double.nan});
       addTearDown(container.dispose);
 
       final results = container
@@ -539,10 +521,13 @@ void main() {
       final circuit = createTestCircuit(
         supplyRoutePath: [const Point2D(x: 0, y: 0)],
       );
-      final state =
-          EditorState(distributor: _distAtOrigin, circuits: [circuit]);
-      final container =
-          _containerWithTubeLengths(state, {circuit.id: double.nan});
+      final state = EditorState(
+        distributor: _distAtOrigin,
+        circuits: [circuit],
+      );
+      final container = _containerWithTubeLengths(state, {
+        circuit.id: double.nan,
+      });
       addTearDown(container.dispose);
 
       final results = container
@@ -559,10 +544,11 @@ void main() {
         final circuit = createTestCircuit(
           supplyRoutePath: [const Point2D(x: 0, y: 0)],
         );
-        final state =
-            EditorState(distributor: _distAtOrigin, circuits: [circuit]);
-        final container =
-            _containerWithTubeLengths(state, {circuit.id: 100.0});
+        final state = EditorState(
+          distributor: _distAtOrigin,
+          circuits: [circuit],
+        );
+        final container = _containerWithTubeLengths(state, {circuit.id: 100.0});
         addTearDown(container.dispose);
 
         final results = container
@@ -578,10 +564,11 @@ void main() {
       final circuit = createTestCircuit(
         supplyRoutePath: [const Point2D(x: 0, y: 0)],
       );
-      final state =
-          EditorState(distributor: _distAtOrigin, circuits: [circuit]);
-      final container =
-          _containerWithTubeLengths(state, {circuit.id: 120.0});
+      final state = EditorState(
+        distributor: _distAtOrigin,
+        circuits: [circuit],
+      );
+      final container = _containerWithTubeLengths(state, {circuit.id: 120.0});
       addTearDown(container.dispose);
 
       final results = container
@@ -599,10 +586,11 @@ void main() {
           id: 'circuit-long',
           supplyRoutePath: [const Point2D(x: 0, y: 0)],
         );
-        final state =
-            EditorState(distributor: _distAtOrigin, circuits: [circuit]);
-        final container =
-            _containerWithTubeLengths(state, {circuit.id: 121.0});
+        final state = EditorState(
+          distributor: _distAtOrigin,
+          circuits: [circuit],
+        );
+        final container = _containerWithTubeLengths(state, {circuit.id: 121.0});
         addTearDown(container.dispose);
 
         final results = container
@@ -657,8 +645,7 @@ void main() {
 
     test('VR04-3: mixed zones, only unconnected ones get errors', () {
       final unconnected = createTestZone(id: 'z-unconnected');
-      final connected =
-          createTestZone(id: 'z-connected', circuitId: 'c-1');
+      final connected = createTestZone(id: 'z-connected', circuitId: 'c-1');
       final state = EditorState(zones: [unconnected, connected]);
       final container = _containerWith(state);
       addTearDown(container.dispose);
@@ -702,8 +689,7 @@ void main() {
         id: 'c-1',
         supplyRoutePath: [const Point2D(x: 0, y: 0)],
       );
-      final state =
-          EditorState(distributor: _distAtOrigin, circuits: [c1]);
+      final state = EditorState(distributor: _distAtOrigin, circuits: [c1]);
       final container = _containerForHB01(
         state,
         tubeLengths: {'c-1': 100.0},
@@ -730,10 +716,7 @@ void main() {
         id: 'c-2',
         supplyRoutePath: [const Point2D(x: 0, y: 0)],
       );
-      final state = EditorState(
-        distributor: _distAtOrigin,
-        circuits: [c1, c2],
-      );
+      final state = EditorState(distributor: _distAtOrigin, circuits: [c1, c2]);
       final container = _containerForHB01(
         state,
         tubeLengths: {},
@@ -751,146 +734,125 @@ void main() {
       expect(results, isEmpty);
     });
 
-    test(
-      'HB01-4: two circuits within 1.3x ratio -> no HB-01 warning',
-      () {
-        final c1 = createTestCircuit(
-          id: 'c-1',
-          supplyRoutePath: [const Point2D(x: 0, y: 0)],
-        );
-        final c2 = createTestCircuit(
-          id: 'c-2',
-          supplyRoutePath: [const Point2D(x: 0, y: 0)],
-        );
-        final state = EditorState(
-          distributor: _distAtOrigin,
-          circuits: [c1, c2],
-        );
-        // 100 / 90 ~= 1.11 <= 1.3 -> no warning
-        final container = _containerForHB01(
-          state,
-          tubeLengths: {'c-1': 90.0, 'c-2': 100.0},
-          distributorId: 'dist-1',
-        );
-        addTearDown(container.dispose);
+    test('HB01-4: two circuits within 1.3x ratio -> no HB-01 warning', () {
+      final c1 = createTestCircuit(
+        id: 'c-1',
+        supplyRoutePath: [const Point2D(x: 0, y: 0)],
+      );
+      final c2 = createTestCircuit(
+        id: 'c-2',
+        supplyRoutePath: [const Point2D(x: 0, y: 0)],
+      );
+      final state = EditorState(distributor: _distAtOrigin, circuits: [c1, c2]);
+      // 100 / 90 ~= 1.11 <= 1.3 -> no warning
+      final container = _containerForHB01(
+        state,
+        tubeLengths: {'c-1': 90.0, 'c-2': 100.0},
+        distributorId: 'dist-1',
+      );
+      addTearDown(container.dispose);
 
-        final results = container
-            .read(validationResultsProvider(''))
-            .where(
-              (r) =>
-                  r.message.contains('Circuit lengths on this distributor'),
-            )
-            .toList();
+      final results = container
+          .read(validationResultsProvider(''))
+          .where(
+            (r) => r.message.contains('Circuit lengths on this distributor'),
+          )
+          .toList();
 
-        expect(results, isEmpty);
-      },
-    );
+      expect(results, isEmpty);
+    });
 
-    test(
-      'HB01-5: two circuits exceeding 1.3x ratio, valve data not loaded '
-      '-> distributor-level warning only',
-      () {
-        final c1 = createTestCircuit(
-          id: 'c-short',
-          supplyRoutePath: [const Point2D(x: 0, y: 0)],
-        );
-        final c2 = createTestCircuit(
-          id: 'c-long',
-          supplyRoutePath: [const Point2D(x: 0, y: 0)],
-        );
-        final state = EditorState(
-          distributor: _distAtOrigin,
-          circuits: [c1, c2],
-        );
-        // 100 / 70 ~= 1.43 > 1.3 -> HB-01 fires.
-        // balanceMap empty (default) -> valveSettings empty -> no per-circuit.
-        final container = _containerForHB01(
-          state,
-          tubeLengths: {'c-short': 70.0, 'c-long': 100.0},
-          distributorId: 'dist-1',
-        );
-        addTearDown(container.dispose);
+    test('HB01-5: two circuits exceeding 1.3x ratio, valve data not loaded '
+        '-> distributor-level warning only', () {
+      final c1 = createTestCircuit(
+        id: 'c-short',
+        supplyRoutePath: [const Point2D(x: 0, y: 0)],
+      );
+      final c2 = createTestCircuit(
+        id: 'c-long',
+        supplyRoutePath: [const Point2D(x: 0, y: 0)],
+      );
+      final state = EditorState(distributor: _distAtOrigin, circuits: [c1, c2]);
+      // 100 / 70 ~= 1.43 > 1.3 -> HB-01 fires.
+      // balanceMap empty (default) -> valveSettings empty -> no per-circuit.
+      final container = _containerForHB01(
+        state,
+        tubeLengths: {'c-short': 70.0, 'c-long': 100.0},
+        distributorId: 'dist-1',
+      );
+      addTearDown(container.dispose);
 
-        final results = container
-            .read(validationResultsProvider(''))
-            .where(
-              (r) =>
-                  r.message.contains('Circuit lengths on this distributor'),
-            )
-            .toList();
+      final results = container
+          .read(validationResultsProvider(''))
+          .where(
+            (r) => r.message.contains('Circuit lengths on this distributor'),
+          )
+          .toList();
 
-        expect(results, hasLength(1));
-        expect(results.first.elementId, equals('dist-1'));
-        expect(results.first.elementType, equals('distributor'));
-        expect(results.first.severity, equals(WarningSeverity.warning));
-        expect(results.first.message, contains('70'));
-        expect(results.first.message, contains('100'));
-        expect(results.first.suggestedFix, isNotNull);
-      },
-    );
+      expect(results, hasLength(1));
+      expect(results.first.elementId, equals('dist-1'));
+      expect(results.first.elementType, equals('distributor'));
+      expect(results.first.severity, equals(WarningSeverity.warning));
+      expect(results.first.message, contains('70'));
+      expect(results.first.message, contains('100'));
+      expect(results.first.suggestedFix, isNotNull);
+    });
 
-    test(
-      'HB01-6: two circuits exceeding ratio with valve delta-P > 2000 Pa '
-      '-> distributor warning + per-circuit warning',
-      () async {
-        final cShort = createTestCircuit(
-          id: 'c-short',
-          supplyRoutePath: [const Point2D(x: 0, y: 0)],
-        );
-        final cLong = createTestCircuit(
-          id: 'c-long',
-          supplyRoutePath: [const Point2D(x: 0, y: 0)],
-        );
-        // Third circuit with NaN length: covers the `if (len == null) continue`
-        // branch inside the per-circuit loop (not in lengths map).
-        final cNan = createTestCircuit(
-          id: 'c-nan',
-          supplyRoutePath: [const Point2D(x: 0, y: 0)],
-        );
-        final state = EditorState(
-          distributor: _distAtOrigin,
-          circuits: [cShort, cLong, cNan],
-        );
-        final container = _containerForHB01(
-          state,
-          tubeLengths: {'c-short': 70.0, 'c-long': 100.0},
-          // c-short needs 5 000 Pa throttling -> > significantValveSettingPa
-          balanceMap: {'c-short': 5000.0},
-          distributorId: 'dist-1',
-        );
-        addTearDown(container.dispose);
+    test('HB01-6: two circuits exceeding ratio with valve delta-P > 2000 Pa '
+        '-> distributor warning + per-circuit warning', () async {
+      final cShort = createTestCircuit(
+        id: 'c-short',
+        supplyRoutePath: [const Point2D(x: 0, y: 0)],
+      );
+      final cLong = createTestCircuit(
+        id: 'c-long',
+        supplyRoutePath: [const Point2D(x: 0, y: 0)],
+      );
+      // Third circuit with NaN length: covers the `if (len == null) continue`
+      // branch inside the per-circuit loop (not in lengths map).
+      final cNan = createTestCircuit(
+        id: 'c-nan',
+        supplyRoutePath: [const Point2D(x: 0, y: 0)],
+      );
+      final state = EditorState(
+        distributor: _distAtOrigin,
+        circuits: [cShort, cLong, cNan],
+      );
+      final container = _containerForHB01(
+        state,
+        tubeLengths: {'c-short': 70.0, 'c-long': 100.0},
+        // c-short needs 5 000 Pa throttling -> > significantValveSettingPa
+        balanceMap: {'c-short': 5000.0},
+        distributorId: 'dist-1',
+      );
+      addTearDown(container.dispose);
 
-        // Pre-initialise the FutureProvider and pump one microtask so that
-        // the sync validationResultsProvider sees AsyncData instead of loading.
-        container.read(hydraulicBalanceProvider('dist-1'));
-        await Future<void>.microtask(() {});
+      // Pre-initialise the FutureProvider and pump one microtask so that
+      // the sync validationResultsProvider sees AsyncData instead of loading.
+      container.read(hydraulicBalanceProvider('dist-1'));
+      await Future<void>.microtask(() {});
 
-        final allResults = container.read(validationResultsProvider(''));
+      final allResults = container.read(validationResultsProvider(''));
 
-        final distResults = allResults
-            .where(
-              (r) =>
-                  r.message.contains('Circuit lengths on this distributor'),
-            )
-            .toList();
-        final circuitResults = allResults
-            .where((r) => r.message.contains('significantly shorter'))
-            .toList();
+      final distResults = allResults
+          .where(
+            (r) => r.message.contains('Circuit lengths on this distributor'),
+          )
+          .toList();
+      final circuitResults = allResults
+          .where((r) => r.message.contains('significantly shorter'))
+          .toList();
 
-        expect(distResults, hasLength(1));
-        expect(distResults.first.elementId, equals('dist-1'));
+      expect(distResults, hasLength(1));
+      expect(distResults.first.elementId, equals('dist-1'));
 
-        expect(circuitResults, hasLength(1));
-        expect(circuitResults.first.elementId, equals('c-short'));
-        expect(
-          circuitResults.first.severity,
-          equals(WarningSeverity.warning),
-        );
-        expect(circuitResults.first.elementType, equals('circuit'));
-        // suggestedFix must mention the kPa valve setting (5 000 Pa -> 5.0 kPa).
-        expect(circuitResults.first.suggestedFix, contains('5.0 kPa'));
-      },
-    );
+      expect(circuitResults, hasLength(1));
+      expect(circuitResults.first.elementId, equals('c-short'));
+      expect(circuitResults.first.severity, equals(WarningSeverity.warning));
+      expect(circuitResults.first.elementType, equals('circuit'));
+      // suggestedFix must mention the kPa valve setting (5 000 Pa -> 5.0 kPa).
+      expect(circuitResults.first.suggestedFix, contains('5.0 kPa'));
+    });
 
     test(
       'HB01-7: circuits within ratio, valve data present -> no HB-01 warning',
@@ -960,10 +922,14 @@ void main() {
       'GE01-2: coincident reciprocal mirror pair (adjacent rooms) -> no error',
       () {
         // ADR-001 shared wall: one segment per room, cross-linked by mirrorId.
-        final a = createTestWall(id: 'wall-a', roomId: 'room-1')
-            .copyWith(mirrorId: 'wall-b', adjacentRoomId: 'room-2');
-        final b = createTestWall(id: 'wall-b', roomId: 'room-2')
-            .copyWith(mirrorId: 'wall-a', adjacentRoomId: 'room-1');
+        final a = createTestWall(
+          id: 'wall-a',
+          roomId: 'room-1',
+        ).copyWith(mirrorId: 'wall-b', adjacentRoomId: 'room-2');
+        final b = createTestWall(
+          id: 'wall-b',
+          roomId: 'room-2',
+        ).copyWith(mirrorId: 'wall-a', adjacentRoomId: 'room-1');
         final state = EditorState(walls: [a, b]);
         final container = _containerWith(state);
         addTearDown(container.dispose);
@@ -997,48 +963,46 @@ void main() {
       },
     );
 
-    test(
-      'GE01-4: coincident walls of two adjacent rooms (reciprocal '
-      'adjacentRoomId, mirrorId dropped) -> no error',
-      () {
-        // Mimics a .hsp reloaded by an older build that stripped mirrorId but
-        // preserved adjacentRoomId. The reciprocal adjacency still identifies
-        // a legitimate shared wall, so no warning.
-        final a = createTestWall(id: 'wall-a', roomId: 'room-1')
-            .copyWith(adjacentRoomId: 'room-2');
-        final b = createTestWall(id: 'wall-b', roomId: 'room-2')
-            .copyWith(adjacentRoomId: 'room-1');
-        final state = EditorState(walls: [a, b]);
-        final container = _containerWith(state);
-        addTearDown(container.dispose);
+    test('GE01-4: coincident walls of two adjacent rooms (reciprocal '
+        'adjacentRoomId, mirrorId dropped) -> no error', () {
+      // Mimics a .hsp reloaded by an older build that stripped mirrorId but
+      // preserved adjacentRoomId. The reciprocal adjacency still identifies
+      // a legitimate shared wall, so no warning.
+      final a = createTestWall(
+        id: 'wall-a',
+        roomId: 'room-1',
+      ).copyWith(adjacentRoomId: 'room-2');
+      final b = createTestWall(
+        id: 'wall-b',
+        roomId: 'room-2',
+      ).copyWith(adjacentRoomId: 'room-1');
+      final state = EditorState(walls: [a, b]);
+      final container = _containerWith(state);
+      addTearDown(container.dispose);
 
-        final results = container
-            .read(validationResultsProvider(''))
-            .where((r) => r.message.contains(stacked))
-            .toList();
+      final results = container
+          .read(validationResultsProvider(''))
+          .where((r) => r.message.contains(stacked))
+          .toList();
 
-        expect(results, isEmpty);
-      },
-    );
+      expect(results, isEmpty);
+    });
 
-    test(
-      'GE01-5: coincident duplicates in the SAME room still error',
-      () {
-        // Two segments in one room with no cross-references: a genuine
-        // duplicate, not a shared boundary. Must still warn.
-        final a = createTestWall(id: 'wall-a', roomId: 'room-1');
-        final b = createTestWall(id: 'wall-b', roomId: 'room-1');
-        final state = EditorState(walls: [a, b]);
-        final container = _containerWith(state);
-        addTearDown(container.dispose);
+    test('GE01-5: coincident duplicates in the SAME room still error', () {
+      // Two segments in one room with no cross-references: a genuine
+      // duplicate, not a shared boundary. Must still warn.
+      final a = createTestWall(id: 'wall-a', roomId: 'room-1');
+      final b = createTestWall(id: 'wall-b', roomId: 'room-1');
+      final state = EditorState(walls: [a, b]);
+      final container = _containerWith(state);
+      addTearDown(container.dispose);
 
-        final results = container
-            .read(validationResultsProvider(''))
-            .where((r) => r.message.contains(stacked))
-            .toList();
+      final results = container
+          .read(validationResultsProvider(''))
+          .where((r) => r.message.contains(stacked))
+          .toList();
 
-        expect(results, hasLength(1));
-      },
-    );
+      expect(results, hasLength(1));
+    });
   });
 }

@@ -105,9 +105,7 @@ Widget _buildWidget({Room room = _testRoom}) {
       theme: AppTheme.light(),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: const [Locale('en')],
-      home: const Scaffold(
-        body: RoomProperties(roomId: _roomId),
-      ),
+      home: const Scaffold(body: RoomProperties(roomId: _roomId)),
     ),
   );
 }
@@ -136,15 +134,9 @@ void main() {
     await tester.pump();
 
     // The temperature row shows "Target Temperature: 21 °C"
-    expect(
-      find.textContaining('21'),
-      findsWidgets,
-    );
+    expect(find.textContaining('21'), findsWidgets);
     // More specifically the label line contains "21 °C"
-    expect(
-      find.textContaining('21 \u00B0C'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('21 \u00B0C'), findsOneWidget);
   });
 
   // RP-3 ─────────────────────────────────────────────────────────────────────
@@ -192,62 +184,56 @@ void main() {
 
   // RP-5 ─────────────────────────────────────────────────────────────────────
 
-  testWidgets(
-    'RP-5: breakdown component rows reconcile with the total',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 3000));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets('RP-5: breakdown component rows reconcile with the total', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 3000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      // A wall with a construction so the transmission (Q_T) row renders
-      // instead of the "assign constructions" hint.
-      final wall = createTestWall(
-        roomId: _roomId,
-        wallType: WallType.exterior,
-        constructionId: 'constr-1',
-      );
+    // A wall with a construction so the transmission (Q_T) row renders
+    // instead of the "assign constructions" hint.
+    final wall = createTestWall(
+      roomId: _roomId,
+      wallType: WallType.exterior,
+      constructionId: 'constr-1',
+    );
 
-      // 478 + 46 + 271 = 795 (ceiling is not applicable → "—").
-      const breakdown = (
-        transmissionW: 478.0,
-        floorW: 46.0,
-        ceilingW: double.nan,
-        ventilationW: 271.0,
-        totalW: 795.0,
-      );
+    // 478 + 46 + 271 = 795 (ceiling is not applicable → "—").
+    const breakdown = (
+      transmissionW: 478.0,
+      floorW: 46.0,
+      ceilingW: double.nan,
+      ventilationW: 271.0,
+      totalW: 795.0,
+    );
 
-      await tester.pumpWidget(
-        ProviderScope(
-          overrides: [
-            editorStateProvider.overrideWith(
-              () => _StubEditorNotifier(
-                EditorState(rooms: const [_testRoom], walls: [wall]),
-              ),
-            ),
-            undoRedoProvider.overrideWith((_) => _StubUndoRedo()),
-            uValueProvider.overrideWith((ref, _) => double.nan),
-            roomHeatDemandBreakdownProvider.overrideWith(
-              (ref, _) => breakdown,
-            ),
-          ],
-          child: MaterialApp(
-            theme: AppTheme.light(),
-            localizationsDelegates:
-                AppLocalizations.localizationsDelegates,
-            supportedLocales: const [Locale('en')],
-            home: const Scaffold(
-              body: RoomProperties(roomId: _roomId),
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          editorStateProvider.overrideWith(
+            () => _StubEditorNotifier(
+              EditorState(rooms: const [_testRoom], walls: [wall]),
             ),
           ),
+          undoRedoProvider.overrideWith((_) => _StubUndoRedo()),
+          uValueProvider.overrideWith((ref, _) => double.nan),
+          roomHeatDemandBreakdownProvider.overrideWith((ref, _) => breakdown),
+        ],
+        child: MaterialApp(
+          theme: AppTheme.light(),
+          localizationsDelegates: AppLocalizations.localizationsDelegates,
+          supportedLocales: const [Locale('en')],
+          home: const Scaffold(body: RoomProperties(roomId: _roomId)),
         ),
-      );
-      await tester.pump();
+      ),
+    );
+    await tester.pump();
 
-      // Every component row and the total come from the one breakdown, so
-      // they reconcile on screen (no more total < sum of parts).
-      expect(find.text('478 W'), findsOneWidget);
-      expect(find.text('46 W'), findsOneWidget);
-      expect(find.text('271 W'), findsOneWidget);
-      expect(find.text('795 W'), findsOneWidget);
-    },
-  );
+    // Every component row and the total come from the one breakdown, so
+    // they reconcile on screen (no more total < sum of parts).
+    expect(find.text('478 W'), findsOneWidget);
+    expect(find.text('46 W'), findsOneWidget);
+    expect(find.text('271 W'), findsOneWidget);
+    expect(find.text('795 W'), findsOneWidget);
+  });
 }

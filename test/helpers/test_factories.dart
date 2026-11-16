@@ -24,11 +24,11 @@ import 'package:heating_planner/data/models/window_element.dart';
 
 /// A 5 m × 4 m rectangle (vertices in mm). Area = 20.0 m².
 List<Point2D> rectanglePolygon5x4() => [
-      const Point2D(x: 0, y: 0),
-      const Point2D(x: 5000, y: 0),
-      const Point2D(x: 5000, y: 4000),
-      const Point2D(x: 0, y: 4000),
-    ];
+  const Point2D(x: 0, y: 0),
+  const Point2D(x: 5000, y: 0),
+  const Point2D(x: 5000, y: 4000),
+  const Point2D(x: 0, y: 4000),
+];
 
 // ── Room ─────────────────────────────────────────────────────────────────
 
@@ -91,12 +91,7 @@ WallConstruction createTestConstruction({
   double rsi = 0.13,
   double rse = 0.04,
 }) {
-  return WallConstruction(
-    id: id,
-    name: name,
-    rsi: rsi,
-    rse: rse,
-  );
+  return WallConstruction(id: id, name: name, rsi: rsi, rse: rse);
 }
 
 // ── MaterialLayer ─────────────────────────────────────────────────────────
@@ -294,9 +289,7 @@ const kSeedFlooringMaterialId = '20000000-0000-4000-8000-000000000001';
 /// The in-memory database created by [AppDatabase.forTesting] calls
 /// [HeatingDao.seedDefaults] in [MigrationStrategy.onCreate], so the
 /// seeded tube-type and flooring-material IDs are already present.
-Future<FullTestProjectSeed> createFullTestProject(
-  $db.AppDatabase db,
-) async {
+Future<FullTestProjectSeed> createFullTestProject($db.AppDatabase db) async {
   const projectId = 'fp-proj-1';
   const floorId = 'fp-floor-1';
   const room1Id = 'fp-room-1';
@@ -318,7 +311,9 @@ Future<FullTestProjectSeed> createFullTestProject(
   ]);
 
   // ── Project ────────────────────────────────────────────────────────────────
-  await db.into(db.projects).insert(
+  await db
+      .into(db.projects)
+      .insert(
         $db.ProjectsCompanion.insert(
           id: projectId,
           name: 'Test Villa',
@@ -330,7 +325,9 @@ Future<FullTestProjectSeed> createFullTestProject(
       );
 
   // ── Floor ─────────────────────────────────────────────────────────────────
-  await db.into(db.floors).insert(
+  await db
+      .into(db.floors)
+      .insert(
         $db.FloorsCompanion.insert(
           id: floorId,
           projectId: projectId,
@@ -339,7 +336,9 @@ Future<FullTestProjectSeed> createFullTestProject(
       );
 
   // ── Rooms ─────────────────────────────────────────────────────────────────
-  await db.into(db.rooms).insert(
+  await db
+      .into(db.rooms)
+      .insert(
         $db.RoomsCompanion.insert(
           id: room1Id,
           floorId: floorId,
@@ -348,7 +347,9 @@ Future<FullTestProjectSeed> createFullTestProject(
           polygonJson: Value(polygonJson),
         ),
       );
-  await db.into(db.rooms).insert(
+  await db
+      .into(db.rooms)
+      .insert(
         $db.RoomsCompanion.insert(
           id: room2Id,
           floorId: floorId,
@@ -413,7 +414,9 @@ Future<FullTestProjectSeed> createFullTestProject(
   ];
 
   for (final w in wallDefs) {
-    await db.into(db.wallSegments).insert(
+    await db
+        .into(db.wallSegments)
+        .insert(
           $db.WallSegmentsCompanion.insert(
             id: w.id,
             roomId: w.roomId,
@@ -426,7 +429,9 @@ Future<FullTestProjectSeed> createFullTestProject(
   }
 
   // ── Distributor ───────────────────────────────────────────────────────────
-  await db.into(db.distributors).insert(
+  await db
+      .into(db.distributors)
+      .insert(
         $db.DistributorsCompanion.insert(
           id: distributorId,
           floorId: floorId,
@@ -437,7 +442,9 @@ Future<FullTestProjectSeed> createFullTestProject(
       );
 
   // ── Zones ─────────────────────────────────────────────────────────────────
-  await db.into(db.heatingZones).insert(
+  await db
+      .into(db.heatingZones)
+      .insert(
         $db.HeatingZonesCompanion.insert(
           id: zone1Id,
           roomId: room1Id,
@@ -448,7 +455,9 @@ Future<FullTestProjectSeed> createFullTestProject(
           circuitId: const Value(circuit1Id),
         ),
       );
-  await db.into(db.heatingZones).insert(
+  await db
+      .into(db.heatingZones)
+      .insert(
         $db.HeatingZonesCompanion.insert(
           id: zone2Id,
           roomId: room2Id,
@@ -461,14 +470,18 @@ Future<FullTestProjectSeed> createFullTestProject(
       );
 
   // ── Circuits ──────────────────────────────────────────────────────────────
-  await db.into(db.heatingCircuits).insert(
+  await db
+      .into(db.heatingCircuits)
+      .insert(
         $db.HeatingCircuitsCompanion.insert(
           id: circuit1Id,
           distributorId: distributorId,
           heatingZoneId: zone1Id,
         ),
       );
-  await db.into(db.heatingCircuits).insert(
+  await db
+      .into(db.heatingCircuits)
+      .insert(
         $db.HeatingCircuitsCompanion.insert(
           id: circuit2Id,
           distributorId: distributorId,

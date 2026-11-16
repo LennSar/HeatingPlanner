@@ -121,9 +121,7 @@ Widget _buildTrigger({
   );
   return ProviderScope(
     overrides: [
-      editorStateProvider.overrideWith(
-        () => _StubEditorNotifier(initialState),
-      ),
+      editorStateProvider.overrideWith(() => _StubEditorNotifier(initialState)),
       materialEntriesProvider.overrideWith(
         (ref) => Stream.value(const [_testMaterial]),
       ),
@@ -155,9 +153,7 @@ Widget _buildTriggerDe({
   );
   return ProviderScope(
     overrides: [
-      editorStateProvider.overrideWith(
-        () => _StubEditorNotifier(initialState),
-      ),
+      editorStateProvider.overrideWith(() => _StubEditorNotifier(initialState)),
       materialEntriesProvider.overrideWith(
         (ref) => Stream.value(const [_testMaterial]),
       ),
@@ -194,12 +190,8 @@ Widget _buildTriggerWithStreamOverride({
   );
   return ProviderScope(
     overrides: [
-      editorStateProvider.overrideWith(
-        () => _StubEditorNotifier(initialState),
-      ),
-      materialEntriesProvider.overrideWith(
-        (ref) => materialStream,
-      ),
+      editorStateProvider.overrideWith(() => _StubEditorNotifier(initialState)),
+      materialEntriesProvider.overrideWith((ref) => materialStream),
     ],
     child: MaterialApp(
       theme: AppTheme.light(),
@@ -243,73 +235,65 @@ void main() {
 
   // WCE-1 ────────────────────────────────────────────────────────────────────
 
-  testWidgets(
-    'WCE-1: U-value is displayed in the summary row',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 900));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(_buildTrigger());
-      await _openDialog(tester);
+  testWidgets('WCE-1: U-value is displayed in the summary row', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(_buildTrigger());
+    await _openDialog(tester);
 
-      // 200 mm Solid brick (λ=0.77) with Rsi=0.13, Rse=0.04
-      // → U ≈ 2.327 W/(m²K)
-      expect(find.textContaining('2.327'), findsOneWidget);
-      await _tearDownDialog(tester);
-    },
-  );
+    // 200 mm Solid brick (λ=0.77) with Rsi=0.13, Rse=0.04
+    // → U ≈ 2.327 W/(m²K)
+    expect(find.textContaining('2.327'), findsOneWidget);
+    await _tearDownDialog(tester);
+  });
 
   // WCE-2 ────────────────────────────────────────────────────────────────────
 
-  testWidgets(
-    'WCE-2: initial material layer name appears in the layer list',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 900));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(_buildTrigger());
-      await _openDialog(tester);
+  testWidgets('WCE-2: initial material layer name appears in the layer list', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(_buildTrigger());
+    await _openDialog(tester);
 
-      // mat-001 is 'Solid brick' in the built-in catalogue.
-      expect(find.text('Solid brick'), findsOneWidget);
-      await _tearDownDialog(tester);
-    },
-  );
+    // mat-001 is 'Solid brick' in the built-in catalogue.
+    expect(find.text('Solid brick'), findsOneWidget);
+    await _tearDownDialog(tester);
+  });
 
   // WCE-3 ────────────────────────────────────────────────────────────────────
 
-  testWidgets(
-    'WCE-3: "Add Layer" button is present',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 900));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(_buildTrigger());
-      await _openDialog(tester);
+  testWidgets('WCE-3: "Add Layer" button is present', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(_buildTrigger());
+    await _openDialog(tester);
 
-      expect(find.text('Add Layer'), findsOneWidget);
-      await _tearDownDialog(tester);
-    },
-  );
+    expect(find.text('Add Layer'), findsOneWidget);
+    await _tearDownDialog(tester);
+  });
 
   // WCE-4 ────────────────────────────────────────────────────────────────────
 
-  testWidgets(
-    'WCE-4: tapping "Add Layer" adds a new row to the layer list',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 900));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(_buildTrigger());
-      await _openDialog(tester);
+  testWidgets('WCE-4: tapping "Add Layer" adds a new row to the layer list', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(_buildTrigger());
+    await _openDialog(tester);
 
-      // One row before.
-      expect(find.text('Solid brick'), findsOneWidget);
+    // One row before.
+    expect(find.text('Solid brick'), findsOneWidget);
 
-      await tester.tap(find.text('Add Layer'));
-      await tester.pump();
+    await tester.tap(find.text('Add Layer'));
+    await tester.pump();
 
-      // The default new layer also uses mat-001 (Solid brick), so two rows.
-      expect(find.text('Solid brick'), findsNWidgets(2));
-      await _tearDownDialog(tester);
-    },
-  );
+    // The default new layer also uses mat-001 (Solid brick), so two rows.
+    expect(find.text('Solid brick'), findsNWidgets(2));
+    await _tearDownDialog(tester);
+  });
 
   // WCE-5 ────────────────────────────────────────────────────────────────────
 
@@ -340,29 +324,28 @@ void main() {
 
   // WCE-6 ────────────────────────────────────────────────────────────────────
 
-  testWidgets(
-    'WCE-6: tapping the delete button removes the layer row',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 900));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(_buildTrigger());
-      await _openDialog(tester);
+  testWidgets('WCE-6: tapping the delete button removes the layer row', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(_buildTrigger());
+    await _openDialog(tester);
 
-      expect(find.text('Solid brick'), findsOneWidget);
+    expect(find.text('Solid brick'), findsOneWidget);
 
-      // ADR-020 Rule 5: removing the *last* layer is disallowed.
-      // Add a second layer first so we can exercise the delete path.
-      await tester.tap(find.text('Add Layer'));
-      await tester.pump();
-      expect(find.text('Solid brick'), findsNWidgets(2));
+    // ADR-020 Rule 5: removing the *last* layer is disallowed.
+    // Add a second layer first so we can exercise the delete path.
+    await tester.tap(find.text('Add Layer'));
+    await tester.pump();
+    expect(find.text('Solid brick'), findsNWidgets(2));
 
-      await tester.tap(find.byIcon(Icons.delete_outline).first);
-      await tester.pump();
+    await tester.tap(find.byIcon(Icons.delete_outline).first);
+    await tester.pump();
 
-      expect(find.text('Solid brick'), findsOneWidget);
-      await _tearDownDialog(tester);
-    },
-  );
+    expect(find.text('Solid brick'), findsOneWidget);
+    await _tearDownDialog(tester);
+  });
 
   // WCE-7 ────────────────────────────────────────────────────────────────────
 
@@ -383,26 +366,25 @@ void main() {
 
   // WCE-4a ───────────────────────────────────────────────────────────────────
 
-  testWidgets(
-    'WCE-4a: tapping Add Layer works in German locale',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 900));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(_buildTriggerDe());
-      await _openDialog(tester);
+  testWidgets('WCE-4a: tapping Add Layer works in German locale', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(_buildTriggerDe());
+    await _openDialog(tester);
 
-      // One row before.
-      expect(find.text('Solid brick'), findsOneWidget);
+    // One row before.
+    expect(find.text('Solid brick'), findsOneWidget);
 
-      // German localised button text: "Schicht hinzufügen"
-      await tester.tap(find.text('Schicht hinzufügen'));
-      await tester.pump();
+    // German localised button text: "Schicht hinzufügen"
+    await tester.tap(find.text('Schicht hinzufügen'));
+    await tester.pump();
 
-      // The default new layer also uses mat-001 (Solid brick), so two rows.
-      expect(find.text('Solid brick'), findsNWidgets(2));
-      await _tearDownDialog(tester);
-    },
-  );
+    // The default new layer also uses mat-001 (Solid brick), so two rows.
+    expect(find.text('Solid brick'), findsNWidgets(2));
+    await _tearDownDialog(tester);
+  });
 
   // WCE-4b ───────────────────────────────────────────────────────────────────
 
@@ -431,44 +413,39 @@ void main() {
 
   // WCE-4c ───────────────────────────────────────────────────────────────────
 
-  testWidgets(
-    'WCE-4c: Add Layer button onPressed is not null',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 900));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets('WCE-4c: Add Layer button onPressed is not null', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      // TextButton.icon uses a private subclass, so find.byType(TextButton)
-      // won't match.  Use an `is` predicate instead.
-      Finder addLayerButton(String label) => find.ancestor(
-            of: find.text(label),
-            matching: find.byWidgetPredicate((w) => w is TextButton),
-          );
+    // TextButton.icon uses a private subclass, so find.byType(TextButton)
+    // won't match.  Use an `is` predicate instead.
+    Finder addLayerButton(String label) => find.ancestor(
+      of: find.text(label),
+      matching: find.byWidgetPredicate((w) => w is TextButton),
+    );
 
-      // English locale.
-      await tester.pumpWidget(_buildTrigger());
-      await _openDialog(tester);
+    // English locale.
+    await tester.pumpWidget(_buildTrigger());
+    await _openDialog(tester);
 
-      expect(addLayerButton('Add Layer'), findsOneWidget);
-      expect(
-        tester.widget<TextButton>(addLayerButton('Add Layer')).onPressed,
-        isNotNull,
-      );
-      await _tearDownDialog(tester);
+    expect(addLayerButton('Add Layer'), findsOneWidget);
+    expect(
+      tester.widget<TextButton>(addLayerButton('Add Layer')).onPressed,
+      isNotNull,
+    );
+    await _tearDownDialog(tester);
 
-      // German locale.
-      await tester.pumpWidget(_buildTriggerDe());
-      await _openDialog(tester);
+    // German locale.
+    await tester.pumpWidget(_buildTriggerDe());
+    await _openDialog(tester);
 
-      expect(addLayerButton('Schicht hinzufügen'), findsOneWidget);
-      expect(
-        tester
-            .widget<TextButton>(addLayerButton('Schicht hinzufügen'))
-            .onPressed,
-        isNotNull,
-      );
-      await _tearDownDialog(tester);
-    },
-  );
+    expect(addLayerButton('Schicht hinzufügen'), findsOneWidget);
+    expect(
+      tester.widget<TextButton>(addLayerButton('Schicht hinzufügen')).onPressed,
+      isNotNull,
+    );
+    await _tearDownDialog(tester);
+  });
 
   // WCE-4d ───────────────────────────────────────────────────────────────────
 
@@ -582,8 +559,7 @@ void main() {
               builder: (ctx, ref, _) {
                 captured = ProviderScope.containerOf(ctx, listen: false);
                 return ElevatedButton(
-                  onPressed: () =>
-                      showWallConstructionEditor(ctx, autoWall),
+                  onPressed: () => showWallConstructionEditor(ctx, autoWall),
                   child: const Text('Open'),
                 );
               },
@@ -604,8 +580,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final post = captured!.read(editorStateProvider);
-      final saved = post.constructions
-          .firstWhere((c) => c.id == autoCid);
+      final saved = post.constructions.firstWhere((c) => c.id == autoCid);
       expect(
         saved.isAutoDefault,
         isFalse,
@@ -697,8 +672,7 @@ void main() {
               builder: (ctx, ref, _) {
                 captured = ProviderScope.containerOf(ctx, listen: false);
                 return ElevatedButton(
-                  onPressed: () =>
-                      showWallConstructionEditor(ctx, autoWall),
+                  onPressed: () => showWallConstructionEditor(ctx, autoWall),
                   child: const Text('Open'),
                 );
               },
@@ -725,18 +699,19 @@ void main() {
       expect(
         post.constructions.where((c) => c.id == autoCid),
         isEmpty,
-        reason: 'ADR-020 Rule 4: load-preset must delete the orphaned '
+        reason:
+            'ADR-020 Rule 4: load-preset must delete the orphaned '
             'auto-default construction',
       );
       // The wall must point at a fresh non-auto-default copy with
       // non-auto-default flag and a brand-new id (≠ presetCid, ≠ autoCid).
-      final wall =
-          post.walls.firstWhere((w) => w.id == 'wall-auto-2');
+      final wall = post.walls.firstWhere((w) => w.id == 'wall-auto-2');
       expect(wall.constructionId, isNot(autoCid));
       expect(wall.constructionId, isNot(presetCid));
       expect(wall.constructionId, isNotNull);
-      final fresh =
-          post.constructions.firstWhere((c) => c.id == wall.constructionId);
+      final fresh = post.constructions.firstWhere(
+        (c) => c.id == wall.constructionId,
+      );
       expect(fresh.isAutoDefault, isFalse);
       expect(fresh.isPreset, isFalse);
       await _tearDownDialog(tester);

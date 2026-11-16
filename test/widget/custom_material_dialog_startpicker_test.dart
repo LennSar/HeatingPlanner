@@ -106,9 +106,9 @@ Future<void> _openStartUnder(WidgetTester tester) async {
 }
 
 Finder _menuOption(String label) => find.descendant(
-      of: find.byType(MenuItemButton),
-      matching: find.text(label),
-    );
+  of: find.byType(MenuItemButton),
+  matching: find.text(label),
+);
 
 Future<void> _pickStartUnder(WidgetTester tester, String label) async {
   await _openStartUnder(tester);
@@ -117,10 +117,7 @@ Future<void> _pickStartUnder(WidgetTester tester, String label) async {
 }
 
 Future<void> _fillRequiredScalars(WidgetTester tester, String name) async {
-  await tester.enterText(
-    find.byKey(const Key('custom-material-name')),
-    name,
-  );
+  await tester.enterText(find.byKey(const Key('custom-material-name')), name);
   await tester.enterText(
     find.byKey(const Key('custom-material-lambda')),
     '0.04',
@@ -152,17 +149,15 @@ void main() {
       expect(
         _menuOption('Concrete & Screed'),
         findsWidgets,
-        reason: 'the intermediate prefix is a first-class option '
+        reason:
+            'the intermediate prefix is a first-class option '
             '(ADR-022 Rule 6)',
       );
       expect(
         _menuOption('Concrete & Screed › Lightweight concrete'),
         findsWidgets,
       );
-      expect(
-        _menuOption('Concrete & Screed › Normal concrete'),
-        findsWidgets,
-      );
+      expect(_menuOption('Concrete & Screed › Normal concrete'), findsWidgets);
     },
   );
 

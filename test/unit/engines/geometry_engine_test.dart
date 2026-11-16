@@ -73,9 +73,7 @@ void main() {
     });
 
     test('fewer than 2 vertices returns NaN', () {
-      final p = GeometryEngine.polygonPerimeterM(const [
-        Point2D(x: 0, y: 0),
-      ]);
+      final p = GeometryEngine.polygonPerimeterM(const [Point2D(x: 0, y: 0)]);
       expect(p.isNaN, isTrue);
     });
   });
@@ -128,10 +126,10 @@ void main() {
 
     test('fewer than 3 vertices returns false', () {
       expect(
-        GeometryEngine.isPointInPolygon(
-          const Point2D(x: 0, y: 0),
-          const [Point2D(x: 0, y: 0), Point2D(x: 1000, y: 0)],
-        ),
+        GeometryEngine.isPointInPolygon(const Point2D(x: 0, y: 0), const [
+          Point2D(x: 0, y: 0),
+          Point2D(x: 1000, y: 0),
+        ]),
         isFalse,
       );
     });
@@ -147,10 +145,7 @@ void main() {
         Point2D(x: 4000, y: 3000),
         Point2D(x: 1000, y: 3000),
       ];
-      expect(
-        GeometryEngine.isPolygonContained(inner, rectangle),
-        isTrue,
-      );
+      expect(GeometryEngine.isPolygonContained(inner, rectangle), isTrue);
     });
 
     test('inner polygon partially outside', () {
@@ -160,10 +155,7 @@ void main() {
         Point2D(x: 7000, y: 3000),
         Point2D(x: 3000, y: 3000),
       ];
-      expect(
-        GeometryEngine.isPolygonContained(inner, rectangle),
-        isFalse,
-      );
+      expect(GeometryEngine.isPolygonContained(inner, rectangle), isFalse);
     });
 
     test('inner polygon completely outside', () {
@@ -173,10 +165,7 @@ void main() {
         Point2D(x: 8000, y: 8000),
         Point2D(x: 6000, y: 8000),
       ];
-      expect(
-        GeometryEngine.isPolygonContained(inner, rectangle),
-        isFalse,
-      );
+      expect(GeometryEngine.isPolygonContained(inner, rectangle), isFalse);
     });
   });
 
@@ -328,9 +317,7 @@ void main() {
     });
 
     test('single point returns NaN', () {
-      final l = GeometryEngine.polylineLengthMm(const [
-        Point2D(x: 0, y: 0),
-      ]);
+      final l = GeometryEngine.polylineLengthMm(const [Point2D(x: 0, y: 0)]);
       expect(l.isNaN, isTrue);
     });
 
@@ -443,10 +430,7 @@ void main() {
     test('snaps to closest endpoint within threshold', () {
       final result = GeometryEngine.snapToEndpoint(
         const Point2D(x: 105, y: 95),
-        const [
-          Point2D(x: 100, y: 100),
-          Point2D(x: 500, y: 500),
-        ],
+        const [Point2D(x: 100, y: 100), Point2D(x: 500, y: 500)],
         20.0,
       );
       expect(result, isNotNull);
@@ -457,10 +441,7 @@ void main() {
     test('no endpoint within threshold returns null', () {
       final result = GeometryEngine.snapToEndpoint(
         const Point2D(x: 1000, y: 1000),
-        const [
-          Point2D(x: 100, y: 100),
-          Point2D(x: 500, y: 500),
-        ],
+        const [Point2D(x: 100, y: 100), Point2D(x: 500, y: 500)],
         20.0,
       );
       expect(result, isNull);
@@ -495,11 +476,7 @@ void main() {
 
     test('midpoint lies on horizontal segment', () {
       expect(
-        GeometryEngine.isPointOnSegment(
-          const Point2D(x: 1500, y: 0),
-          a,
-          b,
-        ),
+        GeometryEngine.isPointOnSegment(const Point2D(x: 1500, y: 0), a, b),
         isTrue,
       );
     });
@@ -514,22 +491,14 @@ void main() {
 
     test('point beyond end does not lie on segment', () {
       expect(
-        GeometryEngine.isPointOnSegment(
-          const Point2D(x: 4000, y: 0),
-          a,
-          b,
-        ),
+        GeometryEngine.isPointOnSegment(const Point2D(x: 4000, y: 0), a, b),
         isFalse,
       );
     });
 
     test('point before start does not lie on segment', () {
       expect(
-        GeometryEngine.isPointOnSegment(
-          const Point2D(x: -100, y: 0),
-          a,
-          b,
-        ),
+        GeometryEngine.isPointOnSegment(const Point2D(x: -100, y: 0), a, b),
         isFalse,
       );
     });
@@ -588,17 +557,11 @@ void main() {
     const b = Point2D(x: 3000, y: 0);
 
     test('start point returns 0.0', () {
-      expect(
-        GeometryEngine.parameterAlongSegment(a, a, b),
-        closeTo(0.0, 1e-9),
-      );
+      expect(GeometryEngine.parameterAlongSegment(a, a, b), closeTo(0.0, 1e-9));
     });
 
     test('end point returns 1.0', () {
-      expect(
-        GeometryEngine.parameterAlongSegment(b, a, b),
-        closeTo(1.0, 1e-9),
-      );
+      expect(GeometryEngine.parameterAlongSegment(b, a, b), closeTo(1.0, 1e-9));
     });
 
     test('midpoint returns 0.5', () {
@@ -656,12 +619,21 @@ void main() {
     );
   }
 
-  void expectPointCloseTo(Point2D actual, Point2D expected,
-      {double tol = 0.5}) {
-    expect(actual.x, closeTo(expected.x, tol),
-        reason: 'x of $actual vs expected $expected');
-    expect(actual.y, closeTo(expected.y, tol),
-        reason: 'y of $actual vs expected $expected');
+  void expectPointCloseTo(
+    Point2D actual,
+    Point2D expected, {
+    double tol = 0.5,
+  }) {
+    expect(
+      actual.x,
+      closeTo(expected.x, tol),
+      reason: 'x of $actual vs expected $expected',
+    );
+    expect(
+      actual.y,
+      closeTo(expected.y, tol),
+      reason: 'y of $actual vs expected $expected',
+    );
   }
 
   group('GeometryEngine.offsetPolygonPerEdge', () {
@@ -717,14 +689,7 @@ void main() {
           Point2D(x: 2000, y: 4000),
           Point2D(x: 0, y: 4000),
         ],
-        edgeOffsetsMm: const [
-          -120.0,
-          -120.0,
-          -120.0,
-          -120.0,
-          -120.0,
-          -120.0,
-        ],
+        edgeOffsetsMm: const [-120.0, -120.0, -120.0, -120.0, -120.0, -120.0],
       );
       expect(inner, hasLength(6));
       // Convex corners offset inward by (±120, ±120).
@@ -739,32 +704,34 @@ void main() {
       expectPointCloseTo(inner[5], const Point2D(x: 120, y: 3880));
     });
 
-    test('GE-OFFSET-COLLINEAR: a 180° vertex falls back to the vertex offset',
-        () {
-      // A 5×4 m rectangle whose bottom edge is split into two collinear
-      // segments by an extra vertex at (2500, 0) — a 180° corner, exactly
-      // what a hand-drawn room gets when a straight side is two wall
-      // segments or a wall was split. The two offset lines there are
-      // parallel; rather than bailing on the whole polygon, the corner
-      // resolves to the offset of the original vertex.
-      final inner = GeometryEngine.offsetPolygonPerEdge(
-        centerline: const [
-          Point2D(x: 0, y: 0),
-          Point2D(x: 2500, y: 0),
-          Point2D(x: 5000, y: 0),
-          Point2D(x: 5000, y: 4000),
-          Point2D(x: 0, y: 4000),
-        ],
-        edgeOffsetsMm: const [-120.0, -120.0, -120.0, -120.0, -120.0],
-      );
-      expect(inner, hasLength(5));
-      expectPointCloseTo(inner[0], const Point2D(x: 120, y: 120));
-      // The collinear midpoint offsets straight inward by 120.
-      expectPointCloseTo(inner[1], const Point2D(x: 2500, y: 120));
-      expectPointCloseTo(inner[2], const Point2D(x: 4880, y: 120));
-      expectPointCloseTo(inner[3], const Point2D(x: 4880, y: 3880));
-      expectPointCloseTo(inner[4], const Point2D(x: 120, y: 3880));
-    });
+    test(
+      'GE-OFFSET-COLLINEAR: a 180° vertex falls back to the vertex offset',
+      () {
+        // A 5×4 m rectangle whose bottom edge is split into two collinear
+        // segments by an extra vertex at (2500, 0) — a 180° corner, exactly
+        // what a hand-drawn room gets when a straight side is two wall
+        // segments or a wall was split. The two offset lines there are
+        // parallel; rather than bailing on the whole polygon, the corner
+        // resolves to the offset of the original vertex.
+        final inner = GeometryEngine.offsetPolygonPerEdge(
+          centerline: const [
+            Point2D(x: 0, y: 0),
+            Point2D(x: 2500, y: 0),
+            Point2D(x: 5000, y: 0),
+            Point2D(x: 5000, y: 4000),
+            Point2D(x: 0, y: 4000),
+          ],
+          edgeOffsetsMm: const [-120.0, -120.0, -120.0, -120.0, -120.0],
+        );
+        expect(inner, hasLength(5));
+        expectPointCloseTo(inner[0], const Point2D(x: 120, y: 120));
+        // The collinear midpoint offsets straight inward by 120.
+        expectPointCloseTo(inner[1], const Point2D(x: 2500, y: 120));
+        expectPointCloseTo(inner[2], const Point2D(x: 4880, y: 120));
+        expectPointCloseTo(inner[3], const Point2D(x: 4880, y: 3880));
+        expectPointCloseTo(inner[4], const Point2D(x: 120, y: 3880));
+      },
+    );
 
     test('GE-OFFSET-DEGENERATE: 200×200 with 240 mm walls returns []', () {
       // Inner offset of 120 on each side of a 200×200 room would push
@@ -833,8 +800,7 @@ void main() {
       expect(edges.keys, containsAll(['w0', 'w1', 'w2', 'w3']));
       expectPointCloseTo(edges['w0']!.start, const Point2D(x: 120, y: 120));
       expectPointCloseTo(edges['w0']!.end, const Point2D(x: 4880, y: 120));
-      expectPointCloseTo(edges['w2']!.start,
-          const Point2D(x: 4880, y: 3880));
+      expectPointCloseTo(edges['w2']!.start, const Point2D(x: 4880, y: 3880));
       expectPointCloseTo(edges['w2']!.end, const Point2D(x: 120, y: 3880));
     });
 
@@ -849,12 +815,7 @@ void main() {
         Point2D(x: 0, y: 4000),
       ];
       final walls = [
-        wall(
-          id: 'wRev',
-          start: corners[1],
-          end: corners[0],
-          thicknessMm: 240,
-        ),
+        wall(id: 'wRev', start: corners[1], end: corners[0], thicknessMm: 240),
         wall(id: 'w1', start: corners[1], end: corners[2], thicknessMm: 240),
         wall(id: 'w2', start: corners[2], end: corners[3], thicknessMm: 240),
         wall(id: 'w3', start: corners[3], end: corners[0], thicknessMm: 240),
@@ -864,8 +825,7 @@ void main() {
         roomPolygon: corners,
         side: RoomFaceSide.inner,
       );
-      expectPointCloseTo(
-          edges['wRev']!.start, const Point2D(x: 4880, y: 120));
+      expectPointCloseTo(edges['wRev']!.start, const Point2D(x: 4880, y: 120));
       expectPointCloseTo(edges['wRev']!.end, const Point2D(x: 120, y: 120));
     });
 
@@ -889,12 +849,9 @@ void main() {
       );
       // Outer envelope: corners at (−120,−120), (5120,−120), (5120,4120),
       // (−120,4120).
-      expectPointCloseTo(
-          edges['w0']!.start, const Point2D(x: -120, y: -120));
-      expectPointCloseTo(
-          edges['w0']!.end, const Point2D(x: 5120, y: -120));
-      expectPointCloseTo(
-          edges['w2']!.start, const Point2D(x: 5120, y: 4120));
+      expectPointCloseTo(edges['w0']!.start, const Point2D(x: -120, y: -120));
+      expectPointCloseTo(edges['w0']!.end, const Point2D(x: 5120, y: -120));
+      expectPointCloseTo(edges['w2']!.start, const Point2D(x: 5120, y: 4120));
     });
 
     test('unmatched polygon edge degrades per-edge (matched walls kept)', () {
@@ -952,8 +909,7 @@ void main() {
       expect(edges, isEmpty);
     });
 
-    test(
-        'collinear split of differing thickness de-tapers — each wall keeps '
+    test('collinear split of differing thickness de-tapers — each wall keeps '
         'a uniform face (ADR-003 partial shared wall)', () {
       // Top side runs straight from (-1000,0) to (3000,0) but is three
       // collinear walls: a 240 outer, a 120 shared sub-segment, a 240 outer.
@@ -969,35 +925,41 @@ void main() {
       ];
       final walls = [
         wall(
-            id: 'left',
-            start: const Point2D(x: -1000, y: 0),
-            end: const Point2D(x: 0, y: 0),
-            thicknessMm: 240),
+          id: 'left',
+          start: const Point2D(x: -1000, y: 0),
+          end: const Point2D(x: 0, y: 0),
+          thicknessMm: 240,
+        ),
         wall(
-            id: 'mid',
-            start: const Point2D(x: 0, y: 0),
-            end: const Point2D(x: 2000, y: 0),
-            thicknessMm: 120),
+          id: 'mid',
+          start: const Point2D(x: 0, y: 0),
+          end: const Point2D(x: 2000, y: 0),
+          thicknessMm: 120,
+        ),
         wall(
-            id: 'right',
-            start: const Point2D(x: 2000, y: 0),
-            end: const Point2D(x: 3000, y: 0),
-            thicknessMm: 240),
+          id: 'right',
+          start: const Point2D(x: 2000, y: 0),
+          end: const Point2D(x: 3000, y: 0),
+          thicknessMm: 240,
+        ),
         wall(
-            id: 'wr',
-            start: const Point2D(x: 3000, y: 0),
-            end: const Point2D(x: 3000, y: -2000),
-            thicknessMm: 240),
+          id: 'wr',
+          start: const Point2D(x: 3000, y: 0),
+          end: const Point2D(x: 3000, y: -2000),
+          thicknessMm: 240,
+        ),
         wall(
-            id: 'wb',
-            start: const Point2D(x: 3000, y: -2000),
-            end: const Point2D(x: -1000, y: -2000),
-            thicknessMm: 240),
+          id: 'wb',
+          start: const Point2D(x: 3000, y: -2000),
+          end: const Point2D(x: -1000, y: -2000),
+          thicknessMm: 240,
+        ),
         wall(
-            id: 'wl',
-            start: const Point2D(x: -1000, y: -2000),
-            end: const Point2D(x: -1000, y: 0),
-            thicknessMm: 240),
+          id: 'wl',
+          start: const Point2D(x: -1000, y: -2000),
+          end: const Point2D(x: -1000, y: 0),
+          thicknessMm: 240,
+        ),
       ];
       final inner = GeometryEngine.roomFaceEdges(
         walls: walls,
@@ -1014,8 +976,7 @@ void main() {
       expect(inner['right']!.end.y, closeTo(-120, 0.5));
     });
 
-    test(
-        'genuine corner of differing thickness squares off (thin shared wall '
+    test('genuine corner of differing thickness squares off (thin shared wall '
         'butts into a thick perpendicular wall — no corner notch)', () {
       // Regression: a smaller room shares only part of a bigger room's wall.
       // The shared sub-segment (120 mm interior) meets the thick 240 mm
@@ -1036,30 +997,35 @@ void main() {
       ];
       final walls = [
         wall(
-            id: 'top',
-            start: const Point2D(x: 0, y: 0),
-            end: const Point2D(x: 6000, y: 0),
-            thicknessMm: 240),
+          id: 'top',
+          start: const Point2D(x: 0, y: 0),
+          end: const Point2D(x: 6000, y: 0),
+          thicknessMm: 240,
+        ),
         wall(
-            id: 'right',
-            start: const Point2D(x: 6000, y: 0),
-            end: const Point2D(x: 6000, y: 4000),
-            thicknessMm: 240),
+          id: 'right',
+          start: const Point2D(x: 6000, y: 0),
+          end: const Point2D(x: 6000, y: 4000),
+          thicknessMm: 240,
+        ),
         wall(
-            id: 'frag',
-            start: const Point2D(x: 6000, y: 4000),
-            end: const Point2D(x: 2760, y: 4000),
-            thicknessMm: 240),
+          id: 'frag',
+          start: const Point2D(x: 6000, y: 4000),
+          end: const Point2D(x: 2760, y: 4000),
+          thicknessMm: 240,
+        ),
         wall(
-            id: 'shared',
-            start: const Point2D(x: 2760, y: 4000),
-            end: const Point2D(x: 0, y: 4000),
-            thicknessMm: 120),
+          id: 'shared',
+          start: const Point2D(x: 2760, y: 4000),
+          end: const Point2D(x: 0, y: 4000),
+          thicknessMm: 120,
+        ),
         wall(
-            id: 'left',
-            start: const Point2D(x: 0, y: 4000),
-            end: const Point2D(x: 0, y: 0),
-            thicknessMm: 240),
+          id: 'left',
+          start: const Point2D(x: 0, y: 4000),
+          end: const Point2D(x: 0, y: 0),
+          thicknessMm: 240,
+        ),
       ];
       final inner = GeometryEngine.roomFaceEdges(
         walls: walls,

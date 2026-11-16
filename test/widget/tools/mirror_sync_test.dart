@@ -101,46 +101,36 @@ void main() {
 
   // ── Scenario 1: constructionId change ─────────────────────────────────────
 
-  group(
-      'ADR-011 Rule 4 — Scenario 1: '
+  group('ADR-011 Rule 4 — Scenario 1: '
       'constructionId change propagates to mirror partner', () {
-    test(
-        'MS-1: updated wall receives the new constructionId', () async {
+    test('MS-1: updated wall receives the new constructionId', () async {
       final (container, notifier) = _makeContainer();
       addTearDown(container.dispose);
 
-      notifier.updateWall(
-        _wallOrig.copyWith(constructionId: 'constr-new'),
-      );
+      notifier.updateWall(_wallOrig.copyWith(constructionId: 'constr-new'));
 
       final walls = container.read(editorStateProvider).walls;
       final orig = walls.firstWhere((w) => w.id == 'wall-orig');
       expect(orig.constructionId, equals('constr-new'));
     });
 
-    test(
-        'MS-2: partner wall receives the same new constructionId', () async {
+    test('MS-2: partner wall receives the same new constructionId', () async {
       final (container, notifier) = _makeContainer();
       addTearDown(container.dispose);
 
-      notifier.updateWall(
-        _wallOrig.copyWith(constructionId: 'constr-new'),
-      );
+      notifier.updateWall(_wallOrig.copyWith(constructionId: 'constr-new'));
 
       final walls = container.read(editorStateProvider).walls;
       final mirror = walls.firstWhere((w) => w.id == 'wall-mirror');
       expect(mirror.constructionId, equals('constr-new'));
     });
 
-    test(
-        'MS-3: partner endpoints remain the reverse of the updated wall '
+    test('MS-3: partner endpoints remain the reverse of the updated wall '
         'when only constructionId changes', () async {
       final (container, notifier) = _makeContainer();
       addTearDown(container.dispose);
 
-      notifier.updateWall(
-        _wallOrig.copyWith(constructionId: 'constr-new'),
-      );
+      notifier.updateWall(_wallOrig.copyWith(constructionId: 'constr-new'));
 
       final walls = container.read(editorStateProvider).walls;
       final orig = walls.firstWhere((w) => w.id == 'wall-orig');
@@ -158,15 +148,12 @@ void main() {
       );
     });
 
-    test(
-        'MS-4: both walls remain in state after the update '
+    test('MS-4: both walls remain in state after the update '
         '(single atomic copyWith)', () async {
       final (container, notifier) = _makeContainer();
       addTearDown(container.dispose);
 
-      notifier.updateWall(
-        _wallOrig.copyWith(constructionId: 'constr-new'),
-      );
+      notifier.updateWall(_wallOrig.copyWith(constructionId: 'constr-new'));
 
       final walls = container.read(editorStateProvider).walls;
       expect(walls.where((w) => w.id == 'wall-orig'), hasLength(1));
@@ -176,104 +163,111 @@ void main() {
 
   // ── Scenario 2: geometry change ────────────────────────────────────────────
 
-  group(
-      'ADR-011 Rule 4 — Scenario 2: '
+  group('ADR-011 Rule 4 — Scenario 2: '
       'geometry change propagates reversed to mirror partner', () {
     // New geometry for wall-orig (shrink both endpoints inward by 500 mm).
     const newStart = Point2D(x: 5000, y: 500);
     const newEnd = Point2D(x: 5000, y: 3500);
 
     test(
-        'MS-5: updated wall receives the new startPoint and endPoint', () async {
-      final (container, notifier) = _makeContainer();
-      addTearDown(container.dispose);
+      'MS-5: updated wall receives the new startPoint and endPoint',
+      () async {
+        final (container, notifier) = _makeContainer();
+        addTearDown(container.dispose);
 
-      notifier.updateWall(
-        _wallOrig.copyWith(startPoint: newStart, endPoint: newEnd),
-      );
+        notifier.updateWall(
+          _wallOrig.copyWith(startPoint: newStart, endPoint: newEnd),
+        );
 
-      final walls = container.read(editorStateProvider).walls;
-      final orig = walls.firstWhere((w) => w.id == 'wall-orig');
-      expect(orig.startPoint, equals(newStart));
-      expect(orig.endPoint, equals(newEnd));
-    });
-
-    test(
-        'MS-6: partner startPoint equals updated wall endPoint (reversed)',
-        () async {
-      final (container, notifier) = _makeContainer();
-      addTearDown(container.dispose);
-
-      notifier.updateWall(
-        _wallOrig.copyWith(startPoint: newStart, endPoint: newEnd),
-      );
-
-      final walls = container.read(editorStateProvider).walls;
-      final mirror = walls.firstWhere((w) => w.id == 'wall-mirror');
-      expect(
-        mirror.startPoint,
-        equals(newEnd),
-        reason: 'mirror.startPoint must equal updated wall endPoint '
-            '(reversed geometry)',
-      );
-    });
+        final walls = container.read(editorStateProvider).walls;
+        final orig = walls.firstWhere((w) => w.id == 'wall-orig');
+        expect(orig.startPoint, equals(newStart));
+        expect(orig.endPoint, equals(newEnd));
+      },
+    );
 
     test(
-        'MS-7: partner endPoint equals updated wall startPoint (reversed)',
-        () async {
-      final (container, notifier) = _makeContainer();
-      addTearDown(container.dispose);
+      'MS-6: partner startPoint equals updated wall endPoint (reversed)',
+      () async {
+        final (container, notifier) = _makeContainer();
+        addTearDown(container.dispose);
 
-      notifier.updateWall(
-        _wallOrig.copyWith(startPoint: newStart, endPoint: newEnd),
-      );
+        notifier.updateWall(
+          _wallOrig.copyWith(startPoint: newStart, endPoint: newEnd),
+        );
 
-      final walls = container.read(editorStateProvider).walls;
-      final mirror = walls.firstWhere((w) => w.id == 'wall-mirror');
-      expect(
-        mirror.endPoint,
-        equals(newStart),
-        reason: 'mirror.endPoint must equal updated wall startPoint '
-            '(reversed geometry)',
-      );
-    });
-
-    test(
-        'MS-8: partner constructionId is unchanged after geometry-only update',
-        () async {
-      final (container, notifier) = _makeContainer();
-      addTearDown(container.dispose);
-
-      notifier.updateWall(
-        _wallOrig.copyWith(startPoint: newStart, endPoint: newEnd),
-      );
-
-      final walls = container.read(editorStateProvider).walls;
-      final mirror = walls.firstWhere((w) => w.id == 'wall-mirror');
-      expect(
-        mirror.constructionId,
-        equals('constr-old'),
-        reason: 'geometry-only update must not change partner constructionId',
-      );
-    });
+        final walls = container.read(editorStateProvider).walls;
+        final mirror = walls.firstWhere((w) => w.id == 'wall-mirror');
+        expect(
+          mirror.startPoint,
+          equals(newEnd),
+          reason:
+              'mirror.startPoint must equal updated wall endPoint '
+              '(reversed geometry)',
+        );
+      },
+    );
 
     test(
-        'MS-9: partner mirrorId remains cross-referenced after geometry update',
-        () async {
-      final (container, notifier) = _makeContainer();
-      addTearDown(container.dispose);
+      'MS-7: partner endPoint equals updated wall startPoint (reversed)',
+      () async {
+        final (container, notifier) = _makeContainer();
+        addTearDown(container.dispose);
 
-      notifier.updateWall(
-        _wallOrig.copyWith(startPoint: newStart, endPoint: newEnd),
-      );
+        notifier.updateWall(
+          _wallOrig.copyWith(startPoint: newStart, endPoint: newEnd),
+        );
 
-      final walls = container.read(editorStateProvider).walls;
-      final mirror = walls.firstWhere((w) => w.id == 'wall-mirror');
-      expect(
-        mirror.mirrorId,
-        equals('wall-orig'),
-        reason: 'mirrorId is not a sync-ed field — it must remain unchanged',
-      );
-    });
+        final walls = container.read(editorStateProvider).walls;
+        final mirror = walls.firstWhere((w) => w.id == 'wall-mirror');
+        expect(
+          mirror.endPoint,
+          equals(newStart),
+          reason:
+              'mirror.endPoint must equal updated wall startPoint '
+              '(reversed geometry)',
+        );
+      },
+    );
+
+    test(
+      'MS-8: partner constructionId is unchanged after geometry-only update',
+      () async {
+        final (container, notifier) = _makeContainer();
+        addTearDown(container.dispose);
+
+        notifier.updateWall(
+          _wallOrig.copyWith(startPoint: newStart, endPoint: newEnd),
+        );
+
+        final walls = container.read(editorStateProvider).walls;
+        final mirror = walls.firstWhere((w) => w.id == 'wall-mirror');
+        expect(
+          mirror.constructionId,
+          equals('constr-old'),
+          reason: 'geometry-only update must not change partner constructionId',
+        );
+      },
+    );
+
+    test(
+      'MS-9: partner mirrorId remains cross-referenced after geometry update',
+      () async {
+        final (container, notifier) = _makeContainer();
+        addTearDown(container.dispose);
+
+        notifier.updateWall(
+          _wallOrig.copyWith(startPoint: newStart, endPoint: newEnd),
+        );
+
+        final walls = container.read(editorStateProvider).walls;
+        final mirror = walls.firstWhere((w) => w.id == 'wall-mirror');
+        expect(
+          mirror.mirrorId,
+          equals('wall-orig'),
+          reason: 'mirrorId is not a sync-ed field — it must remain unchanged',
+        );
+      },
+    );
   });
 }

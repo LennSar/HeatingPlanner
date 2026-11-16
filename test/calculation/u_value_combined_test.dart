@@ -22,9 +22,7 @@ void main() {
         rse: 0.04,
       );
       final uNew = ThermalEngine.uValueCombined(
-        layers: [
-          const HomogeneousLayerSpec(thicknessMm: 200.0, lambda: 0.77),
-        ],
+        layers: [const HomogeneousLayerSpec(thicknessMm: 200.0, lambda: 0.77)],
         rsi: 0.13,
         rse: 0.04,
       );
@@ -195,11 +193,7 @@ void main() {
   group('UVC-4 & UVC-5: invalid inputs return double.nan', () {
     test('empty layer list returns NaN', () {
       expect(
-        ThermalEngine.uValueCombined(
-          layers: [],
-          rsi: 0.13,
-          rse: 0.04,
-        ).isNaN,
+        ThermalEngine.uValueCombined(layers: [], rsi: 0.13, rse: 0.04).isNaN,
         isTrue,
       );
     });
@@ -229,7 +223,9 @@ void main() {
     test('zero rsi returns NaN', () {
       expect(
         ThermalEngine.uValueCombined(
-          layers: [const HomogeneousLayerSpec(thicknessMm: 200.0, lambda: 0.77)],
+          layers: [
+            const HomogeneousLayerSpec(thicknessMm: 200.0, lambda: 0.77),
+          ],
           rsi: 0.0,
           rse: 0.04,
         ).isNaN,

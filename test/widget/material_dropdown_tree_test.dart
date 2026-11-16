@@ -71,9 +71,8 @@ class _HostState extends State<_Host> {
               ),
               Consumer(
                 builder: (context, ref, _) => TextButton(
-                  onPressed: () => ref
-                      .read(materialTreeExpansionProvider.notifier)
-                      .reset(),
+                  onPressed: () =>
+                      ref.read(materialTreeExpansionProvider.notifier).reset(),
                   child: const Text('close-editor'),
                 ),
               ),
@@ -107,39 +106,37 @@ Widget _build() {
 }
 
 void main() {
-  testWidgets(
-    'initial render shows only the top-level node "A" (collapsed)',
-    (tester) async {
-      await tester.pumpWidget(_build());
-      await tester.pump();
+  testWidgets('initial render shows only the top-level node "A" (collapsed)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_build());
+    await tester.pump();
 
-      expect(find.text('A'), findsOneWidget);
-      // Sub-nodes and materials are hidden until "A" is expanded.
-      expect(find.text('B'), findsNothing);
-      expect(find.text('D'), findsNothing);
-      expect(find.text('Material AB'), findsNothing);
-      // Collapsed node shows the ▶ chevron.
-      expect(find.byIcon(Icons.chevron_right), findsOneWidget);
-    },
-  );
+    expect(find.text('A'), findsOneWidget);
+    // Sub-nodes and materials are hidden until "A" is expanded.
+    expect(find.text('B'), findsNothing);
+    expect(find.text('D'), findsNothing);
+    expect(find.text('Material AB'), findsNothing);
+    // Collapsed node shows the ▶ chevron.
+    expect(find.byIcon(Icons.chevron_right), findsOneWidget);
+  });
 
-  testWidgets(
-    'tapping "A" reveals sub-nodes "B" and "D" (still collapsed)',
-    (tester) async {
-      await tester.pumpWidget(_build());
-      await tester.pump();
+  testWidgets('tapping "A" reveals sub-nodes "B" and "D" (still collapsed)', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_build());
+    await tester.pump();
 
-      await tester.tap(find.text('A'));
-      await tester.pump();
+    await tester.tap(find.text('A'));
+    await tester.pump();
 
-      expect(find.text('B'), findsOneWidget);
-      expect(find.text('D'), findsOneWidget);
-      // Their own children remain hidden.
-      expect(find.text('C'), findsNothing);
-      expect(find.text('Material AB'), findsNothing);
-      expect(find.text('Material AD'), findsNothing);
-    },
-  );
+    expect(find.text('B'), findsOneWidget);
+    expect(find.text('D'), findsOneWidget);
+    // Their own children remain hidden.
+    expect(find.text('C'), findsNothing);
+    expect(find.text('Material AB'), findsNothing);
+    expect(find.text('Material AD'), findsNothing);
+  });
 
   testWidgets(
     'tapping "B" reveals sub-node "C" before the material at ["A","B"]',
@@ -164,56 +161,50 @@ void main() {
     },
   );
 
-  testWidgets(
-    'searching "C" hides the tree and shows the leaf with breadcrumb '
-    'subtitle "A › B › C"',
-    (tester) async {
-      await tester.pumpWidget(_build());
-      await tester.pump();
+  testWidgets('searching "C" hides the tree and shows the leaf with breadcrumb '
+      'subtitle "A › B › C"', (tester) async {
+    await tester.pumpWidget(_build());
+    await tester.pump();
 
-      await tester.enterText(find.byType(TextField), 'C');
-      await tester.pump();
+    await tester.enterText(find.byType(TextField), 'C');
+    await tester.pump();
 
-      // The tree node rows are gone in search mode.
-      expect(find.text('A'), findsNothing);
-      // The matching material renders with its full breadcrumb subtitle.
-      expect(find.text('Material ABC'), findsOneWidget);
-      expect(find.text('A › B › C'), findsOneWidget);
-    },
-  );
+    // The tree node rows are gone in search mode.
+    expect(find.text('A'), findsNothing);
+    // The matching material renders with its full breadcrumb subtitle.
+    expect(find.text('Material ABC'), findsOneWidget);
+    expect(find.text('A › B › C'), findsOneWidget);
+  });
 
-  testWidgets(
-    'reopening the dropdown preserves expansion; closing the editor '
-    'resets it',
-    (tester) async {
-      await tester.pumpWidget(_build());
-      await tester.pump();
+  testWidgets('reopening the dropdown preserves expansion; closing the editor '
+      'resets it', (tester) async {
+    await tester.pumpWidget(_build());
+    await tester.pump();
 
-      // Expand A → B.
-      await tester.tap(find.text('A'));
-      await tester.pump();
-      await tester.tap(find.text('B'));
-      await tester.pump();
-      expect(find.text('C'), findsOneWidget);
+    // Expand A → B.
+    await tester.tap(find.text('A'));
+    await tester.pump();
+    await tester.tap(find.text('B'));
+    await tester.pump();
+    expect(find.text('C'), findsOneWidget);
 
-      // Close the dropdown (unmount the picker) and reopen it.
-      await tester.tap(find.text('toggle-dropdown'));
-      await tester.pump();
-      expect(find.text('A'), findsNothing); // dropdown closed
-      await tester.tap(find.text('toggle-dropdown'));
-      await tester.pump();
+    // Close the dropdown (unmount the picker) and reopen it.
+    await tester.tap(find.text('toggle-dropdown'));
+    await tester.pump();
+    expect(find.text('A'), findsNothing); // dropdown closed
+    await tester.tap(find.text('toggle-dropdown'));
+    await tester.pump();
 
-      // Expansion survived: B's sub-node "C" is still visible.
-      expect(find.text('C'), findsOneWidget);
+    // Expansion survived: B's sub-node "C" is still visible.
+    expect(find.text('C'), findsOneWidget);
 
-      // Simulate closing the wall construction editor → reset.
-      await tester.tap(find.text('close-editor'));
-      await tester.pump();
+    // Simulate closing the wall construction editor → reset.
+    await tester.tap(find.text('close-editor'));
+    await tester.pump();
 
-      // Tree is back to fully collapsed: only "A" shows.
-      expect(find.text('A'), findsOneWidget);
-      expect(find.text('B'), findsNothing);
-      expect(find.text('C'), findsNothing);
-    },
-  );
+    // Tree is back to fully collapsed: only "A" shows.
+    expect(find.text('A'), findsOneWidget);
+    expect(find.text('B'), findsNothing);
+    expect(find.text('C'), findsNothing);
+  });
 }

@@ -110,69 +110,54 @@ void main() {
     },
   );
 
-  testWidgets(
-    'with no stored path: the path shows the (default) chip and the '
-    'Reset-to-default button is hidden',
-    (tester) async {
-      await tester.pumpWidget(
-        _build(docsDir: docsDir, db: db, storedPath: null),
-      );
-      // Let the FutureProvider for resolvedLibraryPath resolve.
-      await tester.pump();
-      await tester.pump();
+  testWidgets('with no stored path: the path shows the (default) chip and the '
+      'Reset-to-default button is hidden', (tester) async {
+    await tester.pumpWidget(_build(docsDir: docsDir, db: db, storedPath: null));
+    // Let the FutureProvider for resolvedLibraryPath resolve.
+    await tester.pump();
+    await tester.pump();
 
-      expect(
-        find.byKey(const Key('settings-library-default-chip')),
-        findsOneWidget,
-      );
-      expect(find.text('(default)'), findsOneWidget);
-      expect(
-        find.byKey(const Key('settings-reset-library')),
-        findsNothing,
-      );
+    expect(
+      find.byKey(const Key('settings-library-default-chip')),
+      findsOneWidget,
+    );
+    expect(find.text('(default)'), findsOneWidget);
+    expect(find.byKey(const Key('settings-reset-library')), findsNothing);
 
-      // The effective path matches the Rule 14 default location.
-      final expectedPath = p.join(
-        docsDir.path,
-        'HeatingPlanner',
-        'custom_materials.matlib.json',
-      );
-      expect(find.text(expectedPath), findsOneWidget);
+    // The effective path matches the Rule 14 default location.
+    final expectedPath = p.join(
+      docsDir.path,
+      'HeatingPlanner',
+      'custom_materials.matlib.json',
+    );
+    expect(find.text(expectedPath), findsOneWidget);
 
-      await _drainAndDispose(tester);
-    },
-  );
+    await _drainAndDispose(tester);
+  });
 
-  testWidgets(
-    'with a stored user path: the (default) chip is gone and '
-    'Reset-to-default is visible',
-    (tester) async {
-      // Pre-create a user file at a different location. Real disk
-      // I/O inside testWidgets needs runAsync so the future actually
-      // completes (the default zone uses FakeAsync).
-      final userPath = '${tempDir.path}/user-pick.matlib.json';
-      await tester.runAsync(() async {
-        await File(userPath)
-            .writeAsString('{"version":"1.0","materials":[]}');
-      });
+  testWidgets('with a stored user path: the (default) chip is gone and '
+      'Reset-to-default is visible', (tester) async {
+    // Pre-create a user file at a different location. Real disk
+    // I/O inside testWidgets needs runAsync so the future actually
+    // completes (the default zone uses FakeAsync).
+    final userPath = '${tempDir.path}/user-pick.matlib.json';
+    await tester.runAsync(() async {
+      await File(userPath).writeAsString('{"version":"1.0","materials":[]}');
+    });
 
-      await tester.pumpWidget(
-        _build(docsDir: docsDir, db: db, storedPath: userPath),
-      );
-      await tester.pump();
-      await tester.pump();
+    await tester.pumpWidget(
+      _build(docsDir: docsDir, db: db, storedPath: userPath),
+    );
+    await tester.pump();
+    await tester.pump();
 
-      expect(
-        find.byKey(const Key('settings-library-default-chip')),
-        findsNothing,
-      );
-      expect(
-        find.byKey(const Key('settings-reset-library')),
-        findsOneWidget,
-      );
-      expect(find.text(userPath), findsOneWidget);
+    expect(
+      find.byKey(const Key('settings-library-default-chip')),
+      findsNothing,
+    );
+    expect(find.byKey(const Key('settings-reset-library')), findsOneWidget);
+    expect(find.text(userPath), findsOneWidget);
 
-      await _drainAndDispose(tester);
-    },
-  );
+    await _drainAndDispose(tester);
+  });
 }

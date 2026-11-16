@@ -37,11 +37,7 @@ const _br = Point2D(x: 6000, y: 4000);
 const _bl = Point2D(x: 0, y: 4000);
 const _p = Point2D(x: 2760, y: 4000);
 
-WallSegment _wall(
-  String id, {
-  required Point2D start,
-  required Point2D end,
-}) =>
+WallSegment _wall(String id, {required Point2D start, required Point2D end}) =>
     WallSegment(
       id: id,
       roomId: 'room-1',
@@ -119,11 +115,12 @@ void main() {
       );
 
       // The bottom wall is now two fragments BR→P and P→BL.
-      final room1Walls =
-          post.walls.where((w) => w.roomId == 'room-1').toList();
-      bool hasFragment(Point2D a, Point2D b) => room1Walls.any((w) =>
-          (_eq(w.startPoint, a) && _eq(w.endPoint, b)) ||
-          (_eq(w.startPoint, b) && _eq(w.endPoint, a)));
+      final room1Walls = post.walls.where((w) => w.roomId == 'room-1').toList();
+      bool hasFragment(Point2D a, Point2D b) => room1Walls.any(
+        (w) =>
+            (_eq(w.startPoint, a) && _eq(w.endPoint, b)) ||
+            (_eq(w.startPoint, b) && _eq(w.endPoint, a)),
+      );
       expect(hasFragment(_br, _p), isTrue, reason: 'BR→P fragment exists');
       expect(hasFragment(_p, _bl), isTrue, reason: 'P→BL fragment exists');
 

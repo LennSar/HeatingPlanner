@@ -42,17 +42,16 @@ WallSegment _wall(
   required Point2D start,
   required Point2D end,
   String? constructionId,
-}) =>
-    WallSegment(
-      id: id,
-      roomId: 'room-1',
-      startPoint: start,
-      endPoint: end,
-      wallType: WallType.exterior,
-      thicknessMm: 240,
-      anchorMode: WallAnchorMode.innerFace,
-      constructionId: constructionId,
-    );
+}) => WallSegment(
+  id: id,
+  roomId: 'room-1',
+  startPoint: start,
+  endPoint: end,
+  wallType: WallType.exterior,
+  thicknessMm: 240,
+  anchorMode: WallAnchorMode.innerFace,
+  constructionId: constructionId,
+);
 
 MaterialLayer _layer(String id, String constructionId, double thicknessMm) =>
     MaterialLayer(
@@ -134,10 +133,16 @@ void main() {
       _expectPoint(cd.endPoint, _d);
 
       // Corners still shared → the loop is closed, not split.
-      _expectPoint(ab.startPoint, da.endPoint,
-          reason: 'corner A shared by ab and da');
-      _expectPoint(ab.endPoint, bc.startPoint,
-          reason: 'corner B shared by ab and bc');
+      _expectPoint(
+        ab.startPoint,
+        da.endPoint,
+        reason: 'corner A shared by ab and da',
+      );
+      _expectPoint(
+        ab.endPoint,
+        bc.startPoint,
+        reason: 'corner B shared by ab and bc',
+      );
 
       // Room polygon rebuilt to the new corners.
       final poly = post.rooms.single.polygon;

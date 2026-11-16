@@ -43,10 +43,8 @@ class _FixedCanvasController extends CanvasController {
   static const double _panY = 100.0;
 
   @override
-  CanvasState build() => const CanvasState(
-        zoom: _zoom,
-        panOffset: Offset(_panX, _panY),
-      );
+  CanvasState build() =>
+      const CanvasState(zoom: _zoom, panOffset: Offset(_panX, _panY));
 
   @override
   void setInitialView(double zoom, Offset panOffset) {
@@ -84,7 +82,9 @@ void main() {
         const floorId = 'me-floor-1';
         final now = DateTime(2025, 1, 1);
 
-        await db.into(db.projects).insert(
+        await db
+            .into(db.projects)
+            .insert(
               $db.ProjectsCompanion.insert(
                 id: projectId,
                 name: 'Measure Tool Test',
@@ -94,7 +94,9 @@ void main() {
                 defaultIndoorTempC: const Value(20.0),
               ),
             );
-        await db.into(db.floors).insert(
+        await db
+            .into(db.floors)
+            .insert(
               $db.FloorsCompanion.insert(
                 id: floorId,
                 projectId: projectId,
@@ -143,8 +145,7 @@ void main() {
         await tester.pump();
 
         // ── Default (no Shift): hover to (1230, 0) → raw 1230 mm ──────────
-        final mouse =
-            await tester.createGesture(kind: PointerDeviceKind.mouse);
+        final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
         await mouse.addPointer(location: w2g(0, 0));
         addTearDown(() => mouse.removePointer());
         await mouse.moveTo(w2g(1230, 0));
@@ -155,7 +156,8 @@ void main() {
         expect(
           rawHint,
           contains('(1230 mm)'),
-          reason: 'default measurement must use the raw cursor (grid snap '
+          reason:
+              'default measurement must use the raw cursor (grid snap '
               'would have rounded the endpoint to 1200 mm)',
         );
         expect(
@@ -173,7 +175,8 @@ void main() {
         expect(
           snapHint,
           contains('(1200 mm)'),
-          reason: 'with Shift the endpoint snaps to the grid (1200), not the '
+          reason:
+              'with Shift the endpoint snaps to the grid (1200), not the '
               'raw 1240 mm',
         );
         expect(

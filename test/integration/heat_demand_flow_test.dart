@@ -82,8 +82,11 @@ void main() {
     final bDao = db.buildingDao;
     final cDao = db.constructionDao;
 
-    await upsertFloor(bDao, const Floor(id: floorId, name: 'Floor 1'),
-        projectId);
+    await upsertFloor(
+      bDao,
+      const Floor(id: floorId, name: 'Floor 1'),
+      projectId,
+    );
     await upsertRoom(
       bDao,
       createTestRoom(id: roomId, floorId: floorId, polygon: polygon),
@@ -141,9 +144,7 @@ void main() {
         c.read(wallSegmentsProvider(roomId)).hasValue &&
         c.read(constructionProvider(constrId)).hasValue &&
         c.read(layersProvider(constrId)).hasValue &&
-        walls.every(
-          (w) => c.read(wallSegmentProvider(w.id)).hasValue,
-        );
+        walls.every((w) => c.read(wallSegmentProvider(w.id)).hasValue);
 
     var tries = 0;
     while (!ready() && tries < 400) {
@@ -188,8 +189,9 @@ void main() {
       addTearDown(c.dispose);
       await warmUp(c);
 
-      final breakdownTotal =
-          c.read(roomHeatDemandBreakdownProvider(roomId)).totalW;
+      final breakdownTotal = c
+          .read(roomHeatDemandBreakdownProvider(roomId))
+          .totalW;
 
       // roomHeatDemandProvider is exactly what zone_color_state_provider
       // (zone adequacy: output ÷ demand) and the properties panel consume.
@@ -208,8 +210,7 @@ void main() {
       // buildingHeatDemandProvider walks floors → rooms → roomHeatDemand.
       c.listen(buildingHeatDemandProvider(projectId), (_, __) {});
 
-      final roomTotal =
-          c.read(roomHeatDemandBreakdownProvider(roomId)).totalW;
+      final roomTotal = c.read(roomHeatDemandBreakdownProvider(roomId)).totalW;
       final buildingTotal = c.read(buildingHeatDemandProvider(projectId));
 
       // Single seeded room → the building planning total is that room's

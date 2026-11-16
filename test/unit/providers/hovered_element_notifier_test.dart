@@ -28,9 +28,9 @@ void main() {
     // ── set() ──────────────────────────────────────────────────────────────────
 
     test('HE-2: set() updates state to the given element', () {
-      container.read(hoveredElementProvider.notifier).set(
-            const SelectedElement(type: 'circuit', id: 'circuit-42'),
-          );
+      container
+          .read(hoveredElementProvider.notifier)
+          .set(const SelectedElement(type: 'circuit', id: 'circuit-42'));
 
       final state = container.read(hoveredElementProvider);
       expect(state, isNotNull);
@@ -38,25 +38,28 @@ void main() {
       expect(state.id, equals('circuit-42'));
     });
 
-    test('HE-3: set() with a different element overwrites the previous one', () {
-      container.read(hoveredElementProvider.notifier).set(
-            const SelectedElement(type: 'wall', id: 'wall-1'),
-          );
-      container.read(hoveredElementProvider.notifier).set(
-            const SelectedElement(type: 'zone', id: 'zone-99'),
-          );
+    test(
+      'HE-3: set() with a different element overwrites the previous one',
+      () {
+        container
+            .read(hoveredElementProvider.notifier)
+            .set(const SelectedElement(type: 'wall', id: 'wall-1'));
+        container
+            .read(hoveredElementProvider.notifier)
+            .set(const SelectedElement(type: 'zone', id: 'zone-99'));
 
-      final state = container.read(hoveredElementProvider);
-      expect(state!.type, equals('zone'));
-      expect(state.id, equals('zone-99'));
-    });
+        final state = container.read(hoveredElementProvider);
+        expect(state!.type, equals('zone'));
+        expect(state.id, equals('zone-99'));
+      },
+    );
 
     // ── clear() ────────────────────────────────────────────────────────────────
 
     test('HE-4: clear() resets state to null', () {
-      container.read(hoveredElementProvider.notifier).set(
-            const SelectedElement(type: 'distributor', id: 'dist-1'),
-          );
+      container
+          .read(hoveredElementProvider.notifier)
+          .set(const SelectedElement(type: 'distributor', id: 'dist-1'));
       container.read(hoveredElementProvider.notifier).clear();
 
       expect(container.read(hoveredElementProvider), isNull);
@@ -73,9 +76,9 @@ void main() {
     test('HE-6: all domain element types can be stored', () {
       const types = ['wall', 'room', 'zone', 'circuit', 'distributor'];
       for (final type in types) {
-        container.read(hoveredElementProvider.notifier).set(
-              SelectedElement(type: type, id: 'id-$type'),
-            );
+        container
+            .read(hoveredElementProvider.notifier)
+            .set(SelectedElement(type: type, id: 'id-$type'));
         final state = container.read(hoveredElementProvider);
         expect(state!.type, equals(type), reason: 'Failed for type: $type');
         expect(state.id, equals('id-$type'));

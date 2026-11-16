@@ -34,9 +34,7 @@ Widget _buildApp(SaveState state, {ThemeData? theme}) {
       theme: theme ?? AppTheme.light(),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: const [Locale('en')],
-      home: const Scaffold(
-        body: Center(child: SaveStateIndicator()),
-      ),
+      home: const Scaffold(body: Center(child: SaveStateIndicator())),
     ),
   );
 }
@@ -100,38 +98,42 @@ void main() {
 
   // ── Clean state ────────────────────────────────────────────────────────────
 
-  group('SaveStateIndicator — clean (isDirty=false, isAutoExporting=false)', () {
-    testWidgets('renders check icon and "Saved" label', (tester) async {
-      await tester.pumpWidget(_buildApp(_clean));
-      await tester.pumpAndSettle();
+  group(
+    'SaveStateIndicator — clean (isDirty=false, isAutoExporting=false)',
+    () {
+      testWidgets('renders check icon and "Saved" label', (tester) async {
+        await tester.pumpWidget(_buildApp(_clean));
+        await tester.pumpAndSettle();
 
-      expect(find.byIcon(Icons.check), findsOneWidget);
-      expect(find.text('Saved'), findsOneWidget);
-    });
+        expect(find.byIcon(Icons.check), findsOneWidget);
+        expect(find.text('Saved'), findsOneWidget);
+      });
 
-    testWidgets('does NOT show unsaved dot or spinner', (tester) async {
-      await tester.pumpWidget(_buildApp(_clean));
-      await tester.pumpAndSettle();
+      testWidgets('does NOT show unsaved dot or spinner', (tester) async {
+        await tester.pumpWidget(_buildApp(_clean));
+        await tester.pumpAndSettle();
 
-      expect(find.byType(CircularProgressIndicator), findsNothing);
+        expect(find.byType(CircularProgressIndicator), findsNothing);
 
-      // No circular Container (the unsaved dot).
-      final hasCircularDot = tester
-          .widgetList<Container>(find.byType(Container))
-          .any(
-            (c) =>
-                c.decoration is BoxDecoration &&
-                (c.decoration! as BoxDecoration).shape == BoxShape.circle,
-          );
-      expect(hasCircularDot, isFalse);
-    });
-  });
+        // No circular Container (the unsaved dot).
+        final hasCircularDot = tester
+            .widgetList<Container>(find.byType(Container))
+            .any(
+              (c) =>
+                  c.decoration is BoxDecoration &&
+                  (c.decoration! as BoxDecoration).shape == BoxShape.circle,
+            );
+        expect(hasCircularDot, isFalse);
+      });
+    },
+  );
 
   // ── Dirty state ────────────────────────────────────────────────────────────
 
   group('SaveStateIndicator — isDirty=true, isAutoExporting=false', () {
-    testWidgets('renders the amber unsaved dot (circular Container)',
-        (tester) async {
+    testWidgets('renders the amber unsaved dot (circular Container)', (
+      tester,
+    ) async {
       await tester.pumpWidget(_buildApp(_dirty));
       await tester.pumpAndSettle();
 
@@ -157,8 +159,9 @@ void main() {
   // ── Exporting state ────────────────────────────────────────────────────────
 
   group('SaveStateIndicator — isAutoExporting=true', () {
-    testWidgets('renders spinning micro-indicator and "Saving…" text',
-        (tester) async {
+    testWidgets('renders spinning micro-indicator and "Saving…" text', (
+      tester,
+    ) async {
       await tester.pumpWidget(_buildApp(_saving));
       // Single pump — CircularProgressIndicator animates forever;
       // pumpAndSettle would time out.
@@ -180,9 +183,9 @@ void main() {
   // ── Tooltip ────────────────────────────────────────────────────────────────
 
   group('SaveStateIndicator — tooltip', () {
-    testWidgets(
-        'unsaved dot tooltip reads the export-out-of-date message',
-        (tester) async {
+    testWidgets('unsaved dot tooltip reads the export-out-of-date message', (
+      tester,
+    ) async {
       await tester.pumpWidget(_buildApp(_dirty));
       await tester.pumpAndSettle();
 
@@ -197,8 +200,7 @@ void main() {
   // ── Colour token ───────────────────────────────────────────────────────────
 
   group('SaveStateIndicator — colour token', () {
-    testWidgets(
-        'unsaved dot uses warningAmber from theme extension, '
+    testWidgets('unsaved dot uses warningAmber from theme extension, '
         'not a hard-coded value', (tester) async {
       // Use a distinctive sentinel colour that differs from the default amber
       // so we can be sure the widget reads from the theme extension.
@@ -227,7 +229,8 @@ void main() {
       expect(
         decoration.color,
         equals(sentinelAmber),
-        reason: 'Dot colour must come from HeatingPlannerColors.warningAmber, '
+        reason:
+            'Dot colour must come from HeatingPlannerColors.warningAmber, '
             'not a literal hex value.',
       );
     });

@@ -27,8 +27,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/core/theme/app_theme.dart';
-import 'package:heating_planner/data/database/app_database.dart'
-    as $db;
+import 'package:heating_planner/data/database/app_database.dart' as $db;
 import 'package:heating_planner/data/models/material_entry.dart';
 import 'package:heating_planner/data/models/project.dart';
 import 'package:heating_planner/l10n/app_localizations.dart';
@@ -50,29 +49,20 @@ class _TestApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final langCode =
-        ref.watch(languageCodeProvider).maybeWhen(
-              data: (v) => v,
-              orElse: () => 'en',
-            );
+    final langCode = ref
+        .watch(languageCodeProvider)
+        .maybeWhen(data: (v) => v, orElse: () => 'en');
     return MaterialApp(
       locale: Locale(langCode),
-      localizationsDelegates:
-          AppLocalizations.localizationsDelegates,
-      supportedLocales: const [
-        Locale('en'),
-        Locale('de'),
-      ],
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      supportedLocales: const [Locale('en'), Locale('de')],
       theme: AppTheme.light(),
       home: const ProjectListScreen(),
     );
   }
 }
 
-Future<void> _selectLanguage(
-  WidgetTester tester,
-  String optionText,
-) async {
+Future<void> _selectLanguage(WidgetTester tester, String optionText) async {
   // The Project Settings dialog's language dropdown is the
   // DropdownButton tagged with the ValueKey('languageDropdown')
   // exposed by the language-row widget (ADR-020 added three
@@ -87,11 +77,7 @@ Future<void> _selectLanguage(
         matching: find.byType(Scrollable),
       )
       .first;
-  await tester.scrollUntilVisible(
-    dropdown,
-    100,
-    scrollable: scrollable,
-  );
+  await tester.scrollUntilVisible(dropdown, 100, scrollable: scrollable);
   await tester.tap(dropdown);
   await tester.pumpAndSettle();
   await tester.tap(find.text(optionText).last);
@@ -101,175 +87,159 @@ Future<void> _selectLanguage(
 // ── Tests ────────────────────────────────────────────────
 
 void main() {
-  testWidgets(
-    'language switch persists across simulated restart',
-    (tester) async {
-      // ── Setup ─────────────────────────────────────────
-      SharedPreferencesAsyncPlatform.instance =
-          InMemorySharedPreferencesAsync.empty();
+  testWidgets('language switch persists across simulated restart', (
+    tester,
+  ) async {
+    // ── Setup ─────────────────────────────────────────
+    SharedPreferencesAsyncPlatform.instance =
+        InMemorySharedPreferencesAsync.empty();
 
-      // In-memory database for drift providers that the
-      // project list indirectly depends on.
-      final db = $db.AppDatabase.forTesting(
-        NativeDatabase.memory(),
+    // In-memory database for drift providers that the
+    // project list indirectly depends on.
+    final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+
+    Widget buildApp() {
+      return ProviderScope(
+        overrides: [
+          $db.appDatabaseProvider.overrideWithValue(db),
+          projectsProvider.overrideWith((ref) => Stream.value(<Project>[])),
+          // ADR-020: the project settings dialog now opens
+          // material-default dropdowns that subscribe to
+          // [materialEntriesProvider]. Override with a synchronous
+          // single-value stream so Drift doesn't keep a watch open
+          // and produce a "Timer still pending" assertion when the
+          // test tree is torn down.
+          materialEntriesProvider.overrideWith(
+            (ref) => Stream.value(<MaterialEntry>[
+              const MaterialEntry(
+                id: 'mat-016',
+                name: 'Vertical coring brick',
+                categoryPath: ['Masonry', 'Historic brick'],
+                lambdaDefault: 0.50,
+                densityDefault: 1200,
+                specificHeatDefault: 900,
+              ),
+            ]),
+          ),
+        ],
+        child: const _TestApp(),
       );
-      addTearDown(db.close);
+    }
 
-      Widget buildApp() {
-        return ProviderScope(
-          overrides: [
-            $db.appDatabaseProvider
-                .overrideWithValue(db),
-            projectsProvider.overrideWith(
-              (ref) => Stream.value(<Project>[]),
-            ),
-            // ADR-020: the project settings dialog now opens
-            // material-default dropdowns that subscribe to
-            // [materialEntriesProvider]. Override with a synchronous
-            // single-value stream so Drift doesn't keep a watch open
-            // and produce a "Timer still pending" assertion when the
-            // test tree is torn down.
-            materialEntriesProvider.overrideWith(
-              (ref) => Stream.value(<MaterialEntry>[
-                const MaterialEntry(
-                  id: 'mat-016',
-                  name: 'Vertical coring brick',
-                  categoryPath: ['Masonry', 'Historic brick'],
-                  lambdaDefault: 0.50,
-                  densityDefault: 1200,
-                  specificHeatDefault: 900,
-                ),
-              ]),
-            ),
-          ],
-          child: const _TestApp(),
-        );
-      }
+    // ── 1. Launch — English by default ────────────────
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
 
-      // ── 1. Launch — English by default ────────────────
-      await tester.pumpWidget(buildApp());
-      await tester.pumpAndSettle();
+    // Spot-check English strings on the project list.
+    expect(
+      find.text('HeatingPlanner'),
+      findsOneWidget,
+      reason: 'App title should be in English',
+    );
+    // "New Project" appears twice: AppBar action +
+    // empty state button.
+    expect(
+      find.text('New Project'),
+      findsNWidgets(2),
+      reason: 'New Project button should be English',
+    );
+    expect(
+      find.text('No projects yet'),
+      findsOneWidget,
+      reason: 'Empty state heading should be English',
+    );
 
-      // Spot-check English strings on the project list.
-      expect(
-        find.text('HeatingPlanner'),
-        findsOneWidget,
-        reason: 'App title should be in English',
-      );
-      // "New Project" appears twice: AppBar action +
-      // empty state button.
-      expect(
-        find.text('New Project'),
-        findsNWidgets(2),
-        reason: 'New Project button should be English',
-      );
-      expect(
-        find.text('No projects yet'),
-        findsOneWidget,
-        reason: 'Empty state heading should be English',
-      );
+    // ── 2. Open Project Settings dialog ───────────────
+    final ctx = tester.element(find.byType(ProjectListScreen));
+    unawaitedShow(showProjectSettingsDialog(ctx));
+    await tester.pumpAndSettle();
 
-      // ── 2. Open Project Settings dialog ───────────────
-      final ctx = tester
-          .element(find.byType(ProjectListScreen));
-      unawaitedShow(showProjectSettingsDialog(ctx));
-      await tester.pumpAndSettle();
+    // Dialog now visible with English labels.
+    expect(find.text('Language'), findsOneWidget);
+    expect(find.text('Drawing Grid Size'), findsOneWidget);
 
-      // Dialog now visible with English labels.
-      expect(find.text('Language'), findsOneWidget);
-      expect(
-        find.text('Drawing Grid Size'),
-        findsOneWidget,
-      );
+    // ── 3. Switch to Deutsch ──────────────────────────
+    await _selectLanguage(tester, 'Deutsch');
 
-      // ── 3. Switch to Deutsch ──────────────────────────
-      await _selectLanguage(tester, 'Deutsch');
+    // Dialog labels are now in German.
+    expect(
+      find.text('Sprache'),
+      findsOneWidget,
+      reason: 'Language row label should switch to German',
+    );
+    expect(
+      find.text('Rasterweite'),
+      findsOneWidget,
+      reason: 'Grid size label should be German',
+    );
 
-      // Dialog labels are now in German.
-      expect(
-        find.text('Sprache'),
-        findsOneWidget,
-        reason: 'Language row label should switch to German',
-      );
-      expect(
-        find.text('Rasterweite'),
-        findsOneWidget,
-        reason: 'Grid size label should be German',
-      );
+    // ── 4. Close dialog and verify project list ───────
+    Navigator.of(tester.element(find.byType(ProjectSettingsDialog))).pop();
+    await tester.pumpAndSettle();
 
-      // ── 4. Close dialog and verify project list ───────
-      Navigator.of(
-        tester.element(find.byType(ProjectSettingsDialog)),
-      ).pop();
-      await tester.pumpAndSettle();
+    // Project list now shows German strings.
+    expect(
+      find.text('Neues Projekt'),
+      findsNWidgets(2),
+      reason: 'New Project button should now be German',
+    );
+    expect(
+      find.text('Noch keine Projekte'),
+      findsOneWidget,
+      reason: 'Empty state should be German',
+    );
 
-      // Project list now shows German strings.
-      expect(
-        find.text('Neues Projekt'),
-        findsNWidgets(2),
-        reason: 'New Project button should now be German',
-      );
-      expect(
-        find.text('Noch keine Projekte'),
-        findsOneWidget,
-        reason: 'Empty state should be German',
-      );
+    // ── 5. Simulate restart ───────────────────────────
+    // Re-pumping a fresh widget tree simulates an app
+    // restart. The in-memory SharedPreferences persist
+    // across pumps (same platform instance), so the
+    // stored language code survives.
+    await tester.pumpWidget(buildApp());
+    await tester.pumpAndSettle();
 
-      // ── 5. Simulate restart ───────────────────────────
-      // Re-pumping a fresh widget tree simulates an app
-      // restart. The in-memory SharedPreferences persist
-      // across pumps (same platform instance), so the
-      // stored language code survives.
-      await tester.pumpWidget(buildApp());
-      await tester.pumpAndSettle();
+    // ── 6. Verify German survived restart ─────────────
+    expect(
+      find.text('Neues Projekt'),
+      findsNWidgets(2),
+      reason: 'German should persist after restart',
+    );
+    expect(
+      find.text('Noch keine Projekte'),
+      findsOneWidget,
+      reason:
+          'German empty state should persist after '
+          'restart',
+    );
 
-      // ── 6. Verify German survived restart ─────────────
-      expect(
-        find.text('Neues Projekt'),
-        findsNWidgets(2),
-        reason: 'German should persist after restart',
-      );
-      expect(
-        find.text('Noch keine Projekte'),
-        findsOneWidget,
-        reason:
-            'German empty state should persist after '
-            'restart',
-      );
+    // ── 7. Switch back to English ─────────────────────
+    final ctx2 = tester.element(find.byType(ProjectListScreen));
+    unawaitedShow(showProjectSettingsDialog(ctx2));
+    await tester.pumpAndSettle();
 
-      // ── 7. Switch back to English ─────────────────────
-      final ctx2 = tester
-          .element(find.byType(ProjectListScreen));
-      unawaitedShow(showProjectSettingsDialog(ctx2));
-      await tester.pumpAndSettle();
+    // In the German locale, the English option is
+    // labelled "Englisch".
+    await _selectLanguage(tester, 'Englisch');
 
-      // In the German locale, the English option is
-      // labelled "Englisch".
-      await _selectLanguage(tester, 'Englisch');
+    // Dialog labels back to English.
+    expect(find.text('Language'), findsOneWidget);
 
-      // Dialog labels back to English.
-      expect(find.text('Language'), findsOneWidget);
+    // Close the dialog.
+    Navigator.of(tester.element(find.byType(ProjectSettingsDialog))).pop();
+    await tester.pumpAndSettle();
 
-      // Close the dialog.
-      Navigator.of(
-        tester.element(find.byType(ProjectSettingsDialog)),
-      ).pop();
-      await tester.pumpAndSettle();
-
-      // ── 8. Verify English restored ────────────────────
-      expect(
-        find.text('New Project'),
-        findsNWidgets(2),
-        reason: 'English labels should be restored',
-      );
-      expect(
-        find.text('No projects yet'),
-        findsOneWidget,
-        reason:
-            'English empty state should be restored',
-      );
-    },
-  );
+    // ── 8. Verify English restored ────────────────────
+    expect(
+      find.text('New Project'),
+      findsNWidgets(2),
+      reason: 'English labels should be restored',
+    );
+    expect(
+      find.text('No projects yet'),
+      findsOneWidget,
+      reason: 'English empty state should be restored',
+    );
+  });
 }
 
 /// Fire-and-forget for a dialog future — the test does not

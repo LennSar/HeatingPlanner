@@ -67,12 +67,8 @@ Widget _build(List<MaterialEntry> customs) {
       customMaterialLibraryPathProvider.overrideWith(
         () => _FixedPathNotifier('/tmp/lib.json'),
       ),
-      customMaterialsProvider.overrideWith(
-        (ref) => Stream.value(customs),
-      ),
-      materialEntriesProvider.overrideWith(
-        (ref) => Stream.value(customs),
-      ),
+      customMaterialsProvider.overrideWith((ref) => Stream.value(customs)),
+      materialEntriesProvider.overrideWith((ref) => Stream.value(customs)),
       customMaterialLibraryServiceProvider.overrideWith(
         (ref) => _FakeService(ref),
       ),
@@ -87,34 +83,33 @@ Widget _build(List<MaterialEntry> customs) {
 }
 
 void main() {
-  testWidgets(
-    'groups render by full breadcrumb (mixed depths), sorted '
-    'alphabetically by full path',
-    (tester) async {
-      await tester.pumpWidget(_build(const [_depth2, _depth3, _depth1]));
-      await tester.pumpAndSettle();
+  testWidgets('groups render by full breadcrumb (mixed depths), sorted '
+      'alphabetically by full path', (tester) async {
+    await tester.pumpWidget(_build(const [_depth2, _depth3, _depth1]));
+    await tester.pumpAndSettle();
 
-      const expected = ['A › B', 'A › B › C', 'Z-only'];
-      for (final s in expected) {
-        expect(find.text(s), findsOneWidget,
-            reason: 'breadcrumb header "$s" must render exactly once');
-      }
-
-      final ys = {
-        for (final s in expected) s: tester.getTopLeft(find.text(s)).dy,
-      };
-      final order = expected.toList()
-        ..sort((a, b) => ys[a]!.compareTo(ys[b]!));
+    const expected = ['A › B', 'A › B › C', 'Z-only'];
+    for (final s in expected) {
       expect(
-        order,
-        expected,
-        reason: 'sorted alphabetically by canonical English breadcrumb',
+        find.text(s),
+        findsOneWidget,
+        reason: 'breadcrumb header "$s" must render exactly once',
       );
+    }
 
-      // Each material renders under its group header.
-      expect(find.text('D1 material'), findsOneWidget);
-      expect(find.text('D2 material'), findsOneWidget);
-      expect(find.text('D3 material'), findsOneWidget);
-    },
-  );
+    final ys = {
+      for (final s in expected) s: tester.getTopLeft(find.text(s)).dy,
+    };
+    final order = expected.toList()..sort((a, b) => ys[a]!.compareTo(ys[b]!));
+    expect(
+      order,
+      expected,
+      reason: 'sorted alphabetically by canonical English breadcrumb',
+    );
+
+    // Each material renders under its group header.
+    expect(find.text('D1 material'), findsOneWidget);
+    expect(find.text('D2 material'), findsOneWidget);
+    expect(find.text('D3 material'), findsOneWidget);
+  });
 }

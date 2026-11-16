@@ -18,7 +18,9 @@ Future<void> _seedProject(
   $db.AppDatabase db, {
   required String projectId,
 }) async {
-  await db.into(db.projects).insert(
+  await db
+      .into(db.projects)
+      .insert(
         $db.ProjectsCompanion.insert(
           id: projectId,
           name: 'Test Project',
@@ -26,21 +28,27 @@ Future<void> _seedProject(
           modifiedAt: DateTime(2026, 1, 2),
         ),
       );
-  await db.into(db.floors).insert(
+  await db
+      .into(db.floors)
+      .insert(
         $db.FloorsCompanion.insert(
           id: 'floor-1',
           projectId: projectId,
           name: 'Ground floor',
         ),
       );
-  await db.into(db.rooms).insert(
+  await db
+      .into(db.rooms)
+      .insert(
         $db.RoomsCompanion.insert(
           id: 'room-1',
           floorId: 'floor-1',
           name: 'Living room',
         ),
       );
-  await db.into(db.wallSegments).insert(
+  await db
+      .into(db.wallSegments)
+      .insert(
         $db.WallSegmentsCompanion.insert(
           id: 'wall-1',
           roomId: 'room-1',
@@ -82,14 +90,18 @@ void main() {
 
     test('preserves preset constructions and custom materials', () async {
       // Shared library: a preset construction + a custom material.
-      await db.into(db.wallConstructions).insert(
+      await db
+          .into(db.wallConstructions)
+          .insert(
             $db.WallConstructionsCompanion.insert(
               id: 'preset-1',
               name: 'My preset wall',
               isPreset: const Value(1),
             ),
           );
-      await db.into(db.materialEntries).insert(
+      await db
+          .into(db.materialEntries)
+          .insert(
             $db.MaterialEntriesCompanion.insert(
               id: 'custom-1',
               name: 'Custom insulation',
@@ -101,10 +113,14 @@ void main() {
             ),
           );
       // Project-owned construction + layer (must be deleted).
-      await db.into(db.wallConstructions).insert(
+      await db
+          .into(db.wallConstructions)
+          .insert(
             $db.WallConstructionsCompanion.insert(id: 'proj-c-1', name: 'Wall'),
           );
-      await db.into(db.materialLayers).insert(
+      await db
+          .into(db.materialLayers)
+          .insert(
             $db.MaterialLayersCompanion.insert(
               id: 'layer-1',
               constructionId: 'proj-c-1',
@@ -129,25 +145,27 @@ void main() {
   });
 
   group('HspImporter.importSnapshotPreservingIds', () {
-    test('round-trips the project UUID and does not duplicate on reopen',
-        () async {
-      await _seedProject(db, projectId: 'keep-me');
-      final snapshot = await HspExporter(db).buildSnapshot('keep-me');
+    test(
+      'round-trips the project UUID and does not duplicate on reopen',
+      () async {
+        await _seedProject(db, projectId: 'keep-me');
+        final snapshot = await HspExporter(db).buildSnapshot('keep-me');
 
-      // First close + reopen.
-      await container.read(projectRepositoryProvider).clearWorkingCopy();
-      final id1 = await HspImporter(db).importSnapshotPreservingIds(snapshot);
+        // First close + reopen.
+        await container.read(projectRepositoryProvider).clearWorkingCopy();
+        final id1 = await HspImporter(db).importSnapshotPreservingIds(snapshot);
 
-      expect(id1, 'keep-me');
-      expect((await db.select(db.projects).get()).single.id, 'keep-me');
+        expect(id1, 'keep-me');
+        expect((await db.select(db.projects).get()).single.id, 'keep-me');
 
-      // Second close + reopen of the same snapshot — still exactly one project.
-      await container.read(projectRepositoryProvider).clearWorkingCopy();
-      final id2 = await HspImporter(db).importSnapshotPreservingIds(snapshot);
+        // Second close + reopen of the same snapshot — still exactly one project.
+        await container.read(projectRepositoryProvider).clearWorkingCopy();
+        final id2 = await HspImporter(db).importSnapshotPreservingIds(snapshot);
 
-      expect(id2, 'keep-me');
-      expect((await db.select(db.projects).get()).length, 1);
-      expect((await db.select(db.floors).get()).length, 1);
-    });
+        expect(id2, 'keep-me');
+        expect((await db.select(db.projects).get()).length, 1);
+        expect((await db.select(db.floors).get()).length, 1);
+      },
+    );
   });
 }

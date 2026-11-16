@@ -137,8 +137,7 @@ void main() {
   // ── Group 1: Room detection ──────────────────────────────────────────────
 
   group('RoomDetection.detectClosedRoom — shared wall scenario', () {
-    test(
-        'SH-D-1: detecting Room 1 (4 new walls) '
+    test('SH-D-1: detecting Room 1 (4 new walls) '
         'returns exactly 4 wall IDs', () {
       // Room 1 walls are drawn in order AB, BE, ED, DA.
       // DA is the closing wall.  The DFS must traverse AB, BE, ED
@@ -148,11 +147,13 @@ void main() {
 
       expect(result, isNotNull);
       expect(result!.wallIds, hasLength(4));
-      expect(result.wallIds, containsAll(['wall-da', 'wall-ab', 'wall-be', 'wall-ed']));
+      expect(
+        result.wallIds,
+        containsAll(['wall-da', 'wall-ab', 'wall-be', 'wall-ed']),
+      );
     });
 
-    test(
-        'SH-D-2: closing wall (ED) is present in Room 1 wallIds '
+    test('SH-D-2: closing wall (ED) is present in Room 1 wallIds '
         '— regression for dropped-final-edge bug', () {
       // Before the fix, the DFS returned path = [A, B, E] with
       // closingWall = ED silently discarded.  wallIds would have
@@ -165,14 +166,14 @@ void main() {
       expect(
         result!.wallIds,
         contains('wall-ed'),
-        reason: 'wall-ed connects the last traversed node (E) back to the '
+        reason:
+            'wall-ed connects the last traversed node (E) back to the '
             "start point (D) — it is the 'closing edge' that was previously "
             'dropped from wallIds.',
       );
     });
 
-    test(
-        'SH-D-3: detecting Room 2 returns 4 wall IDs including '
+    test('SH-D-3: detecting Room 2 returns 4 wall IDs including '
         'the shared wall BE', () {
       // At the time Room 2 is detected, walls AB, BE, ED, DA already
       // exist (belonging to Room 1).  The user has just drawn FE.
@@ -191,8 +192,7 @@ void main() {
       );
     });
 
-    test(
-        'SH-D-4: Room 2 detection includes BE (shared wall) specifically '
+    test('SH-D-4: Room 2 detection includes BE (shared wall) specifically '
         '— verifies DFS crosses into existing room territory', () {
       final result = RoomDetection.detectClosedRoom(
         _allWallsForRoom2Detection,
@@ -203,7 +203,8 @@ void main() {
       expect(
         result!.wallIds,
         contains('wall-be'),
-        reason: 'wall-be already belongs to Room 1 but lies on the boundary '
+        reason:
+            'wall-be already belongs to Room 1 but lies on the boundary '
             'of Room 2.  The DFS must traverse it to close the cycle.',
       );
     });
@@ -232,8 +233,7 @@ void main() {
   //   • report `none` when no cycle exists yet (RD-4).
 
   group('RoomDetection.detectRoom — overlap verification', () {
-    test(
-        'RD-1: adjacent Room 2 is detected and does NOT enclose Room 1', () {
+    test('RD-1: adjacent Room 2 is detected and does NOT enclose Room 1', () {
       final result = RoomDetection.detectRoom(
         _allWallsForRoom2Detection,
         _wallFe,
@@ -278,8 +278,7 @@ void main() {
       _wallFe, // F→E
     ];
 
-    test(
-        'RD-2: when one constellation overlaps Room 1, the other '
+    test('RD-2: when one constellation overlaps Room 1, the other '
         '(clean) constellation is returned', () {
       // Room 1 sits inside the left square; the left face of BE would
       // re-enclose it. The right face (B,C,F,E) is clean.
@@ -303,8 +302,7 @@ void main() {
       expect(result.room!.polygon, isNot(contains(_ptA)));
     });
 
-    test(
-        'RD-3: a loop that encloses a floating existing room yields '
+    test('RD-3: a loop that encloses a floating existing room yields '
         'overlapsExistingRoom (error, no dialog)', () {
       // Outer square A,B',F',D closing with newWall; a small Room 1 floats
       // inside with no shared walls. The only bounded face encloses it.
@@ -356,15 +354,11 @@ void main() {
         ],
       );
 
-      expect(
-        result.outcome,
-        equals(RoomDetectionOutcome.overlapsExistingRoom),
-      );
+      expect(result.outcome, equals(RoomDetectionOutcome.overlapsExistingRoom));
       expect(result.room, isNull);
     });
 
-    test(
-        'RD-5: one wall closing a room on each side detects TWO rooms', () {
+    test('RD-5: one wall closing a room on each side detects TWO rooms', () {
       // No existing rooms: the divider BE bounds a clean square on each
       // side, so both must be returned for sequential naming.
       final result = RoomDetection.detectRoom(
@@ -384,8 +378,14 @@ void main() {
       final rightWalls = result.rooms
           .firstWhere((r) => r.wallIds.contains('wall-bc'))
           .wallIds;
-      expect(leftWalls, containsAll(['wall-be', 'wall-ab', 'wall-ed', 'wall-da']));
-      expect(rightWalls, containsAll(['wall-be', 'wall-bc', 'wall-cf', 'wall-fe']));
+      expect(
+        leftWalls,
+        containsAll(['wall-be', 'wall-ab', 'wall-ed', 'wall-da']),
+      );
+      expect(
+        rightWalls,
+        containsAll(['wall-be', 'wall-bc', 'wall-cf', 'wall-fe']),
+      );
     });
 
     test('RD-4: a non-closing wall yields outcome none', () {
@@ -416,9 +416,7 @@ void main() {
     (ProviderContainer, EditorStateNotifier) makeContainer() {
       final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
       final container = ProviderContainer(
-        overrides: [
-          $db.appDatabaseProvider.overrideWithValue(db),
-        ],
+        overrides: [$db.appDatabaseProvider.overrideWithValue(db)],
       );
       addTearDown(db.close);
       final notifier = container.read(editorStateProvider.notifier);
@@ -439,8 +437,7 @@ void main() {
       return (container, notifier);
     }
 
-    test(
-        'SH-S-1: after adding Room 2, state contains exactly 2 rooms', () {
+    test('SH-S-1: after adding Room 2, state contains exactly 2 rooms', () {
       final (container, notifier) = makeContainer();
       addTearDown(container.dispose);
 
@@ -454,8 +451,7 @@ void main() {
       expect(rooms.map((r) => r.id), containsAll(['room-1', 'room-2']));
     });
 
-    test(
-        'SH-S-2: Room 1 still has exactly 4 wall segments after '
+    test('SH-S-2: Room 1 still has exactly 4 wall segments after '
         'Room 2 is added', () {
       final (container, notifier) = makeContainer();
       addTearDown(container.dispose);
@@ -470,13 +466,13 @@ void main() {
       expect(
         room1Walls,
         hasLength(4),
-        reason: 'Room 1 must keep AB, BE (updated), ED, DA — '
+        reason:
+            'Room 1 must keep AB, BE (updated), ED, DA — '
             'the shared wall stays in Room 1 (roomId unchanged).',
       );
     });
 
-    test(
-        'SH-S-3: Room 2 has exactly 4 wall segments '
+    test('SH-S-3: Room 2 has exactly 4 wall segments '
         '(3 new + 1 mirror of shared wall)', () {
       final (container, notifier) = makeContainer();
       addTearDown(container.dispose);
@@ -491,13 +487,13 @@ void main() {
       expect(
         room2Walls,
         hasLength(4),
-        reason: 'Room 2 must have FE, BC, CF (new) and a mirror of '
+        reason:
+            'Room 2 must have FE, BC, CF (new) and a mirror of '
             'BE (created by addRoomFromDetection).',
       );
     });
 
-    test(
-        'SH-S-4: shared wall BE is marked WallType.interior on '
+    test('SH-S-4: shared wall BE is marked WallType.interior on '
         "Room 1's side", () {
       final (container, notifier) = makeContainer();
       addTearDown(container.dispose);
@@ -512,8 +508,7 @@ void main() {
       expect(be.wallType, equals(WallType.interior));
     });
 
-    test(
-        'SH-S-5: shared wall BE has adjacentRoomId = room-2 '
+    test('SH-S-5: shared wall BE has adjacentRoomId = room-2 '
         "on Room 1's side", () {
       final (container, notifier) = makeContainer();
       addTearDown(container.dispose);
@@ -528,13 +523,13 @@ void main() {
       expect(
         be.adjacentRoomId,
         equals('room-2'),
-        reason: 'ThermalEngine.interiorCorrectionFactor needs adjacentRoomId '
+        reason:
+            'ThermalEngine.interiorCorrectionFactor needs adjacentRoomId '
             'to look up the neighbouring room temperature.',
       );
     });
 
-    test(
-        'SH-S-6: mirror wall for Room 2 is marked WallType.interior', () {
+    test('SH-S-6: mirror wall for Room 2 is marked WallType.interior', () {
       final (container, notifier) = makeContainer();
       addTearDown(container.dispose);
 
@@ -551,8 +546,7 @@ void main() {
       expect(mirror.wallType, equals(WallType.interior));
     });
 
-    test(
-        'SH-S-7: mirror wall has adjacentRoomId = room-1 '
+    test('SH-S-7: mirror wall has adjacentRoomId = room-1 '
         "on Room 2's side", () {
       final (container, notifier) = makeContainer();
       addTearDown(container.dispose);
@@ -569,13 +563,13 @@ void main() {
       expect(
         mirror.adjacentRoomId,
         equals('room-1'),
-        reason: 'interiorCorrectionFactor for Room 2 must resolve '
+        reason:
+            'interiorCorrectionFactor for Room 2 must resolve '
             'adjacentRoomId to look up Room 1 targetTempC.',
       );
     });
 
-    test(
-        'SH-S-8: mirror wall geometry is the reverse of BE '
+    test('SH-S-8: mirror wall geometry is the reverse of BE '
         '(start=E, end=B)', () {
       final (container, notifier) = makeContainer();
       addTearDown(container.dispose);
@@ -595,8 +589,7 @@ void main() {
       expect(mirror.endPoint, equals(_ptB));
     });
 
-    test(
-        'SH-S-9: total wall count in state is 8 '
+    test('SH-S-9: total wall count in state is 8 '
         '(4 room-1 + 3 new room-2 + 1 mirror)', () {
       final (container, notifier) = makeContainer();
       addTearDown(container.dispose);
@@ -713,8 +706,7 @@ void main() {
     const room1TempC = 20.0;
     const room2TempC = 24.0;
 
-    test(
-        'SH-T-1: interiorCorrectionFactor for Room 2 facing Room 1 '
+    test('SH-T-1: interiorCorrectionFactor for Room 2 facing Room 1 '
         'is (24−20)/(24−(−12)) = 4/36', () {
       final f = ThermalEngine.interiorCorrectionFactor(
         tThisRoomC: room2TempC,
@@ -725,8 +717,7 @@ void main() {
       expect(f, closeTo(4.0 / 36.0, 0.001));
     });
 
-    test(
-        'SH-T-2: interiorCorrectionFactor for Room 1 facing Room 2 '
+    test('SH-T-2: interiorCorrectionFactor for Room 1 facing Room 2 '
         'is (20−24)/(20−(−12)) = −4/32 (negative = heat gain)', () {
       final f = ThermalEngine.interiorCorrectionFactor(
         tThisRoomC: room1TempC,
@@ -737,8 +728,7 @@ void main() {
       expect(f, closeTo(-4.0 / 32.0, 0.001));
     });
 
-    test(
-        'SH-T-3: transmission loss through the shared wall for Room 2 '
+    test('SH-T-3: transmission loss through the shared wall for Room 2 '
         'is 20.8 W (reduced compared to exterior)', () {
       final f = ThermalEngine.interiorCorrectionFactor(
         tThisRoomC: room2TempC,
@@ -756,8 +746,7 @@ void main() {
       expect(q, closeTo(20.8, 20.8 * 0.02));
     });
 
-    test(
-        'SH-T-4: Room 1 has negative transmission loss (heat gain) '
+    test('SH-T-4: Room 1 has negative transmission loss (heat gain) '
         'through shared wall because bathroom is warmer', () {
       final f = ThermalEngine.interiorCorrectionFactor(
         tThisRoomC: room1TempC,
@@ -775,54 +764,56 @@ void main() {
       expect(
         q,
         lessThan(0),
-        reason: 'A negative transmission loss means the adjacent room is '
+        reason:
+            'A negative transmission loss means the adjacent room is '
             'supplying heat — Room 1 heating demand is reduced.',
       );
       expect(q, closeTo(-20.8, 20.8 * 0.02));
     });
 
     test(
-        'SH-T-5: heat flow is symmetric — magnitude equal from both sides',
-        () {
-      final fRoom2 = ThermalEngine.interiorCorrectionFactor(
-        tThisRoomC: room2TempC,
-        tAdjacentRoomC: room1TempC,
-        tOutdoorC: _outdoorTempC,
-      );
-      final qRoom2 = ThermalEngine.transmissionLoss(
-        uValue: _sharedWallUValue,
-        areaM2: _sharedWallAreaM2,
-        correctionF: fRoom2,
-        tIndoorC: room2TempC,
-        tOutdoorC: _outdoorTempC,
-      );
+      'SH-T-5: heat flow is symmetric — magnitude equal from both sides',
+      () {
+        final fRoom2 = ThermalEngine.interiorCorrectionFactor(
+          tThisRoomC: room2TempC,
+          tAdjacentRoomC: room1TempC,
+          tOutdoorC: _outdoorTempC,
+        );
+        final qRoom2 = ThermalEngine.transmissionLoss(
+          uValue: _sharedWallUValue,
+          areaM2: _sharedWallAreaM2,
+          correctionF: fRoom2,
+          tIndoorC: room2TempC,
+          tOutdoorC: _outdoorTempC,
+        );
 
-      final fRoom1 = ThermalEngine.interiorCorrectionFactor(
-        tThisRoomC: room1TempC,
-        tAdjacentRoomC: room2TempC,
-        tOutdoorC: _outdoorTempC,
-      );
-      final qRoom1 = ThermalEngine.transmissionLoss(
-        uValue: _sharedWallUValue,
-        areaM2: _sharedWallAreaM2,
-        correctionF: fRoom1,
-        tIndoorC: room1TempC,
-        tOutdoorC: _outdoorTempC,
-      );
+        final fRoom1 = ThermalEngine.interiorCorrectionFactor(
+          tThisRoomC: room1TempC,
+          tAdjacentRoomC: room2TempC,
+          tOutdoorC: _outdoorTempC,
+        );
+        final qRoom1 = ThermalEngine.transmissionLoss(
+          uValue: _sharedWallUValue,
+          areaM2: _sharedWallAreaM2,
+          correctionF: fRoom1,
+          tIndoorC: room1TempC,
+          tOutdoorC: _outdoorTempC,
+        );
 
-      // Both sides must resolve to U × A × (T_this − T_adjacent):
-      //   Room 2: 0.5 × 10.4 × (24−20) = +20.8 W
-      //   Room 1: 0.5 × 10.4 × (20−24) = −20.8 W
-      expect(
-        qRoom2,
-        closeTo(-qRoom1, 0.1),
-        reason: 'Heat flowing out of Room 2 must equal heat flowing '
-            'into Room 1 — energy is conserved.',
-      );
-    });
+        // Both sides must resolve to U × A × (T_this − T_adjacent):
+        //   Room 2: 0.5 × 10.4 × (24−20) = +20.8 W
+        //   Room 1: 0.5 × 10.4 × (20−24) = −20.8 W
+        expect(
+          qRoom2,
+          closeTo(-qRoom1, 0.1),
+          reason:
+              'Heat flowing out of Room 2 must equal heat flowing '
+              'into Room 1 — energy is conserved.',
+        );
+      },
+    );
 
-    test(
-        'SH-T-6: Room 2 shared-wall demand is ≈ 11 % of the '
+    test('SH-T-6: Room 2 shared-wall demand is ≈ 11 % of the '
         'equivalent exterior wall demand', () {
       final f = ThermalEngine.interiorCorrectionFactor(
         tThisRoomC: room2TempC,
@@ -849,13 +840,13 @@ void main() {
       expect(
         qInterior,
         lessThan(qExterior),
-        reason: 'Shared interior wall always produces less heat demand '
+        reason:
+            'Shared interior wall always produces less heat demand '
             'than the same wall exposed to outdoor conditions.',
       );
     });
 
-    test(
-        'SH-T-7: zero correction factor when both rooms at same '
+    test('SH-T-7: zero correction factor when both rooms at same '
         'temperature — shared wall contributes nothing to demand', () {
       const sameTempC = 20.0;
       final f = ThermalEngine.interiorCorrectionFactor(
@@ -914,8 +905,7 @@ void main() {
   // Room detection then finds the cycle [wall_3, d1, wall_1, wall_2].
   // addRoomFromDetection marks d1 as interior and creates a mirror for room-2.
 
-  group(
-      'EditorStateNotifier.commitWallWithSplit — '
+  group('EditorStateNotifier.commitWallWithSplit — '
       'wall split at draw time (ADR-003)', () {
     // Room 1 corners.
     const ptA = Point2D(x: 0, y: 0);
@@ -980,9 +970,7 @@ void main() {
     (ProviderContainer, EditorStateNotifier) makeContainer() {
       final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
       final container = ProviderContainer(
-        overrides: [
-          $db.appDatabaseProvider.overrideWithValue(db),
-        ],
+        overrides: [$db.appDatabaseProvider.overrideWithValue(db)],
       );
       addTearDown(db.close);
       final notifier = container.read(editorStateProvider.notifier);
@@ -1007,8 +995,7 @@ void main() {
       return (container, notifier);
     }
 
-    test(
-        'WS-1: committing wall_3 splits wall_d at (0,1000) — '
+    test('WS-1: committing wall_3 splits wall_d at (0,1000) — '
         'original wall_d is removed', () {
       final (container, notifier) = makeContainer();
       addTearDown(container.dispose);
@@ -1023,8 +1010,7 @@ void main() {
       );
     });
 
-    test(
-        'WS-2: two split segments of wall_d are created for big-room', () {
+    test('WS-2: two split segments of wall_d are created for big-room', () {
       final (container, notifier) = makeContainer();
       addTearDown(container.dispose);
 
@@ -1032,13 +1018,15 @@ void main() {
 
       final walls = container.read(editorStateProvider).walls;
       final dPieces = walls
-          .where((w) =>
-              w.roomId == 'big-room' &&
-              (w.startPoint == ptJcd ||
-                  w.startPoint == ptJ ||
-                  w.endPoint == ptJ ||
-                  w.endPoint == ptA) &&
-              w.id != 'wall-c')
+          .where(
+            (w) =>
+                w.roomId == 'big-room' &&
+                (w.startPoint == ptJcd ||
+                    w.startPoint == ptJ ||
+                    w.endPoint == ptJ ||
+                    w.endPoint == ptA) &&
+                w.id != 'wall-c',
+          )
           .toList();
 
       expect(
@@ -1048,8 +1036,7 @@ void main() {
       );
     });
 
-    test(
-        'WS-3: first split piece spans jcd(0,2000)→J(0,1000) and is '
+    test('WS-3: first split piece spans jcd(0,2000)→J(0,1000) and is '
         'exterior (not yet shared)', () {
       final (container, notifier) = makeContainer();
       addTearDown(container.dispose);
@@ -1067,9 +1054,7 @@ void main() {
       expect(d1.wallType, equals(WallType.exterior));
     });
 
-    test(
-        'WS-4: second split piece spans J(0,1000)→A(0,0) and is exterior',
-        () {
+    test('WS-4: second split piece spans J(0,1000)→A(0,0) and is exterior', () {
       final (container, notifier) = makeContainer();
       addTearDown(container.dispose);
 
@@ -1078,16 +1063,13 @@ void main() {
       final walls = container.read(editorStateProvider).walls;
       final d2 = walls.firstWhere(
         (w) =>
-            w.roomId == 'big-room' &&
-            w.startPoint == ptJ &&
-            w.endPoint == ptA,
+            w.roomId == 'big-room' && w.startPoint == ptJ && w.endPoint == ptA,
       );
 
       expect(d2.wallType, equals(WallType.exterior));
     });
 
-    test(
-        'WS-5: wall_3 is added to state after the split', () {
+    test('WS-5: wall_3 is added to state after the split', () {
       final (container, notifier) = makeContainer();
       addTearDown(container.dispose);
 
@@ -1097,8 +1079,7 @@ void main() {
       expect(walls.any((w) => w.id == 'wall-3'), isTrue);
     });
 
-    test(
-        'WS-6: committing wall_1 (endpoint at jcd = existing corner) '
+    test('WS-6: committing wall_1 (endpoint at jcd = existing corner) '
         'does not split wall_d', () {
       // The endpoint of wall_1 is at jcd = startPoint of wall_d,
       // which is NOT an interior point, so no split should occur.
@@ -1111,13 +1092,13 @@ void main() {
       expect(
         walls.any((w) => w.id == 'wall-d'),
         isTrue,
-        reason: 'wall_d must not be split by wall_1 whose endpoint '
+        reason:
+            'wall_d must not be split by wall_1 whose endpoint '
             'is at wall_d\'s own startPoint (a corner, not interior).',
       );
     });
 
-    test(
-        'WS-7: unassigned walls are not split by new wall endpoints', () {
+    test('WS-7: unassigned walls are not split by new wall endpoints', () {
       // If an unassigned wall happens to lie on the path of a new wall,
       // it should not be split (only assigned walls are split).
       final container = ProviderContainer();
@@ -1173,8 +1154,7 @@ void main() {
   // Small room's bottom wall AB = (0,0)→(2000,0). The wide room's top edge
   // tl→tr = (-1000,0)→(3000,0) is 4000 mm long; AB's endpoints A and B lie
   // on its interior.
-  group(
-      'EditorStateNotifier.commitWallWithSplit — '
+  group('EditorStateNotifier.commitWallWithSplit — '
       'reverse split when the new wall is longer (screenshot bug)', () {
     const tl = Point2D(x: -1000, y: 0);
     const tr = Point2D(x: 3000, y: 0);
@@ -1220,12 +1200,14 @@ void main() {
       addTearDown(db.close);
       final notifier = container.read(editorStateProvider.notifier);
 
-      notifier.addRoom(const Room(
-        id: 'small-room',
-        floorId: 'floor-1',
-        name: 'Small Room',
-        targetTempC: 20.0,
-      ));
+      notifier.addRoom(
+        const Room(
+          id: 'small-room',
+          floorId: 'floor-1',
+          name: 'Small Room',
+          targetTempC: 20.0,
+        ),
+      );
       notifier.addWall(smallBottom);
       notifier.addWall(smallRight);
       notifier.addWall(smallTop);
@@ -1248,8 +1230,7 @@ void main() {
           (eq(w.startPoint, b) && eq(w.endPoint, a));
     }
 
-    test('RS-1: the longer new wall is split at the small room\'s corners',
-        () {
+    test('RS-1: the longer new wall is split at the small room\'s corners', () {
       final (container, notifier) = makeContainer();
       addTearDown(container.dispose);
 
@@ -1263,10 +1244,16 @@ void main() {
         reason: 'The full-length top edge must be split into fragments.',
       );
       // The two non-overlapping outer fragments must exist.
-      expect(walls.any((w) => sameSpan(w, tl, smallA)), isTrue,
-          reason: 'Left outer fragment (-1000,0)->(0,0) must be added.');
-      expect(walls.any((w) => sameSpan(w, smallB, tr)), isTrue,
-          reason: 'Right outer fragment (2000,0)->(3000,0) must be added.');
+      expect(
+        walls.any((w) => sameSpan(w, tl, smallA)),
+        isTrue,
+        reason: 'Left outer fragment (-1000,0)->(0,0) must be added.',
+      );
+      expect(
+        walls.any((w) => sameSpan(w, smallB, tr)),
+        isTrue,
+        reason: 'Right outer fragment (2000,0)->(3000,0) must be added.',
+      );
     });
 
     test('RS-2: the shared sub-segment is not duplicated', () {
@@ -1276,19 +1263,20 @@ void main() {
       notifier.commitWallWithSplit(wideTop);
 
       final walls = container.read(editorStateProvider).walls;
-      final sharedSpan =
-          walls.where((w) => sameSpan(w, smallA, smallB)).toList();
+      final sharedSpan = walls
+          .where((w) => sameSpan(w, smallA, smallB))
+          .toList();
       expect(
         sharedSpan,
         hasLength(1),
-        reason: 'Only the existing small-room wall covers the shared span; '
+        reason:
+            'Only the existing small-room wall covers the shared span; '
             'the new wall must not duplicate it.',
       );
       expect(sharedSpan.single.id, 'small-bottom');
     });
 
-    test(
-        'RS-3: detection from the wide room finds it through the existing '
+    test('RS-3: detection from the wide room finds it through the existing '
         'shared wall', () {
       final (container, notifier) = makeContainer();
       addTearDown(container.dispose);
@@ -1296,24 +1284,30 @@ void main() {
       // Draw the wide room as four edges (rect order), capturing the seed
       // fragment returned for the reverse-split top edge.
       final seed = notifier.commitWallWithSplit(wideTop);
-      notifier.commitWallWithSplit(const WallSegment(
-        id: 'wide-right',
-        roomId: '',
-        startPoint: tr,
-        endPoint: br,
-      ));
-      notifier.commitWallWithSplit(const WallSegment(
-        id: 'wide-bottom',
-        roomId: '',
-        startPoint: br,
-        endPoint: bl,
-      ));
-      notifier.commitWallWithSplit(const WallSegment(
-        id: 'wide-left',
-        roomId: '',
-        startPoint: bl,
-        endPoint: tl,
-      ));
+      notifier.commitWallWithSplit(
+        const WallSegment(
+          id: 'wide-right',
+          roomId: '',
+          startPoint: tr,
+          endPoint: br,
+        ),
+      );
+      notifier.commitWallWithSplit(
+        const WallSegment(
+          id: 'wide-bottom',
+          roomId: '',
+          startPoint: br,
+          endPoint: bl,
+        ),
+      );
+      notifier.commitWallWithSplit(
+        const WallSegment(
+          id: 'wide-left',
+          roomId: '',
+          startPoint: bl,
+          endPoint: tl,
+        ),
+      );
 
       final result = RoomDetection.detectRoom(
         container.read(editorStateProvider).walls,
@@ -1328,7 +1322,8 @@ void main() {
       expect(
         room.wallIds,
         contains('small-bottom'),
-        reason: 'The wide room must close through the existing shared wall, '
+        reason:
+            'The wide room must close through the existing shared wall, '
             'not a duplicate fragment.',
       );
     });
@@ -1344,8 +1339,7 @@ void main() {
   //
   // Layout (mm): large room below the x-axis, top wall (0,0)→(4000,0). Small
   // room above, bottom edge (1000,0)→(3000,0) on the large wall's interior.
-  group(
-      'EditorStateNotifier.commitWallWithSplit — '
+  group('EditorStateNotifier.commitWallWithSplit — '
       'attaching a smaller room leaves no orphan duplicate wall', () {
     const l0 = Point2D(x: 0, y: 0);
     const l1 = Point2D(x: 4000, y: 0);
@@ -1364,20 +1358,24 @@ void main() {
       );
       addTearDown(db.close);
       final notifier = container.read(editorStateProvider.notifier);
-      notifier.addRoom(const Room(
-        id: 'large',
-        floorId: 'floor-1',
-        name: 'Large',
-        targetTempC: 20.0,
-      ));
+      notifier.addRoom(
+        const Room(
+          id: 'large',
+          floorId: 'floor-1',
+          name: 'Large',
+          targetTempC: 20.0,
+        ),
+      );
       const corners = [l0, l1, l2, l3];
       for (var i = 0; i < 4; i++) {
-        notifier.addWall(WallSegment(
-          id: 'large-$i',
-          roomId: 'large',
-          startPoint: corners[i],
-          endPoint: corners[(i + 1) % 4],
-        ));
+        notifier.addWall(
+          WallSegment(
+            id: 'large-$i',
+            roomId: 'large',
+            startPoint: corners[i],
+            endPoint: corners[(i + 1) % 4],
+          ),
+        );
       }
       return (container, notifier);
     }
@@ -1385,17 +1383,38 @@ void main() {
     // Draw the small room's four edges; bottom drawn right→left so it is the
     // reverse of the host-split middle piece.
     void drawSmall(EditorStateNotifier n) {
-      final seed = n.commitWallWithSplit(const WallSegment(
-          id: 's-top', roomId: '', startPoint: sTl, endPoint: sTr));
-      n.commitWallWithSplit(const WallSegment(
-          id: 's-right', roomId: '', startPoint: sTr, endPoint: sTrBottomR));
-      n.commitWallWithSplit(const WallSegment(
+      final seed = n.commitWallWithSplit(
+        const WallSegment(
+          id: 's-top',
+          roomId: '',
+          startPoint: sTl,
+          endPoint: sTr,
+        ),
+      );
+      n.commitWallWithSplit(
+        const WallSegment(
+          id: 's-right',
+          roomId: '',
+          startPoint: sTr,
+          endPoint: sTrBottomR,
+        ),
+      );
+      n.commitWallWithSplit(
+        const WallSegment(
           id: 's-bottom',
           roomId: '',
           startPoint: sTrBottomR,
-          endPoint: sTlBottomL));
-      n.commitWallWithSplit(const WallSegment(
-          id: 's-left', roomId: '', startPoint: sTlBottomL, endPoint: sTl));
+          endPoint: sTlBottomL,
+        ),
+      );
+      n.commitWallWithSplit(
+        const WallSegment(
+          id: 's-left',
+          roomId: '',
+          startPoint: sTlBottomL,
+          endPoint: sTl,
+        ),
+      );
       final r = RoomDetection.detectRoom(
         n.state.walls,
         seed,
@@ -1403,7 +1422,11 @@ void main() {
       );
       n.addRoomFromDetection(
         room: const Room(
-            id: 'small', floorId: 'floor-1', name: 'Small', targetTempC: 20.0),
+          id: 'small',
+          floorId: 'floor-1',
+          name: 'Small',
+          targetTempC: 20.0,
+        ),
         wallIds: r.room!.wallIds,
       );
     }
@@ -1428,7 +1451,8 @@ void main() {
       expect(
         orphans,
         isEmpty,
-        reason: 'The drawn shared edge must be absorbed into the shared wall, '
+        reason:
+            'The drawn shared edge must be absorbed into the shared wall, '
             'not left as a duplicate orphan over it.',
       );
     });
@@ -1443,8 +1467,11 @@ void main() {
           .walls
           .where(onSharedSpan)
           .toList();
-      expect(spanWalls, hasLength(2),
-          reason: 'Exactly the shared wall and its mirror.');
+      expect(
+        spanWalls,
+        hasLength(2),
+        reason: 'Exactly the shared wall and its mirror.',
+      );
       for (final w in spanWalls) {
         expect(w.wallType, WallType.interior);
         expect(w.mirrorId, isNotNull);
@@ -1465,10 +1492,12 @@ void main() {
       final largeTopPieces = container
           .read(editorStateProvider)
           .walls
-          .where((w) =>
-              w.roomId == 'large' &&
-              w.startPoint.y.abs() < 1.0 &&
-              w.endPoint.y.abs() < 1.0)
+          .where(
+            (w) =>
+                w.roomId == 'large' &&
+                w.startPoint.y.abs() < 1.0 &&
+                w.endPoint.y.abs() < 1.0,
+          )
           .toList();
       // (0,0)-(1000,0) exterior, (1000,0)-(3000,0) shared interior,
       // (3000,0)-(4000,0) exterior.

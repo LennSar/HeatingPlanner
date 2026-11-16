@@ -42,8 +42,7 @@ class _StubEditorStateNotifier extends EditorStateNotifier {
 ProviderContainer _containerWith(EditorState state) {
   return ProviderContainer(
     overrides: [
-      editorStateProvider
-          .overrideWith(() => _StubEditorStateNotifier(state)),
+      editorStateProvider.overrideWith(() => _StubEditorStateNotifier(state)),
       tubeLengthProvider.overrideWith((ref, _) => double.nan),
       zoneSurfaceTempProvider.overrideWith((ref, _) => double.nan),
       hydraulicBalanceProvider.overrideWith((ref, _) async => {}),
@@ -107,19 +106,22 @@ void main() {
   // ── Empty supply route ─────────────────────────────────────────────────────
 
   group('VR-05 — empty supply route', () {
-    test('VR05-3: circuit with empty supplyRoutePath → error even with distributor', () {
-      final circuit = createTestCircuit(supplyRoutePath: []);
-      final state = EditorState(
-        distributor: _distAtOrigin,
-        circuits: [circuit],
-      );
-      final container = _containerWith(state);
-      addTearDown(container.dispose);
+    test(
+      'VR05-3: circuit with empty supplyRoutePath → error even with distributor',
+      () {
+        final circuit = createTestCircuit(supplyRoutePath: []);
+        final state = EditorState(
+          distributor: _distAtOrigin,
+          circuits: [circuit],
+        );
+        final container = _containerWith(state);
+        addTearDown(container.dispose);
 
-      final results = _vr05Results(container);
-      expect(results, hasLength(1));
-      expect(results.first.elementId, equals(circuit.id));
-    });
+        final results = _vr05Results(container);
+        expect(results, hasLength(1));
+        expect(results.first.elementId, equals(circuit.id));
+      },
+    );
   });
 
   // ── Within 50 mm ──────────────────────────────────────────────────────────
@@ -153,19 +155,22 @@ void main() {
       expect(_vr05Results(container), isEmpty);
     });
 
-    test('VR05-6: first route point exactly 50 mm from distributor → no error', () {
-      final circuit = createTestCircuit(
-        supplyRoutePath: [const Point2D(x: 50, y: 0)],
-      );
-      final state = EditorState(
-        distributor: _distAtOrigin,
-        circuits: [circuit],
-      );
-      final container = _containerWith(state);
-      addTearDown(container.dispose);
+    test(
+      'VR05-6: first route point exactly 50 mm from distributor → no error',
+      () {
+        final circuit = createTestCircuit(
+          supplyRoutePath: [const Point2D(x: 50, y: 0)],
+        );
+        final state = EditorState(
+          distributor: _distAtOrigin,
+          circuits: [circuit],
+        );
+        final container = _containerWith(state);
+        addTearDown(container.dispose);
 
-      expect(_vr05Results(container), isEmpty);
-    });
+        expect(_vr05Results(container), isEmpty);
+      },
+    );
   });
 
   // ── Beyond 50 mm ──────────────────────────────────────────────────────────
@@ -208,40 +213,37 @@ void main() {
   // ── Multiple circuits ──────────────────────────────────────────────────────
 
   group('VR-05 — multiple circuits mixed', () {
-    test('VR05-9: one connected and one disconnected → one error for the disconnected', () {
-      final connected = createTestCircuit(
-        id: 'c-connected',
-        supplyRoutePath: [const Point2D(x: 10, y: 10)],
-      );
-      final disconnected = createTestCircuit(
-        id: 'c-disconnected',
-        supplyRoutePath: [const Point2D(x: 3000, y: 3000)],
-      );
-      final state = EditorState(
-        distributor: _distAtOrigin,
-        circuits: [connected, disconnected],
-      );
-      final container = _containerWith(state);
-      addTearDown(container.dispose);
+    test(
+      'VR05-9: one connected and one disconnected → one error for the disconnected',
+      () {
+        final connected = createTestCircuit(
+          id: 'c-connected',
+          supplyRoutePath: [const Point2D(x: 10, y: 10)],
+        );
+        final disconnected = createTestCircuit(
+          id: 'c-disconnected',
+          supplyRoutePath: [const Point2D(x: 3000, y: 3000)],
+        );
+        final state = EditorState(
+          distributor: _distAtOrigin,
+          circuits: [connected, disconnected],
+        );
+        final container = _containerWith(state);
+        addTearDown(container.dispose);
 
-      final results = _vr05Results(container);
-      expect(results, hasLength(1));
-      expect(results.first.elementId, equals('c-disconnected'));
-    });
+        final results = _vr05Results(container);
+        expect(results, hasLength(1));
+        expect(results.first.elementId, equals('c-disconnected'));
+      },
+    );
 
     test('VR05-10: two disconnected circuits → two errors', () {
       final c1 = createTestCircuit(
         id: 'c1',
         supplyRoutePath: [const Point2D(x: 500, y: 0)],
       );
-      final c2 = createTestCircuit(
-        id: 'c2',
-        supplyRoutePath: [],
-      );
-      final state = EditorState(
-        distributor: _distAtOrigin,
-        circuits: [c1, c2],
-      );
+      final c2 = createTestCircuit(id: 'c2', supplyRoutePath: []);
+      final state = EditorState(distributor: _distAtOrigin, circuits: [c1, c2]);
       final container = _containerWith(state);
       addTearDown(container.dispose);
 

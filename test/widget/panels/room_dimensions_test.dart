@@ -76,64 +76,64 @@ const _rectRoom = Room(
 
 /// Four axis-aligned walls forming the 5000×4000 mm rectangle.
 List<WallSegment> _rectWalls() => const [
-      WallSegment(
-        id: 'w1',
-        roomId: _roomId,
-        startPoint: Point2D(x: 0, y: 0),
-        endPoint: Point2D(x: 5000, y: 0),
-      ),
-      WallSegment(
-        id: 'w2',
-        roomId: _roomId,
-        startPoint: Point2D(x: 5000, y: 0),
-        endPoint: Point2D(x: 5000, y: 4000),
-      ),
-      WallSegment(
-        id: 'w3',
-        roomId: _roomId,
-        startPoint: Point2D(x: 5000, y: 4000),
-        endPoint: Point2D(x: 0, y: 4000),
-      ),
-      WallSegment(
-        id: 'w4',
-        roomId: _roomId,
-        startPoint: Point2D(x: 0, y: 4000),
-        endPoint: Point2D(x: 0, y: 0),
-      ),
-    ];
+  WallSegment(
+    id: 'w1',
+    roomId: _roomId,
+    startPoint: Point2D(x: 0, y: 0),
+    endPoint: Point2D(x: 5000, y: 0),
+  ),
+  WallSegment(
+    id: 'w2',
+    roomId: _roomId,
+    startPoint: Point2D(x: 5000, y: 0),
+    endPoint: Point2D(x: 5000, y: 4000),
+  ),
+  WallSegment(
+    id: 'w3',
+    roomId: _roomId,
+    startPoint: Point2D(x: 5000, y: 4000),
+    endPoint: Point2D(x: 0, y: 4000),
+  ),
+  WallSegment(
+    id: 'w4',
+    roomId: _roomId,
+    startPoint: Point2D(x: 0, y: 4000),
+    endPoint: Point2D(x: 0, y: 0),
+  ),
+];
 
 /// The 5000×4000 mm rectangle with 240 mm-thick walls, so the inner-clear
 /// extents are 4760×3760 mm (centerline minus thickness/2 on each side).
 List<WallSegment> _thickRectWalls() => const [
-      WallSegment(
-        id: 'w1',
-        roomId: _roomId,
-        startPoint: Point2D(x: 0, y: 0),
-        endPoint: Point2D(x: 5000, y: 0),
-        thicknessMm: 240,
-      ),
-      WallSegment(
-        id: 'w2',
-        roomId: _roomId,
-        startPoint: Point2D(x: 5000, y: 0),
-        endPoint: Point2D(x: 5000, y: 4000),
-        thicknessMm: 240,
-      ),
-      WallSegment(
-        id: 'w3',
-        roomId: _roomId,
-        startPoint: Point2D(x: 5000, y: 4000),
-        endPoint: Point2D(x: 0, y: 4000),
-        thicknessMm: 240,
-      ),
-      WallSegment(
-        id: 'w4',
-        roomId: _roomId,
-        startPoint: Point2D(x: 0, y: 4000),
-        endPoint: Point2D(x: 0, y: 0),
-        thicknessMm: 240,
-      ),
-    ];
+  WallSegment(
+    id: 'w1',
+    roomId: _roomId,
+    startPoint: Point2D(x: 0, y: 0),
+    endPoint: Point2D(x: 5000, y: 0),
+    thicknessMm: 240,
+  ),
+  WallSegment(
+    id: 'w2',
+    roomId: _roomId,
+    startPoint: Point2D(x: 5000, y: 0),
+    endPoint: Point2D(x: 5000, y: 4000),
+    thicknessMm: 240,
+  ),
+  WallSegment(
+    id: 'w3',
+    roomId: _roomId,
+    startPoint: Point2D(x: 5000, y: 4000),
+    endPoint: Point2D(x: 0, y: 4000),
+    thicknessMm: 240,
+  ),
+  WallSegment(
+    id: 'w4',
+    roomId: _roomId,
+    startPoint: Point2D(x: 0, y: 4000),
+    endPoint: Point2D(x: 0, y: 0),
+    thicknessMm: 240,
+  ),
+];
 
 /// Five segments (the bottom edge is split) → not rectangle-eligible.
 // A genuine L-shape (six 90° corners) — not a rectangle even after collapsing
@@ -141,88 +141,86 @@ List<WallSegment> _thickRectWalls() => const [
 // fixture was a rectangle whose top edge happened to be split into two
 // collinear walls — that IS rectangle-eligible now, so it moved to RD-8.)
 List<WallSegment> _nonRectWalls() => const [
-      WallSegment(
-        id: 'w1',
-        roomId: _roomId,
-        startPoint: Point2D(x: 0, y: 0),
-        endPoint: Point2D(x: 5000, y: 0),
-      ),
-      WallSegment(
-        id: 'w2',
-        roomId: _roomId,
-        startPoint: Point2D(x: 5000, y: 0),
-        endPoint: Point2D(x: 5000, y: 2000),
-      ),
-      WallSegment(
-        id: 'w3',
-        roomId: _roomId,
-        startPoint: Point2D(x: 5000, y: 2000),
-        endPoint: Point2D(x: 2500, y: 2000),
-      ),
-      WallSegment(
-        id: 'w4',
-        roomId: _roomId,
-        startPoint: Point2D(x: 2500, y: 2000),
-        endPoint: Point2D(x: 2500, y: 4000),
-      ),
-      WallSegment(
-        id: 'w5',
-        roomId: _roomId,
-        startPoint: Point2D(x: 2500, y: 4000),
-        endPoint: Point2D(x: 0, y: 4000),
-      ),
-      WallSegment(
-        id: 'w6',
-        roomId: _roomId,
-        startPoint: Point2D(x: 0, y: 4000),
-        endPoint: Point2D(x: 0, y: 0),
-      ),
-    ];
+  WallSegment(
+    id: 'w1',
+    roomId: _roomId,
+    startPoint: Point2D(x: 0, y: 0),
+    endPoint: Point2D(x: 5000, y: 0),
+  ),
+  WallSegment(
+    id: 'w2',
+    roomId: _roomId,
+    startPoint: Point2D(x: 5000, y: 0),
+    endPoint: Point2D(x: 5000, y: 2000),
+  ),
+  WallSegment(
+    id: 'w3',
+    roomId: _roomId,
+    startPoint: Point2D(x: 5000, y: 2000),
+    endPoint: Point2D(x: 2500, y: 2000),
+  ),
+  WallSegment(
+    id: 'w4',
+    roomId: _roomId,
+    startPoint: Point2D(x: 2500, y: 2000),
+    endPoint: Point2D(x: 2500, y: 4000),
+  ),
+  WallSegment(
+    id: 'w5',
+    roomId: _roomId,
+    startPoint: Point2D(x: 2500, y: 4000),
+    endPoint: Point2D(x: 0, y: 4000),
+  ),
+  WallSegment(
+    id: 'w6',
+    roomId: _roomId,
+    startPoint: Point2D(x: 0, y: 4000),
+    endPoint: Point2D(x: 0, y: 0),
+  ),
+];
 
 // A rectangle whose bottom edge is split into two collinear walls — the exact
 // shape produced when a smaller room is attached (ADR-003). It is still
 // geometrically rectangular, so the Dimensions group must show.
 List<WallSegment> _splitRectWalls() => const [
-      WallSegment(
-        id: 's1',
-        roomId: _roomId,
-        startPoint: Point2D(x: 0, y: 0),
-        endPoint: Point2D(x: 5000, y: 0),
-      ),
-      WallSegment(
-        id: 's2',
-        roomId: _roomId,
-        startPoint: Point2D(x: 5000, y: 0),
-        endPoint: Point2D(x: 5000, y: 4000),
-      ),
-      WallSegment(
-        id: 's3',
-        roomId: _roomId,
-        startPoint: Point2D(x: 5000, y: 4000),
-        endPoint: Point2D(x: 2500, y: 4000),
-      ),
-      WallSegment(
-        id: 's4',
-        roomId: _roomId,
-        startPoint: Point2D(x: 2500, y: 4000),
-        endPoint: Point2D(x: 0, y: 4000),
-      ),
-      WallSegment(
-        id: 's5',
-        roomId: _roomId,
-        startPoint: Point2D(x: 0, y: 4000),
-        endPoint: Point2D(x: 0, y: 0),
-      ),
-    ];
+  WallSegment(
+    id: 's1',
+    roomId: _roomId,
+    startPoint: Point2D(x: 0, y: 0),
+    endPoint: Point2D(x: 5000, y: 0),
+  ),
+  WallSegment(
+    id: 's2',
+    roomId: _roomId,
+    startPoint: Point2D(x: 5000, y: 0),
+    endPoint: Point2D(x: 5000, y: 4000),
+  ),
+  WallSegment(
+    id: 's3',
+    roomId: _roomId,
+    startPoint: Point2D(x: 5000, y: 4000),
+    endPoint: Point2D(x: 2500, y: 4000),
+  ),
+  WallSegment(
+    id: 's4',
+    roomId: _roomId,
+    startPoint: Point2D(x: 2500, y: 4000),
+    endPoint: Point2D(x: 0, y: 4000),
+  ),
+  WallSegment(
+    id: 's5',
+    roomId: _roomId,
+    startPoint: Point2D(x: 0, y: 4000),
+    endPoint: Point2D(x: 0, y: 0),
+  ),
+];
 
 // ── Widget builder ────────────────────────────────────────────────────────────
 
 Widget _build(EditorState initial) {
   return ProviderScope(
     overrides: [
-      editorStateProvider.overrideWith(
-        () => _StubEditorNotifier(initial),
-      ),
+      editorStateProvider.overrideWith(() => _StubEditorNotifier(initial)),
       // Real service so RD-5 can exercise a genuine undo.
       undoRedoProvider.overrideWith((_) => UndoRedoService()),
       roomHeatDemandProvider.overrideWith((ref, _) => double.nan),
@@ -241,17 +239,13 @@ Widget _build(EditorState initial) {
       theme: AppTheme.light(),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: const [Locale('en')],
-      home: const Scaffold(
-        body: RoomProperties(roomId: _roomId),
-      ),
+      home: const Scaffold(body: RoomProperties(roomId: _roomId)),
     ),
   );
 }
 
 ProviderContainer _containerOf(WidgetTester tester) =>
-    ProviderScope.containerOf(
-      tester.element(find.byType(RoomProperties)),
-    );
+    ProviderScope.containerOf(tester.element(find.byType(RoomProperties)));
 
 ({double minX, double minY, double maxX, double maxY}) _bbox(
   List<Point2D> pts,
@@ -305,10 +299,7 @@ void main() {
       );
       await tester.pump();
 
-      await tester.enterText(
-        find.byKey(const Key('roomWidthField')),
-        '600',
-      );
+      await tester.enterText(find.byKey(const Key('roomWidthField')), '600');
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pump();
 
@@ -349,18 +340,12 @@ void main() {
       );
       await tester.pump();
 
-      await tester.enterText(
-        find.byKey(const Key('roomWidthField')),
-        '5',
-      );
+      await tester.enterText(find.byKey(const Key('roomWidthField')), '5');
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pump();
 
       // Toast shown.
-      expect(
-        find.text('Room too small (min 10×10 cm)'),
-        findsOneWidget,
-      );
+      expect(find.text('Room too small (min 10×10 cm)'), findsOneWidget);
 
       // Field reverted to the current value.
       final widthField = tester.widget<TextField>(
@@ -372,33 +357,29 @@ void main() {
       final state = _containerOf(tester).read(editorStateProvider);
       final room = state.rooms.firstWhere((r) => r.id == _roomId);
       expect(_bbox(room.polygon).maxX, 5000);
-      final undoRedo =
-          _containerOf(tester).read(undoRedoProvider);
+      final undoRedo = _containerOf(tester).read(undoRedoProvider);
       expect(undoRedo.canUndo, isFalse);
     },
   );
 
   // RD-6 ──────────────────────────────────────────────────────────────────────
 
-  testWidgets(
-    'RD-6: fields show inner-clear dimensions for thick walls',
-    (tester) async {
-      await sized(tester);
-      await tester.pumpWidget(
-        _build(
-          EditorState(rooms: const [_rectRoom], walls: _thickRectWalls()),
-        ),
-      );
-      await tester.pump();
+  testWidgets('RD-6: fields show inner-clear dimensions for thick walls', (
+    tester,
+  ) async {
+    await sized(tester);
+    await tester.pumpWidget(
+      _build(EditorState(rooms: const [_rectRoom], walls: _thickRectWalls())),
+    );
+    await tester.pump();
 
-      // Centerline 5000×4000 minus 240 mm wall → inner 4760×3760 mm,
-      // shown as 476 × 376 cm (not the 500 × 400 centerline figures).
-      expect(find.text('476'), findsOneWidget);
-      expect(find.text('376'), findsOneWidget);
-      expect(find.text('500'), findsNothing);
-      expect(find.text('400'), findsNothing);
-    },
-  );
+    // Centerline 5000×4000 minus 240 mm wall → inner 4760×3760 mm,
+    // shown as 476 × 376 cm (not the 500 × 400 centerline figures).
+    expect(find.text('476'), findsOneWidget);
+    expect(find.text('376'), findsOneWidget);
+    expect(find.text('500'), findsNothing);
+    expect(find.text('400'), findsNothing);
+  });
 
   // RD-7 ──────────────────────────────────────────────────────────────────────
 
@@ -407,18 +388,13 @@ void main() {
     (tester) async {
       await sized(tester);
       await tester.pumpWidget(
-        _build(
-          EditorState(rooms: const [_rectRoom], walls: _thickRectWalls()),
-        ),
+        _build(EditorState(rooms: const [_rectRoom], walls: _thickRectWalls())),
       );
       await tester.pump();
 
       // Type a new inner width of 500 cm (5000 mm). With a 240 mm wall
       // inset the centerline must become 5240 mm, top-left anchored.
-      await tester.enterText(
-        find.byKey(const Key('roomWidthField')),
-        '500',
-      );
+      await tester.enterText(find.byKey(const Key('roomWidthField')), '500');
       await tester.testTextInput.receiveAction(TextInputAction.done);
       await tester.pump();
 
@@ -433,22 +409,19 @@ void main() {
 
   // RD-4 ──────────────────────────────────────────────────────────────────────
 
-  testWidgets(
-    'RD-4: a non-rectangular room hides the Dimensions group',
-    (tester) async {
-      await sized(tester);
-      await tester.pumpWidget(
-        _build(
-          EditorState(rooms: const [_rectRoom], walls: _nonRectWalls()),
-        ),
-      );
-      await tester.pump();
+  testWidgets('RD-4: a non-rectangular room hides the Dimensions group', (
+    tester,
+  ) async {
+    await sized(tester);
+    await tester.pumpWidget(
+      _build(EditorState(rooms: const [_rectRoom], walls: _nonRectWalls())),
+    );
+    await tester.pump();
 
-      expect(find.text('Dimensions'), findsNothing);
-      expect(find.byKey(const Key('roomWidthField')), findsNothing);
-      expect(find.byKey(const Key('roomHeightField')), findsNothing);
-    },
-  );
+    expect(find.text('Dimensions'), findsNothing);
+    expect(find.byKey(const Key('roomWidthField')), findsNothing);
+    expect(find.byKey(const Key('roomHeightField')), findsNothing);
+  });
 
   // RD-8 ──────────────────────────────────────────────────────────────────────
 
@@ -458,9 +431,7 @@ void main() {
     (tester) async {
       await sized(tester);
       await tester.pumpWidget(
-        _build(
-          EditorState(rooms: const [_rectRoom], walls: _splitRectWalls()),
-        ),
+        _build(EditorState(rooms: const [_rectRoom], walls: _splitRectWalls())),
       );
       await tester.pump();
 
@@ -471,49 +442,45 @@ void main() {
 
   // RD-5 ──────────────────────────────────────────────────────────────────────
 
-  testWidgets(
-    'RD-5: one undo reverts a resize as a single command',
-    (tester) async {
-      await sized(tester);
-      await tester.pumpWidget(
-        _build(EditorState(rooms: const [_rectRoom], walls: _rectWalls())),
-      );
-      await tester.pump();
+  testWidgets('RD-5: one undo reverts a resize as a single command', (
+    tester,
+  ) async {
+    await sized(tester);
+    await tester.pumpWidget(
+      _build(EditorState(rooms: const [_rectRoom], walls: _rectWalls())),
+    );
+    await tester.pump();
 
-      await tester.enterText(
-        find.byKey(const Key('roomWidthField')),
-        '600',
-      );
-      await tester.testTextInput.receiveAction(TextInputAction.done);
-      await tester.pump();
+    await tester.enterText(find.byKey(const Key('roomWidthField')), '600');
+    await tester.testTextInput.receiveAction(TextInputAction.done);
+    await tester.pump();
 
-      final container = _containerOf(tester);
-      expect(
-        _bbox(
-          container
-              .read(editorStateProvider)
-              .rooms
-              .firstWhere((r) => r.id == _roomId)
-              .polygon,
-        ).maxX,
-        6000,
-      );
+    final container = _containerOf(tester);
+    expect(
+      _bbox(
+        container
+            .read(editorStateProvider)
+            .rooms
+            .firstWhere((r) => r.id == _roomId)
+            .polygon,
+      ).maxX,
+      6000,
+    );
 
-      // Single Ctrl+Z.
-      final undoRedo = container.read(undoRedoProvider);
-      expect(undoRedo.canUndo, isTrue);
-      undoRedo.undo();
-      await tester.pump();
+    // Single Ctrl+Z.
+    final undoRedo = container.read(undoRedoProvider);
+    expect(undoRedo.canUndo, isTrue);
+    undoRedo.undo();
+    await tester.pump();
 
-      final reverted = container.read(editorStateProvider);
-      final room = reverted.rooms.firstWhere((r) => r.id == _roomId);
-      expect(_bbox(room.polygon).maxX, 5000);
-      final wallPts = reverted.walls
-          .where((w) => w.roomId == _roomId)
-          .expand((w) => [w.startPoint, w.endPoint])
-          .toList();
-      expect(_bbox(wallPts).maxX, 5000);
-      expect(undoRedo.canUndo, isFalse);
-    },
-  );
+    final reverted = container.read(editorStateProvider);
+    final room = reverted.rooms.firstWhere((r) => r.id == _roomId);
+    expect(_bbox(room.polygon).maxX, 5000);
+    final wallPts = reverted.walls
+        .where((w) => w.roomId == _roomId)
+        .expand((w) => [w.startPoint, w.endPoint])
+        .toList();
+    expect(_bbox(wallPts).maxX, 5000);
+    expect(undoRedo.canUndo, isFalse);
+  });
 }

@@ -66,9 +66,9 @@ ProviderContainer _buildContainer(
 }
 
 Future<List<$db.MaterialEntry>> _customRows($db.AppDatabase db) {
-  return (db.select(db.materialEntries)
-        ..where((t) => t.isBuiltIn.equals(false)))
-      .get();
+  return (db.select(
+    db.materialEntries,
+  )..where((t) => t.isBuiltIn.equals(false))).get();
 }
 
 Future<void> _insertConstruction(
@@ -76,12 +76,9 @@ Future<void> _insertConstruction(
   required String id,
   required String name,
 }) {
-  return db.into(db.wallConstructions).insert(
-        $db.WallConstructionsCompanion.insert(
-          id: id,
-          name: name,
-        ),
-      );
+  return db
+      .into(db.wallConstructions)
+      .insert($db.WallConstructionsCompanion.insert(id: id, name: name));
 }
 
 Future<void> _insertLayer(
@@ -90,7 +87,9 @@ Future<void> _insertLayer(
   required String constructionId,
   required String materialId,
 }) {
-  return db.into(db.materialLayers).insert(
+  return db
+      .into(db.materialLayers)
+      .insert(
         $db.MaterialLayersCompanion.insert(
           id: id,
           constructionId: constructionId,
@@ -104,11 +103,10 @@ Future<void> _insertLayer(
       );
 }
 
-Future<void> _seedCustomRow(
-  $db.AppDatabase db,
-  MaterialEntry entry,
-) async {
-  await db.into(db.materialEntries).insertOnConflictUpdate(
+Future<void> _seedCustomRow($db.AppDatabase db, MaterialEntry entry) async {
+  await db
+      .into(db.materialEntries)
+      .insertOnConflictUpdate(
         $db.MaterialEntriesCompanion(
           id: Value(entry.id),
           name: Value(entry.name),
@@ -122,11 +120,8 @@ Future<void> _seedCustomRow(
       );
 }
 
-String _defaultPathFor(Directory docsDir) => p.join(
-      docsDir.path,
-      'HeatingPlanner',
-      'custom_materials.matlib.json',
-    );
+String _defaultPathFor(Directory docsDir) =>
+    p.join(docsDir.path, 'HeatingPlanner', 'custom_materials.matlib.json');
 
 void main() {
   late Directory tempDir;
@@ -155,15 +150,17 @@ void main() {
       final container = _buildContainer(db, docsDir: docsDir);
       addTearDown(container.dispose);
 
-      final service =
-          container.read(customMaterialLibraryServiceProvider);
+      final service = container.read(customMaterialLibraryServiceProvider);
 
       final libraryPath = '${tempDir.path}/library.json';
       await service.setLibraryPath(libraryPath);
 
       final created = await service.create(_sampleEntry(id: 'placeholder'));
-      expect(created.id, isNot('placeholder'),
-          reason: 'create() must mint a fresh UUID');
+      expect(
+        created.id,
+        isNot('placeholder'),
+        reason: 'create() must mint a fresh UUID',
+      );
       expect(created.isBuiltIn, isFalse);
 
       // File now contains exactly one entry with the new id.
@@ -176,9 +173,9 @@ void main() {
 
       // Drop the SQLite mirror to prove the sync pass repopulates from the
       // file.
-      await (db.delete(db.materialEntries)
-            ..where((t) => t.isBuiltIn.equals(false)))
-          .go();
+      await (db.delete(
+        db.materialEntries,
+      )..where((t) => t.isBuiltIn.equals(false))).go();
       expect(await _customRows(db), isEmpty);
 
       await service.reloadFromFile();
@@ -193,93 +190,85 @@ void main() {
 
   // ── Sync pass replaces previous custom set ─────────────────────────────
 
-  test(
-    'changing the library path replaces the previous custom set',
-    () async {
-      final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
-      addTearDown(db.close);
-      final container = _buildContainer(db, docsDir: docsDir);
-      addTearDown(container.dispose);
+  test('changing the library path replaces the previous custom set', () async {
+    final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final container = _buildContainer(db, docsDir: docsDir);
+    addTearDown(container.dispose);
 
-      final service =
-          container.read(customMaterialLibraryServiceProvider);
+    final service = container.read(customMaterialLibraryServiceProvider);
 
-      final pathA = '${tempDir.path}/lib-a.json';
-      await File(pathA).writeAsString(jsonEncode({
+    final pathA = '${tempDir.path}/lib-a.json';
+    await File(pathA).writeAsString(
+      jsonEncode({
         'version': '1.1',
         'materials': [
-          _sampleEntry(id: 'a-1', name: 'A-One').toJson()
-            ..remove('isBuiltIn'),
-          _sampleEntry(id: 'a-2', name: 'A-Two').toJson()
-            ..remove('isBuiltIn'),
+          _sampleEntry(id: 'a-1', name: 'A-One').toJson()..remove('isBuiltIn'),
+          _sampleEntry(id: 'a-2', name: 'A-Two').toJson()..remove('isBuiltIn'),
         ],
-      }));
-      await service.setLibraryPath(pathA);
+      }),
+    );
+    await service.setLibraryPath(pathA);
 
-      var rows = await _customRows(db);
-      expect(rows.map((r) => r.id).toSet(), {'a-1', 'a-2'});
+    var rows = await _customRows(db);
+    expect(rows.map((r) => r.id).toSet(), {'a-1', 'a-2'});
 
-      final pathB = '${tempDir.path}/lib-b.json';
-      await File(pathB).writeAsString(jsonEncode({
+    final pathB = '${tempDir.path}/lib-b.json';
+    await File(pathB).writeAsString(
+      jsonEncode({
         'version': '1.1',
         'materials': [
-          _sampleEntry(id: 'b-1', name: 'B-One').toJson()
-            ..remove('isBuiltIn'),
+          _sampleEntry(id: 'b-1', name: 'B-One').toJson()..remove('isBuiltIn'),
         ],
-      }));
-      await service.setLibraryPath(pathB);
+      }),
+    );
+    await service.setLibraryPath(pathB);
 
-      rows = await _customRows(db);
-      expect(rows.map((r) => r.id).toSet(), {'b-1'},
-          reason:
-              'previous custom entries must be removed when the path changes');
-    },
-  );
+    rows = await _customRows(db);
+    expect(
+      rows.map((r) => r.id).toSet(),
+      {'b-1'},
+      reason: 'previous custom entries must be removed when the path changes',
+    );
+  });
 
   // ── Malformed JSON does not throw ──────────────────────────────────────
 
-  test(
-    'malformed JSON leaves the custom set empty and does not throw '
-    '(Rule 4.5)',
-    () async {
-      final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
-      addTearDown(db.close);
-      final container = _buildContainer(db, docsDir: docsDir);
-      addTearDown(container.dispose);
+  test('malformed JSON leaves the custom set empty and does not throw '
+      '(Rule 4.5)', () async {
+    final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final container = _buildContainer(db, docsDir: docsDir);
+    addTearDown(container.dispose);
 
-      final service =
-          container.read(customMaterialLibraryServiceProvider);
+    final service = container.read(customMaterialLibraryServiceProvider);
 
-      // Pre-seed a custom row to prove the sync pass still clears it.
-      await _seedCustomRow(db, _sampleEntry(id: 'pre-existing'));
-      expect(await _customRows(db), hasLength(1));
+    // Pre-seed a custom row to prove the sync pass still clears it.
+    await _seedCustomRow(db, _sampleEntry(id: 'pre-existing'));
+    expect(await _customRows(db), hasLength(1));
 
-      final brokenPath = '${tempDir.path}/broken.json';
-      await File(brokenPath)
-          .writeAsString('this is not valid JSON at all {');
+    final brokenPath = '${tempDir.path}/broken.json';
+    await File(brokenPath).writeAsString('this is not valid JSON at all {');
 
-      await expectLater(service.setLibraryPath(brokenPath), completes);
+    await expectLater(service.setLibraryPath(brokenPath), completes);
 
-      expect(await _customRows(db), isEmpty);
-    },
-  );
+    expect(await _customRows(db), isEmpty);
+  });
 
   // ── ADR-022 Rule 4: legacy "1.0" file migration ────────────────────────
 
-  test(
-    'legacy "1.0" library file with category + subcategory loads and '
-    'migrates to categoryPath = [category, subcategory]',
-    () async {
-      final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
-      addTearDown(db.close);
-      final container = _buildContainer(db, docsDir: docsDir);
-      addTearDown(container.dispose);
+  test('legacy "1.0" library file with category + subcategory loads and '
+      'migrates to categoryPath = [category, subcategory]', () async {
+    final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final container = _buildContainer(db, docsDir: docsDir);
+    addTearDown(container.dispose);
 
-      final service =
-          container.read(customMaterialLibraryServiceProvider);
+    final service = container.read(customMaterialLibraryServiceProvider);
 
-      final legacyPath = '${tempDir.path}/legacy-1-0.json';
-      await File(legacyPath).writeAsString(jsonEncode({
+    final legacyPath = '${tempDir.path}/legacy-1-0.json';
+    await File(legacyPath).writeAsString(
+      jsonEncode({
         'version': '1.0',
         'materials': [
           {
@@ -301,58 +290,66 @@ void main() {
             'specificHeatDefault': 750,
           },
         ],
-      }));
+      }),
+    );
 
-      await service.setLibraryPath(legacyPath);
+    await service.setLibraryPath(legacyPath);
 
-      final rows = await _customRows(db);
-      expect(rows, hasLength(2));
-      final byId = {for (final r in rows) r.id: r};
-      expect(decodeCategoryPath(byId['legacy-1']!.categoryPath),
-          ['Insulation boards', 'Wood fibre']);
-      expect(decodeCategoryPath(byId['legacy-2']!.categoryPath), ['Glass']);
-    },
-  );
+    final rows = await _customRows(db);
+    expect(rows, hasLength(2));
+    final byId = {for (final r in rows) r.id: r};
+    expect(decodeCategoryPath(byId['legacy-1']!.categoryPath), [
+      'Insulation boards',
+      'Wood fibre',
+    ]);
+    expect(decodeCategoryPath(byId['legacy-2']!.categoryPath), ['Glass']);
+  });
 
   // ── Delete blocked when referenced ─────────────────────────────────────
 
-  test(
-    'delete blocked when a MaterialLayer references the entry; '
-    'DeleteBlocked includes the construction name list',
-    () async {
-      final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
-      addTearDown(db.close);
-      final container = _buildContainer(db, docsDir: docsDir);
-      addTearDown(container.dispose);
+  test('delete blocked when a MaterialLayer references the entry; '
+      'DeleteBlocked includes the construction name list', () async {
+    final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final container = _buildContainer(db, docsDir: docsDir);
+    addTearDown(container.dispose);
 
-      final service =
-          container.read(customMaterialLibraryServiceProvider);
+    final service = container.read(customMaterialLibraryServiceProvider);
 
-      final libraryPath = '${tempDir.path}/library.json';
-      await service.setLibraryPath(libraryPath);
-      final entry = await service.create(_sampleEntry());
+    final libraryPath = '${tempDir.path}/library.json';
+    await service.setLibraryPath(libraryPath);
+    final entry = await service.create(_sampleEntry());
 
-      await _insertConstruction(db,
-          id: 'wc-living', name: 'Living Room Wall');
-      await _insertConstruction(db,
-          id: 'wc-bath', name: 'Bathroom Wall');
-      await _insertLayer(db,
-          id: 'lay-1', constructionId: 'wc-living', materialId: entry.id);
-      await _insertLayer(db,
-          id: 'lay-2', constructionId: 'wc-living', materialId: entry.id);
-      await _insertLayer(db,
-          id: 'lay-3', constructionId: 'wc-bath', materialId: entry.id);
+    await _insertConstruction(db, id: 'wc-living', name: 'Living Room Wall');
+    await _insertConstruction(db, id: 'wc-bath', name: 'Bathroom Wall');
+    await _insertLayer(
+      db,
+      id: 'lay-1',
+      constructionId: 'wc-living',
+      materialId: entry.id,
+    );
+    await _insertLayer(
+      db,
+      id: 'lay-2',
+      constructionId: 'wc-living',
+      materialId: entry.id,
+    );
+    await _insertLayer(
+      db,
+      id: 'lay-3',
+      constructionId: 'wc-bath',
+      materialId: entry.id,
+    );
 
-      final result = await service.delete(entry.id);
+    final result = await service.delete(entry.id);
 
-      expect(result, isA<DeleteBlocked>());
-      final blocked = result as DeleteBlocked;
-      final names = blocked.usages.map((u) => u.constructionName).toSet();
-      expect(names, {'Living Room Wall', 'Bathroom Wall'});
-      // The row must still exist — block must not mutate SQLite.
-      expect(await _customRows(db), hasLength(1));
-    },
-  );
+    expect(result, isA<DeleteBlocked>());
+    final blocked = result as DeleteBlocked;
+    final names = blocked.usages.map((u) => u.constructionName).toSet();
+    expect(names, {'Living Room Wall', 'Bathroom Wall'});
+    // The row must still exist — block must not mutate SQLite.
+    expect(await _customRows(db), hasLength(1));
+  });
 
   // ── File-write failure leaves SQLite untouched ─────────────────────────
 
@@ -364,8 +361,7 @@ void main() {
       final container = _buildContainer(db, docsDir: docsDir);
       addTearDown(container.dispose);
 
-      final service =
-          container.read(customMaterialLibraryServiceProvider);
+      final service = container.read(customMaterialLibraryServiceProvider);
 
       // The library path is *under* a file rather than a directory —
       // any attempt to create the parent directory or write the file
@@ -388,89 +384,105 @@ void main() {
       } catch (e) {
         thrown = e;
       }
-      expect(thrown, isNotNull,
-          reason: 'create must rethrow when the JSON write fails');
-      expect(await _customRows(db), isEmpty,
-          reason: 'SQLite must stay empty when the file write fails');
+      expect(
+        thrown,
+        isNotNull,
+        reason: 'create must rethrow when the JSON write fails',
+      );
+      expect(
+        await _customRows(db),
+        isEmpty,
+        reason: 'SQLite must stay empty when the file write fails',
+      );
     },
   );
 
   // ── Rule 14: default file bootstrap on first launch ─────────────────────
 
-  test(
-    'first launch with no stored path creates the default file and loads '
-    'an empty custom set',
-    () async {
-      final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
-      addTearDown(db.close);
-      final container = _buildContainer(db, docsDir: docsDir);
-      addTearDown(container.dispose);
+  test('first launch with no stored path creates the default file and loads '
+      'an empty custom set', () async {
+    final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final container = _buildContainer(db, docsDir: docsDir);
+    addTearDown(container.dispose);
 
-      final service =
-          container.read(customMaterialLibraryServiceProvider);
+    final service = container.read(customMaterialLibraryServiceProvider);
 
-      // No prior path stored → initialise as on app launch.
-      await service.initializeOnStartup();
+    // No prior path stored → initialise as on app launch.
+    await service.initializeOnStartup();
 
-      final expectedPath = _defaultPathFor(docsDir);
-      expect(File(expectedPath).existsSync(), isTrue,
-          reason:
-              'service must bootstrap the default library file on first launch');
-      expect(await File(expectedPath).readAsString(),
-          '{"version":"1.1","materials":[]}');
-      expect(await _customRows(db), isEmpty,
-          reason: 'fresh skeleton has zero custom entries');
+    final expectedPath = _defaultPathFor(docsDir);
+    expect(
+      File(expectedPath).existsSync(),
+      isTrue,
+      reason: 'service must bootstrap the default library file on first launch',
+    );
+    expect(
+      await File(expectedPath).readAsString(),
+      '{"version":"1.1","materials":[]}',
+    );
+    expect(
+      await _customRows(db),
+      isEmpty,
+      reason: 'fresh skeleton has zero custom entries',
+    );
 
-      final resolved = await service.resolvedLibraryPath();
-      expect(resolved, equals(expectedPath),
-          reason:
-              'resolvedLibraryPath must return the Rule 14 default when no '
-              'override is set');
-    },
-  );
+    final resolved = await service.resolvedLibraryPath();
+    expect(
+      resolved,
+      equals(expectedPath),
+      reason:
+          'resolvedLibraryPath must return the Rule 14 default when no '
+          'override is set',
+    );
+  });
 
   // ── Rule 14: setLibraryPath(null) reverts to default ───────────────────
 
-  test(
-    'setLibraryPath(null) after an explicit user path reverts to the '
-    'default file',
-    () async {
-      final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
-      addTearDown(db.close);
-      final container = _buildContainer(db, docsDir: docsDir);
-      addTearDown(container.dispose);
+  test('setLibraryPath(null) after an explicit user path reverts to the '
+      'default file', () async {
+    final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(db.close);
+    final container = _buildContainer(db, docsDir: docsDir);
+    addTearDown(container.dispose);
 
-      final service =
-          container.read(customMaterialLibraryServiceProvider);
+    final service = container.read(customMaterialLibraryServiceProvider);
 
-      // Step 1 — point at a user-picked file containing one entry.
-      final userPath = '${tempDir.path}/user-picked.matlib.json';
-      await File(userPath).writeAsString(jsonEncode({
+    // Step 1 — point at a user-picked file containing one entry.
+    final userPath = '${tempDir.path}/user-picked.matlib.json';
+    await File(userPath).writeAsString(
+      jsonEncode({
         'version': '1.1',
         'materials': [
           _sampleEntry(id: 'user-1', name: 'From user file').toJson()
             ..remove('isBuiltIn'),
         ],
-      }));
-      await service.setLibraryPath(userPath);
+      }),
+    );
+    await service.setLibraryPath(userPath);
 
-      expect(
-        (await _customRows(db)).map((r) => r.id).toSet(),
-        {'user-1'},
-      );
+    expect((await _customRows(db)).map((r) => r.id).toSet(), {'user-1'});
 
-      // Step 2 — reset to default.
-      await service.setLibraryPath(null);
+    // Step 2 — reset to default.
+    await service.setLibraryPath(null);
 
-      final resolved = await service.resolvedLibraryPath();
-      expect(resolved, equals(_defaultPathFor(docsDir)));
-      expect(File(resolved).existsSync(), isTrue,
-          reason: 'default file must be bootstrapped on reset');
-      expect(await _customRows(db), isEmpty,
-          reason: 'the user-file entry must be gone after the reset');
-      // The user file on disk must NOT have been touched by the reset.
-      expect(File(userPath).existsSync(), isTrue,
-          reason: 'reset does not delete the user-picked file on disk');
-    },
-  );
+    final resolved = await service.resolvedLibraryPath();
+    expect(resolved, equals(_defaultPathFor(docsDir)));
+    expect(
+      File(resolved).existsSync(),
+      isTrue,
+      reason: 'default file must be bootstrapped on reset',
+    );
+    expect(
+      await _customRows(db),
+      isEmpty,
+      reason: 'the user-file entry must be gone after the reset',
+    );
+    // The user file on disk must NOT have been touched by the reset.
+    expect(
+      File(userPath).existsSync(),
+      isTrue,
+      reason: 'reset does not delete the user-picked file on disk',
+    );
+  });
 }

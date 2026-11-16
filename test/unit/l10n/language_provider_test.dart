@@ -19,91 +19,57 @@ void main() {
     return ProviderContainer();
   }
 
-  test(
-    'defaults to en when no stored value',
-    () async {
-      final container = buildContainer();
-      addTearDown(container.dispose);
+  test('defaults to en when no stored value', () async {
+    final container = buildContainer();
+    addTearDown(container.dispose);
 
-      final code = await container
-          .read(languageCodeProvider.future);
-      expect(code, 'en');
-    },
-  );
+    final code = await container.read(languageCodeProvider.future);
+    expect(code, 'en');
+  });
 
-  test(
-    'set de persists and subsequent reads return de',
-    () async {
-      final container = buildContainer();
-      addTearDown(container.dispose);
+  test('set de persists and subsequent reads return de', () async {
+    final container = buildContainer();
+    addTearDown(container.dispose);
 
-      await container
-          .read(languageCodeProvider.notifier)
-          .set('de');
+    await container.read(languageCodeProvider.notifier).set('de');
 
-      final code = await container
-          .read(languageCodeProvider.future);
-      expect(code, 'de');
+    final code = await container.read(languageCodeProvider.future);
+    expect(code, 'de');
 
-      // Verify persistence via a fresh AppPreferences
-      // read.
-      final stored =
-          await AppPreferences().getLanguageCode();
-      expect(stored, 'de');
-    },
-  );
+    // Verify persistence via a fresh AppPreferences
+    // read.
+    final stored = await AppPreferences().getLanguageCode();
+    expect(stored, 'de');
+  });
 
-  test(
-    'set en after de switches back correctly',
-    () async {
-      final container = buildContainer();
-      addTearDown(container.dispose);
+  test('set en after de switches back correctly', () async {
+    final container = buildContainer();
+    addTearDown(container.dispose);
 
-      await container
-          .read(languageCodeProvider.notifier)
-          .set('de');
-      expect(
-        await container
-            .read(languageCodeProvider.future),
-        'de',
-      );
+    await container.read(languageCodeProvider.notifier).set('de');
+    expect(await container.read(languageCodeProvider.future), 'de');
 
-      await container
-          .read(languageCodeProvider.notifier)
-          .set('en');
-      expect(
-        await container
-            .read(languageCodeProvider.future),
-        'en',
-      );
+    await container.read(languageCodeProvider.notifier).set('en');
+    expect(await container.read(languageCodeProvider.future), 'en');
 
-      final stored =
-          await AppPreferences().getLanguageCode();
-      expect(stored, 'en');
-    },
-  );
+    final stored = await AppPreferences().getLanguageCode();
+    expect(stored, 'en');
+  });
 
-  test(
-    'unsupported code is stored as-is — no validation',
-    () async {
-      // LanguageCodeNotifier does NOT validate language
-      // codes. Validation happens at the MaterialApp
-      // level via supportedLocales. The notifier blindly
-      // persists whatever string is passed in.
-      final container = buildContainer();
-      addTearDown(container.dispose);
+  test('unsupported code is stored as-is — no validation', () async {
+    // LanguageCodeNotifier does NOT validate language
+    // codes. Validation happens at the MaterialApp
+    // level via supportedLocales. The notifier blindly
+    // persists whatever string is passed in.
+    final container = buildContainer();
+    addTearDown(container.dispose);
 
-      await container
-          .read(languageCodeProvider.notifier)
-          .set('fr');
+    await container.read(languageCodeProvider.notifier).set('fr');
 
-      final code = await container
-          .read(languageCodeProvider.future);
-      expect(code, 'fr');
+    final code = await container.read(languageCodeProvider.future);
+    expect(code, 'fr');
 
-      final stored =
-          await AppPreferences().getLanguageCode();
-      expect(stored, 'fr');
-    },
-  );
+    final stored = await AppPreferences().getLanguageCode();
+    expect(stored, 'fr');
+  });
 }

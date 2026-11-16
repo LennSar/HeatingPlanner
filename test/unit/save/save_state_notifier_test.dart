@@ -31,8 +31,9 @@ class _MixinTestNotifier extends Notifier<void> with SaveStateMixin {
   void doReadOnly() {}
 }
 
-final _mixinTestProvider =
-    NotifierProvider<_MixinTestNotifier, void>(_MixinTestNotifier.new);
+final _mixinTestProvider = NotifierProvider<_MixinTestNotifier, void>(
+  _MixinTestNotifier.new,
+);
 
 // ── Database helpers ──────────────────────────────────────────────────────────
 
@@ -47,7 +48,9 @@ Future<void> insertTestProject(
   String id = 'proj-1',
 }) async {
   final now = DateTime.now();
-  await db.into(db.projects).insert(
+  await db
+      .into(db.projects)
+      .insert(
         $db.ProjectsCompanion.insert(
           id: id,
           name: 'Test Project',
@@ -63,8 +66,7 @@ void main() {
   // ── SaveState initial state ─────────────────────────────────────────────────
 
   group('SaveState initial state', () {
-    test(
-        'starts with isDirty = false, isAutoExporting = false, '
+    test('starts with isDirty = false, isAutoExporting = false, '
         'lastExportPath = null', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);
@@ -89,8 +91,7 @@ void main() {
       expect(container.read(saveStateProvider).isDirty, isTrue);
     });
 
-    test(
-        'already dirty: isDirty stays true and no second state emission', () {
+    test('already dirty: isDirty stays true and no second state emission', () {
       final container = ProviderContainer();
       addTearDown(container.dispose);
 
@@ -108,8 +109,7 @@ void main() {
       expect(emitCount, equals(1));
     });
 
-    test(
-        'does NOT write the file even when lastExportPath is set '
+    test('does NOT write the file even when lastExportPath is set '
         '(explicit-save model)', () async {
       final db = buildTestDatabase();
       addTearDown(db.close);
@@ -182,7 +182,8 @@ void main() {
       );
       addTearDown(container.dispose);
       container.read(currentProjectIdProvider.notifier).set('proj-1');
-      container.read(saveStateProvider.notifier)
+      container
+          .read(saveStateProvider.notifier)
           .markOpenedFrom('${dir.path}/test.hsp');
 
       final states = <SaveState>[];
@@ -202,38 +203,38 @@ void main() {
       expect(container.read(saveStateProvider).isAutoExporting, isFalse);
     });
 
-    test('after successful export: isDirty = false, lastExportedAt is set',
-        () async {
-      final db = buildTestDatabase();
-      addTearDown(db.close);
-      await insertTestProject(db, id: 'proj-1');
+    test(
+      'after successful export: isDirty = false, lastExportedAt is set',
+      () async {
+        final db = buildTestDatabase();
+        addTearDown(db.close);
+        await insertTestProject(db, id: 'proj-1');
 
-      final dir = await Directory.systemTemp.createTemp('hsp_test_');
-      addTearDown(() => dir.delete(recursive: true));
-      final path = '${dir.path}/test.hsp';
+        final dir = await Directory.systemTemp.createTemp('hsp_test_');
+        addTearDown(() => dir.delete(recursive: true));
+        final path = '${dir.path}/test.hsp';
 
-      final container = ProviderContainer(
-        overrides: [$db.appDatabaseProvider.overrideWithValue(db)],
-      );
-      addTearDown(container.dispose);
-      container.read(currentProjectIdProvider.notifier).set('proj-1');
+        final container = ProviderContainer(
+          overrides: [$db.appDatabaseProvider.overrideWithValue(db)],
+        );
+        addTearDown(container.dispose);
+        container.read(currentProjectIdProvider.notifier).set('proj-1');
 
-      // Set state: dirty with a known export path.
-      // ignore: invalid_use_of_protected_member
-      container.read(saveStateProvider.notifier).state =
-          container.read(saveStateProvider).copyWith(
-        isDirty: true,
-        lastExportPath: path,
-      );
+        // Set state: dirty with a known export path.
+        // ignore: invalid_use_of_protected_member
+        container.read(saveStateProvider.notifier).state = container
+            .read(saveStateProvider)
+            .copyWith(isDirty: true, lastExportPath: path);
 
-      await container.read(saveStateProvider.notifier).exportNow();
+        await container.read(saveStateProvider.notifier).exportNow();
 
-      final state = container.read(saveStateProvider);
-      expect(state.isDirty, isFalse);
-      expect(state.lastExportedAt, isNotNull);
-      expect(state.isAutoExporting, isFalse);
-      expect(File(path).existsSync(), isTrue);
-    });
+        final state = container.read(saveStateProvider);
+        expect(state.isDirty, isFalse);
+        expect(state.lastExportedAt, isNotNull);
+        expect(state.isAutoExporting, isFalse);
+        expect(File(path).existsSync(), isTrue);
+      },
+    );
 
     test('does nothing when no project is open', () async {
       final db = buildTestDatabase();
@@ -246,11 +247,9 @@ void main() {
       // currentProjectId stays '' (no project open).
 
       // ignore: invalid_use_of_protected_member
-      container.read(saveStateProvider.notifier).state =
-          container.read(saveStateProvider).copyWith(
-        isDirty: true,
-        lastExportPath: '/tmp/irrelevant.hsp',
-      );
+      container.read(saveStateProvider.notifier).state = container
+          .read(saveStateProvider)
+          .copyWith(isDirty: true, lastExportPath: '/tmp/irrelevant.hsp');
 
       await container.read(saveStateProvider.notifier).exportNow();
 
@@ -259,46 +258,47 @@ void main() {
       expect(state.isAutoExporting, isFalse);
     });
 
-    test('on write failure: isDirty stays true, isAutoExporting = false',
-        () async {
-      // Project id set but no matching row → buildSnapshot throws.
-      final db = buildTestDatabase();
-      addTearDown(db.close);
+    test(
+      'on write failure: isDirty stays true, isAutoExporting = false',
+      () async {
+        // Project id set but no matching row → buildSnapshot throws.
+        final db = buildTestDatabase();
+        addTearDown(db.close);
 
-      final container = ProviderContainer(
-        overrides: [$db.appDatabaseProvider.overrideWithValue(db)],
-      );
-      addTearDown(container.dispose);
-      container.read(currentProjectIdProvider.notifier).set('missing');
+        final container = ProviderContainer(
+          overrides: [$db.appDatabaseProvider.overrideWithValue(db)],
+        );
+        addTearDown(container.dispose);
+        container.read(currentProjectIdProvider.notifier).set('missing');
 
-      // ignore: invalid_use_of_protected_member
-      container.read(saveStateProvider.notifier).state =
-          container.read(saveStateProvider).copyWith(
-        isDirty: true,
-        lastExportPath: '/tmp/irrelevant.hsp',
-      );
+        // ignore: invalid_use_of_protected_member
+        container.read(saveStateProvider.notifier).state = container
+            .read(saveStateProvider)
+            .copyWith(isDirty: true, lastExportPath: '/tmp/irrelevant.hsp');
 
-      await container.read(saveStateProvider.notifier).exportNow();
+        await container.read(saveStateProvider.notifier).exportNow();
 
-      final state = container.read(saveStateProvider);
-      expect(state.isDirty, isTrue);
-      expect(state.isAutoExporting, isFalse);
-    });
+        final state = container.read(saveStateProvider);
+        expect(state.isDirty, isTrue);
+        expect(state.isAutoExporting, isFalse);
+      },
+    );
   });
 
   // ── SaveStateMixin ──────────────────────────────────────────────────────────
 
   group('SaveStateMixin', () {
     test(
-        'a repository using SaveStateMixin calls markDirty() after a write',
-        () {
-      final container = ProviderContainer();
-      addTearDown(container.dispose);
+      'a repository using SaveStateMixin calls markDirty() after a write',
+      () {
+        final container = ProviderContainer();
+        addTearDown(container.dispose);
 
-      container.read(_mixinTestProvider.notifier).doWrite();
+        container.read(_mixinTestProvider.notifier).doWrite();
 
-      expect(container.read(saveStateProvider).isDirty, isTrue);
-    });
+        expect(container.read(saveStateProvider).isDirty, isTrue);
+      },
+    );
 
     test('a read-only method does NOT call markDirty()', () {
       final container = ProviderContainer();
@@ -320,18 +320,22 @@ void main() {
           InMemorySharedPreferencesAsync.empty();
     });
 
-    test('lastOpenedProjectId round-trip: write → read returns same value',
-        () async {
-      final prefs = AppPreferences();
-      await prefs.setLastOpenedProjectId('abc-123');
-      expect(await prefs.getLastOpenedProjectId(), equals('abc-123'));
-    });
+    test(
+      'lastOpenedProjectId round-trip: write → read returns same value',
+      () async {
+        final prefs = AppPreferences();
+        await prefs.setLastOpenedProjectId('abc-123');
+        expect(await prefs.getLastOpenedProjectId(), equals('abc-123'));
+      },
+    );
 
-    test('lastOpenedProjectId returns null when no value has been written',
-        () async {
-      final prefs = AppPreferences();
-      expect(await prefs.getLastOpenedProjectId(), isNull);
-    });
+    test(
+      'lastOpenedProjectId returns null when no value has been written',
+      () async {
+        final prefs = AppPreferences();
+        expect(await prefs.getLastOpenedProjectId(), isNull);
+      },
+    );
 
     test('canvasZoom round-trips correctly', () async {
       final prefs = AppPreferences();

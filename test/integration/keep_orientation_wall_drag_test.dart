@@ -39,10 +39,8 @@ class _FixedCanvasController extends CanvasController {
   static const double _panY = 100.0;
 
   @override
-  CanvasState build() => const CanvasState(
-        zoom: _zoom,
-        panOffset: Offset(_panX, _panY),
-      );
+  CanvasState build() =>
+      const CanvasState(zoom: _zoom, panOffset: Offset(_panX, _panY));
 
   @override
   void setInitialView(double zoom, Offset panOffset) {
@@ -58,209 +56,219 @@ Future<void> _pump(WidgetTester tester, [int count = 6]) async {
 
 void main() {
   group('ADR-027 keep-orientation wall-body drag (end to end)', () {
-    testWidgets(
-      'Shift + mid-handle diagonal drag keeps the room rectangular',
-      (tester) async {
-        // ── Viewport ─────────────────────────────────────────────────────
-        tester.view.physicalSize = const Size(1400, 1200);
-        tester.view.devicePixelRatio = 1.0;
-        addTearDown(() {
-          tester.view.resetPhysicalSize();
-          tester.view.resetDevicePixelRatio();
-        });
+    testWidgets('Shift + mid-handle diagonal drag keeps the room rectangular', (
+      tester,
+    ) async {
+      // ── Viewport ─────────────────────────────────────────────────────
+      tester.view.physicalSize = const Size(1400, 1200);
+      tester.view.devicePixelRatio = 1.0;
+      addTearDown(() {
+        tester.view.resetPhysicalSize();
+        tester.view.resetDevicePixelRatio();
+      });
 
-        // The selected-wall properties panel (WallProperties) lays out in a
-        // fixed 247 px column and overflows its inner Row by a few px in the
-        // test environment. That is a pre-existing panel layout quirk
-        // unrelated to this feature; ignore only that specific benign
-        // overflow so it does not mask the real assertions below.
-        final originalOnError = FlutterError.onError;
-        FlutterError.onError = (details) {
-          if (details.exceptionAsString().contains('A RenderFlex overflowed')) {
-            return;
-          }
-          originalOnError?.call(details);
-        };
-        addTearDown(() => FlutterError.onError = originalOnError);
-
-        SharedPreferencesAsyncPlatform.instance =
-            InMemorySharedPreferencesAsync.empty();
-
-        // ── Database: bare project + floor ───────────────────────────────
-        final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
-        addTearDown(db.close);
-
-        const projectId = 'ko-proj-1';
-        const floorId = 'ko-floor-1';
-        final now = DateTime(2025, 1, 1);
-
-        await db.into(db.projects).insert(
-              $db.ProjectsCompanion.insert(
-                id: projectId,
-                name: 'Keep-Orientation Test',
-                createdAt: now,
-                modifiedAt: now,
-                designOutdoorTempC: const Value(-10.0),
-                defaultIndoorTempC: const Value(20.0),
-              ),
-            );
-        await db.into(db.floors).insert(
-              $db.FloorsCompanion.insert(
-                id: floorId,
-                projectId: projectId,
-                name: 'Ground Floor',
-              ),
-            );
-
-        final container = ProviderContainer(
-          overrides: [
-            $db.appDatabaseProvider.overrideWithValue(db),
-            canvasControllerProvider
-                .overrideWith(_FixedCanvasController.new),
-          ],
-        );
-        addTearDown(container.dispose);
-
-        await tester.pumpWidget(
-          UncontrolledProviderScope(
-            container: container,
-            child: MaterialApp(
-              theme: AppTheme.light(),
-              localizationsDelegates:
-                  AppLocalizations.localizationsDelegates,
-              supportedLocales: const [Locale('en')],
-              home: const EditorScreen(projectId: projectId),
-            ),
-          ),
-        );
-        await _pump(tester, 10);
-
-        expect(find.byType(EditorScreen), findsOneWidget);
-
-        // world (x, y) → global tap position under the fixed transform.
-        final canvasTopLeft =
-            tester.getTopLeft(find.byType(FloorPlanCanvas));
-        Offset w2g(double wx, double wy) =>
-            canvasTopLeft +
-            Offset(
-              wx * _FixedCanvasController._zoom +
-                  _FixedCanvasController._panX,
-              wy * _FixedCanvasController._zoom +
-                  _FixedCanvasController._panY,
-            );
-
-        // ── Draw a 4 000 × 3 000 rectangle ───────────────────────────────
-        await tester.tap(find.byTooltip('Wall'));
-        await tester.pump();
-
-        for (final pt in [
-          [0.0, 0.0],
-          [4000.0, 0.0],
-          [4000.0, 3000.0],
-          [0.0, 3000.0],
-          [0.0, 0.0], // closing tap → room detection
-        ]) {
-          await tester.tapAt(w2g(pt[0], pt[1]));
-          await tester.pump();
+      // The selected-wall properties panel (WallProperties) lays out in a
+      // fixed 247 px column and overflows its inner Row by a few px in the
+      // test environment. That is a pre-existing panel layout quirk
+      // unrelated to this feature; ignore only that specific benign
+      // overflow so it does not mask the real assertions below.
+      final originalOnError = FlutterError.onError;
+      FlutterError.onError = (details) {
+        if (details.exceptionAsString().contains('A RenderFlex overflowed')) {
+          return;
         }
+        originalOnError?.call(details);
+      };
+      addTearDown(() => FlutterError.onError = originalOnError);
 
-        expect(find.text('New Room Detected'), findsOneWidget);
-        await tester.tap(find.text('Create'));
-        await _pump(tester, 5);
+      SharedPreferencesAsyncPlatform.instance =
+          InMemorySharedPreferencesAsync.empty();
 
-        final room = container.read(editorStateProvider).rooms.single;
+      // ── Database: bare project + floor ───────────────────────────────
+      final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db.close);
 
-        // Sanity: the freshly drawn room is the expected axis-aligned rect.
-        expect(
-          container
-              .read(editorStateProvider)
-              .walls
-              .where((w) => w.roomId == room.id),
-          hasLength(4),
-        );
+      const projectId = 'ko-proj-1';
+      const floorId = 'ko-floor-1';
+      final now = DateTime(2025, 1, 1);
 
-        // Clear the auto-selection from room creation.
-        container.read(selectedElementProvider.notifier).select(null);
+      await db
+          .into(db.projects)
+          .insert(
+            $db.ProjectsCompanion.insert(
+              id: projectId,
+              name: 'Keep-Orientation Test',
+              createdAt: now,
+              modifiedAt: now,
+              designOutdoorTempC: const Value(-10.0),
+              defaultIndoorTempC: const Value(20.0),
+            ),
+          );
+      await db
+          .into(db.floors)
+          .insert(
+            $db.FloorsCompanion.insert(
+              id: floorId,
+              projectId: projectId,
+              name: 'Ground Floor',
+            ),
+          );
+
+      final container = ProviderContainer(
+        overrides: [
+          $db.appDatabaseProvider.overrideWithValue(db),
+          canvasControllerProvider.overrideWith(_FixedCanvasController.new),
+        ],
+      );
+      addTearDown(container.dispose);
+
+      await tester.pumpWidget(
+        UncontrolledProviderScope(
+          container: container,
+          child: MaterialApp(
+            theme: AppTheme.light(),
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
+            supportedLocales: const [Locale('en')],
+            home: const EditorScreen(projectId: projectId),
+          ),
+        ),
+      );
+      await _pump(tester, 10);
+
+      expect(find.byType(EditorScreen), findsOneWidget);
+
+      // world (x, y) → global tap position under the fixed transform.
+      final canvasTopLeft = tester.getTopLeft(find.byType(FloorPlanCanvas));
+      Offset w2g(double wx, double wy) =>
+          canvasTopLeft +
+          Offset(
+            wx * _FixedCanvasController._zoom + _FixedCanvasController._panX,
+            wy * _FixedCanvasController._zoom + _FixedCanvasController._panY,
+          );
+
+      // ── Draw a 4 000 × 3 000 rectangle ───────────────────────────────
+      await tester.tap(find.byTooltip('Wall'));
+      await tester.pump();
+
+      for (final pt in [
+        [0.0, 0.0],
+        [4000.0, 0.0],
+        [4000.0, 3000.0],
+        [0.0, 3000.0],
+        [0.0, 0.0], // closing tap → room detection
+      ]) {
+        await tester.tapAt(w2g(pt[0], pt[1]));
         await tester.pump();
+      }
 
-        // ── Select tool, then select the top wall ────────────────────────
-        await tester.tap(find.byTooltip('Select'));
-        await tester.pump();
+      expect(find.text('New Room Detected'), findsOneWidget);
+      await tester.tap(find.text('Create'));
+      await _pump(tester, 5);
 
-        // Top wall midpoint is world (2000, 0); tapping it selects the wall.
-        await tester.tapAt(w2g(2000, 0));
-        await _pump(tester, 2);
+      final room = container.read(editorStateProvider).rooms.single;
 
-        final sel = container.read(selectedElementProvider);
-        expect(
-          sel?.type,
-          'wall',
-          reason: 'tapping the top edge must select a wall, not the room',
-        );
-
-        // ── Shift + drag the mid handle diagonally ───────────────────────
-        await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
-
-        // Grab the mid handle (world (2000, 0)) and drag by screen (100, 150)
-        // → world delta (1000, 1500): a deliberate +1000 mm sideways slip
-        // that must be ignored, plus a +1500 mm downward (perpendicular)
-        // move that should slide the top edge down while keeping it level.
-        final gesture = await tester.startGesture(w2g(2000, 0));
-        await tester.pump();
-        await gesture.moveBy(const Offset(40, 60));
-        await tester.pump();
-        await gesture.moveBy(const Offset(60, 90));
-        await tester.pump();
-        await gesture.up();
-        await _pump(tester, 3);
-
-        await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
-
-        // ── Assert: room is still an axis-aligned rectangle ──────────────
-        final movedWalls = container
+      // Sanity: the freshly drawn room is the expected axis-aligned rect.
+      expect(
+        container
             .read(editorStateProvider)
             .walls
-            .where((w) => w.roomId == room.id)
-            .toList();
-        expect(movedWalls, hasLength(4));
+            .where((w) => w.roomId == room.id),
+        hasLength(4),
+      );
 
-        // Every wall stayed axis-aligned (vertical or horizontal): no slant.
-        for (final w in movedWalls) {
-          final axisAligned =
-              (w.startPoint.x - w.endPoint.x).abs() < 1.0 ||
-                  (w.startPoint.y - w.endPoint.y).abs() < 1.0;
-          expect(axisAligned, isTrue,
-              reason: 'wall ${w.id} must remain axis-aligned, got '
-                  '${w.startPoint} → ${w.endPoint}');
-        }
+      // Clear the auto-selection from room creation.
+      container.read(selectedElementProvider.notifier).select(null);
+      await tester.pump();
 
-        final xs = <double>{};
-        final ys = <double>{};
-        for (final w in movedWalls) {
-          xs..add(w.startPoint.x)..add(w.endPoint.x);
-          ys..add(w.startPoint.y)..add(w.endPoint.y);
-        }
+      // ── Select tool, then select the top wall ────────────────────────
+      await tester.tap(find.byTooltip('Select'));
+      await tester.pump();
 
-        // The left/right edges kept x = 0 / 4000 — the sideways drag
-        // component was discarded (the bug would have shifted these,
-        // producing four distinct x-values and slanted side walls).
-        expect(xs, {0.0, 4000.0},
-            reason: 'the sideways drag must not move the side walls in x');
+      // Top wall midpoint is world (2000, 0); tapping it selects the wall.
+      await tester.tapAt(w2g(2000, 0));
+      await _pump(tester, 2);
 
-        // Exactly two horizontal levels, and the top edge actually moved
-        // down off y = 0 (the perpendicular component took effect).
-        expect(ys, hasLength(2));
-        expect(ys, contains(3000.0),
-            reason: 'the bottom edge must stay put');
-        final topY = ys.firstWhere((y) => y != 3000.0);
-        expect(topY, greaterThan(0.0),
-            reason: 'the top edge must have slid downward');
-        expect(topY, lessThan(3000.0));
+      final sel = container.read(selectedElementProvider);
+      expect(
+        sel?.type,
+        'wall',
+        reason: 'tapping the top edge must select a wall, not the room',
+      );
 
-        // ── Teardown ─────────────────────────────────────────────────────
-        await tester.pumpWidget(const SizedBox());
-        await tester.pump(const Duration(milliseconds: 500));
-      },
-    );
+      // ── Shift + drag the mid handle diagonally ───────────────────────
+      await tester.sendKeyDownEvent(LogicalKeyboardKey.shiftLeft);
+
+      // Grab the mid handle (world (2000, 0)) and drag by screen (100, 150)
+      // → world delta (1000, 1500): a deliberate +1000 mm sideways slip
+      // that must be ignored, plus a +1500 mm downward (perpendicular)
+      // move that should slide the top edge down while keeping it level.
+      final gesture = await tester.startGesture(w2g(2000, 0));
+      await tester.pump();
+      await gesture.moveBy(const Offset(40, 60));
+      await tester.pump();
+      await gesture.moveBy(const Offset(60, 90));
+      await tester.pump();
+      await gesture.up();
+      await _pump(tester, 3);
+
+      await tester.sendKeyUpEvent(LogicalKeyboardKey.shiftLeft);
+
+      // ── Assert: room is still an axis-aligned rectangle ──────────────
+      final movedWalls = container
+          .read(editorStateProvider)
+          .walls
+          .where((w) => w.roomId == room.id)
+          .toList();
+      expect(movedWalls, hasLength(4));
+
+      // Every wall stayed axis-aligned (vertical or horizontal): no slant.
+      for (final w in movedWalls) {
+        final axisAligned =
+            (w.startPoint.x - w.endPoint.x).abs() < 1.0 ||
+            (w.startPoint.y - w.endPoint.y).abs() < 1.0;
+        expect(
+          axisAligned,
+          isTrue,
+          reason:
+              'wall ${w.id} must remain axis-aligned, got '
+              '${w.startPoint} → ${w.endPoint}',
+        );
+      }
+
+      final xs = <double>{};
+      final ys = <double>{};
+      for (final w in movedWalls) {
+        xs
+          ..add(w.startPoint.x)
+          ..add(w.endPoint.x);
+        ys
+          ..add(w.startPoint.y)
+          ..add(w.endPoint.y);
+      }
+
+      // The left/right edges kept x = 0 / 4000 — the sideways drag
+      // component was discarded (the bug would have shifted these,
+      // producing four distinct x-values and slanted side walls).
+      expect(xs, {
+        0.0,
+        4000.0,
+      }, reason: 'the sideways drag must not move the side walls in x');
+
+      // Exactly two horizontal levels, and the top edge actually moved
+      // down off y = 0 (the perpendicular component took effect).
+      expect(ys, hasLength(2));
+      expect(ys, contains(3000.0), reason: 'the bottom edge must stay put');
+      final topY = ys.firstWhere((y) => y != 3000.0);
+      expect(
+        topY,
+        greaterThan(0.0),
+        reason: 'the top edge must have slid downward',
+      );
+      expect(topY, lessThan(3000.0));
+
+      // ── Teardown ─────────────────────────────────────────────────────
+      await tester.pumpWidget(const SizedBox());
+      await tester.pump(const Duration(milliseconds: 500));
+    });
   });
 }

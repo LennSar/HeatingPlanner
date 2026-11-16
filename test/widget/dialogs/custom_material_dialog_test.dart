@@ -56,8 +56,9 @@ Widget _build({
     overrides: [
       materialEntriesProvider.overrideWith((ref) => Stream.value(all)),
       customMaterialsProvider.overrideWith((ref) => Stream.value(customs)),
-      customMaterialLibraryServiceProvider
-          .overrideWith((ref) => _StubLibraryService(ref)),
+      customMaterialLibraryServiceProvider.overrideWith(
+        (ref) => _StubLibraryService(ref),
+      ),
     ],
     child: MaterialApp(
       theme: AppTheme.light(),
@@ -126,79 +127,75 @@ Future<void> _fillPath(WidgetTester tester) async {
 }
 
 void main() {
-  testWidgets(
-    'save is disabled until every required field is valid (name + '
-    'composed path + λ); density and specific heat are optional',
-    (tester) async {
-      await tester.pumpWidget(_build());
-      await _openDialog(tester);
+  testWidgets('save is disabled until every required field is valid (name + '
+      'composed path + λ); density and specific heat are optional', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_build());
+    await _openDialog(tester);
 
-      // Initially everything is empty → save disabled.
-      expect(_isSaveEnabled(tester), isFalse);
+    // Initially everything is empty → save disabled.
+    expect(_isSaveEnabled(tester), isFalse);
 
-      await tester.enterText(
-        find.byKey(const Key('custom-material-name')),
-        'Fresh material',
-      );
-      await tester.pump();
-      expect(_isSaveEnabled(tester), isFalse);
+    await tester.enterText(
+      find.byKey(const Key('custom-material-name')),
+      'Fresh material',
+    );
+    await tester.pump();
+    expect(_isSaveEnabled(tester), isFalse);
 
-      await _fillPath(tester);
-      expect(_isSaveEnabled(tester), isFalse);
+    await _fillPath(tester);
+    expect(_isSaveEnabled(tester), isFalse);
 
-      await tester.enterText(
-        find.byKey(const Key('custom-material-lambda')),
-        '0.07',
-      );
-      await tester.pump();
+    await tester.enterText(
+      find.byKey(const Key('custom-material-lambda')),
+      '0.07',
+    );
+    await tester.pump();
 
-      // Density and specific heat are optional — save is enabled now.
-      expect(_isSaveEnabled(tester), isTrue);
-    },
-  );
+    // Density and specific heat are optional — save is enabled now.
+    expect(_isSaveEnabled(tester), isTrue);
+  });
 
-  testWidgets(
-    'out-of-range density blocks save; in-range value re-enables it; '
-    'a typed 0 is treated as blank',
-    (tester) async {
-      await tester.pumpWidget(_build());
-      await _openDialog(tester);
+  testWidgets('out-of-range density blocks save; in-range value re-enables it; '
+      'a typed 0 is treated as blank', (tester) async {
+    await tester.pumpWidget(_build());
+    await _openDialog(tester);
 
-      await tester.enterText(
-        find.byKey(const Key('custom-material-name')),
-        'Fresh material',
-      );
-      await _fillPath(tester);
-      await tester.enterText(
-        find.byKey(const Key('custom-material-lambda')),
-        '0.07',
-      );
-      await tester.pump();
-      expect(_isSaveEnabled(tester), isTrue, reason: 'baseline');
+    await tester.enterText(
+      find.byKey(const Key('custom-material-name')),
+      'Fresh material',
+    );
+    await _fillPath(tester);
+    await tester.enterText(
+      find.byKey(const Key('custom-material-lambda')),
+      '0.07',
+    );
+    await tester.pump();
+    expect(_isSaveEnabled(tester), isTrue, reason: 'baseline');
 
-      await tester.enterText(
-        find.byKey(const Key('custom-material-density')),
-        '99999',
-      );
-      await tester.pump();
-      expect(_isSaveEnabled(tester), isFalse);
+    await tester.enterText(
+      find.byKey(const Key('custom-material-density')),
+      '99999',
+    );
+    await tester.pump();
+    expect(_isSaveEnabled(tester), isFalse);
 
-      await tester.enterText(
-        find.byKey(const Key('custom-material-density')),
-        '275',
-      );
-      await tester.pump();
-      expect(_isSaveEnabled(tester), isTrue);
+    await tester.enterText(
+      find.byKey(const Key('custom-material-density')),
+      '275',
+    );
+    await tester.pump();
+    expect(_isSaveEnabled(tester), isTrue);
 
-      // Typed 0 is treated as blank (UI/UX §5.7.2).
-      await tester.enterText(
-        find.byKey(const Key('custom-material-density')),
-        '0',
-      );
-      await tester.pump();
-      expect(_isSaveEnabled(tester), isTrue);
-    },
-  );
+    // Typed 0 is treated as blank (UI/UX §5.7.2).
+    await tester.enterText(
+      find.byKey(const Key('custom-material-density')),
+      '0',
+    );
+    await tester.pump();
+    expect(_isSaveEnabled(tester), isTrue);
+  });
 
   testWidgets('out-of-range specific heat blocks save', (tester) async {
     await tester.pumpWidget(_build());

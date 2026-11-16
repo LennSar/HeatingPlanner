@@ -5,11 +5,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/app.dart';
 
 void main() {
-  testWidgets('App smoke test — renders without crashing',
-      (WidgetTester tester) async {
-    await tester.pumpWidget(
-      const ProviderScope(child: HeatingPlannerApp()),
-    );
+  testWidgets('App smoke test — renders without crashing', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(const ProviderScope(child: HeatingPlannerApp()));
     expect(find.byType(MaterialApp), findsOneWidget);
 
     // Tear down: replace the widget tree and drain pending timers left by

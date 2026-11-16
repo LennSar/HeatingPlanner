@@ -18,10 +18,7 @@ import 'package:heating_planner/ui/screens/manage_custom_materials_screen.dart';
 // ── Fake service ─────────────────────────────────────────────────────────────
 
 class _FakeService extends CustomMaterialLibraryService {
-  _FakeService(
-    super.ref, {
-    required this.deleteResult,
-  });
+  _FakeService(super.ref, {required this.deleteResult});
 
   final DeleteResult deleteResult;
   int reloadCalls = 0;
@@ -65,12 +62,8 @@ Widget _build({
       customMaterialLibraryPathProvider.overrideWith(
         () => _FixedPathNotifier('/tmp/lib.json'),
       ),
-      customMaterialsProvider.overrideWith(
-        (ref) => Stream.value(customs),
-      ),
-      materialEntriesProvider.overrideWith(
-        (ref) => Stream.value(customs),
-      ),
+      customMaterialsProvider.overrideWith((ref) => Stream.value(customs)),
+      materialEntriesProvider.overrideWith((ref) => Stream.value(customs)),
       customMaterialLibraryServiceProvider.overrideWith(
         (ref) => _FakeService(ref, deleteResult: deleteResult),
       ),
@@ -85,63 +78,49 @@ Widget _build({
 }
 
 void main() {
-  testWidgets(
-    'blocked-delete dialog lists every referencing construction',
-    (tester) async {
-      await tester.pumpWidget(
-        _build(
-          deleteResult: const DeleteBlocked([
-            (
-              constructionId: 'wc-living',
-              constructionName: 'Living Room Wall',
-            ),
-            (
-              constructionId: 'wc-bath',
-              constructionName: 'Bathroom Wall',
-            ),
-          ]),
-        ),
-      );
-      await tester.pump();
+  testWidgets('blocked-delete dialog lists every referencing construction', (
+    tester,
+  ) async {
+    await tester.pumpWidget(
+      _build(
+        deleteResult: const DeleteBlocked([
+          (constructionId: 'wc-living', constructionName: 'Living Room Wall'),
+          (constructionId: 'wc-bath', constructionName: 'Bathroom Wall'),
+        ]),
+      ),
+    );
+    await tester.pump();
 
-      // Open the inline delete button → confirmation dialog appears.
-      await tester.tap(
-        find.byKey(const Key('custom-entry-mat-custom-delete')),
-      );
-      await tester.pumpAndSettle();
+    // Open the inline delete button → confirmation dialog appears.
+    await tester.tap(find.byKey(const Key('custom-entry-mat-custom-delete')));
+    await tester.pumpAndSettle();
 
-      // Confirm the delete.
-      await tester.tap(find.text('Delete').last);
-      await tester.pumpAndSettle();
+    // Confirm the delete.
+    await tester.tap(find.text('Delete').last);
+    await tester.pumpAndSettle();
 
-      // The fake service returned DeleteBlocked → blocked dialog shows
-      // both construction names and stays open until OK is pressed.
-      expect(
-        find.byKey(const Key('custom-material-blocked-dialog')),
-        findsOneWidget,
-      );
-      expect(find.text('• Living Room Wall'), findsOneWidget);
-      expect(find.text('• Bathroom Wall'), findsOneWidget);
-    },
-  );
+    // The fake service returned DeleteBlocked → blocked dialog shows
+    // both construction names and stays open until OK is pressed.
+    expect(
+      find.byKey(const Key('custom-material-blocked-dialog')),
+      findsOneWidget,
+    );
+    expect(find.text('• Living Room Wall'), findsOneWidget);
+    expect(find.text('• Bathroom Wall'), findsOneWidget);
+  });
 
-  testWidgets(
-    '"Reload from file" surfaces a toast with the loaded count',
-    (tester) async {
-      await tester.pumpWidget(
-        _build(deleteResult: const DeleteOk()),
-      );
-      await tester.pump();
+  testWidgets('"Reload from file" surfaces a toast with the loaded count', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_build(deleteResult: const DeleteOk()));
+    await tester.pump();
 
-      await tester.tap(
-        find.byKey(const Key('custom-materials-reload')),
-      );
-      // SnackBar animation in.
-      await tester.pump();
-      await tester.pump(const Duration(milliseconds: 800));
+    await tester.tap(find.byKey(const Key('custom-materials-reload')));
+    // SnackBar animation in.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 800));
 
-      // Plural-aware via l10n: count == 1 → singular branch.
-      expect(find.text('Reloaded 1 custom material'), findsOneWidget);
-    },
-  );
+    // Plural-aware via l10n: count == 1 → singular branch.
+    expect(find.text('Reloaded 1 custom material'), findsOneWidget);
+  });
 }

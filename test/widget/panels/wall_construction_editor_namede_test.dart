@@ -71,17 +71,13 @@ class _StubEditorNotifier extends EditorStateNotifier {
     final retained = state.materialLayers
         .where((l) => l.constructionId != constructionId)
         .toList();
-    state = state.copyWith(
-      materialLayers: [...retained, ...newLayers],
-    );
+    state = state.copyWith(materialLayers: [...retained, ...newLayers]);
   }
 
   @override
   void updateWall(WallSegment wall) {
     state = state.copyWith(
-      walls: state.walls
-          .map((w) => w.id == wall.id ? wall : w)
-          .toList(),
+      walls: state.walls.map((w) => w.id == wall.id ? wall : w).toList(),
     );
   }
 }
@@ -130,9 +126,7 @@ Widget _buildTrigger({required WallConstruction initialConstruction}) {
   );
   return ProviderScope(
     overrides: [
-      editorStateProvider.overrideWith(
-        () => _StubEditorNotifier(initialState),
-      ),
+      editorStateProvider.overrideWith(() => _StubEditorNotifier(initialState)),
       materialEntriesProvider.overrideWith(
         (ref) => Stream.value(const [_testMaterial]),
       ),
@@ -149,8 +143,7 @@ Widget _buildTrigger({required WallConstruction initialConstruction}) {
           home: Scaffold(
             body: Builder(
               builder: (innerCtx) => ElevatedButton(
-                onPressed: () =>
-                    showWallConstructionEditor(innerCtx, _wall),
+                onPressed: () => showWallConstructionEditor(innerCtx, _wall),
                 child: const Text('Open'),
               ),
             ),
@@ -177,9 +170,7 @@ Future<void> _tearDownDialog(WidgetTester tester) async {
 }
 
 WallConstruction _readConstruction(ProviderContainer c) =>
-    c.read(editorStateProvider).constructions.firstWhere(
-          (x) => x.id == _cid,
-        );
+    c.read(editorStateProvider).constructions.firstWhere((x) => x.id == _cid);
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -199,9 +190,7 @@ void main() {
         name: 'Brick wall',
         nameDe: 'Ziegelwand',
       );
-      await tester.pumpWidget(
-        _buildTrigger(initialConstruction: initial),
-      );
+      await tester.pumpWidget(_buildTrigger(initialConstruction: initial));
       await _openDialog(tester);
 
       // The canonical name field is pre-filled.
@@ -217,53 +206,48 @@ void main() {
     },
   );
 
-  testWidgets(
-    'WCE-NDE-2: editing the canonical name and saving preserves the '
-    'row\'s pre-existing localised display name',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 900));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
+  testWidgets('WCE-NDE-2: editing the canonical name and saving preserves the '
+      'row\'s pre-existing localised display name', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
 
-      const initial = WallConstruction(
-        id: _cid,
-        name: 'Brick wall',
-        nameDe: 'Ziegelwand',
-      );
-      await tester.pumpWidget(
-        _buildTrigger(initialConstruction: initial),
-      );
-      await _openDialog(tester);
+    const initial = WallConstruction(
+      id: _cid,
+      name: 'Brick wall',
+      nameDe: 'Ziegelwand',
+    );
+    await tester.pumpWidget(_buildTrigger(initialConstruction: initial));
+    await _openDialog(tester);
 
-      // Edit the canonical name only.
-      await tester.enterText(
-        find.widgetWithText(TextField, 'Brick wall'),
-        'Brick wall (renamed)',
-      );
-      await tester.pump();
+    // Edit the canonical name only.
+    await tester.enterText(
+      find.widgetWithText(TextField, 'Brick wall'),
+      'Brick wall (renamed)',
+    );
+    await tester.pump();
 
-      await _tapSave(tester);
+    await _tapSave(tester);
 
-      // The edit lands and the localised display value is untouched.
-      final afterSave = _readConstruction(_capturedContainer!);
-      expect(afterSave.name, 'Brick wall (renamed)');
-      expect(
-        afterSave.nameDe,
-        'Ziegelwand',
-        reason:
-            'Saving from this editor must preserve any pre-existing '
-            'localised display name written by other code paths.',
-      );
+    // The edit lands and the localised display value is untouched.
+    final afterSave = _readConstruction(_capturedContainer!);
+    expect(afterSave.name, 'Brick wall (renamed)');
+    expect(
+      afterSave.nameDe,
+      'Ziegelwand',
+      reason:
+          'Saving from this editor must preserve any pre-existing '
+          'localised display name written by other code paths.',
+    );
 
-      // Reopening shows the new canonical name; the localised value
-      // is still in state but never surfaced in the UI.
-      await _openDialog(tester);
-      expect(
-        find.widgetWithText(TextField, 'Brick wall (renamed)'),
-        findsOneWidget,
-      );
-      expect(find.widgetWithText(TextField, 'Ziegelwand'), findsNothing);
+    // Reopening shows the new canonical name; the localised value
+    // is still in state but never surfaced in the UI.
+    await _openDialog(tester);
+    expect(
+      find.widgetWithText(TextField, 'Brick wall (renamed)'),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(TextField, 'Ziegelwand'), findsNothing);
 
-      await _tearDownDialog(tester);
-    },
-  );
+    await _tearDownDialog(tester);
+  });
 }

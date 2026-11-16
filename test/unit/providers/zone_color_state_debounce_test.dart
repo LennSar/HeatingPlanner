@@ -108,8 +108,7 @@ void main() {
     return container;
   }
 
-  test(
-      'N-tick temperature burst evaluates demand/output O(1), not O(N), '
+  test('N-tick temperature burst evaluates demand/output O(1), not O(N), '
       'and the map stays at its pre-burst value mid-burst', () async {
     final demandEvals = [0];
     final outputEvals = [0];
@@ -140,11 +139,16 @@ void main() {
     // Mid-burst (before the debounce fires) the colour map is unchanged and
     // the heavy providers have not been re-evaluated: the burst only
     // rescheduled the trailing timer.
-    expect(container.read(zoneColorStatesProvider)['zone-1'],
-        ZoneColorState.insufficient,
-        reason: 'colours hold their settled value during the burst');
-    expect(demandEvals[0], 1,
-        reason: 'demand NOT re-evaluated per tick (O(1), not O(N))');
+    expect(
+      container.read(zoneColorStatesProvider)['zone-1'],
+      ZoneColorState.insufficient,
+      reason: 'colours hold their settled value during the burst',
+    );
+    expect(
+      demandEvals[0],
+      1,
+      reason: 'demand NOT re-evaluated per tick (O(1), not O(N))',
+    );
     expect(outputEvals[0], 1, reason: 'output NOT re-evaluated per tick');
 
     // Let the trailing debounce fire.
@@ -154,50 +158,57 @@ void main() {
 
     // Final outdoor temp = -12 + 20 = +8 °C → demand = 80 - 8 = 72 W vs
     // output 70 W → ratio 0.97 → marginal.
-    expect(container.read(zoneColorStatesProvider)['zone-1'],
-        ZoneColorState.marginal,
-        reason: 'settled colour reflects the final, committed temperature');
+    expect(
+      container.read(zoneColorStatesProvider)['zone-1'],
+      ZoneColorState.marginal,
+      reason: 'settled colour reflects the final, committed temperature',
+    );
     // The whole 10-tick burst caused exactly ONE extra demand evaluation
     // (it is invalidated each tick but only re-read once, at debounce-fire),
     // i.e. O(1) not O(11). Output is never invalidated, so it stays cached.
-    expect(demandEvals[0], 2,
-        reason: 'one demand eval for the whole burst (O(1))');
+    expect(
+      demandEvals[0],
+      2,
+      reason: 'one demand eval for the whole burst (O(1))',
+    );
     expect(outputEvals[0], 1, reason: 'output cached — never recomputed');
   });
 
-  test('settled map matches the colour computed directly at the final value',
-      () async {
-    final demandEvals = [0];
-    final outputEvals = [0];
-    final container = makeContainer(
-      demandEvalCount: demandEvals,
-      outputEvalCount: outputEvals,
-    );
-    final settings = container.read(projectSettingsProvider.notifier);
-    container.listen(zoneColorStatesProvider, (_, __) {}); // canvas-like
+  test(
+    'settled map matches the colour computed directly at the final value',
+    () async {
+      final demandEvals = [0];
+      final outputEvals = [0];
+      final container = makeContainer(
+        demandEvalCount: demandEvals,
+        outputEvalCount: outputEvals,
+      );
+      final settings = container.read(projectSettingsProvider.notifier);
+      container.listen(zoneColorStatesProvider, (_, __) {}); // canvas-like
 
-    // Drive a burst that settles at the warmest allowed outdoor temp
-    // (+10 °C, the slider clamp): demand = 80 - 10 = 70 W vs output 70 W →
-    // ratio 1.0 → sufficient.
-    for (var i = 1; i <= 5; i++) {
-      settings.setDesignOutdoorTempCTransient(i * 2.0);
-    }
-    await Future<void>.delayed(
-      zoneColorDebounceDuration + const Duration(milliseconds: 50),
-    );
+      // Drive a burst that settles at the warmest allowed outdoor temp
+      // (+10 °C, the slider clamp): demand = 80 - 10 = 70 W vs output 70 W →
+      // ratio 1.0 → sufficient.
+      for (var i = 1; i <= 5; i++) {
+        settings.setDesignOutdoorTempCTransient(i * 2.0);
+      }
+      await Future<void>.delayed(
+        zoneColorDebounceDuration + const Duration(milliseconds: 50),
+      );
 
-    // Independently compute the expected colour from the final demand /
-    // output the provider would read now (the "non-debounced" reference).
-    final demand = container.read(roomHeatDemandProvider('room-1'));
-    final output = container.read(zoneHeatOutputProvider('zone-1'));
-    final ratio = output * 1.0 / demand;
-    final expected = ratio >= 1.0
-        ? ZoneColorState.sufficient
-        : ratio >= 0.9
-            ? ZoneColorState.marginal
-            : ZoneColorState.insufficient;
+      // Independently compute the expected colour from the final demand /
+      // output the provider would read now (the "non-debounced" reference).
+      final demand = container.read(roomHeatDemandProvider('room-1'));
+      final output = container.read(zoneHeatOutputProvider('zone-1'));
+      final ratio = output * 1.0 / demand;
+      final expected = ratio >= 1.0
+          ? ZoneColorState.sufficient
+          : ratio >= 0.9
+          ? ZoneColorState.marginal
+          : ZoneColorState.insufficient;
 
-    expect(container.read(zoneColorStatesProvider)['zone-1'], expected);
-    expect(expected, ZoneColorState.sufficient);
-  });
+      expect(container.read(zoneColorStatesProvider)['zone-1'], expected);
+      expect(expected, ZoneColorState.sufficient);
+    },
+  );
 }

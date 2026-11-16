@@ -69,10 +69,7 @@ void main() {
     });
 
     test('WLP-G05: repaints when the dot colour changes', () {
-      expect(
-        grid(dot: const Color(0xFF000000)).shouldRepaint(grid()),
-        isTrue,
-      );
+      expect(grid(dot: const Color(0xFF000000)).shouldRepaint(grid()), isTrue);
     });
   });
 
@@ -97,22 +94,22 @@ void main() {
       final wallsA = [createTestWall()];
       final roomsA = [createTestRoom()];
       // A drag mints a new list with the moved wall — fresh identity.
-      final wallsB = [
-        createTestWall(endPoint: const Point2D(x: 5100, y: 0)),
-      ];
+      final wallsB = [createTestWall(endPoint: const Point2D(x: 5100, y: 0))];
       final before = geometry(walls: wallsA, rooms: roomsA);
       final after = geometry(walls: wallsB, rooms: roomsA);
       expect(after.shouldRepaint(before), isTrue);
     });
 
-    test('WLP-GE02: does NOT repaint when nothing changed (same identities)',
-        () {
-      final walls = [createTestWall()];
-      final rooms = [createTestRoom()];
-      final before = geometry(walls: walls, rooms: rooms);
-      final after = geometry(walls: walls, rooms: rooms);
-      expect(after.shouldRepaint(before), isFalse);
-    });
+    test(
+      'WLP-GE02: does NOT repaint when nothing changed (same identities)',
+      () {
+        final walls = [createTestWall()];
+        final rooms = [createTestRoom()];
+        final before = geometry(walls: walls, rooms: rooms);
+        final after = geometry(walls: walls, rooms: rooms);
+        expect(after.shouldRepaint(before), isFalse);
+      },
+    );
   });
 
   group('PipeLayerPainter.shouldRepaint', () {
@@ -124,13 +121,15 @@ void main() {
       );
     }
 
-    test('WLP-PI01: a fresh walls/rooms identity does NOT repaint the pipe '
-        'layer (ADR-026: geometry lives on the geometry/annotation layers)',
-        () {
-      // The pipe layer holds no wall/room geometry, so the per-frame geometry
-      // churn of a wall drag must never invalidate it.
-      expect(pipes().shouldRepaint(pipes()), isFalse);
-    });
+    test(
+      'WLP-PI01: a fresh walls/rooms identity does NOT repaint the pipe '
+      'layer (ADR-026: geometry lives on the geometry/annotation layers)',
+      () {
+        // The pipe layer holds no wall/room geometry, so the per-frame geometry
+        // churn of a wall drag must never invalidate it.
+        expect(pipes().shouldRepaint(pipes()), isFalse);
+      },
+    );
 
     test('WLP-PI02: repaints when the circuits identity changes', () {
       // const [] is canonical (identical); a fresh list forces a repaint.
@@ -151,17 +150,18 @@ void main() {
       );
     }
 
-    test('WLP-AN01: repaints when wall geometry changes (annotation labels)',
-        () {
-      final rooms = [createTestRoom()];
-      // A new sample from annotationGeometryProvider mints a fresh walls list.
-      final before = annotations(walls: [createTestWall()], rooms: rooms);
-      final after = annotations(walls: [createTestWall()], rooms: rooms);
-      expect(after.shouldRepaint(before), isTrue);
-    });
-
     test(
-        'WLP-AN03: does NOT repaint when the geometry identity is unchanged '
+      'WLP-AN01: repaints when wall geometry changes (annotation labels)',
+      () {
+        final rooms = [createTestRoom()];
+        // A new sample from annotationGeometryProvider mints a fresh walls list.
+        final before = annotations(walls: [createTestWall()], rooms: rooms);
+        final after = annotations(walls: [createTestWall()], rooms: rooms);
+        expect(after.shouldRepaint(before), isTrue);
+      },
+    );
+
+    test('WLP-AN03: does NOT repaint when the geometry identity is unchanged '
         '(stable between 10 fps samples → no text layout)', () {
       // Between samples annotationGeometryProvider returns the SAME lists, so
       // the layer must not repaint and the per-wall/room text layout is skipped

@@ -32,11 +32,9 @@ ProviderContainer _container({
   return ProviderContainer(
     overrides: [
       currentLocaleProvider.overrideWithValue(locale),
-      materialEntriesProvider
-          .overrideWith((ref) => Stream.value(materials)),
+      materialEntriesProvider.overrideWith((ref) => Stream.value(materials)),
       tubeTypesProvider.overrideWith((ref) => Stream.value(tubes)),
-      flooringMaterialsProvider
-          .overrideWith((ref) => Stream.value(flooring)),
+      flooringMaterialsProvider.overrideWith((ref) => Stream.value(flooring)),
     ],
   );
 }
@@ -160,34 +158,25 @@ void main() {
       },
     );
 
-    test(
-      'rows without a German translation still match the canonical name '
-      'in DE locale (displayName falls back to English)',
-      () async {
-        final c = _container(
-          locale: const Locale('de'),
-          materials: [untranslated],
-        );
-        addTearDown(c.dispose);
+    test('rows without a German translation still match the canonical name '
+        'in DE locale (displayName falls back to English)', () async {
+      final c = _container(
+        locale: const Locale('de'),
+        materials: [untranslated],
+      );
+      addTearDown(c.dispose);
 
-        final rows = await _readMaterials(c);
-        expect(rows, hasLength(1));
-        // Both displayName and alternateName resolve to the canonical
-        // English name when no German translation has been set.
-        expect(rows.single.displayName, 'User custom asbestos');
-        // The English fragment matches (whether via displayName or
-        // alternateName, both contain the same string here).
-        expect(
-          catalogRowMatchesQuery(rows.single, 'custom asbestos'),
-          isTrue,
-        );
-        // A query with no overlap still misses.
-        expect(
-          catalogRowMatchesQuery(rows.single, 'völlig fremd'),
-          isFalse,
-        );
-      },
-    );
+      final rows = await _readMaterials(c);
+      expect(rows, hasLength(1));
+      // Both displayName and alternateName resolve to the canonical
+      // English name when no German translation has been set.
+      expect(rows.single.displayName, 'User custom asbestos');
+      // The English fragment matches (whether via displayName or
+      // alternateName, both contain the same string here).
+      expect(catalogRowMatchesQuery(rows.single, 'custom asbestos'), isTrue);
+      // A query with no overlap still misses.
+      expect(catalogRowMatchesQuery(rows.single, 'völlig fremd'), isFalse);
+    });
   });
 
   // ── Sort order ─────────────────────────────────────────────────────────────
@@ -235,10 +224,11 @@ void main() {
       addTearDown(c.dispose);
 
       final rows = await _readMaterials(c);
-      expect(
-        rows.map((r) => r.displayName).toList(),
-        ['Aaron material', 'Brick', 'Marble'],
-      );
+      expect(rows.map((r) => r.displayName).toList(), [
+        'Aaron material',
+        'Brick',
+        'Marble',
+      ]);
     });
 
     test('DE locale sorts by German display name', () async {
@@ -250,10 +240,11 @@ void main() {
 
       final rows = await _readMaterials(c);
       // Backstein < Marmor < Zellulose-Variante
-      expect(
-        rows.map((r) => r.displayName).toList(),
-        ['Backstein', 'Marmor', 'Zellulose-Variante'],
-      );
+      expect(rows.map((r) => r.displayName).toList(), [
+        'Backstein',
+        'Marmor',
+        'Zellulose-Variante',
+      ]);
     });
 
     test('flooring + tube providers sort by displayName too', () async {
@@ -290,15 +281,15 @@ void main() {
       addTearDown(c.dispose);
 
       final tubes = await _readTubes(c);
-      expect(
-        tubes.map((r) => r.displayName).toList(),
-        ['Aluminium-Rohr', 'Zink-Rohr'],
-      );
+      expect(tubes.map((r) => r.displayName).toList(), [
+        'Aluminium-Rohr',
+        'Zink-Rohr',
+      ]);
       final flooring = await _readFlooring(c);
-      expect(
-        flooring.map((r) => r.displayName).toList(),
-        ['Aaa Belag', 'Zzz Belag'],
-      );
+      expect(flooring.map((r) => r.displayName).toList(), [
+        'Aaa Belag',
+        'Zzz Belag',
+      ]);
     });
   });
 }

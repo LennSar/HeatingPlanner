@@ -131,7 +131,10 @@ void main() {
 
         // Wall 3: one door.
         final doorWall = walls[3];
-        final doorWallLenMm = _wallLengthMm(doorWall.startPoint, doorWall.endPoint);
+        final doorWallLenMm = _wallLengthMm(
+          doorWall.startPoint,
+          doorWall.endPoint,
+        );
         final netAreaDoor = ThermalEngine.netWallAreaM2(
           wallLengthMm: doorWallLenMm,
           wallHeightMm: wallHeightMm,
@@ -231,7 +234,8 @@ void main() {
             final openingU = (wd.openings.first.widthMm == 900) ? 2.0 : 1.3;
             buildingDemand += ThermalEngine.transmissionLoss(
               uValue: openingU,
-              areaM2: wd.openings.first.widthMm * wd.openings.first.heightMm / 1e6,
+              areaM2:
+                  wd.openings.first.widthMm * wd.openings.first.heightMm / 1e6,
               correctionF: 1.0,
               tIndoorC: room.targetTempC,
               tOutdoorC: tOutdoor,
@@ -262,10 +266,7 @@ void main() {
     test('pressure loss per circuit < 50 ms', () {
       // Circuit: 80 m tube, 16 mm inner diameter, 800 W heat output,
       // supply 35 °C / return 28 °C, PEX roughness 0.007 mm.
-      final circuit = createTestCircuit(
-        id: 'bench-circuit',
-        tubeLengthM: 80.0,
-      );
+      final circuit = createTestCircuit(id: 'bench-circuit', tubeLengthM: 80.0);
       const innerDiameterMm = 16.0;
       const roughnessMm = 0.007;
       const heatOutputW = 800.0;
@@ -329,10 +330,8 @@ void main() {
       // 12 circuits with tube lengths 40–95 m (step 5 m) to produce varied losses.
       final circuits = List.generate(
         12,
-        (i) => createTestCircuit(
-          id: 'hb-circuit-$i',
-          tubeLengthM: 40.0 + i * 5.0,
-        ),
+        (i) =>
+            createTestCircuit(id: 'hb-circuit-$i', tubeLengthM: 40.0 + i * 5.0),
       );
 
       const innerDiameterMm = 16.0;

@@ -54,7 +54,12 @@ void _drawRect(
       last = match;
     } else {
       final seed = n.commitWallWithSplit(
-        WallSegment(id: IdGenerator.newId(), roomId: '', startPoint: a, endPoint: b),
+        WallSegment(
+          id: IdGenerator.newId(),
+          roomId: '',
+          startPoint: a,
+          endPoint: b,
+        ),
       );
       last = seed;
       firstNew ??= seed;
@@ -68,7 +73,12 @@ void _drawRect(
   for (final rm in res.rooms) {
     n.addRoomFromDetection(
       room: Room(
-          id: roomId, floorId: 'floor-1', name: name, targetTempC: 20, polygon: rm.polygon),
+        id: roomId,
+        floorId: 'floor-1',
+        name: name,
+        targetTempC: 20,
+        polygon: rm.polygon,
+      ),
       wallIds: rm.wallIds,
     );
   }
@@ -83,9 +93,15 @@ List<List<Point2D>> _wallQuads(EditorState st) {
     if (room.polygon.length < 3) continue;
     final rw = st.walls.where((w) => w.roomId == room.id).toList();
     final inner = GeometryEngine.roomFaceEdges(
-        walls: rw, roomPolygon: room.polygon, side: RoomFaceSide.inner);
+      walls: rw,
+      roomPolygon: room.polygon,
+      side: RoomFaceSide.inner,
+    );
     final outer = GeometryEngine.roomFaceEdges(
-        walls: rw, roomPolygon: room.polygon, side: RoomFaceSide.outer);
+      walls: rw,
+      roomPolygon: room.polygon,
+      side: RoomFaceSide.outer,
+    );
     for (final w in rw) {
       final i = inner[w.id];
       final o = outer[w.id];
@@ -137,29 +153,54 @@ List<Point2D> _uncoveredWallCore(EditorState st, List<List<Point2D>> quads) {
 }
 
 /// Assert both rooms keep usable geometry and fused corners.
-void _assertHealthy(EditorState st, {required double bigAreaM2, required double smallAreaM2}) {
+void _assertHealthy(
+  EditorState st, {
+  required double bigAreaM2,
+  required double smallAreaM2,
+}) {
   expect(st.rooms, hasLength(2));
   for (final room in st.rooms) {
     // Geometry available in the properties pane (same call the panel makes).
-    expect(room.polygon.length, greaterThanOrEqualTo(3),
-        reason: 'room ${room.name} lost its polygon');
+    expect(
+      room.polygon.length,
+      greaterThanOrEqualTo(3),
+      reason: 'room ${room.name} lost its polygon',
+    );
     final area = GeometryEngine.polygonAreaM2(room.polygon);
     expect(area, greaterThan(0), reason: 'room ${room.name} area unavailable');
 
     // Every wall resolves a mitred inner and outer face (no dropped corner).
     final rw = st.walls.where((w) => w.roomId == room.id).toList();
     final inner = GeometryEngine.roomFaceEdges(
-        walls: rw, roomPolygon: room.polygon, side: RoomFaceSide.inner);
+      walls: rw,
+      roomPolygon: room.polygon,
+      side: RoomFaceSide.inner,
+    );
     final outer = GeometryEngine.roomFaceEdges(
-        walls: rw, roomPolygon: room.polygon, side: RoomFaceSide.outer);
-    expect(inner.length, rw.length, reason: 'room ${room.name} missing inner faces');
-    expect(outer.length, rw.length, reason: 'room ${room.name} missing outer faces');
+      walls: rw,
+      roomPolygon: room.polygon,
+      side: RoomFaceSide.outer,
+    );
+    expect(
+      inner.length,
+      rw.length,
+      reason: 'room ${room.name} missing inner faces',
+    );
+    expect(
+      outer.length,
+      rw.length,
+      reason: 'room ${room.name} missing outer faces',
+    );
   }
 
   // Corners fused — every wall's body renders, with no notch/hole.
   final gaps = _uncoveredWallCore(st, _wallQuads(st));
-  expect(gaps, isEmpty,
-      reason: '${gaps.length} wall-body gap(s), first at ${gaps.isEmpty ? '' : gaps.first}');
+  expect(
+    gaps,
+    isEmpty,
+    reason:
+        '${gaps.length} wall-body gap(s), first at ${gaps.isEmpty ? '' : gaps.first}',
+  );
 
   final areas = {
     for (final r in st.rooms) r.id: GeometryEngine.polygonAreaM2(r.polygon),
@@ -185,7 +226,9 @@ const _smallAreaM2 = 4.0; // 2000×2000 mm²
 
 ProviderContainer _container() {
   final db = $db.AppDatabase.forTesting(NativeDatabase.memory());
-  final c = ProviderContainer(overrides: [$db.appDatabaseProvider.overrideWithValue(db)]);
+  final c = ProviderContainer(
+    overrides: [$db.appDatabaseProvider.overrideWithValue(db)],
+  );
   addTearDown(db.close);
   addTearDown(c.dispose);
   return c;
@@ -199,8 +242,11 @@ void main() {
     final n = c.read(editorStateProvider.notifier);
     _drawRect(n, _bTL, _bTR, _bBR, _bBL, 'room-1', 'Big');
     _drawRect(n, _bBL, _sTR, _sBR, _sBL, 'room-2', 'Small');
-    _assertHealthy(c.read(editorStateProvider),
-        bigAreaM2: _bigAreaM2, smallAreaM2: _smallAreaM2);
+    _assertHealthy(
+      c.read(editorStateProvider),
+      bigAreaM2: _bigAreaM2,
+      smallAreaM2: _smallAreaM2,
+    );
   });
 
   test('B: connecting a larger room to a smaller one keeps corners fused', () {
@@ -208,32 +254,41 @@ void main() {
     final n = c.read(editorStateProvider.notifier);
     _drawRect(n, _bBL, _sTR, _sBR, _sBL, 'room-2', 'Small');
     _drawRect(n, _bTL, _bTR, _bBR, _bBL, 'room-1', 'Big');
-    _assertHealthy(c.read(editorStateProvider),
-        bigAreaM2: _bigAreaM2, smallAreaM2: _smallAreaM2);
-  });
-
-  test('C: changing the shared wall construction thickness keeps corners fused', () {
-    final c = _container();
-    final n = c.read(editorStateProvider.notifier);
-    _drawRect(n, _bTL, _bTR, _bBR, _bBL, 'room-1', 'Big');
-    _drawRect(n, _bBL, _sTR, _sBR, _sBL, 'room-2', 'Small');
-
-    // Thicken the shared wall's construction (120 → 200 mm).
-    final st0 = c.read(editorStateProvider);
-    final shared = st0.walls.firstWhere(
-        (w) => w.wallType == WallType.interior && w.roomId == 'room-1');
-    final cid = shared.constructionId!;
-    for (final l in st0.materialLayers.where((l) => l.constructionId == cid)) {
-      n.updateMaterialLayer(l.copyWith(thicknessMm: 200));
-    }
-    n.recomputeWallsForConstruction(cid);
-
-    final st = c.read(editorStateProvider);
-    expect(
-      st.walls.firstWhere((w) => w.id == shared.id).thicknessMm,
-      200,
-      reason: 'shared wall thickness followed the construction change',
+    _assertHealthy(
+      c.read(editorStateProvider),
+      bigAreaM2: _bigAreaM2,
+      smallAreaM2: _smallAreaM2,
     );
-    _assertHealthy(st, bigAreaM2: _bigAreaM2, smallAreaM2: _smallAreaM2);
   });
+
+  test(
+    'C: changing the shared wall construction thickness keeps corners fused',
+    () {
+      final c = _container();
+      final n = c.read(editorStateProvider.notifier);
+      _drawRect(n, _bTL, _bTR, _bBR, _bBL, 'room-1', 'Big');
+      _drawRect(n, _bBL, _sTR, _sBR, _sBL, 'room-2', 'Small');
+
+      // Thicken the shared wall's construction (120 → 200 mm).
+      final st0 = c.read(editorStateProvider);
+      final shared = st0.walls.firstWhere(
+        (w) => w.wallType == WallType.interior && w.roomId == 'room-1',
+      );
+      final cid = shared.constructionId!;
+      for (final l in st0.materialLayers.where(
+        (l) => l.constructionId == cid,
+      )) {
+        n.updateMaterialLayer(l.copyWith(thicknessMm: 200));
+      }
+      n.recomputeWallsForConstruction(cid);
+
+      final st = c.read(editorStateProvider);
+      expect(
+        st.walls.firstWhere((w) => w.id == shared.id).thicknessMm,
+        200,
+        reason: 'shared wall thickness followed the construction change',
+      );
+      _assertHealthy(st, bigAreaM2: _bigAreaM2, smallAreaM2: _smallAreaM2);
+    },
+  );
 }

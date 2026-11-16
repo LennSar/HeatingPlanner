@@ -22,10 +22,8 @@ void main() {
   late Set<String> enMetaKeys;
 
   setUpAll(() {
-    final enFile =
-        File('lib/l10n/app_en.arb').readAsStringSync();
-    final deFile =
-        File('lib/l10n/app_de.arb').readAsStringSync();
+    final enFile = File('lib/l10n/app_en.arb').readAsStringSync();
+    final deFile = File('lib/l10n/app_de.arb').readAsStringSync();
 
     enArb = jsonDecode(enFile) as Map<String, dynamic>;
     deArb = jsonDecode(deFile) as Map<String, dynamic>;
@@ -37,9 +35,7 @@ void main() {
         .where((k) => !k.startsWith('@@') && !k.startsWith('@'))
         .toSet();
     enMetaKeys = enArb.keys
-        .where(
-          (k) => k.startsWith('@') && !k.startsWith('@@'),
-        )
+        .where((k) => k.startsWith('@') && !k.startsWith('@@'))
         .map((k) => k.substring(1))
         .toSet();
   });
@@ -49,8 +45,7 @@ void main() {
     expect(
       missing,
       isEmpty,
-      reason:
-          'DE ARB is missing keys: ${missing.join(', ')}',
+      reason: 'DE ARB is missing keys: ${missing.join(', ')}',
     );
   });
 
@@ -59,8 +54,7 @@ void main() {
     expect(
       extra,
       isEmpty,
-      reason:
-          'DE ARB has extra keys: ${extra.join(', ')}',
+      reason: 'DE ARB has extra keys: ${extra.join(', ')}',
     );
   });
 
@@ -69,21 +63,21 @@ void main() {
     expect(
       missing,
       isEmpty,
-      reason: 'EN ARB keys missing @-metadata: '
+      reason:
+          'EN ARB keys missing @-metadata: '
           '${missing.join(', ')}',
     );
   });
 
   test('no DE key has @ metadata (only template)', () {
     final deMeta = deArb.keys
-        .where(
-          (k) => k.startsWith('@') && !k.startsWith('@@'),
-        )
+        .where((k) => k.startsWith('@') && !k.startsWith('@@'))
         .toList();
     expect(
       deMeta,
       isEmpty,
-      reason: 'DE ARB should not contain @-metadata '
+      reason:
+          'DE ARB should not contain @-metadata '
           'keys: ${deMeta.join(', ')}',
     );
   });

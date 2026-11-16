@@ -125,9 +125,7 @@ Widget _buildPanel({
       selectedElementProvider.overrideWith(
         () => _StubSelectionNotifier(selection),
       ),
-      editorStateProvider.overrideWith(
-        () => _StubEditorNotifier(editorState),
-      ),
+      editorStateProvider.overrideWith(() => _StubEditorNotifier(editorState)),
       // Calculation providers — return NaN / empty so rows show "—"
       roomHeatDemandProvider.overrideWith((ref, _) => double.nan),
       roomHeatDemandBreakdownProvider.overrideWith(
@@ -152,9 +150,7 @@ Widget _buildPanel({
       theme: AppTheme.light(),
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: const [Locale('en')],
-      home: const Scaffold(
-        body: PropertiesPanel(),
-      ),
+      home: const Scaffold(body: PropertiesPanel()),
     ),
   );
 }
@@ -164,43 +160,36 @@ Widget _buildPanel({
 void main() {
   // PP-1 ─────────────────────────────────────────────────────────────────────
 
-  testWidgets(
-    'PP-1: null selection renders ProjectSummary',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 3000));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(
-        _buildPanel(
-          selection: null,
-          editorState: const EditorState(),
-        ),
-      );
-      await tester.pump();
+  testWidgets('PP-1: null selection renders ProjectSummary', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(800, 3000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      _buildPanel(selection: null, editorState: const EditorState()),
+    );
+    await tester.pump();
 
-      expect(find.text('Project Summary'), findsOneWidget);
-      expect(find.text('Total Heat Demand'), findsOneWidget);
-    },
-  );
+    expect(find.text('Project Summary'), findsOneWidget);
+    expect(find.text('Total Heat Demand'), findsOneWidget);
+  });
 
   // PP-2 ─────────────────────────────────────────────────────────────────────
 
-  testWidgets(
-    'PP-2: room selection renders RoomProperties with room name',
-    (tester) async {
-      await tester.binding.setSurfaceSize(const Size(800, 3000));
-      addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.pumpWidget(
-        _buildPanel(
-          selection: const SelectedElement(type: 'room', id: 'room-1'),
-          editorState: const EditorState(rooms: [_testRoom]),
-        ),
-      );
-      await tester.pump();
+  testWidgets('PP-2: room selection renders RoomProperties with room name', (
+    tester,
+  ) async {
+    await tester.binding.setSurfaceSize(const Size(800, 3000));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.pumpWidget(
+      _buildPanel(
+        selection: const SelectedElement(type: 'room', id: 'room-1'),
+        editorState: const EditorState(rooms: [_testRoom]),
+      ),
+    );
+    await tester.pump();
 
-      // Room name appears in the name text field value or heading
-      expect(find.text('Living Room'), findsWidgets);
-    },
-  );
+    // Room name appears in the name text field value or heading
+    expect(find.text('Living Room'), findsWidgets);
+  });
 
   // PP-3 ─────────────────────────────────────────────────────────────────────
 
@@ -249,10 +238,7 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(
         _buildPanel(
-          selection: const SelectedElement(
-            type: 'distributor',
-            id: 'dist-1',
-          ),
+          selection: const SelectedElement(type: 'distributor', id: 'dist-1'),
           editorState: const EditorState(distributor: _testDistributor),
         ),
       );
@@ -271,10 +257,7 @@ void main() {
       addTearDown(() => tester.binding.setSurfaceSize(null));
       await tester.pumpWidget(
         _buildPanel(
-          selection: const SelectedElement(
-            type: 'circuit',
-            id: 'circuit-1',
-          ),
+          selection: const SelectedElement(type: 'circuit', id: 'circuit-1'),
           editorState: const EditorState(
             circuits: [_testCircuit],
             zones: [_testZone],

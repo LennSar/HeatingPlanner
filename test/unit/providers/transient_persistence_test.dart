@@ -90,11 +90,7 @@ void main() {
     wallSegmentId: 'w1',
     positionOnWallMm: 100,
   );
-  const door = Door(
-    id: 'door-1',
-    wallSegmentId: 'w1',
-    positionOnWallMm: 100,
-  );
+  const door = Door(id: 'door-1', wallSegmentId: 'w1', positionOnWallMm: 100);
   const zone = HeatingZone(
     id: 'zone-1',
     roomId: 'room-1',
@@ -114,21 +110,31 @@ void main() {
     position: Point2D(x: 500, y: 500),
   );
 
-  test('wall: 6 transient frames write nothing; commit writes exactly once',
-      () {
-    notifier.replaceAllWalls([wall]);
-    for (var i = 1; i <= 6; i++) {
-      notifier.updateWallTransient(
-        wall.copyWith(endPoint: Point2D(x: 1000, y: i * 10.0)),
+  test(
+    'wall: 6 transient frames write nothing; commit writes exactly once',
+    () {
+      notifier.replaceAllWalls([wall]);
+      for (var i = 1; i <= 6; i++) {
+        notifier.updateWallTransient(
+          wall.copyWith(endPoint: Point2D(x: 1000, y: i * 10.0)),
+        );
+      }
+      expect(
+        bDao.countOf(#upsertWallSegment),
+        0,
+        reason: 'no upsert during a multi-frame drag',
       );
-    }
-    expect(bDao.countOf(#upsertWallSegment), 0,
-        reason: 'no upsert during a multi-frame drag');
 
-    notifier.updateWall(wall.copyWith(endPoint: const Point2D(x: 1000, y: 60)));
-    expect(bDao.countOf(#upsertWallSegment), 1,
-        reason: 'exactly one upsert on commit');
-  });
+      notifier.updateWall(
+        wall.copyWith(endPoint: const Point2D(x: 1000, y: 60)),
+      );
+      expect(
+        bDao.countOf(#upsertWallSegment),
+        1,
+        reason: 'exactly one upsert on commit',
+      );
+    },
+  );
 
   test('room: transient frames write nothing; commit writes exactly once', () {
     for (var i = 1; i <= 5; i++) {
@@ -140,17 +146,20 @@ void main() {
     expect(bDao.countOf(#upsertRoom), 1);
   });
 
-  test('window: transient frames write nothing; commit writes exactly once',
-      () {
-    for (var i = 1; i <= 5; i++) {
-      notifier
-          .updateWindowTransient(window.copyWith(positionOnWallMm: 100.0 + i));
-    }
-    expect(bDao.countOf(#upsertWindow), 0);
+  test(
+    'window: transient frames write nothing; commit writes exactly once',
+    () {
+      for (var i = 1; i <= 5; i++) {
+        notifier.updateWindowTransient(
+          window.copyWith(positionOnWallMm: 100.0 + i),
+        );
+      }
+      expect(bDao.countOf(#upsertWindow), 0);
 
-    notifier.updateWindow(window.copyWith(positionOnWallMm: 150));
-    expect(bDao.countOf(#upsertWindow), 1);
-  });
+      notifier.updateWindow(window.copyWith(positionOnWallMm: 150));
+      expect(bDao.countOf(#upsertWindow), 1);
+    },
+  );
 
   test('door: transient frames write nothing; commit writes exactly once', () {
     for (var i = 1; i <= 5; i++) {
@@ -173,18 +182,19 @@ void main() {
   });
 
   test(
-      'distributor: transient frames write nothing; commit writes exactly once',
-      () {
-    for (var i = 1; i <= 5; i++) {
-      notifier.updateDistributorTransient(
-        distributor.copyWith(supplyTempC: 35.0 + i),
-      );
-    }
-    expect(hDao.countOf(#upsertDistributor), 0);
+    'distributor: transient frames write nothing; commit writes exactly once',
+    () {
+      for (var i = 1; i <= 5; i++) {
+        notifier.updateDistributorTransient(
+          distributor.copyWith(supplyTempC: 35.0 + i),
+        );
+      }
+      expect(hDao.countOf(#upsertDistributor), 0);
 
-    notifier.updateDistributor(distributor.copyWith(supplyTempC: 40));
-    expect(hDao.countOf(#upsertDistributor), 1);
-  });
+      notifier.updateDistributor(distributor.copyWith(supplyTempC: 40));
+      expect(hDao.countOf(#upsertDistributor), 1);
+    },
+  );
 
   test('setWallZoneHeightsForIds persists only when persist is true', () {
     notifier.replaceAllWallsRoomsZones(const [], const [], [zone]);

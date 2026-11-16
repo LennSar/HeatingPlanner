@@ -55,9 +55,7 @@ Widget _buildPanel(List<ValidationResult> results) {
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: const [Locale('en'), Locale('de')],
       // Full-screen Scaffold avoids layout overflow in the warnings header.
-      home: const Scaffold(
-        body: PerformanceDashboardPanel(initialIndex: 2),
-      ),
+      home: const Scaffold(body: PerformanceDashboardPanel(initialIndex: 2)),
     ),
   );
 }
@@ -78,8 +76,7 @@ SelectedElement? _readHovered(WidgetTester tester) {
 
 void main() {
   group('_WarningRow — mouse hover (desktop)', () {
-    testWidgets(
-        'WH-1: entering a warning row sets hoveredElementProvider '
+    testWidgets('WH-1: entering a warning row sets hoveredElementProvider '
         'to the matching element', (tester) async {
       await tester.pumpWidget(_buildPanel([_circuitError]));
       await tester.pumpAndSettle();
@@ -103,9 +100,9 @@ void main() {
       expect(hovered.id, equals('circuit-42'));
     });
 
-    testWidgets(
-        'WH-2: exiting a warning row clears hoveredElementProvider',
-        (tester) async {
+    testWidgets('WH-2: exiting a warning row clears hoveredElementProvider', (
+      tester,
+    ) async {
       await tester.pumpWidget(_buildPanel([_circuitError]));
       await tester.pumpAndSettle();
 
@@ -127,66 +124,73 @@ void main() {
     });
 
     testWidgets(
-        'WH-5: hovering a second row updates the provider to that row',
-        (tester) async {
-      await tester.pumpWidget(_buildPanel([_circuitError, _wallWarning]));
-      await tester.pumpAndSettle();
+      'WH-5: hovering a second row updates the provider to that row',
+      (tester) async {
+        await tester.pumpWidget(_buildPanel([_circuitError, _wallWarning]));
+        await tester.pumpAndSettle();
 
-      final gesture = await tester.createGesture(kind: PointerDeviceKind.mouse);
-      await gesture.addPointer(location: Offset.zero);
-      addTearDown(gesture.removePointer);
-      await tester.pump();
+        final gesture = await tester.createGesture(
+          kind: PointerDeviceKind.mouse,
+        );
+        await gesture.addPointer(location: Offset.zero);
+        addTearDown(gesture.removePointer);
+        await tester.pump();
 
-      // Hover first row.
-      await gesture.moveTo(tester.getCenter(find.text(_circuitError.message)));
-      await tester.pump();
-      expect(_readHovered(tester)!.id, equals('circuit-42'));
+        // Hover first row.
+        await gesture.moveTo(
+          tester.getCenter(find.text(_circuitError.message)),
+        );
+        await tester.pump();
+        expect(_readHovered(tester)!.id, equals('circuit-42'));
 
-      // Move to second row.
-      await gesture.moveTo(tester.getCenter(find.text(_wallWarning.message)));
-      await tester.pump();
-      final hovered = _readHovered(tester);
-      expect(hovered!.type, equals('wall'));
-      expect(hovered.id, equals('wall-7'));
-    });
+        // Move to second row.
+        await gesture.moveTo(tester.getCenter(find.text(_wallWarning.message)));
+        await tester.pump();
+        final hovered = _readHovered(tester);
+        expect(hovered!.type, equals('wall'));
+        expect(hovered.id, equals('wall-7'));
+      },
+    );
   });
 
   group('_WarningRow — long press (tablet)', () {
     testWidgets(
-        'WH-3: long-pressing a warning row sets hoveredElementProvider',
-        (tester) async {
-      await tester.pumpWidget(_buildPanel([_circuitError]));
-      await tester.pumpAndSettle();
+      'WH-3: long-pressing a warning row sets hoveredElementProvider',
+      (tester) async {
+        await tester.pumpWidget(_buildPanel([_circuitError]));
+        await tester.pumpAndSettle();
 
-      await tester.longPress(find.text(_circuitError.message));
-      await tester.pump();
+        await tester.longPress(find.text(_circuitError.message));
+        await tester.pump();
 
-      final hovered = _readHovered(tester);
-      expect(hovered, isNotNull);
-      expect(hovered!.type, equals('circuit'));
-      expect(hovered.id, equals('circuit-42'));
-    });
+        final hovered = _readHovered(tester);
+        expect(hovered, isNotNull);
+        expect(hovered!.type, equals('circuit'));
+        expect(hovered.id, equals('circuit-42'));
+      },
+    );
 
     testWidgets(
-        'WH-4: after long press the provider auto-clears after 2 seconds',
-        (tester) async {
-      // Note: tester.longPress internally pumps kLongPressTimeout (500 ms),
-      // so the fake clock is already at ~500 ms when onLongPress fires and
-      // the 2-second auto-clear timer starts. Pumping another 2 s guarantees
-      // the timer elapses without needing intermediate checks.
-      await tester.pumpWidget(_buildPanel([_circuitError]));
-      await tester.pumpAndSettle();
+      'WH-4: after long press the provider auto-clears after 2 seconds',
+      (tester) async {
+        // Note: tester.longPress internally pumps kLongPressTimeout (500 ms),
+        // so the fake clock is already at ~500 ms when onLongPress fires and
+        // the 2-second auto-clear timer starts. Pumping another 2 s guarantees
+        // the timer elapses without needing intermediate checks.
+        await tester.pumpWidget(_buildPanel([_circuitError]));
+        await tester.pumpAndSettle();
 
-      await tester.longPress(find.text(_circuitError.message));
-      await tester.pump();
+        await tester.longPress(find.text(_circuitError.message));
+        await tester.pump();
 
-      // Provider should be set immediately after long press.
-      expect(_readHovered(tester), isNotNull);
+        // Provider should be set immediately after long press.
+        expect(_readHovered(tester), isNotNull);
 
-      // Advance 2 s past the current point → timer fires and clears.
-      await tester.pump(const Duration(seconds: 2));
-      expect(_readHovered(tester), isNull);
-    });
+        // Advance 2 s past the current point → timer fires and clears.
+        await tester.pump(const Duration(seconds: 2));
+        expect(_readHovered(tester), isNull);
+      },
+    );
   });
 
   group('_WarningRow — both error and warning severity', () {

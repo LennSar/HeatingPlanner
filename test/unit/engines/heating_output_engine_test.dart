@@ -84,8 +84,7 @@ void main() {
 
     test('with realistic correction factors', () {
       // B=6.7, aB=0.85, aT=1.02, aU=1.0, aD=1.0, deltaT=11.1, n=1.1
-      final expected =
-          6.7 * 0.85 * 1.02 * 1.0 * 1.0 * pow(11.1, 1.1);
+      final expected = 6.7 * 0.85 * 1.02 * 1.0 * 1.0 * pow(11.1, 1.1);
       final q = HeatingOutputEngine.specificHeatOutput(
         deltaT: 11.1,
         systemConstantB: 6.7,

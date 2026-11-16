@@ -163,7 +163,11 @@ String _startUnderText(WidgetTester tester) {
   return field.controller?.text ?? '';
 }
 
-Future<void> _addSegmentAndType(WidgetTester tester, int index, String text) async {
+Future<void> _addSegmentAndType(
+  WidgetTester tester,
+  int index,
+  String text,
+) async {
   await tester.tap(find.byKey(const Key('custom-material-add-subcategory')));
   await tester.pumpAndSettle();
   await tester.enterText(
@@ -174,10 +178,7 @@ Future<void> _addSegmentAndType(WidgetTester tester, int index, String text) asy
 }
 
 Future<void> _fillRequiredScalars(WidgetTester tester, String name) async {
-  await tester.enterText(
-    find.byKey(const Key('custom-material-name')),
-    name,
-  );
+  await tester.enterText(find.byKey(const Key('custom-material-name')), name);
   await tester.enterText(
     find.byKey(const Key('custom-material-lambda')),
     '0.04',
@@ -207,104 +208,94 @@ bool _isAddSubcategoryEnabled(WidgetTester tester) {
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 void main() {
-  testWidgets(
-    '(a) "(root)" + typed ["Brand New Branch"] → categoryPath = '
-    '["Brand New Branch"]',
-    (tester) async {
-      final h = _Harness();
-      await tester.pumpWidget(h.build());
-      await _openDialog(tester);
+  testWidgets('(a) "(root)" + typed ["Brand New Branch"] → categoryPath = '
+      '["Brand New Branch"]', (tester) async {
+    final h = _Harness();
+    await tester.pumpWidget(h.build());
+    await _openDialog(tester);
 
-      await _pickStartUnder(tester, '(root)');
-      await _addSegmentAndType(tester, 0, 'Brand New Branch');
-      await _fillRequiredScalars(tester, 'Top-level material');
+    await _pickStartUnder(tester, '(root)');
+    await _addSegmentAndType(tester, 0, 'Brand New Branch');
+    await _fillRequiredScalars(tester, 'Top-level material');
 
-      await _tapSave(tester);
+    await _tapSave(tester);
 
-      expect(h.stub.lastCreated, isNotNull);
-      expect(h.stub.lastCreated!.categoryPath, ['Brand New Branch']);
-      expect(h.lastDialogResult!.categoryPath, ['Brand New Branch']);
-    },
-  );
+    expect(h.stub.lastCreated, isNotNull);
+    expect(h.stub.lastCreated!.categoryPath, ['Brand New Branch']);
+    expect(h.lastDialogResult!.categoryPath, ['Brand New Branch']);
+  });
 
-  testWidgets(
-    '(b) Start = "Insulation boards › Wood fibre" + typed '
-    '["custom insulations", "funky new materials"] composes the full path',
-    (tester) async {
-      final h = _Harness(all: const [_insulationWoodFibre, _insulationStoneWool]);
-      await tester.pumpWidget(h.build());
-      await _openDialog(tester);
+  testWidgets('(b) Start = "Insulation boards › Wood fibre" + typed '
+      '["custom insulations", "funky new materials"] composes the full path', (
+    tester,
+  ) async {
+    final h = _Harness(all: const [_insulationWoodFibre, _insulationStoneWool]);
+    await tester.pumpWidget(h.build());
+    await _openDialog(tester);
 
-      // Existing breadcrumb appears in the Start dropdown.
-      await _pickStartUnder(tester, 'Insulation boards › Wood fibre');
-      await _addSegmentAndType(tester, 0, 'custom insulations');
-      await _addSegmentAndType(tester, 1, 'funky new materials');
-      await _fillRequiredScalars(tester, 'flux compensating plates');
+    // Existing breadcrumb appears in the Start dropdown.
+    await _pickStartUnder(tester, 'Insulation boards › Wood fibre');
+    await _addSegmentAndType(tester, 0, 'custom insulations');
+    await _addSegmentAndType(tester, 1, 'funky new materials');
+    await _fillRequiredScalars(tester, 'flux compensating plates');
 
-      await _tapSave(tester);
+    await _tapSave(tester);
 
-      expect(
-        h.stub.lastCreated!.categoryPath,
-        [
-          'Insulation boards',
-          'Wood fibre',
-          'custom insulations',
-          'funky new materials',
-        ],
-      );
-    },
-  );
+    expect(h.stub.lastCreated!.categoryPath, [
+      'Insulation boards',
+      'Wood fibre',
+      'custom insulations',
+      'funky new materials',
+    ]);
+  });
 
-  testWidgets(
-    '(c) cascade-remove: ✕ on a middle segment drops the middle and '
-    'every segment below it — final stack length is 1',
-    (tester) async {
-      final h = _Harness();
-      await tester.pumpWidget(h.build());
-      await _openDialog(tester);
+  testWidgets('(c) cascade-remove: ✕ on a middle segment drops the middle and '
+      'every segment below it — final stack length is 1', (tester) async {
+    final h = _Harness();
+    await tester.pumpWidget(h.build());
+    await _openDialog(tester);
 
-      await _pickStartUnder(tester, '(root)');
-      await _addSegmentAndType(tester, 0, 'first');
-      await _addSegmentAndType(tester, 1, 'middle');
-      await _addSegmentAndType(tester, 2, 'last');
+    await _pickStartUnder(tester, '(root)');
+    await _addSegmentAndType(tester, 0, 'first');
+    await _addSegmentAndType(tester, 1, 'middle');
+    await _addSegmentAndType(tester, 2, 'last');
 
-      // Pre-condition: three typed-segment fields rendered.
-      expect(
-        find.byKey(const Key('custom-material-path-segment-0')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('custom-material-path-segment-1')),
-        findsOneWidget,
-      );
-      expect(
-        find.byKey(const Key('custom-material-path-segment-2')),
-        findsOneWidget,
-      );
+    // Pre-condition: three typed-segment fields rendered.
+    expect(
+      find.byKey(const Key('custom-material-path-segment-0')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('custom-material-path-segment-1')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const Key('custom-material-path-segment-2')),
+      findsOneWidget,
+    );
 
-      // ✕ on the middle segment removes index 1 AND 2 (cascade).
-      await tester.tap(
-        find.byKey(const Key('custom-material-path-segment-1-remove')),
-      );
-      await tester.pumpAndSettle();
+    // ✕ on the middle segment removes index 1 AND 2 (cascade).
+    await tester.tap(
+      find.byKey(const Key('custom-material-path-segment-1-remove')),
+    );
+    await tester.pumpAndSettle();
 
-      expect(
-        find.byKey(const Key('custom-material-path-segment-0')),
-        findsOneWidget,
-        reason: 'first segment survives',
-      );
-      expect(
-        find.byKey(const Key('custom-material-path-segment-1')),
-        findsNothing,
-        reason: 'middle segment removed',
-      );
-      expect(
-        find.byKey(const Key('custom-material-path-segment-2')),
-        findsNothing,
-        reason: 'bottom segment cascade-removed',
-      );
-    },
-  );
+    expect(
+      find.byKey(const Key('custom-material-path-segment-0')),
+      findsOneWidget,
+      reason: 'first segment survives',
+    );
+    expect(
+      find.byKey(const Key('custom-material-path-segment-1')),
+      findsNothing,
+      reason: 'middle segment removed',
+    );
+    expect(
+      find.byKey(const Key('custom-material-path-segment-2')),
+      findsNothing,
+      reason: 'bottom segment cascade-removed',
+    );
+  });
 
   testWidgets(
     '(d) "+ Add subcategory" is disabled while the last typed segment '
@@ -320,7 +311,9 @@ void main() {
       expect(_isAddSubcategoryEnabled(tester), isTrue);
 
       // Add an empty segment by tapping the button once.
-      await tester.tap(find.byKey(const Key('custom-material-add-subcategory')));
+      await tester.tap(
+        find.byKey(const Key('custom-material-add-subcategory')),
+      );
       await tester.pumpAndSettle();
       // Last (and only) segment is empty → button disabled.
       expect(_isAddSubcategoryEnabled(tester), isFalse);

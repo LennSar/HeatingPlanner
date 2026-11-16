@@ -67,10 +67,7 @@ Widget _buildPicker({required String? libraryPath}) {
         body: SizedBox(
           width: 400,
           height: 600,
-          child: MaterialPicker(
-            onSelected: (_) {},
-            onManageRequested: () {},
-          ),
+          child: MaterialPicker(onSelected: (_) {}, onManageRequested: () {}),
         ),
       ),
     ),
@@ -88,10 +85,7 @@ void main() {
       // Both pinned rows present and have no disabled-state caption.
       expect(find.text('New custom material…'), findsOneWidget);
       expect(find.text('Manage custom materials…'), findsOneWidget);
-      expect(
-        find.text('Pick a library file in Settings first'),
-        findsNothing,
-      );
+      expect(find.text('Pick a library file in Settings first'), findsNothing);
 
       // Each row's InkWell has a non-null onTap callback — always enabled.
       final newRowInkWell = tester.widget<InkWell>(
@@ -112,54 +106,48 @@ void main() {
     },
   );
 
-  testWidgets(
-    'custom rows show the Custom chip but built-in rows do not',
-    (tester) async {
-      await tester.pumpWidget(
-        _buildPicker(libraryPath: '/tmp/lib.json'),
-      );
-      // Expand the grouped tree to surface the rows.
-      await tester.pump();
+  testWidgets('custom rows show the Custom chip but built-in rows do not', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_buildPicker(libraryPath: '/tmp/lib.json'));
+    // Expand the grouped tree to surface the rows.
+    await tester.pump();
 
-      // Type into the search field so the rows render in flat mode and
-      // both materials are visible at once.
-      await tester.enterText(find.byType(TextField), 'e');
-      await tester.pump();
+    // Type into the search field so the rows render in flat mode and
+    // both materials are visible at once.
+    await tester.enterText(find.byType(TextField), 'e');
+    await tester.pump();
 
-      // Chip appears for the custom entry — once because only one
-      // custom row matched.
-      final chip = find.byKey(const Key('custom-material-chip'));
-      expect(chip, findsOneWidget);
-      expect(find.text('Custom'), findsOneWidget);
+    // Chip appears for the custom entry — once because only one
+    // custom row matched.
+    final chip = find.byKey(const Key('custom-material-chip'));
+    expect(chip, findsOneWidget);
+    expect(find.text('Custom'), findsOneWidget);
 
-      // The built-in row is also visible but does not carry the chip.
-      expect(find.text('Cement render'), findsOneWidget);
-      expect(find.text('Custom hempcrete'), findsOneWidget);
-    },
-  );
+    // The built-in row is also visible but does not carry the chip.
+    expect(find.text('Cement render'), findsOneWidget);
+    expect(find.text('Custom hempcrete'), findsOneWidget);
+  });
 
-  testWidgets(
-    'right-click on a custom row opens Edit / Delete context menu',
-    (tester) async {
-      await tester.pumpWidget(
-        _buildPicker(libraryPath: '/tmp/lib.json'),
-      );
-      await tester.enterText(find.byType(TextField), 'hemp');
-      await tester.pump();
+  testWidgets('right-click on a custom row opens Edit / Delete context menu', (
+    tester,
+  ) async {
+    await tester.pumpWidget(_buildPicker(libraryPath: '/tmp/lib.json'));
+    await tester.enterText(find.byType(TextField), 'hemp');
+    await tester.pump();
 
-      // Right-click on the custom row to open the context menu.
-      final rowCenter = tester.getCenter(find.text('Custom hempcrete'));
-      final gesture = await tester.createGesture(
-        kind: PointerDeviceKind.mouse,
-        buttons: kSecondaryMouseButton,
-      );
-      await gesture.addPointer(location: rowCenter);
-      await gesture.down(rowCenter);
-      await gesture.up();
-      await tester.pumpAndSettle();
+    // Right-click on the custom row to open the context menu.
+    final rowCenter = tester.getCenter(find.text('Custom hempcrete'));
+    final gesture = await tester.createGesture(
+      kind: PointerDeviceKind.mouse,
+      buttons: kSecondaryMouseButton,
+    );
+    await gesture.addPointer(location: rowCenter);
+    await gesture.down(rowCenter);
+    await gesture.up();
+    await tester.pumpAndSettle();
 
-      expect(find.text('Edit'), findsOneWidget);
-      expect(find.text('Delete'), findsOneWidget);
-    },
-  );
+    expect(find.text('Edit'), findsOneWidget);
+    expect(find.text('Delete'), findsOneWidget);
+  });
 }

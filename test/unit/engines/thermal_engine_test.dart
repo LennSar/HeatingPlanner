@@ -483,22 +483,21 @@ void main() {
   // Ventilation loss Q_V = 277.87 W (verified in ventilationLoss tests).
 
   group('HD-1 edge cases: interior wall scenarios', () {
-    const uWall = 0.283;    // W/(m²K)
+    const uWall = 0.283; // W/(m²K)
     const wallAreaM2 = 13.0; // 5.0 m × 2.6 m, no openings
-    const tThis = 20.0;     // °C
+    const tThis = 20.0; // °C
     const tOutdoor = -12.0; // °C
 
     // Ventilation loss is identical in all four cases.
     // Computed inline to keep each test self-contained.
     double computeQVent() => ThermalEngine.ventilationLoss(
-          roomVolumeM3: 52.0,
-          airChangeRate: 0.5,
-          tIndoorC: tThis,
-          tOutdoorC: tOutdoor,
-        );
+      roomVolumeM3: 52.0,
+      airChangeRate: 0.5,
+      tIndoorC: tThis,
+      tOutdoorC: tOutdoor,
+    );
 
-    test(
-        'all interior walls at same temperature: '
+    test('all interior walls at same temperature: '
         'Q_T = 0, Q_total equals Q_V', () {
       // f = (20 − 20) / (20 − (−12)) = 0
       final f = ThermalEngine.interiorCorrectionFactor(
@@ -528,8 +527,7 @@ void main() {
       expect(qTotal, closeTo(qVent, qVent * 0.02));
     });
 
-    test(
-        'interior wall to colder adjacent room (15°C): '
+    test('interior wall to colder adjacent room (15°C): '
         'positive correction factor adds partial transmission loss', () {
       // f = (20 − 15) / (20 − (−12)) = 5/32 = 0.15625
       // Q_T = 0.283 × 13.0 × 0.15625 × 32 ≈ 18.38 W
@@ -559,8 +557,7 @@ void main() {
       expect(qTotal, closeTo(18.395 + 277.87, (18.395 + 277.87) * 0.02));
     });
 
-    test(
-        'interior wall to warmer adjacent room (24°C): '
+    test('interior wall to warmer adjacent room (24°C): '
         'negative correction factor reduces total demand', () {
       // f = (20 − 24) / (20 − (−12)) = −4/32 = −0.125
       // Q_T = 0.283 × 13.0 × (−0.125) × 32 ≈ −14.72 W  (heat gain)
@@ -593,8 +590,7 @@ void main() {
       expect(qTotal, closeTo(-14.716 + 277.87, 263.154 * 0.02));
     });
 
-    test(
-        'room with no constructions assigned: '
+    test('room with no constructions assigned: '
         'Q_T = 0, Q_total equals Q_V', () {
       // When no wall has a constructionId the transmission loop is
       // skipped entirely. The caller must not call transmissionLoss.

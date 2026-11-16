@@ -125,8 +125,7 @@ void main() {
         innerDiameterMm: 13.0,
         tubeLengthM: 80.0,
       );
-      const manual =
-          pi * (0.013 / 2.0) * (0.013 / 2.0) * 80.0 * 1000.0;
+      const manual = pi * (0.013 / 2.0) * (0.013 / 2.0) * 80.0 * 1000.0;
       expect(v, closeTo(manual, manual * 0.01));
     });
 
@@ -404,9 +403,7 @@ void main() {
 
   group('HydraulicEngine.fittingPressureLoss', () {
     test('default 40% surcharge', () {
-      final dp = HydraulicEngine.fittingPressureLoss(
-        frictionLossPa: 15660.0,
-      );
+      final dp = HydraulicEngine.fittingPressureLoss(frictionLossPa: 15660.0);
       // 15660 * 0.40 = 6264
       expect(dp, closeTo(6264.0, 1.0));
     });
@@ -447,9 +444,7 @@ void main() {
     });
 
     test('negative friction loss returns NaN', () {
-      final dp = HydraulicEngine.fittingPressureLoss(
-        frictionLossPa: -100.0,
-      );
+      final dp = HydraulicEngine.fittingPressureLoss(frictionLossPa: -100.0);
       expect(dp.isNaN, isTrue);
     });
   });
@@ -487,11 +482,7 @@ void main() {
   group('HydraulicEngine.hydraulicBalance', () {
     test('3 circuits: reference has 0 throttling', () {
       final result = HydraulicEngine.hydraulicBalance(
-        circuitPressureLosses: {
-          'c1': 20000.0,
-          'c2': 18000.0,
-          'c3': 15000.0,
-        },
+        circuitPressureLosses: {'c1': 20000.0, 'c2': 18000.0, 'c3': 15000.0},
       );
       // c1 is reference (highest)
       expect(result['c1'], equals(0.0));
@@ -515,10 +506,7 @@ void main() {
 
     test('equal losses: all zero throttling', () {
       final result = HydraulicEngine.hydraulicBalance(
-        circuitPressureLosses: {
-          'c1': 10000.0,
-          'c2': 10000.0,
-        },
+        circuitPressureLosses: {'c1': 10000.0, 'c2': 10000.0},
       );
       expect(result['c1'], equals(0.0));
       expect(result['c2'], equals(0.0));
@@ -547,9 +535,7 @@ void main() {
     });
 
     test('single point returns NaN', () {
-      final l = HydraulicEngine.polylineLengthM([
-        const Point2D(x: 0, y: 0),
-      ]);
+      final l = HydraulicEngine.polylineLengthM([const Point2D(x: 0, y: 0)]);
       expect(l.isNaN, isTrue);
     });
 

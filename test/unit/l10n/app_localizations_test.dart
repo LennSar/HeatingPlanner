@@ -35,10 +35,7 @@ void main() {
         l10n.deleteProjectContent('Villa'),
         'Delete "Villa"? This cannot be undone.',
       );
-      expect(
-        l10n.projectCopyName('My Plan'),
-        'My Plan (copy)',
-      );
+      expect(l10n.projectCopyName('My Plan'), 'My Plan (copy)');
       expect(l10n.statusBarZoom(150), 'Zoom: 150%');
     });
 
@@ -47,14 +44,8 @@ void main() {
       expect(l10n.statusBarWarnings(5), '5 warnings');
       expect(l10n.statusBarRooms(1), '1 room');
       expect(l10n.statusBarRooms(3), '3 rooms');
-      expect(
-        l10n.relativeWeeksAgo(1),
-        '1 week ago',
-      );
-      expect(
-        l10n.relativeWeeksAgo(4),
-        '4 weeks ago',
-      );
+      expect(l10n.relativeWeeksAgo(1), '1 week ago');
+      expect(l10n.relativeWeeksAgo(4), '4 weeks ago');
     });
   });
 
@@ -83,10 +74,7 @@ void main() {
         '"Villa" löschen? Dies kann nicht '
         'rückgängig gemacht werden.',
       );
-      expect(
-        l10n.projectCopyName('Mein Plan'),
-        'Mein Plan (Kopie)',
-      );
+      expect(l10n.projectCopyName('Mein Plan'), 'Mein Plan (Kopie)');
       expect(l10n.statusBarZoom(150), 'Zoom: 150%');
     });
 
@@ -96,10 +84,7 @@ void main() {
       expect(l10n.statusBarRooms(1), '1 Raum');
       expect(l10n.statusBarRooms(3), '3 Räume');
       expect(l10n.relativeWeeksAgo(1), 'vor 1 Woche');
-      expect(
-        l10n.relativeWeeksAgo(4),
-        'vor 4 Wochen',
-      );
+      expect(l10n.relativeWeeksAgo(4), 'vor 4 Wochen');
     });
   });
 
