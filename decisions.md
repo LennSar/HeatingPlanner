@@ -2771,3 +2771,518 @@ key import as heated (`isHeated ?? true`).
 drift / json sources. Heat-demand provider tests assert an unheated room returns
 `0.0` and that a heated neighbour's interior-wall loss rises as the unheated
 room's assumed temperature falls.
+
+---
+
+## ADR-037 — Zones split by equal area, fill to the inner wall faces, and share boundaries
+
+**Decision.**
+Three changes to how floor heating zones are created and reshaped. Together
+they make "fill the room, split it, then nudge the divider" a three-gesture
+workflow that always leaves two zones that tile the room without gap or
+overlap.
+
+**Rules.**
+
+1. **Any single-cut shape is splittable.** ADR-018 limited splitting to
+   4-vertex axis-aligned rectangles. A floor zone is now splittable along a
+   direction whenever one straight vertical or horizontal cut divides it into
+   exactly two simple polygons. Shapes the cut line would cross more than once
+   (U-shapes across the prongs, open rings) are rejected for that direction
+   with the toast *"This zone's shape cannot be split into two halves in that
+   direction."* The right-click *Split …* items are disabled only when neither
+   direction works. Wall zones remain unsplittable.
+
+2. **The cut is placed for equal area, not at the bounding-box midpoint.**
+   `SplitZoneCommand.equalAreaCut` moves the cut line until both children have
+   the same area (bisection on the clipped area, which is monotonic in the cut
+   coordinate). For a rectangle this is exactly the ADR-018 midpoint and the
+   ADR-018 Rule 2 vertex order is preserved; for an L-shaped zone the line
+   lands off-centre so both halves still carry the same heated area. The cut
+   coordinate is not grid-snapped (ADR-018 reasoning unchanged). The 100 mm
+   minimum (ADR-018 Rule 4) applies to each child's depth across the cut.
+
+3. **Direction selection.** The Zone-tool double-click still bisects the longer
+   bounding-box side (tie → vertical) and falls back to the other direction
+   when the shape cannot be cut that way. The hover preview draws the actual
+   cut segment for every splittable zone.
+
+4. **Fill-room uses the inner clear polygon.** `Room.polygon` follows the wall
+   centerlines (ADR-017), so a fill-room zone drawn on it reached half a wall
+   thickness under every wall, and its two split halves looked unequal
+   wherever opposite walls differ in thickness. `ZoneDrawTool` now offsets
+   each room edge inward by half the thickness of the room's wall on that edge
+   (unmatched edges stay on the centerline, mirroring
+   `GeometryEngine.roomFaceEdges`) and drops straight-through vertices left by
+   split walls (ADR-003), so a rectangular room yields a 4-vertex rectangle.
+   This implements what ADR-018 Rule 11 already specified. Existing zones are
+   not migrated.
+
+5. **Zone boundaries are shared and dragged as one.** In the Select tool a
+   press-and-drag on a zone boundary moves that boundary along its normal; no
+   prior selection and no modifier are needed.
+   - A *boundary* is the maximal straight line formed by overlapping collinear
+     zone edges, so the divider between one full-height zone and two stacked
+     neighbours is a single boundary whichever edge is grabbed.
+   - Every zone with two or more vertices on the boundary is reshaped
+     together: growing one zone shrinks its neighbour by the same amount.
+   - A boundary is a drag target when two or more zones lie on it, or when it
+     is an edge of the selected zone (so a lone zone is resized by its edges
+     once selected). Vertex handles of the selected zone, handles of a selected
+     wall, a selected distributor and a multi-wall group keep priority.
+   - Axis-aligned boundaries snap to the grid. A position that would invert a
+     zone, leave any edge shorter than 100 mm, or push a vertex out of the
+     zone's valid rooms (ADR-006) is ignored — the boundary stops at its last
+     valid position.
+   - The pointer shows a resize cursor over a draggable boundary. A press
+     without movement still selects (deferred tap, as for a zone body).
+   - One drag is one undo entry (`_MoveZonesCommand`) covering every zone that
+     changed; Escape reverts all of them.
+
+**Why.**
+Planners fill a room, see it under-supplied, split it for a second circuit and
+then balance the two circuit lengths by shifting the divider. Before this
+change the split only worked on rectangles, the "halves" of a centerline-based
+zone were visibly unequal, and moving the divider meant dragging two vertices
+of each zone separately while keeping them aligned by hand.
+
+**Scope.**
+`SplitZoneCommand`, `ZoneDrawTool` (fill-room polygon, double-click routing,
+hover preview), `SelectTool` (boundary drag, context-menu enabling),
+`GeometryEngine.clipPolygonToHalfPlane` / `removeCollinearVertices`. ADR-018
+Rules 5–7 and 10 (inherited fields, circuit ownership, atomic undo, tablet
+equivalence) are unchanged.
+
+**Not covered.**
+A boundary that is not straight across all affected zones (e.g. a stepped
+divider) is dragged one straight piece at a time. Zones that only overlap,
+rather than share an edge, are not linked.
+
+**Verification.**
+`test/widget/tools/zone_draw_tool_test.dart` ZDT-8, ZDT-8b, ZDT-9b, ZDT-10;
+`test/widget/tools/select_tool_test.dart` ST-S2, ST-B1 … ST-B5;
+`test/unit/engines/pipe_layout_engine_test.dart` (polygon helpers).
+
+---
+
+## ADR-038 — Tube layout starts at the zone entry; transit lines reduce the zone
+
+**Decision.**
+The meander drawn inside a floor zone is a real, continuous tube path that
+starts where the zone's supply line enters it, and supply/return lines of
+*other* circuits that run through a zone in the screed take their strip of
+floor away from it.
+
+**Rules.**
+
+1. **The entry point is derived from the distribution lines — it is not a
+   separate object.** `PipeLayoutEngine.zoneEntryPoint` resolves, in order:
+   1. the last crossing of the circuit's `supplyRoutePath` with the zone
+      boundary (the exit is the first crossing of `returnRoutePath`);
+   2. for a zone with no route yet, the boundary point nearest the
+      distributor — a preview of where the line will most likely arrive;
+   3. neither available → the layout picks its own start corner.
+
+   *Why not an entry-point object.* The route already says where the pipe
+   arrives; a second object would have to be kept consistent with it by hand
+   and would need its own model, table, tool and validation. Drawing the
+   distribution line is a step the planner performs anyway, and Rule 3 needs
+   those lines regardless. The cost — the layout of an unrouted zone is a
+   guess — is covered by fallback 2. An optional manual override can be added
+   later as a nullable field on `HeatingZone` without changing this order.
+
+   The pipe-route painter stops a route at the boundary of the zone it serves;
+   the zone's tube layout continues from there.
+
+2. **Meander layout.** `PipeLayoutEngine.meanderPath` returns one polyline:
+   `entry → serpentine rows → return lane → exit`.
+   - Rows are scanlines of the actual polygon (not its bounding box), inset by
+     `borderDistanceMm`, so L-shaped zones are followed.
+   - Rows stop one spacing short of one side; the last row runs through and
+     the tube returns along that side (the *return lane*) to the first row, so
+     supply and return meet at the entry.
+   - The row pitch is at most `tubeSpacingMm`; it is tightened slightly where
+     needed to make the row count even (an odd count would strand the tube on
+     the far side).
+   - Of the eight layouts (rows along X or Y × lane on either side × start at
+     either end) the one whose first row starts closest to the entry wins,
+     among those covering ≥ 80 % of the best coverage; layouts that jump a
+     transit corridor, have a stepped return lane, or have the entry away from
+     the first-row side are penalised. Without an entry, rows run along the
+     longer side.
+   - The layout is a drawing aid. Tube length still comes from
+     `HydraulicEngine.zoneTubeLength` (area ÷ spacing), not from the polyline.
+
+3. **Transit lines reduce the zone unless laid beneath it.** For zone *Z*,
+   every supply/return polyline of a circuit that does not serve *Z* is a
+   transit line.
+   - `supplyPipeInsulationType == insulationLayer` (ADR-008: routed in the
+     insulation layer beneath the screed): no effect. The zone lies over the
+     line unchanged.
+   - `none`, `corrugatedConduit`, or not yet chosen: the line owns a corridor
+     one `tubeSpacingMm` wide centred on it. The corridor is cut out of the
+     zone's fill and hatch, the zone's tubes keep a full spacing from the
+     line, and the corridor area is subtracted from the zone's heated area
+     (`zoneEffectiveAreaM2Provider`), which feeds tube length, flow rate, heat
+     output, the ADR-004 colour state and the area shown in the panels.
+     Overlapping corridors count once.
+   - A corridor along an edge simply shortens the layout. A corridor through
+     the middle is jumped: rows run parallel to it on both sides.
+
+   The ADR-008 Rule 4 warning for uninsulated lines crossing a zone stays; the
+   reduction makes the consequence visible and accounted for, it does not make
+   the routing advisable.
+
+**Scope.**
+New `lib/calculation/engines/pipe_layout_engine.dart` and
+`lib/calculation/providers/pipe_layout_providers.dart`; `HeatingZonePainter`,
+`PipeRoutePainter`, the world-layer painters and canvas wiring; area consumers
+in `tube_length_providers.dart`, `flow_rate_providers.dart`,
+`zone_color_state_provider.dart`, the zone/circuit panels and the dashboard.
+No model or schema change.
+
+**Not covered.**
+Only `LayoutPattern.meander` is drawn (as before). The perimeter-based border
+deduction in `zoneTubeLength` still uses the full polygon perimeter. ADR-006
+per-room output attribution of a zone spanning two rooms is unchanged.
+
+**Verification.**
+`test/unit/engines/pipe_layout_engine_test.dart`,
+`test/unit/providers/pipe_layout_providers_test.dart`,
+`test/unit/painters/heating_zone_painter_layout_test.dart`.
+
+---
+
+## ADR-039 — Connection pipes are editable and drawn with the tube's bend radius
+
+**Decision.**
+The supply and return runs between the distributor and a zone (the
+*connection pipes*, German *Anbindeleitungen*) can be reshaped after they are
+drawn, and their corners are drawn as arcs with the minimum bending radius of
+the tube.
+
+**Rules.**
+
+1. **Editing in the Select tool.** Selecting a circuit shows its corner
+   polygon (dashed) and a handle on every corner.
+   - *Fixed ends.* The supply start and the return end sit on the distributor
+     and carry no handle. They move only when the distributor moves.
+   - *Corner drag.* A handle drag moves that corner; it snaps to the grid.
+   - *Shared zone end.* The supply pipe ends where the return pipe starts.
+     That point has one handle and moves on both pipes.
+   - *Section drag.* A press on a pipe between two corners translates that
+     section — both corners move by the same offset, so the section keeps its
+     direction and its neighbours stretch. The offset snaps so the section's
+     first corner lands on the grid.
+   - *Section next to the distributor.* Its distributor end stays fixed; a
+     corner is inserted there so the section can still be moved. This is also
+     how a jog is added to a straight run.
+   - *Removing a corner.* A corner dropped onto its neighbour is merged with
+     it at commit.
+   - *Validity.* The pipe must still end inside the zone it serves (that end
+     defines the connection and, through ADR-038 Rule 1, the zone entry).
+     Otherwise the drag is reverted with the toast *"The connection pipe must
+     end inside its heating zone."*
+   - *Persistence and undo.* The drag writes transient state only
+     (`updateCircuitTransient`, ADR-023); the commit is one
+     `_UpdateCircuitCommand`. Escape reverts.
+   - A press without movement still selects / cycles (deferred tap, ADR-005).
+
+2. **Naming.** The tool is called *Connection pipes* / *Anbindeleitungen*
+   (menu: *Route Connection Pipes* / *Anbindeleitungen verlegen*). "Pipe" did
+   not say which pipe: the tube inside a zone is laid out automatically
+   (ADR-038); this tool draws only the runs between distributor and zone.
+
+3. **Bend radius.** Every corner of a connection pipe and every turn of the
+   zone tube layout is drawn as a circular arc tangent to both adjoining
+   segments, with radius `5 × outerDiameterMm` of the tube type of the zone
+   the circuit serves (`PipeLayoutEngine.minBendRadiusMm`, e.g. 80 mm for a
+   16 mm tube). While a pipe is still being drawn its zone is unknown, so the
+   default (first) tube type is used; once committed it follows its zone.
+   - The stored route stays the list of corner points. The arcs are derived
+     for drawing (`PipeLayoutEngine.filletPolyline`), so corners remain
+     editable and nothing changes in the model or the file format.
+   - Where a segment is too short for the full radius the arc may use at most
+     half of that segment and is therefore tighter.
+     `PipeLayoutEngine.tightestBendRadiusMm` reports the result; no warning is
+     raised yet.
+   - Pipe length is still the length of the corner polyline. Rounding a
+     90° corner with an 80 mm radius shortens the run by about 34 mm, so the
+     calculated length is marginally on the safe side.
+
+**Scope.**
+`SelectTool` (pipe editing), `EditorCallbacks.updateCircuitTransient` and the
+editor-state notifier, `CircuitSelectionData`, `InteractionPainter`,
+`PipeRoutePainter`, `PipeLayoutEngine` (bends),
+`zoneBendRadiiMmProvider` / `defaultBendRadiusMmProvider`, toolbar and menu
+labels.
+
+**Not covered.**
+Inserting a corner in the middle of a run other than by dragging the section
+next to the distributor; moving the distributor still does not carry the pipe
+ends with it (existing behaviour — the zone turns "unconnected", ADR-004).
+
+**Verification.**
+`test/widget/tools/select_tool_test.dart` ST-P1 … ST-P8;
+`test/unit/engines/pipe_layout_engine_test.dart` (bends).
+
+---
+
+## ADR-040 — Connection pipes are drawn as one route and laid out as a pair
+
+**Decision.**
+The connection-pipe tool draws a single route from the distributor to a zone.
+The supply and the return pipe are derived from it as a parallel pair, and
+three distances stored on the circuit — between the two pipes, to heating
+zones, to walls — are applied automatically. A zone is connected by a
+double-click, not by the first click that happens to land in a zone.
+
+**Rules.**
+
+1. **Double-click connects.** Click the distributor to start, click to place
+   route points, **double-click inside the heating zone** to connect it.
+   - A single click inside a zone is an ordinary route point. This is what
+     makes it possible to leave the room the distributor stands in: before,
+     the first click in any zone ended the supply pipe there, and the zone
+     under the distributor caught every route.
+   - Double-click outside every zone: toast *"Double-click inside a heating
+     zone to connect the pipes."*, the route stays. Double-click in a zone
+     that already has a circuit: toast *"This heating zone is already
+     connected."*
+   - The click that starts the route never counts as half of a double-click.
+   - Escape discards the route.
+
+2. **One route, two pipes.** `HeatingCircuit.centerlinePath` stores the drawn
+   route. `PipeLayoutEngine.connectionPipePair` offsets it by half of
+   `pipeSpacingMm` to either side (mitred corners): supply on the left of the
+   direction of travel, return on the right. Both are tied to the distributor
+   at the route's first point. The results are stored in the existing
+   `supplyRoutePath` / `returnRoutePath`, so pipe lengths, the zone entry and
+   exit (ADR-038 Rule 1 — now two points one pipe spacing apart), the route
+   painter and validation read plain polylines as before.
+
+3. **Three distances per circuit** (integer mm, edited in the circuit
+   properties panel under *Connection pipes*):
+   - `pipeSpacingMm` (30–500, default 100) — centre to centre between supply
+     and return.
+   - `zoneClearanceMm` (0–1000, default 100) — between a connection pipe and
+     the nearest tube of a heating zone the pair runs through. Replaces the
+     fixed "one tube spacing" of ADR-038 Rule 3 for circuits with a route:
+     the zone's tubes stay out of `pipeSpacing/2 + zoneClearance` either side
+     of the route, and `pipeSpacing/2 + zoneClearance/2` either side is cut
+     from its heated area (the gap is shared between pipe and zone tube).
+     `insulationLayer` circuits still do not affect zones at all.
+   - `wallClearanceMm` (0–1000, default 100) — between the outer pipe and the
+     face of a wall the route runs along.
+
+   A new circuit takes its distances and insulation type from the pair drawn
+   last, so a setting made once carries over.
+
+4. **Applied automatically.** `PipeLayoutEngine.layOutConnectionPipes` runs
+   whenever a route is drawn, edited, or one of its distances changes:
+   - `snapRouteToWalls` moves every section that runs along a wall (parallel
+     within 3°, overlapping it, outer pipe within `wallClearance + 250 mm` of
+     the face) square to the wall so the outer pipe is exactly
+     `wallClearanceMm` from the face. A corner between two such sections
+     takes both shifts. Sections that cross a wall or run free in the room,
+     and the point on the distributor, are never moved. The operation is
+     stable (applying it twice changes nothing).
+   - Changing a distance in the panel re-lays the pipes at once
+     (`withConnectionPipeDistances`); when the wall distance shrinks, sections
+     at the old distance are still recognised as following their wall.
+
+5. **Live preview.** On every pointer move the tool lays out the route up to
+   the cursor with exactly the code that commits it, so the preview shows
+   both pipes at their final positions — parallel, at the wall distance, with
+   bend radii (ADR-039 Rule 3). The status bar shows the length of both
+   pipes.
+
+6. **Editing (extends ADR-039 Rule 1).** For a circuit with a route the Select
+   tool edits the route: handles sit on its corners, a press on either pipe
+   grabs the route section it belongs to, and both pipes are laid out again
+   on every move.
+
+7. **Circuits drawn before this change** have an empty `centerlinePath` and
+   keep their two independently drawn pipes, the ADR-039 editing of each pipe,
+   and the ADR-038 Rule 3 corridors. Changing any of the three distances
+   converts such a circuit: its supply pipe becomes the route.
+
+**Persistence.**
+Schema v20 adds `centerline_path_json`, `pipe_spacing_mm`,
+`zone_clearance_mm`, `wall_clearance_mm` and `supply_pipe_insulation_type` to
+`heating_circuits` (plain `ALTER TABLE … ADD COLUMN` with defaults). The last
+one fixes an older gap: the ADR-008 insulation type existed on the model but
+was never written to the database or to `.hsp` files, so it was lost on every
+reload — which would also have reset the "laid beneath the heating area"
+choice ADR-038 Rule 3 depends on. `.hsp` files written before v20 import with
+the defaults.
+
+**Not covered.**
+Drawing a circuit is still not an undo step (unchanged). The wall distance is
+applied to sections along walls only — there is no general collision check, so
+a route can still be drawn through a wall. The two pipes use the same bend
+radius rather than concentric arcs.
+
+**Verification.**
+`test/widget/tools/route_draw_tool_test.dart` RDT-1 … RDT-17;
+`test/widget/tools/select_tool_test.dart` ST-R1 … ST-R4;
+`test/widget/panels/circuit_properties_test.dart` CP-1 … CP-5;
+`test/unit/engines/pipe_layout_engine_test.dart` (pipe pair, wall distance);
+`test/unit/providers/pipe_layout_providers_test.dart` (distances, corridors);
+`test/unit/repositories/heating_circuit_persistence_test.dart`;
+`test/unit/models/serialization_test.dart`;
+`test/integration/file_roundtrip_test.dart`.
+
+---
+
+## ADR-041 — Supply and return can be swapped; zone tube leads never cross
+
+**Decision.**
+The two connection pipes of a circuit can trade roles, and the tube layout
+inside a zone always picks a direction in which the leads from the supply and
+to the return pipe cross nothing.
+
+**Rules.**
+
+1. **Crossing-free leads.** Since ADR-040 the supply and return pipe reach a
+   zone at two points one pipe spacing apart. A meander layout ends near its
+   first row in two points — the first-row start and the end of the return
+   lane — and `meanderPath` used to connect the supply to the first row
+   regardless of where the return arrived. When the return entered on the
+   wrong side, the lead from the supply ran across the return lane (bug
+   report screenshot). Now:
+   - every eligible layout (ADR-038 Rule 2) is tried in **both directions**:
+     supply → first row … return lane → return, and supply → return lane …
+     first row → return (the loop simply runs the other way round);
+   - `PipeLayoutEngine.leadCrossings` counts where either lead crosses or
+     touches (within 1 mm) another segment of the tube or the other lead;
+   - the best-scored layout with a crossing-free direction wins; only when
+     none exists is the one with the fewest crossings used.
+
+   The zone therefore "flips" by itself whenever the pipes are drawn,
+   edited, or swapped (Rule 2) — no extra step at the double-click.
+   A rectangular zone is crossing-free for every entry position and order
+   (tested exhaustively along all edges).
+
+2. **Swap supply and return.** Circuit properties → *Connection pipes* →
+   **Swap supply and return**.
+   - For a pair drawn as one route (ADR-040) the route stays and the pipes
+     trade sides: `HeatingCircuit.supplyOnRight` is toggled and the pair is
+     laid out again. Default (false): supply on the left of the route seen
+     from the distributor. The choice survives later distance changes.
+   - For a circuit drawn as two separate pipes the polylines trade places
+     (each reversed).
+   - Swapping twice restores the original. Like the other panel edits it is
+     not an undo step.
+
+**Persistence.**
+Schema v21 adds `supply_on_right INTEGER NOT NULL DEFAULT 0` to
+`heating_circuits`; `.hsp` files without the key import with `false`.
+
+**Not covered.**
+Pipes entering an L-shaped (concave) zone through one of the edges at its
+inner corner: no straight lead can reach either end of the serpentine without
+crossing it, so the layout with the fewest crossings (one) is used. Splitting
+the zone at the corner (ADR-037) or entering through an outer edge avoids it.
+Crossings between pipes of *different* circuits outside zones are not
+checked.
+
+**Verification.**
+`test/unit/engines/pipe_layout_engine_test.dart` (crossing-free leads, swap
+sides); `test/unit/providers/pipe_layout_providers_test.dart` (swap);
+`test/widget/tools/route_draw_tool_test.dart` RDT-18;
+`test/widget/panels/circuit_properties_test.dart` CP-6;
+persistence, serialization and `.hsp` round-trip tests.
+
+---
+
+## ADR-042 — Pipe undo, all four tube layouts, zone identity colours, drawn tube length
+
+**Decision.**
+Four gaps closed together because they share the zone tube layout: every
+change to connection pipes is undoable; every `LayoutPattern` draws a tube;
+zones are told apart by colour; and tube length is measured along the drawing.
+
+**Rules.**
+
+1. **Undo / redo for connection pipes.** Every change to a circuit is one
+   entry on `UndoRedoService` (`circuit_commands.dart`):
+   - drawing a pair (`CreateCircuitCommand`: adds the circuit and connects
+     the zone; undo removes it and disconnects the zone; redo restores the
+     identical circuit);
+   - dragging corners / sections (already, ADR-039);
+   - the circuit panel: the three distances, *Swap supply and return*, the
+     insulation type (`UpdateCircuitCommand`) and *Delete*
+     (`DeleteCircuitCommand`). This supersedes "not an undo step" in
+     ADR-040 and ADR-041.
+
+   Shortcuts: Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y, and the same with Cmd. Flutter
+   reports Cmd as *meta*, which the shortcut map did not contain, so Cmd+Y
+   in particular did nothing on macOS.
+
+2. **Tube layouts.** `PipeLayoutEngine.tubePath` draws all four patterns;
+   before, only the meander was drawn and the others left the zone empty.
+   - **meander** — serpentine rows, return along one side; supply into the
+     first row (ADR-038).
+   - **counterflow** — the same tube with the flow reversed: supply runs
+     along the lane to the far end first, the rows work back to the entry.
+   - **bifilar** — double meander: a serpentine centre line through every
+     pair of rows, the tube laid as a pair either side of it and folded at
+     the far end, so supply and return rows alternate.
+   - **spiral** — snail: concentric rings one spacing apart; the supply
+     takes rings 0, 2, 4 …, the return rings 1, 3, 5 …, joined by a U-turn
+     at the innermost ring; both start side by side at one convex corner.
+     Where rings would cover less than 70 % of the zone (an L-shape: rings
+     stop when the narrowest arm is full) the double meander is used
+     instead; where even that does not fit, the meander.
+   - Turns between rows of very different length (a step in the zone
+     outline) are squared off at the shorter row instead of running
+     diagonally across the step; the stub of the longer row stays without
+     tube.
+   - ADR-041 applies to all patterns. Among the crossing-free options the
+     one with the shortest leads is used; a pattern's own direction of flow
+     is given up only when reversing saves more than 1.5 m of lead.
+   - The spiral does not route around transit corridors; they are still
+     cut out of the drawing and of the heated area.
+
+3. **Zone identity colours.** Each zone is filled, and its tube drawn, in an
+   identity colour from `HeatingPlannerColors.zonePalette` (ten hues).
+   `GeometryEngine.distinctColorIndices` assigns them in zone order: zones
+   whose outlines come within 600 mm of each other (sharing an edge, or
+   either side of a wall) never share a colour; while the palette lasts
+   every zone has its own; after that the least used colour no neighbour
+   has. Adding a zone never changes the colours of earlier zones.
+
+   **ADR-004 is kept but moves to the outline:** the zone outline shows the
+   state colour (red / yellow / green / grey) and an unconnected zone keeps
+   its red hatch. The fill no longer carries the state.
+
+4. **Tube length is measured, not estimated.**
+   - Floor zone: the length of the drawn tube, from where the supply pipe
+     enters the zone to where the return pipe leaves it, bends included
+     (`zoneTubeLengthProvider`). It follows the pattern, the zone shape, the
+     border distance, transit corridors and the entry position.
+   - Circuit: `supply pipe + tube in the zone + return pipe`, each
+     connection pipe measured with its bend radii and only up to the zone
+     boundary (`connectionPipeLengthsM`), so nothing is counted twice
+     (`tubeLengthProvider`, now read from editor state so it follows every
+     edit at once).
+   - Water volume, pressure loss, the maximum-length check and the panels
+     use these values. This supersedes the "tube length still comes from
+     area ÷ spacing" notes in ADR-038 Rule 2 and ADR-039 Rule 3.
+   - Wall heating zones have no drawn layout and keep the area ÷ spacing
+     estimate. Heat output stays area-based (EN 1264).
+
+**Not covered.**
+The drawn row pitch can be slightly below the configured spacing (even row
+count, ADR-038), which now shows up in the length. L-shaped zones lose a
+little coverage at the step in the row-based patterns and get no true snail;
+splitting them into rectangles (ADR-037) gives full coverage.
+
+**Verification.**
+`test/unit/engines/pipe_layout_engine_test.dart` (patterns, colours);
+`test/unit/providers/tube_length_from_drawing_test.dart`;
+`test/unit/painters/heating_zone_painter_layout_test.dart`;
+`test/unit/platform/undo_redo_shortcuts_test.dart`;
+`test/widget/tools/route_draw_tool_test.dart` RDT-19, RDT-20;
+`test/widget/panels/circuit_properties_test.dart` CP-7.

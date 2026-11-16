@@ -245,11 +245,16 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas> {
   5. Output ≥ 100% demand → `zoneGreen` (30% opacity fill)
 - The zone state enum is provided by the Architect's provider; the painter only maps enum → colour.
 - Draw tube routing preview: generate meander/spiral/bifilar/counterflow line paths based on zone polygon, spacing, and border distance.
-- Meander pattern: parallel lines alternating direction, connected at ends.
+- Zone colours (ADR-042 Rule 3): the **outline** carries the ADR-004 state colour; fill and tube use the zone's identity colour (`colors.zonePalette[zoneColorIndicesProvider[id]]`), which never repeats on neighbouring zones.
+- All four layout patterns are drawn (ADR-042 Rule 2) from the same provider.
+- Meander pattern (ADR-038): the painter draws the path from `zonePipeLayoutsProvider` — a continuous polyline that starts where the zone's supply line enters it (`PipeLayoutEngine.zoneEntryPoint`), runs the serpentine rows and comes back along a return lane. Do not generate the meander in the painter from the bounding box.
+- Transit corridors (ADR-038 Rule 3): cut the corridors from `zonePipeLayoutsProvider` out of the zone's fill, hatch and tube layout.
 - Spiral pattern: concentric inward path.
 - These are visual previews — approximate rendering is acceptable.
 
 **Pipe route painter specifics:**
+- Corners are drawn as arcs with the tube's minimum bend radius — `PipeLayoutEngine.filletPolyline` with the radius from `zoneBendRadiiMmProvider` (ADR-039 Rule 3). The stored route stays the corner points.
+- A route is drawn only up to the boundary of the zone it serves (ADR-038 Rule 1).
 - Supply lines: draw polyline in `supplyPipe` colour, 3px width (world-scaled).
 - Return lines: draw polyline in `returnPipe` colour, 3px width.
 - Add small directional arrows every 500mm along the path.
@@ -640,6 +645,17 @@ Rule 1.2); both tools already have `undoRedo` injected via
 ADR-014. See `DECISIONS.md` ADR-018 for the full rules including
 direction selection, minimum-size guard, inherited fields, hover
 preview, and tablet long-press equivalence.
+
+### 7.3 Zone Splitting by Area and Linked Boundaries (ADR-037)
+
+ADR-037 extends §7.2: any floor zone that one straight cut divides in
+two is splittable, and the cut is placed for **equal area**
+(`SplitZoneCommand.equalAreaCut`) rather than at the bounding-box
+midpoint. Fill-room commits the room's inner clear polygon, not
+`Room.polygon`. In `SelectTool`, a press-and-drag on a zone boundary
+moves every zone on that boundary together and commits one
+`_MoveZonesCommand`; see ADR-037 Rule 5 for eligibility, snapping,
+limits and handle priority.
 
 ---
 

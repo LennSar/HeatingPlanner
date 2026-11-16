@@ -520,6 +520,11 @@ agent handles presentation; the data model just stores the path.
 | supplyPipeInsulationType | SupplyPipeInsulationType | enum | required (no default) |
 | supplyRoutePath | List\<Point2D\> | continuous from dist. | required |
 | returnRoutePath | List\<Point2D\> | continuous to dist. | required |
+| centerlinePath | List\<Point2D\> | drawn route, distributor → zone; supply/return are derived from it (ADR-040). Empty = pipes drawn separately | [] |
+| pipeSpacingMm | int | 30–500, supply ↔ return | 100 |
+| zoneClearanceMm | int | 0–1000, pipe ↔ zone tubes | 100 |
+| wallClearanceMm | int | 0–1000, outer pipe ↔ wall face | 100 |
+| supplyOnRight | bool | supply on the right of the route (ADR-041) | false |
 | tubeLengthM | double | calculated | 0.0 |
 | flowRateKgH | double | calculated | 0.0 |
 | pressureLossPa | double | calculated | 0.0 |

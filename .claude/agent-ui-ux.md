@@ -295,20 +295,24 @@ At viewport width < 600dp:
 2. Properties panel shows: supply temperature, return temperature. Pump head is a calculated read-only field shown after circuits are connected (see ADR-007). An optional pump capacity field allows the user to enter an existing pump's rating for validation.
 3. Only one distributor per floor is allowed. If one already exists, show dialog: "Replace existing distributor?" with Move/Replace/Cancel options.
 
-### 5.5 Circuit Routing (Pipe Drawing)
+### 5.5 Circuit Routing (Connection Pipes)
 
-**Trigger:** User selects the Route Pipe tool.
+**Trigger:** User selects the Connection pipes tool. Full rules: `DECISIONS.md` ADR-040 (drawing), ADR-039 (editing, bend radius).
 
-1. User clicks the distributor → route starts from a free port on the distributor.
-2. User clicks waypoints to define the pipe path. Lines drawn in `supplyPipe` colour.
-3. When the user clicks on a heating zone: the supply route is completed, and the system automatically begins the return route (drawn in `returnPipe` colour).
-4. User clicks waypoints for the return path back to the distributor.
-5. When the user clicks the distributor again: circuit is complete. System validates continuity.
-6. If the route is incomplete (user presses Escape), the partial route is discarded.
+1. User clicks the distributor → the route starts at its centre.
+2. User clicks route points. **One** line is drawn; the supply pipe (`supplyPipe` colour) and the return pipe (`returnPipe` colour) are laid out parallel to it automatically. A click inside a heating zone is an ordinary route point.
+3. User **double-clicks inside the heating zone** to connect it. The circuit is complete.
+4. Double-click outside every zone, or in a zone that already has a circuit: toast, the route stays.
+5. Escape discards the route.
+
+**Swap supply and return** (same section) trades the two pipes; the zone's tube layout follows and never lets its leads cross (ADR-041).
+
+**Distances (circuit properties → *Connection pipes*):** distance between supply and return, distance to heating zones, distance to walls. Changing one re-lays the pipes immediately. A new circuit starts with the values of the pair drawn last.
 
 **Visual feedback during routing:**
+- Both pipes are shown live up to the cursor exactly as they would be committed: parallel, at the wall distance, with bend radii.
 - Pipe lines show directional arrows indicating flow direction.
-- Cumulative pipe length is displayed in the status bar during routing.
+- Cumulative length of both pipes is displayed in the status bar during routing.
 - When hovering over a zone that already has a circuit, show a "⚠ Already connected" indicator.
 
 ### 5.6 Selection & Editing
