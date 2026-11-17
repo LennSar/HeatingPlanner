@@ -562,8 +562,8 @@ List<ValidationResult> _manualTubePathResults(Ref ref) {
         elementId: zone.id,
         elementType: 'zone',
         message: 'The hand-drawn tube path ${problems.join(', ')}.',
-        suggestedFix: 'Edit the tube with the Edit tube tool, or reset it '
-            'to automatic in the zone panel.',
+        suggestedFix: 'Edit the tube or reset it to automatic in the '
+            'Tube path section of the zone panel.',
       ),
     );
   }

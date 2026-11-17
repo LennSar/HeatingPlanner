@@ -1,6 +1,7 @@
 // ADR-046 Rule 6: the "Tube path" section of the floor zone panel.
 //
-//   ZT-1  an automatic zone: status, Edit / Draw switch tools, no Reset
+//   ZT-1  an automatic zone: status, Edit / Draw turn their tool on and
+//         off ("Done"), with a hint while active; no Reset
 //   ZT-2  a manual zone: status, pattern hint, Reset (undoable)
 //   ZT-3  choosing a pattern on a manual zone resets it to automatic
 //   ZT-4  the snap switch updates the preference
@@ -128,10 +129,21 @@ void main() {
     expect(find.byKey(const Key('zone-tube-reset')), findsNothing);
     expect(find.byKey(const Key('zone-tube-pattern-ignored')), findsNothing);
 
+    expect(find.byKey(const Key('zone-tube-tool-hint')), findsNothing);
     await _tap(tester, const Key('zone-tube-edit'));
     expect(c.read(selectedToolProvider), DrawingTool.editTube);
+    expect(find.text(l10n.zoneTubePathDone), findsOneWidget);
+    expect(find.text(l10n.tube_editHint), findsOneWidget);
+    await _tap(tester, const Key('zone-tube-edit')); // Done
+    expect(c.read(selectedToolProvider), DrawingTool.select);
+    expect(find.text(l10n.zoneTubePathDone), findsNothing);
+
     await _tap(tester, const Key('zone-tube-draw'));
     expect(c.read(selectedToolProvider), DrawingTool.drawTube);
+    expect(find.text(l10n.zoneTubeDrawStartHint), findsOneWidget);
+    // Edit switches straight over from Draw.
+    await _tap(tester, const Key('zone-tube-edit'));
+    expect(c.read(selectedToolProvider), DrawingTool.editTube);
   });
 
   testWidgets('ZT-2 manual zone: Reset makes it automatic, undo restores', (

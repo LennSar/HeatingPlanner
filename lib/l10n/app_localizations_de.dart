@@ -1707,13 +1707,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String get roomSummary_notes =>
-      'Heizlast: EN 12831. Wärmeabgabe: EN 1264-2 für Vor- und Rücklauftemperatur des Verteilers, Raumtemperatur, Verlegeabstand, Rohr und Bodenbelag, bei angenommenen 45 mm Zementestrich über dem Rohr. Massenstrom: Wärmeabgabe ÷ (4,186 kJ/(kg·K) × Spreizung). Druckverlust: Darcy-Weisbach für den Rohrinnendurchmesser über das Rohr im Raum und beide Anbindeleitungen, zuzüglich 40 % für Bögen und Armaturen.';
-
-  @override
-  String get toolEditTube => 'Rohr bearbeiten';
-
-  @override
-  String get toolDrawTube => 'Rohr zeichnen';
+      'Heizlast: EN 12831. Wärmeabgabe: EN 1264-2 für Vor- und Rücklauftemperatur des Verteilers, Raumtemperatur, Verlegeabstand, Rohr und Bodenbelag, bei angenommenen 45 mm Zementestrich über dem Rohr. Volumenstrom: Wärmeabgabe ÷ (4,186 kJ/(kg·K) × Spreizung), in Litern bei 992,2 kg/m³ (Wasser bei 40 °C). Druckverlust: Darcy-Weisbach für den Rohrinnendurchmesser über das Rohr im Raum und beide Anbindeleitungen, zuzüglich 40 % für Bögen und Armaturen.';
 
   @override
   String get undo_editTubePath => 'Rohrverlauf bearbeiten';
@@ -1773,4 +1767,11 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get zoneTubePatternIgnored =>
       'Das Rohr ist von Hand gezeichnet, das Verlegemuster wird nicht angewendet. Die Wahl eines Musters setzt das Rohr auf automatisch zurück.';
+
+  @override
+  String get zoneTubePathDone => 'Fertig';
+
+  @override
+  String get zoneTubeDrawStartHint =>
+      'In diese Zone klicken, um das Rohr zu beginnen, Eckpunkte setzen, Doppelklick zum Abschließen. Strg+Z nimmt einen Eckpunkt zurück, Esc bricht ab.';
 }

@@ -3539,8 +3539,8 @@ Rule 5.
    disconnects the tube. All other corners stay where they were put. An
    unconnected zone keeps both ends as drawn.
 
-3. **Edit tool (`DrawingTool.editTube`, key T).** Edits the selected floor
-   zone's tube, or the floor zone clicked. Every interior corner has a
+3. **Edit tool (`DrawingTool.editTube`).** Edits the tube of the zone
+   selected in the panel (a click on another floor zone switches to it). Every interior corner has a
    handle; the two ends have none.
    - Drag a corner: it lines up with a neighbouring corner per axis within
      a third of the spacing (segments stay square), else the grid.
@@ -3551,20 +3551,22 @@ Rule 5.
      ADR-039).
    - Double-click a run to add a corner. Click a handle and press Delete /
      Backspace to remove it. A corner dropped onto its neighbour merges.
-   - Escape reverts a drag in progress. Every committed change is one undo
-     step; undoing the first change of an automatic zone makes it automatic
-     again.
+   - Escape reverts a drag in progress or drops the corner selection; with
+     nothing left to cancel it returns to the Select tool. Every committed
+     change is one undo step; undoing the first change of an automatic zone
+     makes it automatic again.
    It is a separate tool rather than part of the Select tool, so the tube
    handles never compete with the zone-outline handles.
 
-4. **Draw tool (`DrawingTool.drawTube`, Shift+T).** Click inside a floor
-   zone; a connected zone's tube starts at its supply entry, an unconnected
-   one at the click. Click corners; double-click finishes, and a connected
+4. **Draw tool (`DrawingTool.drawTube`).** Draws in the zone selected in
+   the panel. Click inside it; a connected zone's tube starts at its supply
+   entry, an unconnected one at the click. Click corners; double-click finishes, and a connected
    zone's tube then runs on to its return exit. Corners outside the zone
    are refused with a toast. Backspace removes the last corner; Escape
-   discards. The preview shows the tube with its bend radius; the status
-   bar shows its length. The result replaces any earlier tube (one undo
-   step).
+   discards, and with nothing drawn returns to the Select tool. The preview
+   shows the tube with its bend radius; the status bar shows its length.
+   The result replaces any earlier tube (one undo step), and the tool
+   returns to Select.
 
 5. **Snapping** (`PipeLayoutEngine.snapTubePoint`) is on by default:
    segments are horizontal or vertical; a segment's end lines up with the
@@ -3576,9 +3578,13 @@ Rule 5.
    corners* turns snapping off for both tools; the choice is kept in the
    app preferences.
 
-6. **Panel.** The floor zone panel has a *Tube path* section: status
-   (Automatic / Manual), *Edit*, *Draw manually*, *Reset to automatic* (only
-   when manual) and the snap switch. With a manual path a hint under the
+6. **Panel — the only way in.** The tube tools are part of the heating
+   zone, not standalone tools: they have no toolbar button, menu entry or
+   shortcut, and are started from the floor zone panel's *Tube path*
+   section: status (Automatic / Manual), *Edit*, *Draw manually*, *Reset to
+   automatic* (only when manual) and the snap switch. While a tube tool is
+   active its button reads *Done* (back to the Select tool) and a hint
+   below says how to use it. With a manual path a hint under the
    pattern says it is not applied; choosing a pattern resets the tube to
    automatic.
 

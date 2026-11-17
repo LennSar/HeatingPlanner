@@ -82,4 +82,9 @@ abstract class CanvasTool {
 
   /// Ctrl/Cmd+Y / Ctrl+Shift+Z counterpart of [undoInTool].
   bool redoInTool() => false;
+
+  /// Escape pressed while this tool is active. Defaults to [cancel];
+  /// a tool that is only entered for a task (the tube tools, ADR-046)
+  /// leaves itself when there is nothing left to cancel.
+  void escape() => cancel();
 }

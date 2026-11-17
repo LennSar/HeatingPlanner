@@ -433,12 +433,17 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
         ref.read(zoneTubeCornersProvider)[zoneId];
     bool tubeSnap() =>
         ref.read(tubeSnapEnabledProvider).asData?.value ?? true;
+    // They are entered from the zone panel and Escape leads back to
+    // the Select tool.
+    void backToSelect() =>
+        ref.read(selectedToolProvider.notifier).select(DrawingTool.select);
     _tools[DrawingTool.editTube] = TubeEditTool(
       callbacks: this,
       onStateChanged: onChanged,
       undoRedo: undoRedo,
       tubeCorners: tubeCorners,
       snapEnabled: tubeSnap,
+      onExit: backToSelect,
     );
     _tools[DrawingTool.drawTube] = TubeDrawTool(
       callbacks: this,
@@ -449,6 +454,7 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
           ref.read(zoneBendRadiiMmProvider)[zoneId] ??
           ref.read(defaultBendRadiusMmProvider),
       snapEnabled: tubeSnap,
+      onExit: backToSelect,
     );
   }
 
@@ -1074,12 +1080,15 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
     ref.listen<DrawingTool>(selectedToolProvider, (previous, next) {
       if (previous == null || previous == next) return;
       _tools[previous]?.cancel();
-      // ADR-046: the tube edit tool starts on the selected floor zone.
-      final editTube = _tools[DrawingTool.editTube];
-      if (next == DrawingTool.editTube && editTube is TubeEditTool) {
-        final selected = ref.read(selectedElementProvider);
-        editTube.zoneId = selected?.type == 'zone' ? selected!.id : null;
-        _setInteractionData(editTube.getInteractionData());
+      // ADR-046: the tube tools work on the floor zone selected in the
+      // panel they were started from.
+      final selected = ref.read(selectedElementProvider);
+      final zoneId = selected?.type == 'zone' ? selected!.id : null;
+      final tool = _tools[next];
+      if (tool is TubeEditTool) tool.zoneId = zoneId;
+      if (tool is TubeDrawTool) tool.zoneId = zoneId;
+      if (tool is TubeEditTool || tool is TubeDrawTool) {
+        _setInteractionData(tool!.getInteractionData());
       }
     });
 
@@ -1087,7 +1096,7 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
     // completes. ref.listen fires its callback post-build,
     // avoiding "modified provider during build" errors.
     ref.listen<int>(toolCancelProvider, (_, __) {
-      _activeTool?.cancel();
+      _activeTool?.escape();
     });
     ref.listen<int>(toolDeleteProvider, (_, __) {
       _activeTool?.onDelete();

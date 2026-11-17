@@ -1693,13 +1693,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get roomSummary_notes =>
-      'Heat demand: EN 12831. Delivered heat: EN 1264-2 for the distributor\'s supply and return temperature, the room temperature, tube spacing, tube and floor covering, assuming 45 mm cement screed above the tube. Flow rate: delivered heat ÷ (4.186 kJ/(kg·K) × temperature spread). Pressure loss: Darcy–Weisbach for the tube\'s inner diameter over the tube in the room and both connection pipes, plus 40 % for bends and fittings.';
-
-  @override
-  String get toolEditTube => 'Edit tube';
-
-  @override
-  String get toolDrawTube => 'Draw tube';
+      'Heat demand: EN 12831. Delivered heat: EN 1264-2 for the distributor\'s supply and return temperature, the room temperature, tube spacing, tube and floor covering, assuming 45 mm cement screed above the tube. Flow rate: delivered heat ÷ (4.186 kJ/(kg·K) × temperature spread), in litres at 992.2 kg/m³ (water at 40 °C). Pressure loss: Darcy–Weisbach for the tube\'s inner diameter over the tube in the room and both connection pipes, plus 40 % for bends and fittings.';
 
   @override
   String get undo_editTubePath => 'Edit tube path';
@@ -1758,4 +1752,11 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get zoneTubePatternIgnored =>
       'The tube is drawn by hand, so the pattern is not applied. Choosing a pattern resets the tube to automatic.';
+
+  @override
+  String get zoneTubePathDone => 'Done';
+
+  @override
+  String get zoneTubeDrawStartHint =>
+      'Click inside this zone to start the tube, click corners, double-click to finish. Ctrl+Z takes back a corner, Escape cancels.';
 }

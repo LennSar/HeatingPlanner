@@ -132,6 +132,7 @@ class _HeatingZonePropertiesState
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
     final l10n = AppLocalizations.of(context)!;
+    final activeTool = ref.watch(selectedToolProvider);
 
     final editorState = ref.watch(editorStateProvider);
     final floorHeightMm = ref.watch(floorHeightMmProvider);
@@ -477,25 +478,25 @@ class _HeatingZonePropertiesState
               style: textTheme.bodySmall,
             ),
             const SizedBox(height: Spacing.sm),
+            // The tube tools are only reachable from here (ADR-046): each
+            // button turns its tool on for this zone, and off again.
             Wrap(
               spacing: Spacing.sm,
               runSpacing: Spacing.xs,
               children: [
-                OutlinedButton.icon(
-                  key: const Key('zone-tube-edit'),
-                  icon: const Icon(Icons.timeline),
-                  label: Text(l10n.zoneTubePathEdit),
-                  onPressed: () => ref
-                      .read(selectedToolProvider.notifier)
-                      .select(DrawingTool.editTube),
+                _TubeToolButton(
+                  buttonKey: const Key('zone-tube-edit'),
+                  tool: DrawingTool.editTube,
+                  icon: Icons.timeline,
+                  label: l10n.zoneTubePathEdit,
+                  doneLabel: l10n.zoneTubePathDone,
                 ),
-                OutlinedButton.icon(
-                  key: const Key('zone-tube-draw'),
-                  icon: const Icon(Icons.gesture),
-                  label: Text(l10n.zoneTubePathDraw),
-                  onPressed: () => ref
-                      .read(selectedToolProvider.notifier)
-                      .select(DrawingTool.drawTube),
+                _TubeToolButton(
+                  buttonKey: const Key('zone-tube-draw'),
+                  tool: DrawingTool.drawTube,
+                  icon: Icons.gesture,
+                  label: l10n.zoneTubePathDraw,
+                  doneLabel: l10n.zoneTubePathDone,
                 ),
                 if (zone.manualTubePath != null)
                   TextButton(
@@ -505,6 +506,17 @@ class _HeatingZonePropertiesState
                   ),
               ],
             ),
+            if (activeTool == DrawingTool.editTube ||
+                activeTool == DrawingTool.drawTube) ...[
+              const SizedBox(height: Spacing.xs),
+              Text(
+                activeTool == DrawingTool.editTube
+                    ? l10n.tube_editHint
+                    : l10n.zoneTubeDrawStartHint,
+                key: const Key('zone-tube-tool-hint'),
+                style: textTheme.bodySmall,
+              ),
+            ],
             SwitchListTile(
               key: const Key('zone-tube-snap'),
               dense: true,
@@ -937,6 +949,46 @@ class _CustomRValueField extends StatelessWidget {
         controller.text = clamped.toStringAsFixed(3);
         onSubmitted(clamped);
       },
+    );
+  }
+}
+
+// ── Tube tool button (ADR-046) ────────────────────────────────────────────────
+
+/// Turns the tube [tool] on for the selected zone, or — while it is the
+/// active tool — off again ("Done", back to the Select tool).
+class _TubeToolButton extends ConsumerWidget {
+  const _TubeToolButton({
+    required this.buttonKey,
+    required this.tool,
+    required this.icon,
+    required this.label,
+    required this.doneLabel,
+  });
+
+  final Key buttonKey;
+  final DrawingTool tool;
+  final IconData icon;
+  final String label;
+  final String doneLabel;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final active = ref.watch(selectedToolProvider) == tool;
+    final notifier = ref.read(selectedToolProvider.notifier);
+    if (active) {
+      return FilledButton.icon(
+        key: buttonKey,
+        icon: const Icon(Icons.check),
+        label: Text(doneLabel),
+        onPressed: () => notifier.select(DrawingTool.select),
+      );
+    }
+    return OutlinedButton.icon(
+      key: buttonKey,
+      icon: Icon(icon),
+      label: Text(label),
+      onPressed: () => notifier.select(tool),
     );
   }
 }

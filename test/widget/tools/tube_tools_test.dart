@@ -12,6 +12,9 @@
 //                 refused corners, Backspace / Escape, unconnected zone,
 //                 no floor zone
 //   TD-8          draw tool: Ctrl+Z / Ctrl+Y per corner while drawing
+//   TE-11, TD-9   Escape with nothing to cancel leaves the tool; the draw
+//                 tool is bound to the zone from the panel and leaves
+//                 itself once the tube is finished
 //   UR-1          the undo service gives the active tool the first chance
 
 import 'package:flutter/gestures.dart';
@@ -501,6 +504,74 @@ void main() {
       undo.undo();
       expect(tool.isDrawing, isFalse);
       expect(cb.zone.manualTubePath, isNotNull);
+    });
+  });
+
+  group('leaving the tools (Escape, finish)', () {
+    test('TE-11 Escape drops a corner selection first, then leaves', () {
+      final cb = _StubCallbacks([_zone]);
+      var exits = 0;
+      final tool = TubeEditTool(
+        callbacks: cb,
+        onStateChanged: () {},
+        undoRedo: UndoRedoService(),
+        tubeCorners: _cornersOf(cb),
+        snapEnabled: () => true,
+        onExit: () => exits++,
+      )..zoneId = _zone.id;
+
+      tool.onTap(const Point2D(x: 200, y: 500), _mouse); // select a corner
+      tool.escape();
+      expect(exits, 0);
+      expect(
+        (tool.getInteractionData()! as TubePathData).selectedHandleIndex,
+        isNull,
+      );
+      tool.escape();
+      expect(exits, 1);
+    });
+
+    test('TD-9 bound to the panel zone; finishing or Escape leaves', () {
+      final other = _zone.copyWith(
+        id: 'zone-2',
+        polygon: const [
+          Point2D(x: 5000, y: 0),
+          Point2D(x: 8000, y: 0),
+          Point2D(x: 8000, y: 3000),
+          Point2D(x: 5000, y: 3000),
+        ],
+      );
+      final cb = _StubCallbacks([_zone, other]);
+      var exits = 0;
+      final tool = TubeDrawTool(
+        callbacks: cb,
+        onStateChanged: () {},
+        undoRedo: UndoRedoService(),
+        tubeCorners: _cornersOf(cb),
+        bendRadiusMm: (_) => 80,
+        snapEnabled: () => false,
+        onExit: () => exits++,
+      )..zoneId = _zone.id;
+
+      // A click in another zone does not start a tube there.
+      tool.onTap(const Point2D(x: 6000, y: 1000), _mouse);
+      expect(tool.isDrawing, isFalse);
+      expect(cb.toasts, [cb.l10n.tube_mustStayInZoneToast]);
+
+      // Escape while drawing discards but stays in the tool.
+      tool.onTap(const Point2D(x: 100, y: 150), _mouse);
+      tool.escape();
+      expect(tool.isDrawing, isFalse);
+      expect(exits, 0);
+
+      tool.onTap(const Point2D(x: 100, y: 150), _mouse);
+      tool.onTap(const Point2D(x: 2000, y: 1500), _mouse);
+      tool.onTap(const Point2D(x: 2000, y: 1500), _mouse); // double-click
+      expect(cb.zone.manualTubePath, isNotNull);
+      expect(exits, 1);
+
+      tool.escape(); // nothing drawn → leave
+      expect(exits, 2);
     });
   });
 

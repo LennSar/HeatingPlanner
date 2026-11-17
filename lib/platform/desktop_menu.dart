@@ -302,25 +302,6 @@ class DesktopMenuBar extends ConsumerWidget {
               Actions.invoke(context, const RotateOrRoutePipeIntent()),
         ),
         PlatformMenuItem(
-          label: l10n.toolEditTube,
-          shortcut: const SingleActivator(LogicalKeyboardKey.keyT),
-          onSelected: () => Actions.invoke(
-            context,
-            const SwitchToolIntent(DrawingTool.editTube),
-          ),
-        ),
-        PlatformMenuItem(
-          label: l10n.toolDrawTube,
-          shortcut: const SingleActivator(
-            LogicalKeyboardKey.keyT,
-            shift: true,
-          ),
-          onSelected: () => Actions.invoke(
-            context,
-            const SwitchToolIntent(DrawingTool.drawTube),
-          ),
-        ),
-        PlatformMenuItem(
           label: l10n.toolMeasure,
           shortcut: const SingleActivator(LogicalKeyboardKey.keyM),
           onSelected: () => Actions.invoke(

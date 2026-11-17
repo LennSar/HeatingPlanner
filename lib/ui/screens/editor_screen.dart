@@ -336,16 +336,6 @@ class _Toolbar extends StatelessWidget {
           l10n.toolPipe,
         ),
         _ToolEntry(
-          DrawingTool.editTube,
-          Icons.timeline,
-          l10n.toolEditTube,
-        ),
-        _ToolEntry(
-          DrawingTool.drawTube,
-          Icons.gesture,
-          l10n.toolDrawTube,
-        ),
-        _ToolEntry(
           DrawingTool.measure,
           Icons.straighten,
           l10n.toolMeasure,

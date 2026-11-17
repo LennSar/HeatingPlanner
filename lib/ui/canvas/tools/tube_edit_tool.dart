@@ -13,7 +13,9 @@ import 'undo_redo_service.dart';
 
 /// Tool for correcting the tube inside a floor heating zone (ADR-046).
 ///
-/// Click a floor zone to edit its tube. Its corners get handles:
+/// Started from the *Tube path* section of the zone panel; works on the
+/// zone selected there (a click on another floor zone switches to it).
+/// Its corners get handles:
 ///
 /// - **Drag a corner** to move it. With snapping on it lines up with its
 ///   neighbours (so the segments stay square) or snaps to the grid.
@@ -23,7 +25,8 @@ import 'undo_redo_service.dart';
 /// - **Double-click a run** to add a corner there.
 /// - **Click a handle, then Delete / Backspace** to remove that corner.
 /// - **Alt** places freely for the current drag.
-/// - **Escape** cancels a drag in progress.
+/// - **Escape** cancels a drag in progress or drops the corner selection;
+///   with nothing left to cancel it leaves the tool ([onExit]).
 /// - **Ctrl/Cmd+Z / Ctrl/Cmd+Y** undo and redo committed changes; the
 ///   handles follow at once. During a drag, Ctrl+Z reverts the drag.
 ///
@@ -40,7 +43,12 @@ class TubeEditTool extends CanvasTool with ModifierDrawTool {
     required this.undoRedo,
     required this.tubeCorners,
     required this.snapEnabled,
+    this.onExit,
   });
+
+  /// Called when Escape is pressed with nothing to cancel — switches
+  /// back to the Select tool.
+  final void Function()? onExit;
 
   /// Undo/redo stack — every committed change is one entry.
   final UndoRedoService undoRedo;
@@ -290,6 +298,16 @@ class TubeEditTool extends CanvasTool with ModifierDrawTool {
     _clearDrag();
     _selectedCorner = null;
     onStateChanged();
+  }
+
+  @override
+  void escape() {
+    final busy = (_dragOriginal != null && _dragMoved) || _selectedCorner != null;
+    if (busy) {
+      cancel();
+    } else {
+      onExit?.call();
+    }
   }
 
   @override

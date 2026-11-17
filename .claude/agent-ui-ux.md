@@ -317,7 +317,7 @@ At viewport width < 600dp:
 
 ### 5.5a Tube Path Editing and Drawing (ADR-046)
 
-**Trigger:** *Edit tube* (T) or *Draw tube* (Shift+T), or *Edit* / *Draw manually* in the zone panel's *Tube path* section. Full rules: `DECISIONS.md` ADR-046.
+**Trigger:** *Edit* or *Draw manually* in the floor zone panel's *Tube path* section — the only entry point; there is no toolbar button, menu entry or shortcut. While active the button reads *Done*; Escape with nothing in progress, or finishing a drawn tube, returns to the Select tool. Full rules: `DECISIONS.md` ADR-046.
 
 - **Edit tube:** works on the selected floor zone (or the one clicked). Handles on every tube corner except the two ends, which follow the connection pipes. Drag a corner; drag a run to move it as a whole; double-click a run to add a corner; select a corner and press Delete to remove it. The first change stores the automatic layout as the zone's manual tube path; undo makes it automatic again.
 - **Draw tube:** click in a floor zone (a connected zone's tube starts at its supply entry), click corners, double-click to finish (it runs on to the return exit). Backspace removes the last corner, Escape discards. Corners outside the zone are refused.
@@ -1116,8 +1116,6 @@ thickness changes."*
 | G | Distributor tool | Editor (G for "Gabelung"/manifold) |
 | R | Route pipe tool | Editor |
 | M | Measure tool | Editor |
-| T | Edit tube tool (ADR-046) | Editor |
-| Shift + T | Draw tube tool (ADR-046) | Editor |
 | Ctrl/Cmd + = | Zoom in | Editor |
 | Ctrl/Cmd + - | Zoom out | Editor |
 | Ctrl/Cmd + 0 | Zoom to fit | Editor |

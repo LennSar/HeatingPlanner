@@ -3083,20 +3083,8 @@ abstract class AppLocalizations {
   /// Room summary — footnote naming the calculation methods behind the columns (ADR-045)
   ///
   /// In en, this message translates to:
-  /// **'Heat demand: EN 12831. Delivered heat: EN 1264-2 for the distributor\'s supply and return temperature, the room temperature, tube spacing, tube and floor covering, assuming 45 mm cement screed above the tube. Flow rate: delivered heat ÷ (4.186 kJ/(kg·K) × temperature spread). Pressure loss: Darcy–Weisbach for the tube\'s inner diameter over the tube in the room and both connection pipes, plus 40 % for bends and fittings.'**
+  /// **'Heat demand: EN 12831. Delivered heat: EN 1264-2 for the distributor\'s supply and return temperature, the room temperature, tube spacing, tube and floor covering, assuming 45 mm cement screed above the tube. Flow rate: delivered heat ÷ (4.186 kJ/(kg·K) × temperature spread), in litres at 992.2 kg/m³ (water at 40 °C). Pressure loss: Darcy–Weisbach for the tube\'s inner diameter over the tube in the room and both connection pipes, plus 40 % for bends and fittings.'**
   String get roomSummary_notes;
-
-  /// Toolbar tooltip and menu entry for the tube edit tool (ADR-046)
-  ///
-  /// In en, this message translates to:
-  /// **'Edit tube'**
-  String get toolEditTube;
-
-  /// Toolbar tooltip and menu entry for drawing a zone's tube by hand (ADR-046)
-  ///
-  /// In en, this message translates to:
-  /// **'Draw tube'**
-  String get toolDrawTube;
 
   /// Undo label: a change made with the tube edit tool
   ///
@@ -3199,6 +3187,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'The tube is drawn by hand, so the pattern is not applied. Choosing a pattern resets the tube to automatic.'**
   String get zoneTubePatternIgnored;
+
+  /// Zone panel: leaves the active tube tool (back to Select)
+  ///
+  /// In en, this message translates to:
+  /// **'Done'**
+  String get zoneTubePathDone;
+
+  /// Zone panel: hint while the tube draw tool is active
+  ///
+  /// In en, this message translates to:
+  /// **'Click inside this zone to start the tube, click corners, double-click to finish. Ctrl+Z takes back a corner, Escape cancels.'**
+  String get zoneTubeDrawStartHint;
 }
 
 class _AppLocalizationsDelegate

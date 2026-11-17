@@ -13,6 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/core/theme/app_theme.dart';
 import 'package:heating_planner/data/database/app_database.dart' as $db;
+import 'package:heating_planner/data/models/enums.dart';
 import 'package:heating_planner/data/models/heating_zone.dart';
 import 'package:heating_planner/data/models/point2d.dart';
 import 'package:heating_planner/l10n/app_localizations.dart';
@@ -20,6 +21,7 @@ import 'package:heating_planner/repositories/app_preferences.dart';
 import 'package:heating_planner/ui/canvas/canvas_controller.dart';
 import 'package:heating_planner/ui/canvas/floor_plan_canvas.dart';
 import 'package:heating_planner/ui/providers/editor_state_provider.dart';
+import 'package:heating_planner/ui/providers/selection_provider.dart';
 import 'package:heating_planner/ui/screens/editor_screen.dart';
 import 'package:shared_preferences_platform_interface/in_memory_shared_preferences_async.dart';
 import 'package:shared_preferences_platform_interface/shared_preferences_async_platform_interface.dart';
@@ -159,8 +161,17 @@ void main() {
         ?.map((p) => Point2D(x: p.x.roundToDouble(), y: p.y.roundToDouble()))
         .toList();
 
-    await tester.tap(find.byTooltip('Draw tube'));
+    // The tube tools are not in the toolbar; they are started from the
+    // zone panel's Tube path section.
+    expect(find.byTooltip('Draw tube'), findsNothing);
+    container
+        .read(selectedElementProvider.notifier)
+        .select(const SelectedElement(type: 'zone', id: 'tu-zone-1'));
     await _pump(tester);
+    await tester.ensureVisible(find.byKey(const Key('zone-tube-draw')));
+    await tester.tap(find.byKey(const Key('zone-tube-draw')));
+    await _pump(tester);
+    expect(container.read(selectedToolProvider), DrawingTool.drawTube);
 
     await click(500, 500); // start
     await click(3000, 500);
@@ -175,6 +186,8 @@ void main() {
     await tester.tapAt(w2g(1000, 1000));
     await _pump(tester);
 
+    // Finishing returns to the Select tool.
+    expect(container.read(selectedToolProvider), DrawingTool.select);
     expect(tube(), const [
       Point2D(x: 500, y: 500),
       Point2D(x: 3000, y: 500),

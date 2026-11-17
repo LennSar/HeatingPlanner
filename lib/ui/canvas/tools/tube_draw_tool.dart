@@ -14,8 +14,11 @@ import 'undo_redo_service.dart';
 /// Tool for drawing the tube inside a floor heating zone by hand
 /// (ADR-046).
 ///
+/// Started from the *Tube path* section of the zone panel and works on
+/// the zone selected there ([zoneId]).
+///
 /// Interaction flow:
-///  1. Click inside a floor zone. A connected zone's tube starts where its
+///  1. Click inside the zone. A connected zone's tube starts where its
 ///     supply pipe enters the zone; an unconnected zone's at the click.
 ///  2. Click to place corners. With snapping on (the panel toggle), each
 ///     segment is horizontal or vertical, rows lie a whole tube spacing
@@ -25,10 +28,11 @@ import 'undo_redo_service.dart';
 ///  3. **Double-click** to finish. A connected zone's tube then runs on to
 ///     where its return pipe leaves the zone. The tube is stored as the
 ///     zone's [HeatingZone.manualTubePath] — one undo step, replacing any
-///     earlier manual or automatic tube.
+///     earlier manual or automatic tube — and the tool is left
+///     ([onExit]).
 ///  4. **Backspace / Delete** or **Ctrl/Cmd+Z** removes the last corner,
 ///     **Ctrl/Cmd+Y** (or Ctrl+Shift+Z) puts it back; **Escape** discards
-///     the tube. Ctrl+Z on the starting point alone ends the drawing.
+///     the tube, and with nothing drawn leaves the tool. Ctrl+Z on the starting point alone ends the drawing.
 ///     Once finished, the whole tube is one entry on the undo stack.
 ///
 /// The preview shows the tube with its bend radius and its length.
@@ -41,7 +45,12 @@ class TubeDrawTool extends CanvasTool with ModifierDrawTool {
     required this.tubeCorners,
     required this.bendRadiusMm,
     required this.snapEnabled,
+    this.onExit,
   });
+
+  /// Called when a tube is finished, or Escape is pressed with nothing
+  /// drawn — switches back to the Select tool.
+  final void Function()? onExit;
 
   /// Undo/redo stack — a finished tube is one entry.
   final UndoRedoService undoRedo;
@@ -56,7 +65,9 @@ class TubeDrawTool extends CanvasTool with ModifierDrawTool {
   /// Whether snapping is on (the panel toggle). Alt overrides it.
   final bool Function() snapEnabled;
 
-  String? _zoneId;
+  /// Zone the tube is drawn in — the zone selected in the panel. When
+  /// null, the first click picks the floor zone under it.
+  String? zoneId;
   final List<Point2D> _points = [];
 
   /// Corners taken back with Ctrl+Z while drawing, most recent last —
@@ -80,7 +91,7 @@ class TubeDrawTool extends CanvasTool with ModifierDrawTool {
   bool get isDrawing => _points.isNotEmpty;
 
   HeatingZone? get _zone {
-    final id = _zoneId;
+    final id = zoneId;
     if (id == null) return null;
     return callbacks.currentZones.where((z) => z.id == id).firstOrNull;
   }
@@ -145,6 +156,15 @@ class TubeDrawTool extends CanvasTool with ModifierDrawTool {
   void cancel() => _reset();
 
   @override
+  void escape() {
+    if (isDrawing) {
+      _reset();
+    } else {
+      onExit?.call();
+    }
+  }
+
+  @override
   bool undoInTool() {
     if (!isDrawing) return false;
     if (_points.length > 1) {
@@ -189,12 +209,25 @@ class TubeDrawTool extends CanvasTool with ModifierDrawTool {
   // ----------------------------------------------------------------
 
   void _start(Point2D worldPoint) {
-    final zone = _floorZoneAt(worldPoint);
-    if (zone == null) {
-      callbacks.showToast(callbacks.l10n.tube_clickFloorZoneToast);
-      return;
+    final target = _zone;
+    final HeatingZone? zone;
+    if (target != null) {
+      // Bound to the zone from the panel: the tube starts inside it.
+      zone = GeometryEngine.isPointInPolygon(worldPoint, target.polygon)
+          ? target
+          : null;
+      if (zone == null) {
+        callbacks.showToast(callbacks.l10n.tube_mustStayInZoneToast);
+        return;
+      }
+    } else {
+      zone = _floorZoneAt(worldPoint);
+      if (zone == null) {
+        callbacks.showToast(callbacks.l10n.tube_clickFloorZoneToast);
+        return;
+      }
     }
-    _zoneId = zone.id;
+    zoneId = zone.id;
     final current = tubeCorners(zone.id) ?? const [];
     final connected = zone.circuitId != null && current.length >= 2;
     _undonePoints.clear();
@@ -231,6 +264,7 @@ class TubeDrawTool extends CanvasTool with ModifierDrawTool {
       label: callbacks.l10n.undo_drawTubePath,
     ));
     _reset();
+    onExit?.call();
   }
 
   Point2D _snap(Point2D raw, HeatingZone zone) {
@@ -258,7 +292,6 @@ class TubeDrawTool extends CanvasTool with ModifierDrawTool {
   void _reset() {
     _points.clear();
     _undonePoints.clear();
-    _zoneId = null;
     _exit = null;
     _cursor = null;
     _lastTapTime = null;
