@@ -177,6 +177,7 @@ lib/
 │       ├── heat_demand_providers.dart
 │       ├── heat_output_providers.dart
 │       ├── pressure_loss_providers.dart
+│       ├── room_summary_providers.dart    # ADR-045
 │       ├── hydraulic_balance_providers.dart
 │       ├── tube_length_providers.dart
 │       ├── water_volume_providers.dart
@@ -226,7 +227,8 @@ lib/
 │   └── dialogs/
 │       ├── material_picker_dialog.dart
 │       ├── export_dialog.dart
-│       └── project_settings_dialog.dart
+│       ├── project_settings_dialog.dart
+│       └── room_summary_dialog.dart       # ADR-045
 │
 ├── export/
 │   ├── pdf_report_generator.dart
@@ -584,11 +586,14 @@ Use `@riverpod` annotation with code generation. Every provider is defined in th
 | `waterVolumeProvider` | Provider.family | circuitId | double (L) | water_volume_providers.dart |
 | `flowRateProvider` | Provider.family | circuitId | double (kg/h) | flow_rate_providers.dart |
 | `pressureLossProvider` | FutureProvider.family | circuitId | double (Pa) | pressure_loss_providers.dart |
+| `zoneHeatedAreaM2Provider` | Provider.family | zoneId | double (m²) | heat_output_providers.dart |
+| `zoneHeatOutputWProvider` | Provider.family | zoneId | double (W) | heat_output_providers.dart |
 | `hydraulicBalanceProvider` | FutureProvider.family | distributorId | Map\<String, double\> | hydraulic_balance_providers.dart |
 | **UI state providers** | | | | |
 | `selectedToolProvider` | StateProvider | — | DrawingTool | editor_screen.dart |
 | `canvasTransformProvider` | StateNotifierProvider | — | Matrix4 | canvas_controller.dart |
 | `selectedElementProvider` | StateProvider | — | (String type, String id)? | editor_screen.dart |
+| `floorSummaryProvider` | Provider | — | FloorSummary (rooms + totals, ADR-045) | room_summary_providers.dart |
 | `validationResultsProvider` | Provider.family | projectId | List\<ValidationResult\> | validation_service.dart |
 
 ### 6.3 Invalidation Cascade

@@ -1606,4 +1606,80 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get settingsCustomMaterialLibraryFilePickerTitle =>
       'Bibliothek für benutzerdefinierte Materialien wählen';
+
+  @override
+  String get tooltipRoomSummary => 'Raumübersicht';
+
+  @override
+  String get roomSummary_title => 'Raumübersicht';
+
+  @override
+  String get roomSummary_empty =>
+      'Zeichne einen Raum, um seine Wärmebilanz zu sehen.';
+
+  @override
+  String get roomSummary_colRoom => 'Raum / Heizkreis';
+
+  @override
+  String get roomSummary_colArea => 'Heizfläche';
+
+  @override
+  String get roomSummary_colDemand => 'Heizlast';
+
+  @override
+  String get roomSummary_colTemps => 'Vorlauf / Rücklauf';
+
+  @override
+  String get roomSummary_colFlow => 'Massenstrom';
+
+  @override
+  String get roomSummary_colSpecificOutput => 'Wärmestromdichte';
+
+  @override
+  String get roomSummary_colOutput => 'Wärmeabgabe';
+
+  @override
+  String get roomSummary_colDifference => 'Differenz';
+
+  @override
+  String get roomSummary_colSurfaceTemp => 'Oberflächentemp.';
+
+  @override
+  String get roomSummary_colTube => 'Rohr';
+
+  @override
+  String get roomSummary_colPressureLoss => 'Druckverlust';
+
+  @override
+  String get roomSummary_colLengthInRoom => 'Rohr im Raum';
+
+  @override
+  String get roomSummary_colLengthTotal => 'Inkl. Anbindeleitungen';
+
+  @override
+  String get roomSummary_total => 'Summe';
+
+  @override
+  String roomSummary_circuit(int number) {
+    return 'Heizkreis $number';
+  }
+
+  @override
+  String roomSummary_wallCircuit(int number) {
+    return 'Heizkreis $number (Wand)';
+  }
+
+  @override
+  String get roomSummary_zoneNotConnected => 'Zone nicht angeschlossen';
+
+  @override
+  String get roomSummary_unheated => 'unbeheizt';
+
+  @override
+  String get roomSummary_demandIncomplete =>
+      'Die Heizlast mindestens eines Raums kann noch nicht berechnet werden (Wandaufbau fehlt). Diese Räume sind in der Summe nicht enthalten.';
+
+  @override
+  String get roomSummary_notes =>
+      'Heizlast: EN 12831. Wärmeabgabe: EN 1264-2 für Vor- und Rücklauftemperatur des Verteilers, Raumtemperatur, Verlegeabstand, Rohr und Bodenbelag, bei angenommenen 45 mm Zementestrich über dem Rohr. Massenstrom: Wärmeabgabe ÷ (4,186 kJ/(kg·K) × Spreizung). Druckverlust: Darcy-Weisbach für den Rohrinnendurchmesser über das Rohr im Raum und beide Anbindeleitungen, zuzüglich 40 % für Bögen und Armaturen.';
 }

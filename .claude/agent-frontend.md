@@ -52,7 +52,8 @@ lib/
 │       ├── material_picker_dialog.dart
 │       ├── custom_material_dialog.dart    # ADR-021 §5.7.2
 │       ├── export_dialog.dart
-│       └── project_settings_dialog.dart
+│       ├── project_settings_dialog.dart
+│       └── room_summary_dialog.dart       # ADR-045
 ├── export/
 │   ├── pdf_report_generator.dart
 │   └── csv_exporter.dart

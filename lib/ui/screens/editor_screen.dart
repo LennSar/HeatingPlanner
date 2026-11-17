@@ -14,6 +14,7 @@ import '../../repositories/save_state_notifier.dart';
 import '../canvas/canvas_controller.dart';
 import '../canvas/floor_plan_canvas.dart';
 import '../dialogs/project_settings_dialog.dart';
+import '../dialogs/room_summary_dialog.dart';
 import '../panels/performance_dashboard.dart';
 import '../panels/properties_panel.dart';
 import '../providers/editor_state_provider.dart';
@@ -436,6 +437,28 @@ class _Toolbar extends StatelessWidget {
                         : Theme.of(context)
                             .colorScheme
                             .onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+          // Room summary (ADR-045)
+          Tooltip(
+            message: l10n.tooltipRoomSummary,
+            child: Material(
+              color: Colors.transparent,
+              child: InkWell(
+                onTap: () => showRoomSummaryDialog(context),
+                child: SizedBox(
+                  width: toolbarWidth,
+                  height: toolbarWidth,
+                  child: Icon(
+                    Icons.table_chart_outlined,
+                    size: isCompact ? 20 : 22,
+                    color: Theme.of(context)
+                        .colorScheme
+                        .onSurfaceVariant,
                   ),
                 ),
               ),

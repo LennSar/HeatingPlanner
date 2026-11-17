@@ -2905,6 +2905,144 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Pick custom material library'**
   String get settingsCustomMaterialLibraryFilePickerTitle;
+
+  /// Toolbar tooltip for the button that opens the room summary table (ADR-045)
+  ///
+  /// In en, this message translates to:
+  /// **'Room summary'**
+  String get tooltipRoomSummary;
+
+  /// Title of the room summary dialog (ADR-045)
+  ///
+  /// In en, this message translates to:
+  /// **'Room summary'**
+  String get roomSummary_title;
+
+  /// Room summary — shown when the floor has no rooms
+  ///
+  /// In en, this message translates to:
+  /// **'Draw a room to see its heat balance.'**
+  String get roomSummary_empty;
+
+  /// Room summary column — room name, with one row per heating circuit below it
+  ///
+  /// In en, this message translates to:
+  /// **'Room / circuit'**
+  String get roomSummary_colRoom;
+
+  /// Room summary column — floor or wall area covered by heating zones, m²
+  ///
+  /// In en, this message translates to:
+  /// **'Heated area'**
+  String get roomSummary_colArea;
+
+  /// Room summary column — design heat load of the room (EN 12831), W
+  ///
+  /// In en, this message translates to:
+  /// **'Heat demand'**
+  String get roomSummary_colDemand;
+
+  /// Room summary column — supply and return water temperature of the circuit, °C
+  ///
+  /// In en, this message translates to:
+  /// **'Supply / return'**
+  String get roomSummary_colTemps;
+
+  /// Room summary column — design mass flow rate of the circuit, kg/h
+  ///
+  /// In en, this message translates to:
+  /// **'Flow rate'**
+  String get roomSummary_colFlow;
+
+  /// Room summary column — heat delivered per square metre of zone (EN 1264-2), W/m²
+  ///
+  /// In en, this message translates to:
+  /// **'Heat flux'**
+  String get roomSummary_colSpecificOutput;
+
+  /// Room summary column — heat delivered by the floor or wall heating, W
+  ///
+  /// In en, this message translates to:
+  /// **'Delivered heat'**
+  String get roomSummary_colOutput;
+
+  /// Room summary column — delivered heat minus heat demand, W; green when covered, red when under-supplied
+  ///
+  /// In en, this message translates to:
+  /// **'Difference'**
+  String get roomSummary_colDifference;
+
+  /// Room summary column — mean floor or wall surface temperature, °C
+  ///
+  /// In en, this message translates to:
+  /// **'Surface temp.'**
+  String get roomSummary_colSurfaceTemp;
+
+  /// Room summary column — tube outer diameter × wall thickness, mm
+  ///
+  /// In en, this message translates to:
+  /// **'Tube'**
+  String get roomSummary_colTube;
+
+  /// Room summary column — pressure loss of the circuit, kPa
+  ///
+  /// In en, this message translates to:
+  /// **'Pressure loss'**
+  String get roomSummary_colPressureLoss;
+
+  /// Room summary column — tube length laid inside the heating zone, m
+  ///
+  /// In en, this message translates to:
+  /// **'Tube in room'**
+  String get roomSummary_colLengthInRoom;
+
+  /// Room summary column — tube length including the supply and return connection pipes to the distributor, m
+  ///
+  /// In en, this message translates to:
+  /// **'Incl. connection pipes'**
+  String get roomSummary_colLengthTotal;
+
+  /// Room summary — label of the totals row
+  ///
+  /// In en, this message translates to:
+  /// **'Total'**
+  String get roomSummary_total;
+
+  /// Room summary — row label of a floor heating circuit
+  ///
+  /// In en, this message translates to:
+  /// **'Circuit {number}'**
+  String roomSummary_circuit(int number);
+
+  /// Room summary — row label of a wall heating circuit
+  ///
+  /// In en, this message translates to:
+  /// **'Circuit {number} (wall)'**
+  String roomSummary_wallCircuit(int number);
+
+  /// Room summary — row label of a heating zone that has no connection pipes to the distributor yet
+  ///
+  /// In en, this message translates to:
+  /// **'Zone not connected'**
+  String get roomSummary_zoneNotConnected;
+
+  /// Room summary — suffix after the name of an unheated room (ADR-036)
+  ///
+  /// In en, this message translates to:
+  /// **'unheated'**
+  String get roomSummary_unheated;
+
+  /// Room summary — warning below the table when a room's heat demand is unknown
+  ///
+  /// In en, this message translates to:
+  /// **'The heat demand of at least one room cannot be calculated yet (wall construction missing). Those rooms are not part of the total.'**
+  String get roomSummary_demandIncomplete;
+
+  /// Room summary — footnote naming the calculation methods behind the columns (ADR-045)
+  ///
+  /// In en, this message translates to:
+  /// **'Heat demand: EN 12831. Delivered heat: EN 1264-2 for the distributor\'s supply and return temperature, the room temperature, tube spacing, tube and floor covering, assuming 45 mm cement screed above the tube. Flow rate: delivered heat ÷ (4.186 kJ/(kg·K) × temperature spread). Pressure loss: Darcy–Weisbach for the tube\'s inner diameter over the tube in the room and both connection pipes, plus 40 % for bends and fittings.'**
+  String get roomSummary_notes;
 }
 
 class _AppLocalizationsDelegate

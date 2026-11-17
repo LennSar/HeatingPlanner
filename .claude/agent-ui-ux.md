@@ -823,6 +823,36 @@ Opens as a right-side panel (desktop) or full-screen overlay (tablet). Contains 
 
 ---
 
+### 5.9 Room Summary (ADR-045)
+
+**Trigger:** toolbar button below the Dashboard toggle (table icon). Opens a modal dialog; desktop and tablet alike.
+
+A table of the open floor. One bold row per room (name · set temperature), one row per heating zone / circuit below it, a totals row at the bottom.
+
+| Column | Unit | Room row | Circuit row |
+|--------|------|----------|-------------|
+| Room / circuit | | name · temperature | "Circuit n", "Circuit n (wall)" or "Zone not connected" |
+| Heated area | m² | sum | zone |
+| Heat demand | W | EN 12831 | |
+| Supply / return | °C | | distributor temperatures |
+| Flow rate | kg/h | sum | circuit |
+| Heat flux | W/m² | | EN 1264-2 |
+| Delivered heat | W | sum | zone |
+| Difference | W | delivered − demand | |
+| Surface temp. | °C | | zone |
+| Tube | mm | | outer diameter × wall |
+| Pressure loss | kPa | highest circuit | circuit |
+| Tube in room | m | sum | tube laid in the zone |
+| Incl. connection pipes | m | sum | zone tube + supply + return |
+
+- **Difference** is a tinted chip: `zoneGreen` with an up arrow when delivered ≥ demand, `zoneRed` with a down arrow when the room is short. Sign and arrow carry the meaning without colour.
+- Values that cannot be calculated show "—". An unconnected zone delivers nothing, so its room shows the shortfall.
+- Unheated rooms (ADR-036) show "unheated" and no demand.
+- Footnote names the calculation methods; a warning line appears when a room's demand is unknown.
+- The table scrolls in both directions when it does not fit.
+
+---
+
 ## 6. Canvas Interaction Patterns
 
 ### 6.1 Cross-Platform Input Mapping

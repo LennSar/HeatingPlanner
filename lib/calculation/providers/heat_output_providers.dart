@@ -10,12 +10,19 @@ import '../../data/models/flooring_material.dart'
     show kCustomFlooringMaterialId;
 import '../../repositories/building_repository.dart';
 import '../../repositories/heating_repository.dart';
+import '../../ui/providers/editor_state_provider.dart';
+import '../engines/geometry_engine.dart';
 import '../engines/heating_output_engine.dart';
+import 'pipe_layout_providers.dart';
 import 'project_settings_provider.dart';
 
-/// Specific heat output (W/m²) for a heating zone — EN 1264.
+/// Specific heat output (W/m²) for a heating zone — EN 1264-2.
 ///
-/// q = B × a_B × a_T × a_U × a_D × ΔT^n
+/// `q = K_H × Δθ_H` with
+/// `K_H = B × a_B × a_T^m_T × a_U^m_U × a_D^m_D` (floor, system type A)
+/// or its EN 1264-5 conversion (wall). The screed above the pipes is
+/// not modelled; the [EN1264Tables] defaults apply (45 mm cement screed,
+/// 1.2 W/(m·K)).
 ///
 /// Watches:
 /// - [zoneByIdProvider] for zone geometry and references
@@ -68,7 +75,7 @@ final zoneHeatOutputProvider =
       ?.value;
   if (distributor == null) return double.nan;
 
-  // LMTD per EN 1264.
+  // Δθ_H: logarithmic mean of the heating-medium over-temperature.
   final deltaT = HeatingOutputEngine.logMeanTempDifference(
     tSupplyC: distributor.supplyTempC,
     tReturnC: distributor.returnTempC,
@@ -76,29 +83,84 @@ final zoneHeatOutputProvider =
   );
   if (deltaT.isNaN) return double.nan;
 
-  // EN 1264 correction factors.
-  final aB = EN1264Tables.coveringFactor(rCoveringM2KW);
-  final aT = EN1264Tables.spacingFactor(zone.tubeSpacingMm);
-  final aU = EN1264Tables.diameterFactor(tubeType.outerDiameterMm);
-  final aD = EN1264Tables.conductivityFactor(tubeType.thermalConductivity);
-  final exponent = zone.zoneType == ZoneType.wallHeating
-      ? EN1264Tables.exponentWall
-      : EN1264Tables.exponentFloor;
+  // K_H per EN 1264-2 (floor) / EN 1264-5 (wall), ADR-045.
+  final isWall = zone.zoneType == ZoneType.wallHeating;
+  final kH = isWall
+      ? HeatingOutputEngine.heatTransferCoefficientWall(
+          tubeSpacingMm: zone.tubeSpacingMm,
+          tubeOuterDiameterMm: tubeType.outerDiameterMm,
+          tubeWallThicknessMm: tubeType.wallThicknessMm,
+          tubeConductivityWPerMK: tubeType.thermalConductivity,
+          coveringResistanceM2KPerW: rCoveringM2KW,
+        )
+      : HeatingOutputEngine.heatTransferCoefficientTypeA(
+          tubeSpacingMm: zone.tubeSpacingMm,
+          tubeOuterDiameterMm: tubeType.outerDiameterMm,
+          tubeWallThicknessMm: tubeType.wallThicknessMm,
+          tubeConductivityWPerMK: tubeType.thermalConductivity,
+          coveringResistanceM2KPerW: rCoveringM2KW,
+        );
 
-  return HeatingOutputEngine.specificHeatOutput(
+  return HeatingOutputEngine.heatFluxDensity(
+    heatTransferCoefficientWPerM2K: kH,
     deltaT: deltaT,
-    systemConstantB: EN1264Tables.systemConstantB,
-    coveringFactorAB: aB,
-    spacingFactorAT: aT,
-    diameterFactorAU: aU,
-    conductFactorAD: aD,
-    exponentN: exponent,
   );
 });
 
-/// Estimated mean surface temperature (°C) of a heating zone.
+/// Heat-emitting area of a zone in m².
 ///
-/// T_surface ≈ T_room + q / α_total
+/// Floor zones: the polygon minus the transit corridors of other
+/// circuits ([zoneEffectiveAreaM2Provider], ADR-038 Rule 3). Wall zones:
+/// [HeatingZone.widthMm] (or the full wall length) ×
+/// [HeatingZone.heightMm] (or [floorHeightMmProvider]).
+///
+/// Returns [double.nan] when the zone is unknown or its geometry is
+/// incomplete.
+final zoneHeatedAreaM2Provider =
+    Provider.family<double, String>((ref, zoneId) {
+  final zone = ref
+      .watch(editorStateProvider.select((s) => s.zones))
+      .where((z) => z.id == zoneId)
+      .firstOrNull;
+  if (zone == null) {
+    // Not on the open floor: fall back to the stored polygon.
+    final stored = ref.watch(zoneByIdProvider(zoneId)).asData?.value;
+    if (stored == null || stored.polygon.length < 3) return double.nan;
+    return GeometryEngine.polygonAreaM2(stored.polygon);
+  }
+  if (zone.zoneType != ZoneType.wallHeating) {
+    return ref.watch(zoneEffectiveAreaM2Provider(zoneId));
+  }
+  final wall = ref
+      .watch(editorStateProvider.select((s) => s.walls))
+      .where((w) => w.id == zone.wallSegmentId)
+      .firstOrNull;
+  if (wall == null) return double.nan;
+  final int floorHeightMm = ref.watch(floorHeightMmProvider);
+  final int widthMm = zone.widthMm ??
+      GeometryEngine.distanceMm(wall.startPoint, wall.endPoint).round();
+  final int heightMm = zone.heightMm ?? floorHeightMm;
+  return widthMm * heightMm / 1e6;
+});
+
+/// Heat delivered by a zone in watts: `Q = q × A`, with q from
+/// [zoneHeatOutputProvider] and A from [zoneHeatedAreaM2Provider].
+///
+/// Returns [double.nan] when either is unavailable (zone not connected,
+/// data still loading).
+final zoneHeatOutputWProvider =
+    Provider.family<double, String>((ref, zoneId) {
+  return HeatingOutputEngine.zoneHeatOutput(
+    specificOutputWPerM2: ref.watch(zoneHeatOutputProvider(zoneId)),
+    zoneAreaM2: ref.watch(zoneHeatedAreaM2Provider(zoneId)),
+  );
+});
+
+/// Mean surface temperature (°C) of a heating zone.
+///
+/// Floor zones: EN 1264-2 basic characteristic curve
+/// (`θ_F,m = θ_i + (q / 8.92)^(1/1.1)`). Wall zones: `θ_i + q / 8`
+/// (EN 1264-5).
 ///
 /// Uses the specific heat output from [zoneHeatOutputProvider] and the
 /// room's target temperature. Falls back to [defaultIndoorTempCProvider]
@@ -117,7 +179,14 @@ final zoneSurfaceTempProvider =
       ref.watch(roomProvider(zone.roomId)).asData?.value?.targetTempC ??
           ref.watch(defaultIndoorTempCProvider);
 
-  return HeatingOutputEngine.surfaceTemperature(
+  if (zone.zoneType == ZoneType.wallHeating) {
+    return HeatingOutputEngine.surfaceTemperature(
+      tRoomC: tRoomC,
+      specificOutputWPerM2: specificOutput,
+      alphaTotal: EN1264Tables.alphaWallWPerM2K,
+    );
+  }
+  return HeatingOutputEngine.floorSurfaceTemperature(
     tRoomC: tRoomC,
     specificOutputWPerM2: specificOutput,
   );

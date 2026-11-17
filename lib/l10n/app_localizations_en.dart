@@ -1593,4 +1593,79 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get settingsCustomMaterialLibraryFilePickerTitle =>
       'Pick custom material library';
+
+  @override
+  String get tooltipRoomSummary => 'Room summary';
+
+  @override
+  String get roomSummary_title => 'Room summary';
+
+  @override
+  String get roomSummary_empty => 'Draw a room to see its heat balance.';
+
+  @override
+  String get roomSummary_colRoom => 'Room / circuit';
+
+  @override
+  String get roomSummary_colArea => 'Heated area';
+
+  @override
+  String get roomSummary_colDemand => 'Heat demand';
+
+  @override
+  String get roomSummary_colTemps => 'Supply / return';
+
+  @override
+  String get roomSummary_colFlow => 'Flow rate';
+
+  @override
+  String get roomSummary_colSpecificOutput => 'Heat flux';
+
+  @override
+  String get roomSummary_colOutput => 'Delivered heat';
+
+  @override
+  String get roomSummary_colDifference => 'Difference';
+
+  @override
+  String get roomSummary_colSurfaceTemp => 'Surface temp.';
+
+  @override
+  String get roomSummary_colTube => 'Tube';
+
+  @override
+  String get roomSummary_colPressureLoss => 'Pressure loss';
+
+  @override
+  String get roomSummary_colLengthInRoom => 'Tube in room';
+
+  @override
+  String get roomSummary_colLengthTotal => 'Incl. connection pipes';
+
+  @override
+  String get roomSummary_total => 'Total';
+
+  @override
+  String roomSummary_circuit(int number) {
+    return 'Circuit $number';
+  }
+
+  @override
+  String roomSummary_wallCircuit(int number) {
+    return 'Circuit $number (wall)';
+  }
+
+  @override
+  String get roomSummary_zoneNotConnected => 'Zone not connected';
+
+  @override
+  String get roomSummary_unheated => 'unheated';
+
+  @override
+  String get roomSummary_demandIncomplete =>
+      'The heat demand of at least one room cannot be calculated yet (wall construction missing). Those rooms are not part of the total.';
+
+  @override
+  String get roomSummary_notes =>
+      'Heat demand: EN 12831. Delivered heat: EN 1264-2 for the distributor\'s supply and return temperature, the room temperature, tube spacing, tube and floor covering, assuming 45 mm cement screed above the tube. Flow rate: delivered heat ÷ (4.186 kJ/(kg·K) × temperature spread). Pressure loss: Darcy–Weisbach for the tube\'s inner diameter over the tube in the room and both connection pipes, plus 40 % for bends and fittings.';
 }

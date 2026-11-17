@@ -239,10 +239,9 @@ class HeatingOutputEngine {
     required double tRoomC,
   });
 
-  /// Specific heat output per EN 1264 (W/m²)
-  /// q = B × a_B × a_T × a_U × a_D × ΔT^n
-  ///
-  /// Correction factors are looked up from EN 1264 tables.
+  /// Generic power-product form, kept for callers with their own
+  /// factors. The application uses heatTransferCoefficientTypeA /
+  /// heatTransferCoefficientWall + heatFluxDensity — see Section 6.
   static double specificHeatOutput({
     required double deltaT,            // from logMeanTempDifference
     required double systemConstantB,   // from EN 1264 table
@@ -538,62 +537,29 @@ enum RoomFaceSide { inner, outer }
 
 **File:** `lib/core/constants/en1264_tables.dart`
 
-> **AMBIGUITY FLAG:** The specification references EN 1264 correction factors (B, a_B, a_T, a_U, a_D) but does not provide the actual digitised tables. Implement the following **simplified empirical model** as a starting point, and clearly document that it is an approximation. Ask the user whether they can provide full EN 1264 tables for higher accuracy.
+Implemented per **EN 1264-2, system types A and C** (pipes embedded in the screed) — see `DECISIONS.md` ADR-045. The simplified curve fits that stood here before are gone.
 
-```dart
-/// Simplified EN 1264 heat output model
-/// q = B × a_B × a_T × a_U × a_D × ΔT^n
-///
-/// APPROXIMATION: These are simplified curve fits.
-/// For production use, replace with full EN 1264 digitised tables.
-
-class EN1264Tables {
-  EN1264Tables._();
-
-  /// System constant B
-  /// Typical value for embedded tube systems: 6.7 (Type A - wet system)
-  static const double systemConstantB = 6.7;
-
-  /// Exponent n for floor heating
-  static const double exponentFloor = 1.1;
-
-  /// Exponent n for wall heating
-  static const double exponentWall = 1.1;
-
-  /// Covering resistance correction factor a_B
-  /// Approximation: a_B = 1 / (1 + R_covering / 0.1)^0.4
-  /// where R_covering is the flooring thermal resistance (m²K/W)
-  static double coveringFactor(double rCoveringM2KW) {
-    if (rCoveringM2KW <= 0) return 1.0;
-    return 1.0 / pow(1.0 + rCoveringM2KW / 0.1, 0.4);
-  }
-
-  /// Tube spacing correction factor a_T
-  /// Approximation: a_T = (0.15 / spacing_m)^0.08
-  /// where spacing_m is tube spacing in metres
-  static double spacingFactor(int spacingMm) {
-    final spacingM = spacingMm / 1000.0;
-    if (spacingM <= 0) return double.nan;
-    return pow(0.15 / spacingM, 0.08).toDouble();
-  }
-
-  /// Tube outer diameter correction factor a_U
-  /// Approximation: a_U = (outerDiam_mm / 16.0)^0.03
-  static double diameterFactor(double outerDiameterMm) {
-    if (outerDiameterMm <= 0) return double.nan;
-    return pow(outerDiameterMm / 16.0, 0.03).toDouble();
-  }
-
-  /// Tube wall conductivity correction factor a_D
-  /// Approximation: a_D ≈ 1.0 for plastic tubes (λ_tube < 1.0 W/mK)
-  /// For metal tubes (copper): a_D ≈ 1.02
-  static double conductivityFactor(double tubeLambdaWPerMK) {
-    if (tubeLambdaWPerMK >= 50.0) return 1.04; // copper
-    if (tubeLambdaWPerMK >= 1.0) return 1.02;  // multilayer / metal
-    return 1.0;                                  // plastic
-  }
-}
 ```
+q   = K_H · Δθ_H
+K_H = B · a_B · a_T^m_T · a_U^m_U · a_D^m_D
+Δθ_H = (θ_V − θ_R) / ln((θ_V − θ_i) / (θ_R − θ_i))
+
+a_B = (1/α + s_u,0/λ_u,0) / (1/α + s_u,0/λ_E + R_λ,B)     α = 10.8, s_u,0 = 0.045 m, λ_u,0 = 1.0
+m_T = 1 − T/0.075          a_T: Table A.1 (by R_λ,B)
+m_U = 100·(0.045 − s_u)    a_U: Table A.2 (by T, R_λ,B)
+m_D = 250·(D − 0.020)      a_D: Table A.3 (by T, R_λ,B)
+
+B = B₀ = 6.7 W/(m²K) for λ_R = 0.35 W/(mK), s_R = 2 mm; otherwise
+1/B = 1/B₀ + 1.1/π · Π(a_i^m_i) · T · [ln(D/(D−2s_R))/(2λ_R) − ln(D/(D−2s_R,0))/(2λ_R,0)]
+
+T > 0.375 m:  q = q(0.375) · 0.375/T
+```
+
+- `EN1264Tables` holds Tables A.1–A.3 (linear interpolation, clamped to R_λ,B 0…0.15 m²K/W and T 0.05…0.375 m), `coveringFactorAB`, and the constants.
+- `HeatingOutputEngine.heatTransferCoefficientTypeA` returns K_H; `heatFluxDensity` returns q.
+- **Wall heating (EN 1264-5):** `heatTransferCoefficientWall` — `K_H = K_H,0 / (1 + (ΔR_α + R_λ,B)/0.15 · (K_H,0/K_H* − 1))`, ΔR_α = 1/8 − 1/10.8.
+- **Surface temperature:** floor `θ_F,m = θ_i + (q/8.92)^(1/1.1)` (basic characteristic curve, `floorSurfaceTemperature`); wall `θ_i + q/8`.
+- **Screed:** the build-up above the pipe is not modelled. Defaults: s_u = 45 mm, λ_E = 1.2 W/(m·K) (cement screed).
 
 ---
 
@@ -827,9 +793,9 @@ You must produce reference test cases for every engine function. These are the a
 
 When implementing, add these as `// TODO(HVAC):` comments and raise to the user:
 
-1. **EN 1264 full tables:** The correction factor approximations in Section 6 are simplified. Production accuracy requires the full digitised tables from the standard.
+1. **Screed build-up and downward heat loss:** Heat output uses EN 1264-2 (ADR-045) with a default screed (45 mm, 1.2 W/(m·K)). The layers above and below the pipe are not modelled, so the EN 1264-3 flow-rate allowance for downward heat loss is not applied.
 2. **Ground floor U-value:** ISO 13370 provides a rigorous method for ground contact heat loss. The current simplified factor (0.6) is a rough estimate. Ask user which approach to use.
 3. **Inter-floor heat transfer:** Heat loss through floor slabs between floors at different temperatures is not currently modelled. Flag if the user creates floors with rooms at different set temperatures.
 4. **Water temperature dependency:** Physical properties of water (ρ, μ, ν) vary with temperature. Current implementation uses 40°C values as constants. For higher accuracy, implement temperature-dependent lookup.
-5. **Wall heating exponent:** EN 15377 may specify a different exponent `n` for wall heating versus floor heating. Currently both use 1.1.
+5. **Wall heating:** calculated with the EN 1264-5 conversion of the floor value (ADR-045); the plaster layer uses the screed defaults.
 6. **Supply pipe insulation variants (ADR-008):** The `corrugatedConduit` residual factor (0.30) and simultaneous-use factor (0.5) are derived from BVF information sheet data (2014) for Bauart A (wet screed) systems only. For Bauart B (dry systems) or thin-layer constructions these values do not apply — flag to user if such a system type is selected.

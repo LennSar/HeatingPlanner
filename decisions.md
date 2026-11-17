@@ -3357,3 +3357,72 @@ inside the zone, no crossings, coverage; counterflow is a spiral; edge zone
 spacing, feed order and density; name mapping);
 `test/unit/models/serialization_test.dart` (old names);
 `test/unit/repositories/heating_circuit_persistence_test.dart` (v22 rename).
+
+---
+
+## ADR-045 — Room summary; heat output follows EN 1264-2
+
+**Decision.**
+A room summary table shows, per room and per circuit, what the room needs,
+what the heating delivers and what that costs hydraulically. Because the
+table puts delivered heat next to demand, the heat output behind it now
+follows EN 1264-2 instead of the simplified curve fits flagged in
+`agent-hvac.md` §6.
+
+**Rules.**
+
+1. **Room summary** (`RoomSummaryDialog`, toolbar button below the Dashboard
+   toggle). One row per room, one per zone / circuit, one for the totals.
+   Columns: heated area, heat demand, supply / return temperature, flow rate,
+   heat flux, delivered heat, difference, surface temperature, tube
+   (outer diameter × wall), pressure loss, tube in the room, tube including
+   connection pipes.
+   - *Difference* = delivered − demand, green when ≥ 0, red when the room is
+     short. An unconnected zone delivers nothing.
+   - *Pressure loss* on a room and on the totals row is the highest of its
+     circuits (parallel circuits do not add).
+   - *Tube in room* is the tube laid in the zone; *including connection
+     pipes* adds the supply and return runs to the distributor
+     (ADR-042 Rule 4).
+   - The dialog only displays `floorSummaryProvider`, which only collects
+     existing providers. No formula lives in either.
+
+2. **Heat output — EN 1264-2, system types A and C.**
+   `q = K_H · Δθ_H`, `K_H = B · a_B · a_T^m_T · a_U^m_U · a_D^m_D`, with the
+   factors of Annex A (Tables A.1–A.3, interpolated linearly) and B corrected
+   for pipe conductivity and wall thickness. Spacing above 0.375 m scales with
+   `0.375 / T`. Formulas: `agent-hvac.md` §6.
+   - The old model used `ΔT^1.1` with fitted factors. The exponent 1.1
+     belongs to the basic characteristic curve (surface to room), not to the
+     water side, so it overstated the output — e.g. tiles, 150 mm spacing,
+     35/28 °C, 20 °C room: 91 W/m² before, 58 W/m² now.
+   - The screed above the pipe is not modelled: 45 mm cement screed,
+     1.2 W/(m·K), is assumed.
+
+3. **Wall heating — EN 1264-5.** The floor value is converted with the wall
+   surface resistance: `K_H = K_H,0 / (1 + (ΔR_α + R_λ,B)/0.15 · (K_H,0/K_H* − 1))`,
+   `ΔR_α = 1/8 − 1/10.8 m²K/W`.
+
+4. **Surface temperature.** Floors use the basic characteristic curve,
+   `θ_F,m = θ_i + (q / 8.92)^(1/1.1)`; walls `θ_i + q / 8`. Before, both used
+   `q / 10.8`.
+
+5. **Delivered heat of a zone** is `zoneHeatOutputWProvider` = q × heated
+   area (`zoneHeatedAreaM2Provider`: floor polygon minus transit corridors,
+   or wall width × height). `flowRateProvider` uses it, so wall zones now get
+   a flow rate too.
+
+**Unchanged.** Heat demand (EN 12831), flow rate `ṁ = Q / (c_W · σ)`,
+pressure loss (Darcy–Weisbach, Swamee–Jain friction factor, water at 40 °C,
+40 % allowance for bends and fittings).
+
+**Not covered.** The EN 1264-3 flow-rate allowance for heat lost downwards
+needs the build-up below the pipe, which is not modelled. Manifold and valve
+losses are not part of the circuit pressure loss. Type B (dry) systems are
+not distinguished.
+
+**Verification.**
+`test/unit/engines/en1264_heat_output_test.dart` (tables, K_H worked by hand,
+wall conversion, surface temperature);
+`test/unit/providers/room_summary_providers_test.dart`;
+`test/widget/dialogs/room_summary_dialog_test.dart`.
