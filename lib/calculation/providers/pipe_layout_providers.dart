@@ -373,28 +373,30 @@ final zoneColorIndicesProvider = Provider<Map<String, int>>((ref) {
   };
 });
 
-/// Tube layout per floor zone id for the active floor (ADR-038).
+/// Corner polyline of the tube in every floor zone of the active floor,
+/// keyed by zone id — before the bends are rounded (ADR-038, ADR-046).
 ///
-/// Each entry carries the tube path in the zone's layout pattern —
-/// starting where the zone's supply line enters it, with bend radii —
-/// and the transit corridors cut out of the zone.
-final zonePipeLayoutsProvider = Provider<Map<String, ZonePipeLayout>>((ref) {
+/// - A zone with a [HeatingZone.manualTubePath] uses it, with its ends
+///   pulled to where the connection pipes currently enter and leave the
+///   zone ([PipeLayoutEngine.attachManualPathEnds]).
+/// - Every other zone gets the tube laid out in its layout pattern,
+///   starting where its supply line enters it.
+///
+/// These are the corners the tube edit and draw tools work on.
+final zoneTubeCornersProvider = Provider<Map<String, List<Point2D>>>((ref) {
   final zones = ref.watch(editorStateProvider.select((s) => s.zones));
   final circuits = ref.watch(editorStateProvider.select((s) => s.circuits));
   final distributor = ref.watch(
     editorStateProvider.select((s) => s.distributor),
   );
-
-  final bendRadii = ref.watch(zoneBendRadiiMmProvider);
   final walls = ref.watch(editorStateProvider.select((s) => s.walls));
 
   final circuitById = {for (final c in circuits) c.id: c};
-  final result = <String, ZonePipeLayout>{};
+  final result = <String, List<Point2D>>{};
   for (final zone in zones) {
     if (zone.zoneType != ZoneType.floorHeating || zone.polygon.length < 3) {
       continue;
     }
-    final corridors = transitCorridorsForZone(zone, circuits);
     final circuit = circuitById[zone.circuitId];
     final entry = PipeLayoutEngine.zoneEntryPoint(
       polygon: zone.polygon,
@@ -405,19 +407,48 @@ final zonePipeLayoutsProvider = Provider<Map<String, ZonePipeLayout>>((ref) {
       polygon: zone.polygon,
       returnRoutePath: circuit?.returnRoutePath ?? const [],
     );
-    final keepOut = transitKeepOutForZone(zone, circuits);
-    final tube = PipeLayoutEngine.tubePath(
+    final manual = zone.manualTubePath;
+    if (manual != null) {
+      // ADR-046: the drawn path is kept; only its ends follow the pipes.
+      // Without a return pipe yet both ends stay where they were drawn.
+      result[zone.id] = PipeLayoutEngine.attachManualPathEnds(
+        manual,
+        entry: circuit == null ? null : entry,
+        exit: circuit == null ? null : exit,
+      );
+      continue;
+    }
+    result[zone.id] = PipeLayoutEngine.tubePath(
       pattern: zone.layoutPattern,
       polygon: zone.polygon,
       tubeSpacingMm: zone.tubeSpacingMm,
       borderDistanceMm: zone.borderDistanceMm,
       entryPoint: entry,
       exitPoint: exit,
-      exclusions: keepOut,
+      exclusions: transitKeepOutForZone(zone, circuits),
       exteriorEdges: zone.layoutPattern == LayoutPattern.edgeZoneMeander
           ? exteriorEdgesForZone(zone, walls)
           : const [],
     );
+  }
+  return result;
+});
+
+/// Tube layout per floor zone id for the active floor (ADR-038).
+///
+/// Each entry carries the tube path — the corners of
+/// [zoneTubeCornersProvider], with bend radii — and the transit
+/// corridors cut out of the zone.
+final zonePipeLayoutsProvider = Provider<Map<String, ZonePipeLayout>>((ref) {
+  final zones = ref.watch(editorStateProvider.select((s) => s.zones));
+  final circuits = ref.watch(editorStateProvider.select((s) => s.circuits));
+  final corners = ref.watch(zoneTubeCornersProvider);
+  final bendRadii = ref.watch(zoneBendRadiiMmProvider);
+
+  final result = <String, ZonePipeLayout>{};
+  for (final zone in zones) {
+    final tube = corners[zone.id];
+    if (tube == null) continue;
     result[zone.id] = (
       // ADR-039 Rule 3: turns are drawn with the tube's bend radius.
       pipePath: PipeLayoutEngine.filletPolyline(
@@ -425,8 +456,27 @@ final zonePipeLayoutsProvider = Provider<Map<String, ZonePipeLayout>>((ref) {
         bendRadii[zone.id] ??
             PipeLayoutEngine.minBendRadiusMm(fallbackTubeOuterDiameterMm),
       ),
-      corridors: corridors,
+      corridors: transitCorridorsForZone(zone, circuits),
     );
   }
   return result;
+});
+
+/// Problems with the manual tube path of zone [zoneId] (ADR-046,
+/// validation rule TP-01). All false for a zone laid out automatically.
+final manualTubePathIssuesProvider = Provider.family<
+    ({bool leavesZone, bool crossesCorridor, bool selfCrossing}),
+    String>((ref, zoneId) {
+  const none = (leavesZone: false, crossesCorridor: false, selfCrossing: false);
+  final zones = ref.watch(editorStateProvider.select((s) => s.zones));
+  final zone = zones.where((z) => z.id == zoneId).firstOrNull;
+  if (zone == null || zone.manualTubePath == null) return none;
+  final path = ref.watch(zoneTubeCornersProvider)[zoneId];
+  if (path == null) return none;
+  final circuits = ref.watch(editorStateProvider.select((s) => s.circuits));
+  return PipeLayoutEngine.manualTubePathIssues(
+    path: path,
+    polygon: zone.polygon,
+    keepOut: transitCorridorsForZone(zone, circuits),
+  );
 });

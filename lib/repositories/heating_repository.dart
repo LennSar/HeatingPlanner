@@ -263,6 +263,9 @@ HeatingZone _zoneFromRow($db.HeatingZone row) {
     positionOnWallMm: row.positionOnWallMm,
     widthMm: row.widthMm,
     customFlooringResistance: row.customFlooringResistance,
+    manualTubePath: row.manualTubePathJson == null
+        ? null
+        : _decodePointList(row.manualTubePathJson!),
   );
 }
 
@@ -349,6 +352,11 @@ $db.HeatingZonesCompanion _zoneToCompanion(HeatingZone zone) {
     positionOnWallMm: Value(zone.positionOnWallMm),
     widthMm: Value(zone.widthMm),
     customFlooringResistance: Value(zone.customFlooringResistance),
+    manualTubePathJson: Value(
+      zone.manualTubePath == null
+          ? null
+          : _encodePointList(zone.manualTubePath!),
+    ),
   );
 }
 

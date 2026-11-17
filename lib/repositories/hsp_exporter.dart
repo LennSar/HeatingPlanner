@@ -271,6 +271,9 @@ class HspExporter {
         positionOnWallMm: row.positionOnWallMm,
         widthMm: row.widthMm,
         customFlooringResistance: row.customFlooringResistance,
+        manualTubePath: row.manualTubePathJson == null
+            ? null
+            : _decodePoints(row.manualTubePathJson!),
       ).toJson();
 
   Map<String, dynamic> _tubeTypeJson($db.TubeType row) => TubeType(

@@ -78,6 +78,14 @@ abstract class HeatingZone with _$HeatingZone {
     /// [kCustomFlooringMaterialId]. Range: 0.000–0.500. Null until
     /// the user sets a value.
     double? customFlooringResistance,
+
+    /// Hand-edited or hand-drawn tube path inside a floor zone (ADR-046).
+    ///
+    /// `null` ⇒ the tube is laid out automatically from
+    /// [layoutPattern] (ADR-038). Otherwise the corner polyline of the
+    /// tube, without bend arcs; its first and last point are pulled to
+    /// the current supply entry and return exit when it is drawn.
+    List<Point2D>? manualTubePath,
   }) = _HeatingZone;
 
   factory HeatingZone.fromJson(Map<String, dynamic> json) =>

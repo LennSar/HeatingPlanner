@@ -65,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 24;
+  int get schemaVersion => 25;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -177,6 +177,12 @@ class AppDatabase extends _$AppDatabase {
                 "DEFAULT '10000000-0000-4000-8000-000000000001'",
               );
             }
+          }
+          // ADR-046 (v25): manual tube path of a floor heating zone.
+          if (from < 25) {
+            await m.database.customStatement(
+              'ALTER TABLE heating_zones ADD COLUMN manual_tube_path_json TEXT',
+            );
           }
         },
       );

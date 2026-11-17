@@ -30,7 +30,7 @@ void main() {
   });
 
   test('schema v22: heating_circuits has the ADR-040/041 columns', () async {
-    expect(db.schemaVersion, 24);
+    expect(db.schemaVersion, 25);
     final cols = await db
         .customSelect('PRAGMA table_info(heating_circuits)')
         .get();

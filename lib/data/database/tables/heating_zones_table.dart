@@ -46,6 +46,10 @@ class HeatingZones extends Table {
   /// Null until set by the user.
   RealColumn get customFlooringResistance => real().nullable()();
 
+  /// JSON array of {x, y} corner points of a manual tube path
+  /// (ADR-046); null while the tube is laid out automatically.
+  TextColumn get manualTubePathJson => text().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

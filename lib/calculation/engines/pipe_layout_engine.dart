@@ -1466,6 +1466,275 @@ class PipeLayoutEngine {
 
   static Point2D _lerp(Point2D a, Point2D b, double t) =>
       Point2D(x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t);
+
+  // ──────────────────────────────────────────────────────────────────────
+  // Manual tube paths (ADR-046)
+  // ──────────────────────────────────────────────────────────────────────
+
+  /// Returns [path] with its first point moved to [entry] and its last
+  /// point to [exit], so a manual tube stays attached to the connection
+  /// pipes when they move. A missing [entry] / [exit] leaves that end as
+  /// it is; fewer than 2 points are returned unchanged.
+  static List<Point2D> attachManualPathEnds(
+    List<Point2D> path, {
+    Point2D? entry,
+    Point2D? exit,
+  }) {
+    if (path.length < 2) return path;
+    return [
+      entry ?? path.first,
+      ...path.sublist(1, path.length - 1),
+      exit ?? path.last,
+    ];
+  }
+
+  /// Snaps [raw], the next corner of a tube being drawn after [previous],
+  /// for a zone with [spacingMm] between tube runs (ADR-046).
+  ///
+  /// 1. The new segment is made horizontal or vertical, whichever is
+  ///    closer to the cursor.
+  /// 2. Its end lines up with the end of an earlier parallel run of
+  ///    [corners] within half a spacing, so the turns of a serpentine
+  ///    form a straight column.
+  /// 3. Otherwise the end lies a whole number of spacings from the
+  ///    nearest run across it: a step between two rows ends exactly one
+  ///    (or more) spacing from the row it leaves.
+  /// 4. With no run across it yet, the end snaps to [gridMm].
+  ///
+  /// Without [previous] the point snaps to [gridMm] (no snap when ≤ 0).
+  /// Returns [raw] for a non-positive [spacingMm].
+  static Point2D snapTubePoint({
+    required Point2D raw,
+    required Point2D? previous,
+    required List<Point2D> corners,
+    required double spacingMm,
+    double gridMm = 0,
+  }) {
+    double gridded(double v) =>
+        gridMm > 0 ? (v / gridMm).roundToDouble() * gridMm : v;
+    if (previous == null) return Point2D(x: gridded(raw.x), y: gridded(raw.y));
+    if (spacingMm.isNaN || spacingMm <= 0) return raw;
+
+    final horizontal = (raw.x - previous.x).abs() >= (raw.y - previous.y).abs();
+    // Coordinate along the new segment — the one that is snapped.
+    double along(Point2D p) => horizontal ? p.x : p.y;
+    Point2D make(double a) => horizontal
+        ? Point2D(x: a, y: previous.y)
+        : Point2D(x: previous.x, y: a);
+
+    final across = <double>[];
+    final parallelEnds = <double>[];
+    for (var i = 0; i + 1 < corners.length; i++) {
+      final a = corners[i];
+      final b = corners[i + 1];
+      final isH = (a.y - b.y).abs() <= _tolMm && (a.x - b.x).abs() > _tolMm;
+      final isV = (a.x - b.x).abs() <= _tolMm && (a.y - b.y).abs() > _tolMm;
+      if (!isH && !isV) continue;
+      if (isH == horizontal) {
+        parallelEnds
+          ..add(along(a))
+          ..add(along(b));
+      } else {
+        // A run across the new segment: its fixed coordinate.
+        across.add(horizontal ? a.x : a.y);
+      }
+    }
+
+    final target = along(raw);
+    double? nearest(List<double> values) => values.isEmpty
+        ? null
+        : values.reduce(
+            (a, b) => (a - target).abs() <= (b - target).abs() ? a : b,
+          );
+
+    final end = nearest(parallelEnds);
+    if (end != null && (end - target).abs() <= spacingMm / 2) {
+      return make(end);
+    }
+    final origin = nearest(across);
+    if (origin != null) {
+      final steps = ((target - origin) / spacingMm).roundToDouble();
+      return make(origin + steps * spacingMm);
+    }
+    return make(gridded(target));
+  }
+
+  /// [path] with corner [index] moved to [point]. The first and last
+  /// point (attached to the connection pipes) do not move; an index out
+  /// of range returns [path] unchanged.
+  static List<Point2D> moveTubeCorner(
+    List<Point2D> path,
+    int index,
+    Point2D point,
+  ) {
+    if (index <= 0 || index >= path.length - 1) return path;
+    return [...path]..[index] = point;
+  }
+
+  /// [path] with segment [segment] (from corner `segment` to
+  /// `segment + 1`) translated by ([dx], [dy]); its neighbours stretch.
+  ///
+  /// An end of the path stays put: moving the first or last segment
+  /// inserts a corner at that end first, so the segment can still move
+  /// and a jog appears (as for connection pipes, ADR-039). Returns the
+  /// new path and the index of the moved segment in it.
+  static ({List<Point2D> path, int segment}) moveTubeRun(
+    List<Point2D> path,
+    int segment,
+    double dx,
+    double dy,
+  ) {
+    if (segment < 0 || segment >= path.length - 1) {
+      return (path: path, segment: segment);
+    }
+    final out = [...path];
+    var first = segment;
+    if (first == 0) {
+      out.insert(0, out.first);
+      first = 1;
+    }
+    if (first + 1 == out.length - 1) {
+      out.add(out.last);
+    }
+    for (final i in [first, first + 1]) {
+      out[i] = Point2D(x: out[i].x + dx, y: out[i].y + dy);
+    }
+    return (path: out, segment: first);
+  }
+
+  /// [path] with a corner inserted on segment [segment] at the point of
+  /// that segment nearest to [point]. Returns [path] unchanged for an
+  /// index out of range.
+  static List<Point2D> insertTubeCorner(
+    List<Point2D> path,
+    int segment,
+    Point2D point,
+  ) {
+    if (segment < 0 || segment >= path.length - 1) return path;
+    final a = path[segment];
+    final b = path[segment + 1];
+    final dx = b.x - a.x;
+    final dy = b.y - a.y;
+    final len2 = dx * dx + dy * dy;
+    final t = len2 == 0
+        ? 0.0
+        : (((point.x - a.x) * dx + (point.y - a.y) * dy) / len2).clamp(
+            0.0,
+            1.0,
+          );
+    return [...path]..insert(segment + 1, _lerp(a, b, t));
+  }
+
+  /// [path] without corner [index]. The two ends cannot be removed, and a
+  /// path keeps at least 2 points.
+  static List<Point2D> removeTubeCorner(List<Point2D> path, int index) {
+    if (index <= 0 || index >= path.length - 1 || path.length <= 2) {
+      return path;
+    }
+    return [...path]..removeAt(index);
+  }
+
+  /// Problems with a manual tube [path] in a zone [polygon]
+  /// (validation rule TP-01).
+  ///
+  /// - `leavesZone` — a corner lies outside the zone or a segment crosses
+  ///   its boundary. The two ends sit on the boundary by construction
+  ///   (where the connection pipes arrive) and are not checked.
+  /// - `crossesCorridor` — a segment runs through one of the [keepOut]
+  ///   strips of other circuits' connection pipes (ADR-038 Rule 3).
+  /// - `selfCrossing` — two non-adjacent segments cross or touch.
+  static ({bool leavesZone, bool crossesCorridor, bool selfCrossing})
+  manualTubePathIssues({
+    required List<Point2D> path,
+    required List<Point2D> polygon,
+    List<List<Point2D>> keepOut = const [],
+  }) {
+    const none = (
+      leavesZone: false,
+      crossesCorridor: false,
+      selfCrossing: false,
+    );
+    if (path.length < 2 || polygon.length < 3) return none;
+
+    var leaves = false;
+    for (var i = 1; i < path.length - 1 && !leaves; i++) {
+      if (!GeometryEngine.isPointInPolygon(path[i], polygon)) leaves = true;
+    }
+    for (var i = 0; i + 1 < path.length && !leaves; i++) {
+      final mid = _lerp(path[i], path[i + 1], 0.5);
+      if (!GeometryEngine.isPointInPolygon(mid, polygon)) {
+        leaves = true;
+        break;
+      }
+      for (var k = 0; k < polygon.length; k++) {
+        if (_crossesProperly(
+          path[i],
+          path[i + 1],
+          polygon[k],
+          polygon[(k + 1) % polygon.length],
+        )) {
+          leaves = true;
+          break;
+        }
+      }
+    }
+
+    var corridor = false;
+    for (final strip in keepOut) {
+      if (strip.length < 3 || corridor) continue;
+      for (var i = 0; i + 1 < path.length && !corridor; i++) {
+        final a = path[i];
+        final b = path[i + 1];
+        if (GeometryEngine.isPointInPolygon(_lerp(a, b, 0.5), strip)) {
+          corridor = true;
+          break;
+        }
+        for (var k = 0; k < strip.length; k++) {
+          if (GeometryEngine.segmentsIntersect(
+            a,
+            b,
+            strip[k],
+            strip[(k + 1) % strip.length],
+          )) {
+            corridor = true;
+            break;
+          }
+        }
+      }
+    }
+
+    var self = false;
+    for (var i = 0; i + 1 < path.length && !self; i++) {
+      for (var j = i + 2; j + 1 < path.length; j++) {
+        // The first and the last segment meet only in a closed loop.
+        if (i == 0 &&
+            j == path.length - 2 &&
+            GeometryEngine.distanceMm(path.first, path.last) <= _tolMm) {
+          continue;
+        }
+        if (_segmentDistanceMm(path[i], path[i + 1], path[j], path[j + 1]) <=
+            _tolMm) {
+          self = true;
+          break;
+        }
+      }
+    }
+    return (leavesZone: leaves, crossesCorridor: corridor, selfCrossing: self);
+  }
+
+  /// True when segments [a1]→[a2] and [b1]→[b2] cross at a point inside
+  /// both (touching at an end does not count).
+  static bool _crossesProperly(Point2D a1, Point2D a2, Point2D b1, Point2D b2) {
+    double cross(Point2D o, Point2D p, Point2D q) =>
+        (p.x - o.x) * (q.y - o.y) - (p.y - o.y) * (q.x - o.x);
+    final d1 = cross(b1, b2, a1);
+    final d2 = cross(b1, b2, a2);
+    final d3 = cross(a1, a2, b1);
+    final d4 = cross(a1, a2, b2);
+    const eps = 1e-6;
+    return ((d1 > eps && d2 < -eps) || (d1 < -eps && d2 > eps)) &&
+        ((d3 > eps && d4 < -eps) || (d3 < -eps && d4 > eps));
+  }
 }
 
 /// One evaluated meander layout.

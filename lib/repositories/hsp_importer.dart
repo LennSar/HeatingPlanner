@@ -527,6 +527,10 @@ class HspImporter {
         (d['customFlooringResistance'] as num?)
             ?.toDouble(),
       ),
+      // ADR-046: files written before v25 have no manual tube path.
+      manualTubePathJson: Value(
+        d['manualTubePath'] == null ? null : jsonEncode(d['manualTubePath']),
+      ),
     );
   }
 

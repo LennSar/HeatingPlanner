@@ -48,6 +48,8 @@ void main() {
               'CREATE TABLE heating_circuits '
               '(id TEXT PRIMARY KEY, distributor_id TEXT)',
             )
+            // The v25 step (ADR-046) alters `heating_zones`.
+            ..execute('CREATE TABLE heating_zones (id TEXT PRIMARY KEY)')
             ..execute('PRAGMA user_version = 22');
         },
       ),
