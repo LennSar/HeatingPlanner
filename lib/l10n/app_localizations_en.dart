@@ -1399,6 +1399,19 @@ class AppLocalizationsEn extends AppLocalizations {
   String get customMaterialChip => 'Custom';
 
   @override
+  String get defaultTubeTypes => 'Default tube types';
+
+  @override
+  String get defaultTubeTypesDesc =>
+      'Tube type assigned to newly drawn heating zones.';
+
+  @override
+  String get defaultFloorTubeType => 'Floor heating';
+
+  @override
+  String get defaultWallTubeType => 'Wall heating';
+
+  @override
   String get customMaterialDialogAddTitle => 'Add Custom Material';
 
   @override

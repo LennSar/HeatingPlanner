@@ -30,7 +30,7 @@ void main() {
   });
 
   test('schema v22: heating_circuits has the ADR-040/041 columns', () async {
-    expect(db.schemaVersion, 22);
+    expect(db.schemaVersion, 24);
     final cols = await db
         .customSelect('PRAGMA table_info(heating_circuits)')
         .get();
@@ -127,12 +127,14 @@ CREATE TABLE heating_circuits (
 )''';
 
 void upgradeTests() {
-  test('a v19 database upgrades to v22 and keeps its circuits', () async {
+  test('a v19 database upgrades to v24 and keeps its circuits', () async {
     final db = $db.AppDatabase.forTesting(
       NativeDatabase.memory(
         setup: (raw) {
           raw
             ..execute(_v19HeatingCircuits)
+            // The v24 step alters `projects`, so it must exist.
+            ..execute('CREATE TABLE projects (id TEXT NOT NULL PRIMARY KEY)')
             ..execute(
               'INSERT INTO heating_circuits '
               '(id, distributor_id, heating_zone_id, '

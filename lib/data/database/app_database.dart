@@ -65,7 +65,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.executor);
 
   @override
-  int get schemaVersion => 22;
+  int get schemaVersion => 24;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -156,6 +156,27 @@ class AppDatabase extends _$AppDatabase {
               "UPDATE heating_zones SET layout_pattern = 'doubleMeander' "
               "WHERE layout_pattern = 'bifilar'",
             );
+          }
+          // v24: project-level default tube types for floor and wall zones.
+          // Guarded per column so the step is safe whatever order the
+          // parallel ADR-044 (v23) work and this one reached a database in.
+          if (from < 24) {
+            final existing = {
+              for (final r in await m.database
+                  .customSelect('PRAGMA table_info(projects)')
+                  .get())
+                r.read<String>('name'),
+            };
+            for (final column in const [
+              'default_floor_tube_type_id',
+              'default_wall_tube_type_id',
+            ]) {
+              if (existing.contains(column)) continue;
+              await m.database.customStatement(
+                'ALTER TABLE projects ADD COLUMN $column TEXT NOT NULL '
+                "DEFAULT '10000000-0000-4000-8000-000000000001'",
+              );
+            }
           }
         },
       );

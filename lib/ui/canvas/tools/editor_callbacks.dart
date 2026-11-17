@@ -280,10 +280,15 @@ abstract class EditorCallbacks {
   /// [floorId] foreign key (rooms, distributors).
   String get currentFloorId;
 
-  /// ID of the first available tube type (from seeded data).
+  /// Default tube type ID for new floor heating zones (project setting).
   ///
   /// Used by [ZoneDrawTool] when creating a zone with defaults.
   String get defaultTubeTypeId;
+
+  /// Default tube type ID for new wall heating zones (project setting).
+  ///
+  /// Used by [WallZonePlaceTool] when creating a wall zone.
+  String get defaultWallTubeTypeId;
 
   /// ID of the first available flooring material (from seeded data).
   ///

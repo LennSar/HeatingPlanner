@@ -1402,6 +1402,19 @@ class AppLocalizationsDe extends AppLocalizations {
       'Benutzerdefinierte Materialien verwalten…';
 
   @override
+  @override
+  String get defaultTubeTypes => 'Standard-Rohrtypen';
+
+  @override
+  String get defaultTubeTypesDesc =>
+      'Rohrtyp, der neu gezeichneten Heizzonen zugewiesen wird.';
+
+  @override
+  String get defaultFloorTubeType => 'Fußbodenheizung';
+
+  @override
+  String get defaultWallTubeType => 'Wandheizung';
+
   String get customMaterialChip => 'Benutzerdefiniert';
 
   @override

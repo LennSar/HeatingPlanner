@@ -188,6 +188,8 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   String get defaultTubeTypeId => 'tube-1';
   @override
+  String get defaultWallTubeTypeId => 'tube-1';
+  @override
   String get defaultFlooringMaterialId => 'mat-1';
   @override
   void selectElement(String? type, String? id) {}

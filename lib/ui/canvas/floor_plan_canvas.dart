@@ -8,6 +8,7 @@ import 'package:vector_math/vector_math_64.dart' show Vector3;
 
 import '../../calculation/engines/geometry_engine.dart';
 import '../../calculation/providers/pipe_layout_providers.dart';
+import '../../calculation/providers/project_settings_provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/id_generator.dart';
 import '../../data/models/distributor.dart';
@@ -630,15 +631,17 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
   @override
   String get currentFloorId => ref.read(currentFloorIdProvider);
 
-  /// First available tube type ID (PE-Xa 16×2, seeded default).
-  static const _defaultTubeTypeId = '10000000-0000-4000-8000-000000000001';
-
   /// First available flooring material ID (Ceramic tile, seeded default).
   static const _defaultFlooringMaterialId =
       '20000000-0000-4000-8000-000000000001';
 
   @override
-  String get defaultTubeTypeId => _defaultTubeTypeId;
+  String get defaultTubeTypeId =>
+      ref.read(projectSettingsProvider).defaultFloorTubeTypeId;
+
+  @override
+  String get defaultWallTubeTypeId =>
+      ref.read(projectSettingsProvider).defaultWallTubeTypeId;
 
   @override
   String get defaultFlooringMaterialId => _defaultFlooringMaterialId;

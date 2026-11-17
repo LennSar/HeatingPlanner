@@ -30,8 +30,10 @@ import 'package:heating_planner/core/theme/app_theme.dart';
 import 'package:heating_planner/data/database/app_database.dart' as $db;
 import 'package:heating_planner/data/models/material_entry.dart';
 import 'package:heating_planner/data/models/project.dart';
+import 'package:heating_planner/data/models/tube_type.dart';
 import 'package:heating_planner/l10n/app_localizations.dart';
 import 'package:heating_planner/repositories/app_preferences.dart';
+import 'package:heating_planner/repositories/heating_repository.dart';
 import 'package:heating_planner/repositories/material_repository.dart';
 import 'package:heating_planner/repositories/project_repository.dart';
 import 'package:heating_planner/ui/dialogs/project_settings_dialog.dart';
@@ -110,6 +112,10 @@ void main() {
           // single-value stream so Drift doesn't keep a watch open
           // and produce a "Timer still pending" assertion when the
           // test tree is torn down.
+          // Same for the default tube type dropdowns.
+          tubeTypesProvider.overrideWith(
+            (ref) => Stream.value(<TubeType>[]),
+          ),
           materialEntriesProvider.overrideWith(
             (ref) => Stream.value(<MaterialEntry>[
               const MaterialEntry(

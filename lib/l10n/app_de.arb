@@ -451,6 +451,10 @@
   "layerStackRequiresOneLayer": "Ein Aufbau muss mindestens eine Schicht enthalten.",
 
   "customMaterialPickerNewRow": "Neues benutzerdefiniertes Material…",
+  "defaultTubeTypes": "Standard-Rohrtypen",
+  "defaultTubeTypesDesc": "Rohrtyp, der neu gezeichneten Heizzonen zugewiesen wird.",
+  "defaultFloorTubeType": "Fußbodenheizung",
+  "defaultWallTubeType": "Wandheizung",
   "customMaterialPickerManageRow": "Benutzerdefinierte Materialien verwalten…",
   "customMaterialChip": "Benutzerdefiniert",
 

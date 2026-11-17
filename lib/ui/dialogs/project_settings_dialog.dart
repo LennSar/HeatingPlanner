@@ -10,6 +10,8 @@ import '../../data/models/wall_construction.dart';
 import '../../data/models/wall_segment.dart';
 import '../../l10n/app_localizations.dart';
 import '../../repositories/app_preferences.dart';
+import '../../repositories/heating_repository.dart'
+    show localizedTubeTypesProvider;
 import '../../repositories/material_repository.dart';
 import '../canvas/tools/undo_redo_service.dart';
 import '../providers/editor_state_provider.dart';
@@ -767,6 +769,41 @@ class _ProjectSettingsDialogState
                     const Divider(),
                     const SizedBox(height: Spacing.md),
 
+                    // ── Default tube types (floor / wall) ────
+                    Text(
+                      l10n.defaultTubeTypes,
+                      style: textTheme.headlineSmall,
+                    ),
+                    const SizedBox(height: Spacing.xs),
+                    Text(
+                      l10n.defaultTubeTypesDesc,
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: Spacing.sm),
+                    _TubeTypeDefaultRow(
+                      fieldKey: const Key('default-floor-tube-type'),
+                      label: l10n.defaultFloorTubeType,
+                      value: settings.defaultFloorTubeTypeId,
+                      onChanged: ref
+                          .read(projectSettingsProvider.notifier)
+                          .setDefaultFloorTubeTypeId,
+                    ),
+                    const SizedBox(height: Spacing.xs),
+                    _TubeTypeDefaultRow(
+                      fieldKey: const Key('default-wall-tube-type'),
+                      label: l10n.defaultWallTubeType,
+                      value: settings.defaultWallTubeTypeId,
+                      onChanged: ref
+                          .read(projectSettingsProvider.notifier)
+                          .setDefaultWallTubeTypeId,
+                    ),
+
+                    const SizedBox(height: Spacing.lg),
+                    const Divider(),
+                    const SizedBox(height: Spacing.md),
+
                     // ── Drawing grid size ────────────────────
                     Text(
                       l10n.settingsDrawingGridSize,
@@ -1220,6 +1257,56 @@ class _MaterialDefaultRow extends ConsumerWidget {
               style: textTheme.bodyMedium,
               overflow: TextOverflow.ellipsis,
             ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Label + dropdown row selecting a default tube type.
+class _TubeTypeDefaultRow extends ConsumerWidget {
+  const _TubeTypeDefaultRow({
+    required this.fieldKey,
+    required this.label,
+    required this.value,
+    required this.onChanged,
+  });
+
+  final Key fieldKey;
+  final String label;
+  final String value;
+  final ValueChanged<String> onChanged;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final textTheme = Theme.of(context).textTheme;
+    final tubes = ref.watch(localizedTubeTypesProvider);
+    final hasValue = tubes.any((t) => t.row.id == value);
+    return Row(
+      children: [
+        SizedBox(
+          width: 140,
+          child: Text(label, style: textTheme.bodyMedium),
+        ),
+        Expanded(
+          child: DropdownButton<String>(
+            key: fieldKey,
+            isExpanded: true,
+            value: hasValue ? value : null,
+            items: [
+              for (final t in tubes)
+                DropdownMenuItem(
+                  value: t.row.id,
+                  child: Text(
+                    t.displayName,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+            ],
+            onChanged: (v) {
+              if (v != null && v != value) onChanged(v);
+            },
           ),
         ),
       ],

@@ -83,6 +83,14 @@ abstract class Project with _$Project {
     /// See [defaultExteriorMaterialId] for cascade semantics.
     @Default('mat-016') String defaultPartitionMaterialId,
 
+    /// Default tube type ID assigned to newly drawn floor heating zones.
+    @Default('10000000-0000-4000-8000-000000000001')
+    String defaultFloorTubeTypeId,
+
+    /// Default tube type ID assigned to newly placed wall heating zones.
+    @Default('10000000-0000-4000-8000-000000000001')
+    String defaultWallTubeTypeId,
+
     /// Optional geographic location used for climate data lookup.
     GeoLocation? location,
   }) = _Project;

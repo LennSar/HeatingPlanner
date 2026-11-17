@@ -71,6 +71,8 @@ Project _projectFromRow($db.Project row) {
     defaultExteriorMaterialId: row.defaultExteriorMaterialId,
     defaultInteriorMaterialId: row.defaultInteriorMaterialId,
     defaultPartitionMaterialId: row.defaultPartitionMaterialId,
+    defaultFloorTubeTypeId: row.defaultFloorTubeTypeId,
+    defaultWallTubeTypeId: row.defaultWallTubeTypeId,
     location: location,
   );
 }
@@ -205,6 +207,8 @@ $db.ProjectsCompanion _projectToCompanion(Project p) {
     defaultExteriorMaterialId: Value(p.defaultExteriorMaterialId),
     defaultInteriorMaterialId: Value(p.defaultInteriorMaterialId),
     defaultPartitionMaterialId: Value(p.defaultPartitionMaterialId),
+    defaultFloorTubeTypeId: Value(p.defaultFloorTubeTypeId),
+    defaultWallTubeTypeId: Value(p.defaultWallTubeTypeId),
     locationJson: Value(locationJson),
   );
 }

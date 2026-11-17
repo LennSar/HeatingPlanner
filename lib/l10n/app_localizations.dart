@@ -2594,6 +2594,30 @@ abstract class AppLocalizations {
   /// **'Manage custom materials…'**
   String get customMaterialPickerManageRow;
 
+  /// Heading for the default floor/wall tube type dropdowns on the project settings dialog
+  ///
+  /// In en, this message translates to:
+  /// **'Default tube types'**
+  String get defaultTubeTypes;
+
+  /// Subtitle for the default tube types section in project settings
+  ///
+  /// In en, this message translates to:
+  /// **'Tube type assigned to newly drawn heating zones.'**
+  String get defaultTubeTypesDesc;
+
+  /// Label for the default floor tube type dropdown in project settings
+  ///
+  /// In en, this message translates to:
+  /// **'Floor heating'**
+  String get defaultFloorTubeType;
+
+  /// Label for the default wall tube type dropdown in project settings
+  ///
+  /// In en, this message translates to:
+  /// **'Wall heating'**
+  String get defaultWallTubeType;
+
   /// Chip label rendered next to the name of a custom (non-built-in) material entry in the picker (UI/UX §5.7.1 item 5)
   ///
   /// In en, this message translates to:

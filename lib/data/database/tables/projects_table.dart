@@ -37,6 +37,14 @@ class Projects extends Table {
   TextColumn get defaultPartitionMaterialId =>
       text().withDefault(const Constant('mat-016'))();
 
+  /// Default tube type ID for new floor heating zones.
+  TextColumn get defaultFloorTubeTypeId => text().withDefault(
+      const Constant('10000000-0000-4000-8000-000000000001'))();
+
+  /// Default tube type ID for new wall heating zones.
+  TextColumn get defaultWallTubeTypeId => text().withDefault(
+      const Constant('10000000-0000-4000-8000-000000000001'))();
+
   /// Serialised JSON blob for the optional GeoLocation.
   TextColumn get locationJson => text().nullable()();
 

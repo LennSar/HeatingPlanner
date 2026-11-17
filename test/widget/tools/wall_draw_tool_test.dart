@@ -179,6 +179,8 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   String get defaultTubeTypeId => 'tube-1';
   @override
+  String get defaultWallTubeTypeId => 'tube-1';
+  @override
   String get defaultFlooringMaterialId => 'mat-1';
   @override
   void selectElement(String? type, String? id) {}
@@ -411,6 +413,8 @@ class _RoomAwareStubCallbacks implements EditorCallbacks {
   @override
   String get defaultTubeTypeId => 'tube-1';
   @override
+  String get defaultWallTubeTypeId => 'tube-1';
+  @override
   String get defaultFlooringMaterialId => 'mat-1';
   @override
   void selectElement(String? type, String? id) {}
@@ -599,6 +603,8 @@ class _ProviderWallDrawCallbacks implements EditorCallbacks {
   String get currentFloorId => 'floor-1';
   @override
   String get defaultTubeTypeId => 'tube-1';
+  @override
+  String get defaultWallTubeTypeId => 'tube-1';
   @override
   String get defaultFlooringMaterialId => 'mat-1';
 

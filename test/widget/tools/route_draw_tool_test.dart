@@ -198,6 +198,8 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   void selectElement(String? type, String? id) {}
   @override
+  String get defaultWallTubeTypeId => 'tube-1';
+  @override
   void requestRoomDialog(
     List<Point2D> polygon,
     List<String> wallIds, {

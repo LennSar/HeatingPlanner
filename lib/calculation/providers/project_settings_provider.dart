@@ -24,7 +24,13 @@ class ProjectSettings {
     this.defaultExteriorMaterialId = 'mat-016',
     this.defaultInteriorMaterialId = 'mat-016',
     this.defaultPartitionMaterialId = 'mat-016',
+    this.defaultFloorTubeTypeId = defaultTubeTypeId,
+    this.defaultWallTubeTypeId = defaultTubeTypeId,
   });
+
+  /// Seeded PE-Xa 16×2 tube type, the initial floor/wall default.
+  static const String defaultTubeTypeId =
+      '10000000-0000-4000-8000-000000000001';
 
   /// Outdoor design temperature (°C). Valid range: −50 to +10.
   final double designOutdoorTempC;
@@ -61,6 +67,12 @@ class ProjectSettings {
   /// ADR-020 Rule 1 — material catalog ID for new partition walls.
   final String defaultPartitionMaterialId;
 
+  /// Tube type ID assigned to newly drawn floor heating zones.
+  final String defaultFloorTubeTypeId;
+
+  /// Tube type ID assigned to newly placed wall heating zones.
+  final String defaultWallTubeTypeId;
+
   /// Returns a copy with updated fields.
   ProjectSettings copyWith({
     double? designOutdoorTempC,
@@ -73,6 +85,8 @@ class ProjectSettings {
     String? defaultExteriorMaterialId,
     String? defaultInteriorMaterialId,
     String? defaultPartitionMaterialId,
+    String? defaultFloorTubeTypeId,
+    String? defaultWallTubeTypeId,
   }) {
     return ProjectSettings(
       designOutdoorTempC:
@@ -94,6 +108,10 @@ class ProjectSettings {
           defaultInteriorMaterialId ?? this.defaultInteriorMaterialId,
       defaultPartitionMaterialId:
           defaultPartitionMaterialId ?? this.defaultPartitionMaterialId,
+      defaultFloorTubeTypeId:
+          defaultFloorTubeTypeId ?? this.defaultFloorTubeTypeId,
+      defaultWallTubeTypeId:
+          defaultWallTubeTypeId ?? this.defaultWallTubeTypeId,
     );
   }
 }
@@ -138,6 +156,10 @@ class ProjectSettingsNotifier
                           project.defaultInteriorMaterialId,
                       defaultPartitionMaterialId:
                           project.defaultPartitionMaterialId,
+                      defaultFloorTubeTypeId:
+                          project.defaultFloorTubeTypeId,
+                      defaultWallTubeTypeId:
+                          project.defaultWallTubeTypeId,
                     ),
             ) ??
         const ProjectSettings();
@@ -268,6 +290,18 @@ class ProjectSettingsNotifier
     _persist();
   }
 
+  /// Sets the default tube type for new floor heating zones.
+  void setDefaultFloorTubeTypeId(String value) {
+    state = state.copyWith(defaultFloorTubeTypeId: value);
+    _persist();
+  }
+
+  /// Sets the default tube type for new wall heating zones.
+  void setDefaultWallTubeTypeId(String value) {
+    state = state.copyWith(defaultWallTubeTypeId: value);
+    _persist();
+  }
+
   // ── Private helpers ────────────────────────────────────────────────────────
 
   /// Writes the current [state] back to the [Project] row in SQLite.
@@ -294,6 +328,8 @@ class ProjectSettingsNotifier
       defaultExteriorMaterialId: state.defaultExteriorMaterialId,
       defaultInteriorMaterialId: state.defaultInteriorMaterialId,
       defaultPartitionMaterialId: state.defaultPartitionMaterialId,
+      defaultFloorTubeTypeId: state.defaultFloorTubeTypeId,
+      defaultWallTubeTypeId: state.defaultWallTubeTypeId,
       modifiedAt: DateTime.now(),
     );
     unawaited(

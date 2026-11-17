@@ -211,6 +211,8 @@ class _ProviderCallbacks implements EditorCallbacks {
   @override
   String get defaultTubeTypeId => 'tube-1';
   @override
+  String get defaultWallTubeTypeId => 'tube-1';
+  @override
   String get defaultFlooringMaterialId => 'mat-1';
 
   @override

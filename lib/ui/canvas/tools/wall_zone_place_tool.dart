@@ -83,7 +83,7 @@ class WallZonePlaceTool extends CanvasTool {
       zoneType: ZoneType.wallHeating,
       polygon: polygon,
       tubeSpacingMm: 150,
-      tubeTypeId: callbacks.defaultTubeTypeId,
+      tubeTypeId: callbacks.defaultWallTubeTypeId,
       flooringMaterialId: callbacks.defaultFlooringMaterialId,
       borderDistanceMm: 100,
       layoutPattern: LayoutPattern.meander,

@@ -258,6 +258,8 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   String get defaultTubeTypeId => 'tube-1';
   @override
+  String get defaultWallTubeTypeId => 'tube-1';
+  @override
   String get defaultFlooringMaterialId => 'mat-1';
   @override
   void requestRoomDialog(
@@ -2577,6 +2579,8 @@ class _ReshapeStubCallbacks implements EditorCallbacks {
   @override
   String get defaultTubeTypeId => 'tube-1';
   @override
+  String get defaultWallTubeTypeId => 'tube-1';
+  @override
   String get defaultFlooringMaterialId => 'mat-1';
   @override
   void requestRoomDialog(
@@ -2747,6 +2751,8 @@ class _ProviderBridgeCallbacks implements EditorCallbacks {
   String get currentFloorId => 'floor-1';
   @override
   String get defaultTubeTypeId => 'tube-1';
+  @override
+  String get defaultWallTubeTypeId => 'tube-1';
   @override
   String get defaultFlooringMaterialId => 'mat-1';
   @override
