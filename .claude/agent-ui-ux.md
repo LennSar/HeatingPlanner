@@ -291,7 +291,7 @@ At viewport width < 600dp:
 
 **Trigger:** User selects the Distributor tool.
 
-1. User clicks a location on the floor plan → distributor symbol is placed (a small rectangle icon with pipe stubs).
+1. User clicks a location on the floor plan → distributor symbol is placed (a small rectangle with one outlet stub per circuit on its front side, facing away from the nearest wall — ADR-044).
 2. Properties panel shows: supply temperature, return temperature. Pump head is a calculated read-only field shown after circuits are connected (see ADR-007). An optional pump capacity field allows the user to enter an existing pump's rating for validation.
 3. Only one distributor per floor is allowed. If one already exists, show dialog: "Replace existing distributor?" with Move/Replace/Cancel options.
 

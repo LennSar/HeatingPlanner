@@ -3360,6 +3360,87 @@ spacing, feed order and density; name mapping);
 
 ---
 
+## ADR-044 — Distributor outlets: one stub per circuit, supply and return share it
+
+**Decision.**
+A distributor has a number of circuit outlets, entered in its properties.
+They are drawn as equally spaced stubs on the front of the body, and each
+circuit's connection pipes start at the tip of its own stub instead of at the
+distributor centre. Supply and return attach to the **same** stub: on site the
+supply and the return outlet of a manifold sit one above the other, so in plan
+they coincide.
+
+**Rules.**
+
+1. **Outlet count.** `Distributor.outletCount` (1–24, default 4), edited in
+   the distributor properties as *Circuit outlets* / *Heizkreisabgänge*,
+   with "*n* of *m* in use" below it. It cannot be set below the highest
+   outlet a circuit is connected to — the value is clamped, so no connected
+   circuit ever loses its stub.
+
+2. **Geometry.** `PipeLayoutEngine.distributorOutletPoints`: stub *i* sits at
+   `(i + 0.5) · width / count` from the body's left end, on its front face
+   (local −y, the upper long side at 0°), and the pipes attach at the stub
+   tip, `240 / 2 + 120 = 240 mm` in front of the body centre. The
+   painter draws exactly these stubs — filled when a circuit is connected,
+   outlined when free. The old two-up / two-down supply and return stubs
+   are gone.
+
+3. **Choosing an outlet.** The connection-pipe tool starts when the body or
+   its stubs are clicked (150 mm tolerance, any width and rotation — before
+   it was a fixed 400 mm radius around the centre, which missed the ends of
+   wide distributors). The route starts at the **free outlet nearest to the
+   click**, and `HeatingCircuit.outletIndex` records it. With every outlet in
+   use the route does not start and a toast says *"All n outlets of the
+   distributor are in use…"*. Deleting a circuit frees its outlet.
+
+4. **Pipes follow their stub.** Whenever the distributor changes — moved,
+   turned, resized with its handles, or given a different outlet count — every
+   circuit's route start moves to its stub tip and the supply/return pair is
+   derived again from the rest of the route, which is kept as drawn
+   (`anchoredAtOutlet`, applied by the editor state through
+   `withCircuitsOnOutlets`). Walls are deliberately not re-snapped here, so
+   the operation is exactly reversible and undoing a distributor move
+   restores the pipes. A drag moves the pipes transiently; its commit writes
+   the distributor and its circuits. This replaces the ADR-039 note that
+   moving the distributor leaves the pipe ends behind. (Moving it with the
+   *Place distributor* tool still removes all circuits, as before.)
+
+5. **Facing the room.** Placing or dragging a distributor against a wall
+   still aligns it with the wall, and now also turns it so the outlets face
+   away from the wall (`SnapService.distributorRotationAlongWall`). The
+   placement ghost shows the stubs so the direction is visible beforehand.
+
+**Persistence and migration.**
+Schema v23 adds `distributors.outlet_count INTEGER NOT NULL DEFAULT 4` and
+`heating_circuits.outlet_index INTEGER` (nullable). The migration raises the
+outlet count to at least the number of circuits on each distributor. Circuits
+without an outlet (older databases and `.hsp` files) get the free outlet
+nearest to where their pipes start when the floor is loaded, and their start
+moves to that stub. This is written back without marking the project dirty.
+`.hsp` files now also carry `widthMm`, `rotationDeg`, `outletCount` and
+`pumpCapacityPa` of the distributor. Before this, the exporter dropped width
+and rotation and the importer dropped the pump capacity, so a re-imported
+distributor came back 500 mm wide, unrotated and without its pump rating.
+
+**Not covered.**
+The pair still splits sideways right at the stub, half a pipe spacing to each
+side. When the outlet pitch (`width / count`) is smaller than the pipe
+spacing, pairs from neighbouring stubs overlap next to the distributor until
+their routes diverge. Widening the body or reducing the spacing avoids it.
+Hydraulics do not depend on which outlet a circuit uses.
+
+**Verification.**
+`test/unit/providers/distributor_outlets_test.dart` O-1 … O-14;
+`test/widget/tools/route_draw_tool_test.dart` RDT-21 … RDT-24 (fixture now
+has one outlet whose tip is at the old start point);
+`test/unit/repositories/heating_circuit_persistence_test.dart` (v23 columns,
+upgrade, round trip);
+`test/integration/file_roundtrip_test.dart` (ADR-044 `.hsp` round trip);
+`test/integration/full_workflow_test.dart`.
+
+---
+
 ## ADR-045 — Room summary; heat output follows EN 1264-2
 
 **Decision.**

@@ -6,6 +6,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:heating_planner/data/database/app_database.dart' as $db;
+import 'package:heating_planner/data/models/distributor.dart';
 import 'package:heating_planner/data/models/enums.dart';
 import 'package:heating_planner/data/models/heating_circuit.dart';
 import 'package:heating_planner/data/models/point2d.dart';
@@ -29,7 +30,8 @@ void main() {
     await db.close();
   });
 
-  test('schema v22: heating_circuits has the ADR-040/041 columns', () async {
+  test('schema v23: heating_circuits has the ADR-040/041/044 columns',
+      () async {
     expect(db.schemaVersion, 25);
     final cols = await db
         .customSelect('PRAGMA table_info(heating_circuits)')
@@ -44,8 +46,33 @@ void main() {
         'zone_clearance_mm',
         'wall_clearance_mm',
         'supply_on_right',
+        'outlet_index',
       ]),
     );
+  });
+
+  test('outlet count and outlet index are written and read back (ADR-044)',
+      () async {
+    const distributor = Distributor(
+      id: 'dist-1',
+      floorId: 'floor-1',
+      position: Point2D(x: 1000, y: 1000),
+      widthMm: 800,
+      rotationDeg: 270,
+      outletCount: 7,
+    );
+    const circuit = HeatingCircuit(
+      id: 'circuit-3',
+      distributorId: 'dist-1',
+      heatingZoneId: 'zone-1',
+      outletIndex: 5,
+    );
+    await upsertDistributor(db.heatingDao, distributor);
+    await upsertHeatingCircuit(db.heatingDao, circuit);
+    final repo = container.read(heatingRepositoryProvider);
+
+    expect(await repo.getDistributorForFloor('floor-1'), distributor);
+    expect((await repo.getCircuitsForDistributor('dist-1')).single, circuit);
   });
 
   test(
@@ -133,7 +160,7 @@ void upgradeTests() {
         setup: (raw) {
           raw
             ..execute(_v19HeatingCircuits)
-            // The v24 step alters `projects`, so it must exist.
+            // Later migrations ALTER `projects`, so it must exist.
             ..execute('CREATE TABLE projects (id TEXT NOT NULL PRIMARY KEY)')
             ..execute(
               'INSERT INTO heating_circuits '
@@ -141,6 +168,21 @@ void upgradeTests() {
               'supply_route_path_json) VALUES '
               "('old', 'dist-1', 'zone-1', "
               '\'[{"x":0.0,"y":0.0},{"x":1000.0,"y":0.0}]\')',
+            )
+            // ADR-044 (v23) alters `distributors`. dist-2 has more circuits
+            // than the default 4 outlets.
+            ..execute(
+              'CREATE TABLE distributors (id TEXT NOT NULL PRIMARY KEY)',
+            )
+            ..execute(
+              "INSERT INTO distributors (id) VALUES ('dist-1'), ('dist-2')",
+            )
+            ..execute(
+              'INSERT INTO heating_circuits '
+              '(id, distributor_id, heating_zone_id) VALUES '
+              "('d2-1', 'dist-2', 'z'), ('d2-2', 'dist-2', 'z'), "
+              "('d2-3', 'dist-2', 'z'), ('d2-4', 'dist-2', 'z'), "
+              "('d2-5', 'dist-2', 'z'), ('d2-6', 'dist-2', 'z')",
             )
             // Only the columns the v22 rename touches.
             ..execute(
@@ -160,8 +202,7 @@ void upgradeTests() {
 
     final rows = await db.select(db.heatingCircuits).get();
 
-    final row = rows.single;
-    expect(row.id, 'old');
+    final row = rows.singleWhere((r) => r.id == 'old');
     expect(row.supplyRoutePathJson, contains('1000.0'));
     // New columns arrive with their defaults.
     expect(row.centerlinePathJson, '[]');
@@ -170,6 +211,15 @@ void upgradeTests() {
     expect(row.wallClearanceMm, 100);
     expect(row.supplyPipeInsulationType, isNull);
     expect(row.supplyOnRight, isFalse);
+    expect(row.outletIndex, isNull, reason: 'assigned when the floor loads');
+
+    // ADR-044 (v23): at least one outlet per connected circuit.
+    final outlets = await db
+        .customSelect('SELECT id, outlet_count FROM distributors')
+        .get();
+    expect({
+      for (final r in outlets) r.read<String>('id'): r.read<int>('outlet_count'),
+    }, {'dist-1': 4, 'dist-2': 6});
 
     // ADR-043 (v22): layout patterns renamed to the four in common use.
     final zones = await db

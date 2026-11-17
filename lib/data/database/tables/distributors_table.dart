@@ -17,6 +17,8 @@ class Distributors extends Table {
   RealColumn get pumpCapacityPa => real().nullable()();
   IntColumn get widthMm => integer().withDefault(const Constant(500))();
   IntColumn get rotationDeg => integer().withDefault(const Constant(0))();
+  /// Number of outlet stubs / circuits the distributor holds (ADR-044).
+  IntColumn get outletCount => integer().withDefault(const Constant(4))();
 
   @override
   Set<Column> get primaryKey => {id};

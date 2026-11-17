@@ -418,6 +418,9 @@
   "undo_editConnectionPipe": "Anbindeleitung bearbeiten",
   "circuit_routeMustEndInZoneToast": "Die Anbindeleitung muss in ihrer Heizzone enden.",
   "route_doubleClickInZoneToast": "Zum Anschließen innerhalb einer Heizzone doppelklicken.",
+  "route_allOutletsInUseToast": "Alle {count} Abgänge des Verteilers sind belegt. Erhöhen Sie die Anzahl der Heizkreisabgänge in den Verteiler-Eigenschaften.",
+  "distributorOutlets": "Heizkreisabgänge",
+  "distributorOutletsInUse": "{used} von {count} belegt",
   "route_zoneAlreadyConnectedToast": "Diese Heizzone ist bereits angeschlossen.",
   "connectionPipes": "Anbindeleitungen",
   "circuit_pipeSpacing": "Abstand zwischen Vor- und Rücklauf",
@@ -448,13 +451,13 @@
   "defaultExteriorMaterial": "Außenwand-Standardmaterial",
   "defaultInteriorMaterial": "Innenwand-Standardmaterial",
   "defaultPartitionMaterial": "Trennwand-Standardmaterial",
-  "layerStackRequiresOneLayer": "Ein Aufbau muss mindestens eine Schicht enthalten.",
-
-  "customMaterialPickerNewRow": "Neues benutzerdefiniertes Material…",
   "defaultTubeTypes": "Standard-Rohrtypen",
   "defaultTubeTypesDesc": "Rohrtyp, der neu gezeichneten Heizzonen zugewiesen wird.",
   "defaultFloorTubeType": "Fußbodenheizung",
   "defaultWallTubeType": "Wandheizung",
+  "layerStackRequiresOneLayer": "Ein Aufbau muss mindestens eine Schicht enthalten.",
+
+  "customMaterialPickerNewRow": "Neues benutzerdefiniertes Material…",
   "customMaterialPickerManageRow": "Benutzerdefinierte Materialien verwalten…",
   "customMaterialChip": "Benutzerdefiniert",
 

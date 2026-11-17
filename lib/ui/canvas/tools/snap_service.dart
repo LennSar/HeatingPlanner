@@ -472,6 +472,21 @@ abstract final class SnapService {
     return best;
   }
 
+  /// Rotation (0–359°) that lays a distributor at [position] parallel to
+  /// [wall], with its outlet stubs facing away from the wall — into the
+  /// room the distributor stands in (ADR-044).
+  static int distributorRotationAlongWall(Point2D position, WallSegment wall) {
+    final dx = wall.endPoint.x - wall.startPoint.x;
+    final dy = wall.endPoint.y - wall.startPoint.y;
+    var angleDeg = atan2(dy, dx) * 180.0 / pi;
+    // At this angle the outlet side of the body points along (dy, −dx);
+    // turn it round when that is towards the wall.
+    final side = (position.x - wall.startPoint.x) * dy -
+        (position.y - wall.startPoint.y) * dx;
+    if (side < 0) angleDeg += 180.0;
+    return (angleDeg.round() % 360 + 360) % 360;
+  }
+
   /// Project [point] onto [wall] and return the distance in
   /// mm from the wall's start point.
   ///

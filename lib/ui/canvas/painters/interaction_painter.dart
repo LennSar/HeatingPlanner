@@ -1087,6 +1087,23 @@ class InteractionPainter extends CustomPainter {
     );
     _drawDashedRect(canvas, rect, color.withValues(alpha: 0.7));
 
+    // Outlet stubs on the front side, so it is clear which way the
+    // distributor will face (ADR-044). A new distributor has 4.
+    const outlets = 4;
+    final pitch = widthMm / outlets;
+    final stubPaint = Paint()
+      ..color = color.withValues(alpha: 0.7)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 8.0;
+    for (var i = 0; i < outlets; i++) {
+      final x = rect.left + (i + 0.5) * pitch;
+      canvas.drawLine(
+        Offset(x, rect.top),
+        Offset(x, rect.top - PipeLayoutEngine.distributorStubLengthMm),
+        stubPaint,
+      );
+    }
+
     canvas.restore();
   }
 

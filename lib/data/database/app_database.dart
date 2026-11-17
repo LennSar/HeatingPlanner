@@ -157,6 +157,23 @@ class AppDatabase extends _$AppDatabase {
               "WHERE layout_pattern = 'bifilar'",
             );
           }
+          // ADR-044 (v23): distributor outlet stubs. Existing distributors
+          // get at least one outlet per connected circuit; the circuits
+          // themselves are assigned an outlet when their floor is loaded.
+          if (from < 23) {
+            await m.database.customStatement(
+              'ALTER TABLE distributors ADD COLUMN outlet_count '
+              'INTEGER NOT NULL DEFAULT 4',
+            );
+            await m.database.customStatement(
+              'ALTER TABLE heating_circuits ADD COLUMN outlet_index INTEGER',
+            );
+            await m.database.customStatement(
+              'UPDATE distributors SET outlet_count = MAX(outlet_count, '
+              '(SELECT COUNT(*) FROM heating_circuits '
+              'WHERE heating_circuits.distributor_id = distributors.id))',
+            );
+          }
           // v24: project-level default tube types for floor and wall zones.
           // Guarded per column so the step is safe whatever order the
           // parallel ADR-044 (v23) work and this one reached a database in.

@@ -45,6 +45,10 @@ class HeatingCircuits extends Table {
   BoolColumn get supplyOnRight =>
       boolean().withDefault(const Constant(false))();
 
+  /// Distributor outlet stub the circuit is connected to (ADR-044).
+  /// Null for circuits saved before v23 until the floor is next loaded.
+  IntColumn get outletIndex => integer().nullable()();
+
   @override
   Set<Column> get primaryKey => {id};
 }

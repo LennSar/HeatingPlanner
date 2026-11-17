@@ -5087,7 +5087,8 @@ class SelectTool extends CanvasTool {
   }
 
   /// Returns the rotation (0–359°) that aligns the distributor parallel to
-  /// the nearest wall within [SnapService.wallHoverThresholdMm].
+  /// the nearest wall within [SnapService.wallHoverThresholdMm], outlet
+  /// stubs facing away from the wall (ADR-044).
   ///
   /// Uses the exact wall angle so any wall orientation is supported.
   /// Returns [currentRotation] unchanged when no wall is nearby.
@@ -5098,11 +5099,7 @@ class SelectTool extends CanvasTool {
   ) {
     final nearest = SnapService.nearestWall(position, walls);
     if (nearest == null) return currentRotation;
-    final dx = nearest.endPoint.x - nearest.startPoint.x;
-    final dy = nearest.endPoint.y - nearest.startPoint.y;
-    double angleDeg = math.atan2(dy, dx) * 180.0 / math.pi;
-    if (angleDeg < 0) angleDeg += 360.0;
-    return angleDeg.round() % 360;
+    return SnapService.distributorRotationAlongWall(position, nearest);
   }
 
   void _applyDistributorDrag(Point2D worldPoint) {

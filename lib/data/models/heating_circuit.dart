@@ -70,6 +70,13 @@ abstract class HeatingCircuit with _$HeatingCircuit {
     /// (seen from the distributor) and the return on the left; false for
     /// the default, supply on the left (ADR-041).
     @Default(false) bool supplyOnRight,
+
+    /// Zero-based outlet stub of the distributor this circuit is
+    /// connected to (ADR-044). The route starts at that stub's tip and
+    /// follows it when the distributor moves, turns, is resized or changes
+    /// its outlet count. Null only for circuits saved before ADR-044; they
+    /// get the next free outlet when the floor is loaded.
+    int? outletIndex,
   }) = _HeatingCircuit;
 
   factory HeatingCircuit.fromJson(Map<String, dynamic> json) =>

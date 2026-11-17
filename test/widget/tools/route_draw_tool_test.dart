@@ -49,10 +49,14 @@ class _StubCallbacks implements EditorCallbacks {
   final List<WallSegment> _walls;
 
   /// The floor's distributor; null to test the no-distributor case.
+  ///
+  /// One outlet, so its stub tip — where every route starts (ADR-044) —
+  /// is at (500, 500): 240 mm in front of the body centre.
   Distributor? distributor = const Distributor(
     id: 'dist-1',
     floorId: 'floor-1',
-    position: Point2D(x: 500, y: 500),
+    position: Point2D(x: 500, y: 740),
+    outletCount: 1,
   );
 
   _StubCallbacks({
@@ -194,11 +198,11 @@ class _StubCallbacks implements EditorCallbacks {
   @override
   String get defaultTubeTypeId => 'tube-1';
   @override
+  String get defaultWallTubeTypeId => 'tube-1';
+  @override
   String get defaultFlooringMaterialId => 'mat-1';
   @override
   void selectElement(String? type, String? id) {}
-  @override
-  String get defaultWallTubeTypeId => 'tube-1';
   @override
   void requestRoomDialog(
     List<Point2D> polygon,
@@ -219,8 +223,9 @@ class _StubCallbacks implements EditorCallbacks {
 
 // ── Fixtures ─────────────────────────────────────────────────────────────────
 //
-// Two rooms side by side. The distributor stands at (500, 500) in the left
-// room, on top of zone A. Zone B is the zone in the other room.
+// Two rooms side by side. The distributor stands in the left room, on top
+// of zone A, with its outlet at (500, 500). Zone B is the zone in the
+// other room.
 
 const _zoneA = HeatingZone(
   id: 'zone-a',
@@ -281,7 +286,7 @@ void main() {
     });
 
     test(
-      'RDT-2: a click on the distributor starts the route at its centre',
+      'RDT-2: a click on the distributor starts the route at its outlet',
       () {
         final cb = _StubCallbacks(zones: const [_zoneA, _zoneB]);
         final tool = _makeTool(cb);
@@ -537,8 +542,11 @@ void main() {
 
       undo.undo();
       expect(cb.currentCircuits, isEmpty);
-      expect(undo.canUndo, isFalse,
-          reason: 'drawing one pair is exactly one undo entry');
+      expect(
+        undo.canUndo,
+        isFalse,
+        reason: 'drawing one pair is exactly one undo entry',
+      );
     });
 
     test('RDT-20: a refused double-click leaves nothing to undo', () {
@@ -679,6 +687,96 @@ void main() {
         Point2D(x: 500, y: 2000),
         Point2D(x: 6000, y: 2000),
       ]);
+    });
+  });
+
+  group('RDT: distributor outlets (ADR-044)', () {
+    // 500 mm wide, 4 outlets: stub tips at x = 312.5, 437.5, 562.5,
+    // 687.5 on y = 500.
+    const four = Distributor(
+      id: 'dist-1',
+      floorId: 'floor-1',
+      position: Point2D(x: 500, y: 740),
+      outletCount: 4,
+    );
+
+    test('RDT-21: the route starts at the outlet nearest the click; supply '
+        'and return both attach to that one stub', () {
+      final cb = _StubCallbacks(zones: const [_zoneA, _zoneB])
+        ..distributor = four;
+      final tool = _makeTool(cb);
+      _click(tool, 690, 520);
+      _click(tool, 700, 2000);
+      _doubleClick(tool, 6000, 2000);
+
+      final c = cb.currentCircuits.single;
+      const tip = Point2D(x: 687.5, y: 500);
+      expect(c.outletIndex, 3);
+      expect(c.centerlinePath.first, tip);
+      expect(c.supplyRoutePath.first, tip);
+      expect(c.returnRoutePath.last, tip);
+    });
+
+    test('RDT-22: an outlet already in use is skipped for the nearest free '
+        'one', () {
+      final cb = _StubCallbacks(
+        zones: const [_zoneA, _zoneB],
+        circuits: const [
+          HeatingCircuit(
+            id: 'c-0',
+            distributorId: 'dist-1',
+            heatingZoneId: 'zone-x',
+            outletIndex: 3,
+          ),
+        ],
+      )..distributor = four;
+      final tool = _makeTool(cb);
+      _click(tool, 690, 520);
+      final data = tool.getInteractionData()! as RouteDrawData;
+      expect(data.waypoints.first, const Point2D(x: 562.5, y: 500));
+    });
+
+    test('RDT-23: with every outlet in use nothing starts and a toast says '
+        'so', () {
+      final cb = _StubCallbacks(
+        zones: const [_zoneA, _zoneB],
+        circuits: const [
+          HeatingCircuit(
+            id: 'c-0',
+            distributorId: 'dist-1',
+            heatingZoneId: 'zone-x',
+            outletIndex: 0,
+          ),
+        ],
+      ); // the default fixture has one outlet
+      final tool = _makeTool(cb);
+      _click(tool, 500, 500);
+      expect(tool.isDrawing, isFalse);
+      expect(cb.toasts, [cb.l10n.route_allOutletsInUseToast(1)]);
+    });
+
+    test('RDT-24: the whole body counts as the distributor, also when it '
+        'is wide and turned', () {
+      final cb = _StubCallbacks(zones: const [_zoneA, _zoneB])
+        ..distributor = const Distributor(
+          id: 'dist-1',
+          floorId: 'floor-1',
+          position: Point2D(x: 2000, y: 2000),
+          widthMm: 2000,
+          rotationDeg: 90,
+          outletCount: 8,
+        );
+      final tool = _makeTool(cb);
+      // Turned 90° clockwise: the body runs along y, outlets face +x.
+      // Near its lower end — 900 mm from the centre.
+      _click(tool, 2000, 2900);
+      expect(tool.isDrawing, isTrue);
+      final start = (tool.getInteractionData()! as RouteDrawData)
+          .waypoints
+          .first;
+      // Last outlet: 875 mm along the body, 240 mm in front of it.
+      expect(start.x, closeTo(2240, 1e-6));
+      expect(start.y, closeTo(2875, 1e-6));
     });
   });
 }

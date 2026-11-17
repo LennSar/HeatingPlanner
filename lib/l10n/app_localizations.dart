@@ -2420,6 +2420,24 @@ abstract class AppLocalizations {
   /// **'Double-click inside a heating zone to connect the pipes.'**
   String get route_doubleClickInZoneToast;
 
+  /// Toast when the connection-pipe tool starts on a distributor whose outlet stubs are all connected (ADR-044)
+  ///
+  /// In en, this message translates to:
+  /// **'All {count} outlets of the distributor are in use. Raise the number of circuit outlets in the distributor properties.'**
+  String route_allOutletsInUseToast(int count);
+
+  /// Distributor properties: number of heating circuits / outlet stubs the distributor holds (ADR-044)
+  ///
+  /// In en, this message translates to:
+  /// **'Circuit outlets'**
+  String get distributorOutlets;
+
+  /// Distributor properties: how many outlet stubs are connected to a circuit (ADR-044)
+  ///
+  /// In en, this message translates to:
+  /// **'{used} of {count} in use'**
+  String distributorOutletsInUse(int used, int count);
+
   /// Transient toast shown when the connection-pipe tool is double-clicked in a zone that already has a circuit (ADR-040 Rule 1)
   ///
   /// In en, this message translates to:
@@ -2576,24 +2594,6 @@ abstract class AppLocalizations {
   /// **'Default partition material'**
   String get defaultPartitionMaterial;
 
-  /// Toast shown when the user tries to remove the final layer from a construction (ADR-020 Rule 5)
-  ///
-  /// In en, this message translates to:
-  /// **'A construction must have at least one layer.'**
-  String get layerStackRequiresOneLayer;
-
-  /// Pinned row in the material picker dropdown that opens the Add Custom Material dialog (UI/UX §5.7.1 item 2)
-  ///
-  /// In en, this message translates to:
-  /// **'New custom material…'**
-  String get customMaterialPickerNewRow;
-
-  /// Pinned row at the bottom of the material picker dropdown that opens the Manage Custom Materials screen (UI/UX §5.7.1 item 3)
-  ///
-  /// In en, this message translates to:
-  /// **'Manage custom materials…'**
-  String get customMaterialPickerManageRow;
-
   /// Heading for the default floor/wall tube type dropdowns on the project settings dialog
   ///
   /// In en, this message translates to:
@@ -2617,6 +2617,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Wall heating'**
   String get defaultWallTubeType;
+
+  /// Toast shown when the user tries to remove the final layer from a construction (ADR-020 Rule 5)
+  ///
+  /// In en, this message translates to:
+  /// **'A construction must have at least one layer.'**
+  String get layerStackRequiresOneLayer;
+
+  /// Pinned row in the material picker dropdown that opens the Add Custom Material dialog (UI/UX §5.7.1 item 2)
+  ///
+  /// In en, this message translates to:
+  /// **'New custom material…'**
+  String get customMaterialPickerNewRow;
+
+  /// Pinned row at the bottom of the material picker dropdown that opens the Manage Custom Materials screen (UI/UX §5.7.1 item 3)
+  ///
+  /// In en, this message translates to:
+  /// **'Manage custom materials…'**
+  String get customMaterialPickerManageRow;
 
   /// Chip label rendered next to the name of a custom (non-built-in) material entry in the picker (UI/UX §5.7.1 item 5)
   ///

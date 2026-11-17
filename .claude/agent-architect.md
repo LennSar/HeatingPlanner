@@ -513,6 +513,9 @@ agent handles presentation; the data model just stores the path.
 | returnTempC | double | < supplyTemp | 28.0 |
 | pumpHeadPa | double | calculated | 0.0 |
 | pumpCapacityPa | double? | optional, user-entered for validation | null |
+| widthMm | int | body width; outlets are spaced across it | 500 |
+| rotationDeg | int | 0–359, clockwise; outlets on the local −y side | 0 |
+| outletCount | int | 1–24 and ≥ highest outlet in use; one stub per circuit (ADR-044) | 4 |
 
 **HeatingCircuit**
 | Field | Type | Constraint | Default |
@@ -528,6 +531,7 @@ agent handles presentation; the data model just stores the path.
 | zoneClearanceMm | int | 0–1000, pipe ↔ zone tubes | 100 |
 | wallClearanceMm | int | 0–1000, outer pipe ↔ wall face | 100 |
 | supplyOnRight | bool | supply on the right of the route (ADR-041) | false |
+| outletIndex | int? | distributor outlet stub, 0-based; the route starts at its tip (ADR-044). Null only before the floor's first load after v23 | null |
 | tubeLengthM | double | calculated | 0.0 |
 | flowRateKgH | double | calculated | 0.0 |
 | pressureLossPa | double | calculated | 0.0 |
@@ -583,18 +587,18 @@ Use `@riverpod` annotation with code generation. Every provider is defined in th
 | `buildingHeatDemandProvider` | Provider.family | projectId | double (W) | heat_demand_providers.dart |
 | `zoneHeatOutputProvider` | Provider.family | zoneId | double (W/m²) | heat_output_providers.dart |
 | `zoneSurfaceTempProvider` | Provider.family | zoneId | double (°C) | heat_output_providers.dart |
+| `zoneHeatedAreaM2Provider` | Provider.family | zoneId | double (m²) | heat_output_providers.dart |
+| `zoneHeatOutputWProvider` | Provider.family | zoneId | double (W) | heat_output_providers.dart |
 | `tubeLengthProvider` | Provider.family | circuitId | double (m) | tube_length_providers.dart |
 | `waterVolumeProvider` | Provider.family | circuitId | double (L) | water_volume_providers.dart |
 | `flowRateProvider` | Provider.family | circuitId | double (kg/h) | flow_rate_providers.dart |
 | `pressureLossProvider` | FutureProvider.family | circuitId | double (Pa) | pressure_loss_providers.dart |
-| `zoneHeatedAreaM2Provider` | Provider.family | zoneId | double (m²) | heat_output_providers.dart |
-| `zoneHeatOutputWProvider` | Provider.family | zoneId | double (W) | heat_output_providers.dart |
 | `hydraulicBalanceProvider` | FutureProvider.family | distributorId | Map\<String, double\> | hydraulic_balance_providers.dart |
+| `floorSummaryProvider` | Provider | — | FloorSummary (rooms + totals, ADR-045) | room_summary_providers.dart |
 | **UI state providers** | | | | |
 | `selectedToolProvider` | StateProvider | — | DrawingTool | editor_screen.dart |
 | `canvasTransformProvider` | StateNotifierProvider | — | Matrix4 | canvas_controller.dart |
 | `selectedElementProvider` | StateProvider | — | (String type, String id)? | editor_screen.dart |
-| `floorSummaryProvider` | Provider | — | FloorSummary (rooms + totals, ADR-045) | room_summary_providers.dart |
 | `validationResultsProvider` | Provider.family | projectId | List\<ValidationResult\> | validation_service.dart |
 
 ### 6.3 Invalidation Cascade

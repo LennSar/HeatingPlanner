@@ -473,6 +473,11 @@ class HspImporter {
           Value(_double(d, 'supplyTempC')),
       returnTempC:
           Value(_double(d, 'returnTempC')),
+      pumpCapacityPa: Value((d['pumpCapacityPa'] as num?)?.toDouble()),
+      // Written to files only since ADR-044 — older files used defaults.
+      widthMm: Value((d['widthMm'] as num?)?.toInt() ?? 500),
+      rotationDeg: Value((d['rotationDeg'] as num?)?.toInt() ?? 0),
+      outletCount: Value((d['outletCount'] as num?)?.toInt() ?? 4),
     );
   }
 
@@ -569,6 +574,8 @@ class HspImporter {
           Value((d['wallClearanceMm'] as num?)?.toInt() ?? 100),
       // Added with ADR-041 — absent in older files.
       supplyOnRight: Value(d['supplyOnRight'] as bool? ?? false),
+      // Added with ADR-044 — older files get an outlet on load.
+      outletIndex: Value((d['outletIndex'] as num?)?.toInt()),
     );
   }
 

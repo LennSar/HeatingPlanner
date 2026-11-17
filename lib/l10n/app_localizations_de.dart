@@ -1301,6 +1301,19 @@ class AppLocalizationsDe extends AppLocalizations {
       'Zum Anschließen innerhalb einer Heizzone doppelklicken.';
 
   @override
+  String route_allOutletsInUseToast(int count) {
+    return 'Alle $count Abgänge des Verteilers sind belegt. Erhöhen Sie die Anzahl der Heizkreisabgänge in den Verteiler-Eigenschaften.';
+  }
+
+  @override
+  String get distributorOutlets => 'Heizkreisabgänge';
+
+  @override
+  String distributorOutletsInUse(int used, int count) {
+    return '$used von $count belegt';
+  }
+
+  @override
   String get route_zoneAlreadyConnectedToast =>
       'Diese Heizzone ist bereits angeschlossen.';
 
@@ -1390,19 +1403,6 @@ class AppLocalizationsDe extends AppLocalizations {
   String get defaultPartitionMaterial => 'Trennwand-Standardmaterial';
 
   @override
-  String get layerStackRequiresOneLayer =>
-      'Ein Aufbau muss mindestens eine Schicht enthalten.';
-
-  @override
-  String get customMaterialPickerNewRow =>
-      'Neues benutzerdefiniertes Material…';
-
-  @override
-  String get customMaterialPickerManageRow =>
-      'Benutzerdefinierte Materialien verwalten…';
-
-  @override
-  @override
   String get defaultTubeTypes => 'Standard-Rohrtypen';
 
   @override
@@ -1415,6 +1415,19 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get defaultWallTubeType => 'Wandheizung';
 
+  @override
+  String get layerStackRequiresOneLayer =>
+      'Ein Aufbau muss mindestens eine Schicht enthalten.';
+
+  @override
+  String get customMaterialPickerNewRow =>
+      'Neues benutzerdefiniertes Material…';
+
+  @override
+  String get customMaterialPickerManageRow =>
+      'Benutzerdefinierte Materialien verwalten…';
+
+  @override
   String get customMaterialChip => 'Benutzerdefiniert';
 
   @override

@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/gestures.dart';
 
 import '../../../calculation/engines/geometry_engine.dart';
@@ -17,7 +19,9 @@ import 'undo_redo_service.dart';
 /// supply and return run between the distributor and a zone (ADR-040).
 ///
 /// Interaction flow:
-///  1. Click the distributor — the route starts at its centre.
+///  1. Click the distributor — the route starts at the tip of the free
+///     outlet stub nearest to the click (ADR-044). Supply and return both
+///     attach to that one stub. With every outlet in use a toast says so.
 ///  2. Click to place route points. A click inside a heating zone is an
 ///     ordinary route point, so the route can cross the zone the
 ///     distributor stands in and any zone on the way.
@@ -46,8 +50,11 @@ class RouteDrawTool extends CanvasTool {
   final UndoRedoService undoRedo;
 
   /// Route points placed so far (grid-snapped clicks). The first one is
-  /// the distributor centre. Empty while idle.
+  /// the tip of the outlet stub [_outletIndex]. Empty while idle.
   final List<Point2D> _points = [];
+
+  /// Distributor outlet the route starts at (ADR-044); null while idle.
+  int? _outletIndex;
 
   /// Raw cursor position, or null before the first pointer move.
   Point2D? _cursor;
@@ -55,11 +62,9 @@ class RouteDrawTool extends CanvasTool {
   DateTime? _lastTapTime;
   Point2D? _lastTapPos;
 
-  /// World-space hit radius for the distributor (mm).
-  ///
-  /// Covers the distributor body with comfortable click
-  /// tolerance regardless of zoom level.
-  static const double _distributorHitRadiusMm = 400.0;
+  /// Click tolerance around the distributor body and its outlet stubs
+  /// (mm, world space).
+  static const double _distributorHitToleranceMm = 150.0;
 
   /// Two taps closer than this (and within [_doubleTapWindow]) form a
   /// double-click.
@@ -88,14 +93,27 @@ class RouteDrawTool extends CanvasTool {
     _lastTapPos = worldPoint;
 
     if (!isDrawing) {
-      // The route can only start on the distributor.
-      if (_isOnDistributor(worldPoint)) {
-        _points.add(callbacks.currentDistributor!.position);
-        _cursor = worldPoint;
-        // The starting click must not count as half of a double-click.
-        _lastTapTime = null;
-        onStateChanged();
+      // The route can only start on the distributor, at a free outlet.
+      final distributor = callbacks.currentDistributor;
+      if (distributor == null || !_isOnDistributor(worldPoint)) return;
+      final outlets = distributorOutlets(distributor);
+      final index = PipeLayoutEngine.nearestFreeOutletIndex(
+        outlets,
+        worldPoint,
+        occupied: occupiedOutlets(callbacks.currentCircuits, distributor.id),
+      );
+      if (index < 0) {
+        callbacks.showToast(
+          callbacks.l10n.route_allOutletsInUseToast(distributor.outletCount),
+        );
+        return;
       }
+      _outletIndex = index;
+      _points.add(outlets[index]);
+      _cursor = worldPoint;
+      // The starting click must not count as half of a double-click.
+      _lastTapTime = null;
+      onStateChanged();
       return;
     }
 
@@ -218,6 +236,7 @@ class RouteDrawTool extends CanvasTool {
         zoneClearanceMm: template?.zoneClearanceMm ?? 100,
         wallClearanceMm: template?.wallClearanceMm ?? 100,
         supplyPipeInsulationType: template?.supplyPipeInsulationType,
+        outletIndex: _outletIndex,
       ),
       callbacks.currentWalls,
       centerline: PipeLayoutEngine.dedupePolyline(route),
@@ -225,13 +244,22 @@ class RouteDrawTool extends CanvasTool {
     return circuit.centerlinePath.length < 2 ? null : circuit;
   }
 
-  /// True if [point] is within [_distributorHitRadiusMm] of
-  /// the current distributor centre.
+  /// True if [point] lies on the current distributor's body or its
+  /// outlet stubs, within [_distributorHitToleranceMm].
   bool _isOnDistributor(Point2D point) {
-    final dist = callbacks.currentDistributor;
-    if (dist == null) return false;
-    return GeometryEngine.distanceMm(point, dist.position) <=
-        _distributorHitRadiusMm;
+    final d = callbacks.currentDistributor;
+    if (d == null) return false;
+    // Into the distributor's local (unrotated) frame.
+    final rad = -d.rotationDeg * math.pi / 180.0;
+    final dx = point.x - d.position.x;
+    final dy = point.y - d.position.y;
+    final lx = dx * math.cos(rad) - dy * math.sin(rad);
+    final ly = dx * math.sin(rad) + dy * math.cos(rad);
+    const halfDepth = PipeLayoutEngine.distributorBodyDepthMm / 2;
+    const front = halfDepth + PipeLayoutEngine.distributorStubLengthMm;
+    return lx.abs() <= d.widthMm / 2 + _distributorHitToleranceMm &&
+        ly >= -front - _distributorHitToleranceMm &&
+        ly <= halfDepth + _distributorHitToleranceMm;
   }
 
   /// Returns the heating zone (floor or wall) whose polygon contains
@@ -252,6 +280,7 @@ class RouteDrawTool extends CanvasTool {
 
   void _reset() {
     _points.clear();
+    _outletIndex = null;
     _cursor = null;
     _lastTapTime = null;
     _lastTapPos = null;

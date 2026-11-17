@@ -258,6 +258,11 @@ class PipeLayerPainter extends CustomPainter {
         bodyColor: colors.wallFill,
         strokeColor: colors.wallStroke,
         labelColor: colors.wallStroke,
+        occupiedOutlets: {
+          for (final c in circuits)
+            if (c.distributorId == distributor!.id && c.outletIndex != null)
+              c.outletIndex!,
+        },
       ).paint(canvas, size);
     }
 

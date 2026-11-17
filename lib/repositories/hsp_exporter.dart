@@ -304,6 +304,9 @@ class HspExporter {
         supplyTempC: row.supplyTempC,
         returnTempC: row.returnTempC,
         pumpCapacityPa: row.pumpCapacityPa,
+        widthMm: row.widthMm,
+        rotationDeg: row.rotationDeg,
+        outletCount: row.outletCount,
       ).toJson();
 
   Map<String, dynamic> _circuitJson($db.HeatingCircuit row) => HeatingCircuit(
@@ -325,6 +328,7 @@ class HspExporter {
         zoneClearanceMm: row.zoneClearanceMm,
         wallClearanceMm: row.wallClearanceMm,
         supplyOnRight: row.supplyOnRight,
+        outletIndex: row.outletIndex,
       ).toJson();
 
   // ── JSON helpers ───────────────────────────────────────────────────────────

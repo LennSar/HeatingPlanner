@@ -35,11 +35,17 @@ abstract class Distributor with _$Distributor {
     /// Width of the distributor body in millimetres. Default 500 mm.
     @Default(500) int widthMm,
 
-    /// Rotation of the distributor in degrees (0, 90, 180, or 270).
+    /// Rotation of the distributor in degrees (0–359, clockwise).
     ///
-    /// 0° = supply stubs up / return stubs down (default).
+    /// 0° = outlet stubs on the upper long side (default).
     /// 90° = rotated 90° clockwise.
     @Default(0) int rotationDeg,
+
+    /// Number of heating circuits the distributor can hold — one outlet
+    /// stub each, equally spaced across [widthMm] (ADR-044). Supply and
+    /// return of a circuit share one stub. Range: 1–24; never fewer than
+    /// the highest outlet in use.
+    @Default(4) int outletCount,
   }) = _Distributor;
 
   factory Distributor.fromJson(Map<String, dynamic> json) =>

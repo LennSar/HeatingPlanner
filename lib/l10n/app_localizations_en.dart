@@ -1298,6 +1298,19 @@ class AppLocalizationsEn extends AppLocalizations {
       'Double-click inside a heating zone to connect the pipes.';
 
   @override
+  String route_allOutletsInUseToast(int count) {
+    return 'All $count outlets of the distributor are in use. Raise the number of circuit outlets in the distributor properties.';
+  }
+
+  @override
+  String get distributorOutlets => 'Circuit outlets';
+
+  @override
+  String distributorOutletsInUse(int used, int count) {
+    return '$used of $count in use';
+  }
+
+  @override
   String get route_zoneAlreadyConnectedToast =>
       'This heating zone is already connected.';
 
@@ -1386,19 +1399,6 @@ class AppLocalizationsEn extends AppLocalizations {
   String get defaultPartitionMaterial => 'Default partition material';
 
   @override
-  String get layerStackRequiresOneLayer =>
-      'A construction must have at least one layer.';
-
-  @override
-  String get customMaterialPickerNewRow => 'New custom material…';
-
-  @override
-  String get customMaterialPickerManageRow => 'Manage custom materials…';
-
-  @override
-  String get customMaterialChip => 'Custom';
-
-  @override
   String get defaultTubeTypes => 'Default tube types';
 
   @override
@@ -1410,6 +1410,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get defaultWallTubeType => 'Wall heating';
+
+  @override
+  String get layerStackRequiresOneLayer =>
+      'A construction must have at least one layer.';
+
+  @override
+  String get customMaterialPickerNewRow => 'New custom material…';
+
+  @override
+  String get customMaterialPickerManageRow => 'Manage custom materials…';
+
+  @override
+  String get customMaterialChip => 'Custom';
 
   @override
   String get customMaterialDialogAddTitle => 'Add Custom Material';

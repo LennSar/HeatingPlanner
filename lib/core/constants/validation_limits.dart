@@ -34,6 +34,11 @@ const double minPumpHeadPa = 1000.0;
 /// Maximum available pump head at the distributor (Pa).
 const double maxPumpHeadPa = 100000.0;
 
+/// Range of [Distributor.outletCount] — heating circuits per distributor
+/// (ADR-044). Common manifolds hold 2–12; 24 leaves room for large ones.
+const int minDistributorOutlets = 1;
+const int maxDistributorOutlets = 24;
+
 // ── Geometry ─────────────────────────────────────────────────────────────────
 const int minWallLengthMm = 100;
 const int minRoomHeightMm = 2000;

@@ -1,4 +1,3 @@
-import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart';
 
@@ -91,7 +90,8 @@ class DistributorPlaceTool extends CanvasTool {
   // ── Private helpers ────────────────────────────────────────
 
   /// Returns the rotation (in degrees, 0–359) that aligns the distributor
-  /// parallel to the nearest wall within [SnapService.wallHoverThresholdMm].
+  /// parallel to the nearest wall within [SnapService.wallHoverThresholdMm],
+  /// outlet stubs facing away from the wall (ADR-044).
   ///
   /// Uses the exact wall angle so the distributor aligns for walls at any
   /// orientation, not just horizontal and vertical.
@@ -102,12 +102,7 @@ class DistributorPlaceTool extends CanvasTool {
       callbacks.currentWalls,
     );
     if (nearest == null) return _ghostRotationDeg;
-
-    final dx = nearest.endPoint.x - nearest.startPoint.x;
-    final dy = nearest.endPoint.y - nearest.startPoint.y;
-    double angleDeg = math.atan2(dy, dx) * 180.0 / math.pi;
-    if (angleDeg < 0) angleDeg += 360.0;
-    return angleDeg.round() % 360;
+    return SnapService.distributorRotationAlongWall(position, nearest);
   }
 
   void _placeNew(Point2D position) {

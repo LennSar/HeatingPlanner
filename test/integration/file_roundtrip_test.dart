@@ -258,6 +258,40 @@ void main() {
       expect(other.supplyOnRight, isFalse);
     });
 
+    test('distributor geometry, outlet count and each circuit\'s outlet '
+        'survive a save and re-import (ADR-044)', () async {
+      await db.update(db.distributors).write(
+        const $db.DistributorsCompanion(
+          widthMm: Value(900),
+          rotationDeg: Value(270),
+          outletCount: Value(9),
+          pumpCapacityPa: Value(42000),
+        ),
+      );
+      final source = (await db.select(db.heatingCircuits).get()).first;
+      await (db.update(
+        db.heatingCircuits,
+      )..where((t) => t.id.equals(source.id))).write(
+        const $db.HeatingCircuitsCompanion(outletIndex: Value(7)),
+      );
+
+      await container.read(saveStateProvider.notifier).saveAs(tempPath);
+      final snapshot = await _decodeHsp(tempPath);
+
+      final db2 = $db.AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db2.close);
+      await HspImporter(db2).importSnapshot(snapshot);
+
+      final dist = (await db2.select(db2.distributors).get()).single;
+      expect(dist.widthMm, 900);
+      expect(dist.rotationDeg, 270);
+      expect(dist.outletCount, 9);
+      expect(dist.pumpCapacityPa, 42000);
+      final outlets =
+          (await db2.select(db2.heatingCircuits).get()).map((c) => c.outletIndex);
+      expect(outlets, containsAll(<int?>[7, null]));
+    });
+
     test('a manual tube path survives a save and re-import; an automatic '
         'zone stays automatic (ADR-046)', () async {
       const path =

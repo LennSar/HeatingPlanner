@@ -6,6 +6,7 @@ import 'dart:math' as math;
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../data/models/distributor.dart';
 import '../../data/models/enums.dart';
 import '../../data/models/heating_circuit.dart';
 import '../../data/models/heating_zone.dart';
@@ -143,6 +144,138 @@ HeatingCircuit relaidConnectionPipes(
     supplyRoutePath: laid.supply,
     returnRoutePath: laid.back,
   );
+}
+
+/// Tips of the outlet stubs of [distributor] (ADR-044), index = outlet.
+List<Point2D> distributorOutlets(Distributor distributor) =>
+    PipeLayoutEngine.distributorOutletPoints(
+      center: distributor.position,
+      widthMm: distributor.widthMm.toDouble(),
+      rotationDeg: distributor.rotationDeg,
+      outletCount: distributor.outletCount,
+    );
+
+/// Outlets of the distributor [distributorId] that a circuit in
+/// [circuits] is connected to.
+Set<int> occupiedOutlets(
+  List<HeatingCircuit> circuits,
+  String distributorId,
+) => {
+  for (final c in circuits)
+    if (c.distributorId == distributorId && c.outletIndex != null)
+      c.outletIndex!,
+};
+
+/// Returns [circuit] with its connection pipes starting at [outlet], the
+/// tip of its distributor stub (ADR-044).
+///
+/// Only the start moves: the rest of the route is kept as drawn and the
+/// supply/return pair is derived from it again, so supply and return both
+/// leave the same stub. Walls are not re-snapped, which keeps the result
+/// reversible — moving the distributor back restores the circuit exactly.
+/// A circuit drawn as two separate pipes gets the new point as supply
+/// start and return end.
+HeatingCircuit anchoredAtOutlet(HeatingCircuit circuit, Point2D outlet) {
+  if (circuit.centerlinePath.length >= 2) {
+    if (GeometryEngine.distanceMm(circuit.centerlinePath.first, outlet) <
+        0.5) {
+      return circuit;
+    }
+    final route = PipeLayoutEngine.dedupePolyline([
+      outlet,
+      ...circuit.centerlinePath.skip(1),
+    ]);
+    final pair = PipeLayoutEngine.connectionPipePair(
+      centerline: route,
+      pipeSpacingMm: circuit.pipeSpacingMm.toDouble(),
+      supplyOnRight: circuit.supplyOnRight,
+    );
+    if (pair.supply.isEmpty) return circuit;
+    return circuit.copyWith(
+      centerlinePath: route,
+      supplyRoutePath: pair.supply,
+      returnRoutePath: pair.back,
+    );
+  }
+  final supply = circuit.supplyRoutePath;
+  final back = circuit.returnRoutePath;
+  bool at(List<Point2D> path, Point2D p) =>
+      path.isEmpty || GeometryEngine.distanceMm(p, outlet) < 0.5;
+  if (at(supply, supply.firstOrNull ?? outlet) &&
+      at(back, back.lastOrNull ?? outlet)) {
+    return circuit;
+  }
+  return circuit.copyWith(
+    supplyRoutePath: supply.isEmpty ? supply : [outlet, ...supply.skip(1)],
+    returnRoutePath: back.isEmpty
+        ? back
+        : [...back.take(back.length - 1), outlet],
+  );
+}
+
+/// Puts every circuit of [distributor] on an outlet stub and starts its
+/// pipes at that stub's tip (ADR-044).
+///
+/// - A circuit without an outlet (saved before ADR-044), with one beyond
+///   the outlet count or sharing one with an earlier circuit gets the free
+///   outlet nearest to where its pipes currently start.
+/// - The outlet count grows when there are more circuits than outlets.
+/// - Circuits of other distributors are returned unchanged.
+///
+/// Applied when a floor is loaded and whenever the distributor changes,
+/// so the pipes follow their stub when the distributor is moved, turned,
+/// resized or given a different number of outlets.
+({Distributor distributor, List<HeatingCircuit> circuits}) withCircuitsOnOutlets(
+  Distributor distributor,
+  List<HeatingCircuit> circuits,
+) {
+  final own = [
+    for (var i = 0; i < circuits.length; i++)
+      if (circuits[i].distributorId == distributor.id) i,
+  ];
+  if (own.isEmpty) return (distributor: distributor, circuits: circuits);
+
+  // Keep valid, unique outlets; collect the rest for reassignment.
+  final taken = <int>{};
+  final unassigned = <int>[];
+  for (final i in own) {
+    final idx = circuits[i].outletIndex;
+    if (idx != null && idx >= 0 && idx < distributor.outletCount &&
+        taken.add(idx)) {
+      continue;
+    }
+    unassigned.add(i);
+  }
+  final d = own.length > distributor.outletCount
+      ? distributor.copyWith(outletCount: own.length)
+      : distributor;
+  final outlets = distributorOutlets(d);
+
+  final out = List<HeatingCircuit>.of(circuits);
+  for (final i in unassigned) {
+    final c = out[i];
+    final start = c.centerlinePath.isNotEmpty
+        ? c.centerlinePath.first
+        : (c.supplyRoutePath.isNotEmpty ? c.supplyRoutePath.first : d.position);
+    final idx = PipeLayoutEngine.nearestFreeOutletIndex(
+      outlets,
+      start,
+      occupied: taken,
+    );
+    taken.add(idx);
+    out[i] = c.copyWith(outletIndex: idx);
+  }
+  var changed = unassigned.isNotEmpty;
+  for (final i in own) {
+    final anchored = anchoredAtOutlet(out[i], outlets[out[i].outletIndex!]);
+    if (!identical(anchored, out[i])) {
+      out[i] = anchored;
+      changed = true;
+    }
+  }
+  // The same list when nothing moved, so watchers of the circuits do not
+  // recompute on e.g. every tick of a temperature slider.
+  return (distributor: d, circuits: changed ? out : circuits);
 }
 
 /// Returns [circuit] with supply and return swapped (ADR-041).

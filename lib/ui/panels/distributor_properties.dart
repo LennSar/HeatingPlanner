@@ -14,6 +14,8 @@ import '../providers/editor_state_provider.dart';
 /// - Supply temperature (°C) — range [minSupplyTempC, maxSupplyTempC]
 /// - Return temperature (°C) — range [minReturnTempC, max < supplyTempC]
 /// - Pump capacity (Pa) — optional, user's pump rating (ADR-007)
+/// - Circuit outlets — number of outlet stubs (ADR-044); never below the
+///   highest outlet a circuit is connected to
 ///
 /// Read-only fields:
 /// - Min. required pump pressure (Pa) — computed; shows "—" until circuits
@@ -42,6 +44,7 @@ class _DistributorPropertiesState
   late TextEditingController _supplyCtrl;
   late TextEditingController _returnCtrl;
   late TextEditingController _capacityCtrl;
+  late TextEditingController _outletsCtrl;
 
   Distributor? _last;
 
@@ -55,6 +58,7 @@ class _DistributorPropertiesState
     _supplyCtrl = TextEditingController();
     _returnCtrl = TextEditingController();
     _capacityCtrl = TextEditingController();
+    _outletsCtrl = TextEditingController();
   }
 
   @override
@@ -62,6 +66,7 @@ class _DistributorPropertiesState
     _supplyCtrl.dispose();
     _returnCtrl.dispose();
     _capacityCtrl.dispose();
+    _outletsCtrl.dispose();
     super.dispose();
   }
 
@@ -70,6 +75,7 @@ class _DistributorPropertiesState
   void _syncControllers(Distributor d) {
     if (d == _last) return;
     _last = d;
+    _setText(_outletsCtrl, d.outletCount.toString());
     final supply = d.supplyTempC.toStringAsFixed(1);
     final ret = d.returnTempC.toStringAsFixed(1);
     final capacity = d.pumpCapacityPa != null
@@ -100,6 +106,14 @@ class _DistributorPropertiesState
         ),
       );
     }
+  }
+
+  static void _setText(TextEditingController ctrl, String text) {
+    if (ctrl.text == text) return;
+    ctrl.value = ctrl.value.copyWith(
+      text: text,
+      selection: TextSelection.collapsed(offset: text.length),
+    );
   }
 
   void _update(Distributor updated) {
@@ -137,7 +151,17 @@ class _DistributorPropertiesState
 
     _syncControllers(distributor);
 
-    return Padding(
+    final occupied = {
+      for (final c in editorState.circuits)
+        if (c.distributorId == distributor.id && c.outletIndex != null)
+          c.outletIndex!,
+    };
+    final minOutlets = occupied.isEmpty
+        ? minDistributorOutlets
+        : (occupied.reduce((a, b) => a > b ? a : b) + 1)
+            .clamp(minDistributorOutlets, maxDistributorOutlets);
+
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(Spacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -266,6 +290,36 @@ class _DistributorPropertiesState
                 distributor.copyWith(returnTempC: clamped),
               );
             },
+          ),
+          const SizedBox(height: Spacing.md),
+
+          // ── Circuit outlets (ADR-044) ──────────────────────
+          _SectionLabel(
+            label: l10n.distributorOutlets,
+            unit: '',
+            textTheme: textTheme,
+          ),
+          const SizedBox(height: Spacing.xs),
+          _NumericField(
+            controller: _outletsCtrl,
+            min: minOutlets.toDouble(),
+            max: maxDistributorOutlets.toDouble(),
+            onCommit: (v) {
+              final count = v.round().clamp(minOutlets, maxDistributorOutlets);
+              // Show the clamped value even when the count is unchanged.
+              _setText(_outletsCtrl, count.toString());
+              if (count != distributor.outletCount) {
+                _update(distributor.copyWith(outletCount: count));
+              }
+            },
+          ),
+          _infoRow(
+            '',
+            l10n.distributorOutletsInUse(
+              occupied.length,
+              distributor.outletCount,
+            ),
+            textTheme,
           ),
           const SizedBox(height: Spacing.md),
 

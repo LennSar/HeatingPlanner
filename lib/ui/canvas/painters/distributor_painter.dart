@@ -1,16 +1,20 @@
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 
+import 'package:flutter/foundation.dart' show setEquals;
 import 'package:flutter/material.dart';
 
+import '../../../calculation/engines/pipe_layout_engine.dart';
 import '../../../data/models/distributor.dart';
 
 /// Draws the distributor manifold symbol on the canvas.
 ///
 /// The symbol is a filled rectangle (widthMm × 240 mm in world
-/// space) representing the header/manifold body, with two
-/// short pipe stubs extending upward (supply) and two
-/// extending downward (return), and a centred label "D".
+/// space) representing the header/manifold body, one outlet stub per
+/// circuit ([Distributor.outletCount]) on its front side, equally spaced
+/// across the width, and a centred label "D" (ADR-044). Supply and return
+/// of a circuit share a stub — on site they sit one above the other.
+/// Stubs in [occupiedOutlets] are drawn filled, free ones as an outline.
 ///
 /// All dimensions are in world-space millimetres so they
 /// scale correctly with the canvas transform.
@@ -21,6 +25,7 @@ class DistributorPainter extends CustomPainter {
     required this.bodyColor,
     required this.strokeColor,
     required this.labelColor,
+    this.occupiedOutlets = const {},
   });
 
   /// The distributor to draw.
@@ -35,10 +40,13 @@ class DistributorPainter extends CustomPainter {
   /// Colour for the "D" label text.
   final Color labelColor;
 
+  /// Outlet indices a circuit is connected to.
+  final Set<int> occupiedOutlets;
+
   // ── Fixed geometry constants (world mm) ──────────────────
-  static const double _bodyH = 240.0;
-  static const double _stubLen = 120.0;
-  static const double _stubW = 20.0;
+  static const double _bodyH = PipeLayoutEngine.distributorBodyDepthMm;
+  static const double _stubLen = PipeLayoutEngine.distributorStubLengthMm;
+  static const double _stubW = 30.0;
   static const double _strokeW = 10.0;
   static const double _labelSize = 120.0;
 
@@ -47,8 +55,6 @@ class DistributorPainter extends CustomPainter {
     final cx = distributor.position.x;
     final cy = distributor.position.y;
     final bodyW = distributor.widthMm.toDouble();
-    // Stub offset scales with body width (20% from centre).
-    final stubOffset = bodyW * 0.2;
 
     // Apply rotation around the distributor centre.
     final angleRad = distributor.rotationDeg * math.pi / 180.0;
@@ -80,13 +86,22 @@ class DistributorPainter extends CustomPainter {
         ..strokeWidth = _strokeW,
     );
 
-    // Supply stubs (upward from top edge).
-    _drawStub(canvas, cx - stubOffset, cy - _bodyH / 2, up: true);
-    _drawStub(canvas, cx + stubOffset, cy - _bodyH / 2, up: true);
-
-    // Return stubs (downward from bottom edge).
-    _drawStub(canvas, cx - stubOffset, cy + _bodyH / 2, up: false);
-    _drawStub(canvas, cx + stubOffset, cy + _bodyH / 2, up: false);
+    // Outlet stubs on the front face, one per circuit (ADR-044). Same
+    // spacing as PipeLayoutEngine.distributorOutletPoints.
+    final count = distributor.outletCount;
+    if (count > 0) {
+      final pitch = bodyW / count;
+      final stubW = math.min(_stubW, pitch * 0.6);
+      for (var i = 0; i < count; i++) {
+        _drawStub(
+          canvas,
+          cx - bodyW / 2 + (i + 0.5) * pitch,
+          cy - _bodyH / 2,
+          stubW,
+          occupied: occupiedOutlets.contains(i),
+        );
+      }
+    }
 
     // "D" label in the centre.
     _drawLabel(canvas, cx, cy, bodyW);
@@ -94,24 +109,36 @@ class DistributorPainter extends CustomPainter {
     canvas.restore();
   }
 
+  /// One outlet stub at [x], from the body face [y] outwards (local −y).
   void _drawStub(
     Canvas canvas,
     double x,
-    double y, {
-    required bool up,
+    double y,
+    double width, {
+    required bool occupied,
   }) {
-    final yEnd = up ? y - _stubLen : y + _stubLen;
-    canvas.drawRect(
-      Rect.fromLTRB(
-        x - _stubW / 2,
-        up ? yEnd : y,
-        x + _stubW / 2,
-        up ? y : yEnd,
-      ),
-      Paint()
-        ..color = strokeColor
-        ..style = PaintingStyle.fill,
+    final rect = Rect.fromLTRB(
+      x - width / 2,
+      y - _stubLen,
+      x + width / 2,
+      y,
     );
+    if (occupied) {
+      canvas.drawRect(
+        rect,
+        Paint()
+          ..color = strokeColor
+          ..style = PaintingStyle.fill,
+      );
+    } else {
+      canvas.drawRect(
+        rect.deflate(math.min(_strokeW, width) / 4),
+        Paint()
+          ..color = strokeColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = math.min(_strokeW, width) / 2,
+      );
+    }
   }
 
   void _drawLabel(Canvas canvas, double cx, double cy, double bodyW) {
@@ -147,6 +174,7 @@ class DistributorPainter extends CustomPainter {
     return oldDelegate.distributor != distributor ||
         oldDelegate.bodyColor != bodyColor ||
         oldDelegate.strokeColor != strokeColor ||
-        oldDelegate.labelColor != labelColor;
+        oldDelegate.labelColor != labelColor ||
+        !setEquals(oldDelegate.occupiedOutlets, occupiedOutlets);
   }
 }

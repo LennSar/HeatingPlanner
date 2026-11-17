@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../calculation/engines/geometry_engine.dart';
+import '../../calculation/providers/pipe_layout_providers.dart'
+    show withCircuitsOnOutlets;
 import '../../calculation/providers/project_settings_provider.dart';
 import '../../data/database/app_database.dart' show appDatabaseProvider;
 import '../../repositories/app_preferences.dart';
@@ -148,14 +150,32 @@ class EditorStateNotifier extends Notifier<EditorState>
     final constructions = await cRepo.getAllConstructions();
     final materialLayers = await cRepo.getAllLayers();
 
+    // ADR-044: circuits saved before outlet stubs existed get one, and
+    // every route starts at its stub. Stored quietly — it is a migration
+    // of old data, not an edit.
+    var onOutlets = (distributor: distributor, circuits: circuits);
+    if (distributor != null) {
+      final r = withCircuitsOnOutlets(distributor, circuits);
+      onOutlets = (distributor: r.distributor, circuits: r.circuits);
+      final dao = ref.read(heatingDaoProvider);
+      if (r.distributor != distributor) {
+        unawaited(upsertDistributor(dao, r.distributor));
+      }
+      for (var i = 0; i < circuits.length; i++) {
+        if (!identical(r.circuits[i], circuits[i])) {
+          unawaited(upsertHeatingCircuit(dao, r.circuits[i]));
+        }
+      }
+    }
+
     state = EditorState(
       walls: walls,
       rooms: rooms,
       windows: windows,
       doors: doors,
       zones: zones,
-      circuits: circuits,
-      distributor: distributor,
+      circuits: onOutlets.circuits,
+      distributor: onOutlets.distributor,
       constructions: constructions,
       materialLayers: materialLayers,
     );
@@ -1628,18 +1648,22 @@ class EditorStateNotifier extends Notifier<EditorState>
   // ---- Distributor ----
 
   /// Set (or replace) the floor's distributor.
-  void setDistributor(Distributor d) {
-    state = state.copyWith(distributor: d);
-    final dao = ref.read(heatingDaoProvider);
-    unawaited(upsertDistributor(dao, d));
-    markProjectDirty();
-  }
+  void setDistributor(Distributor d) => updateDistributor(d);
 
   /// Replace the existing distributor with an updated copy.
+  ///
+  /// The connection pipes of its circuits follow their outlet stubs
+  /// (ADR-044). Every circuit of the distributor is written as well — a
+  /// preceding drag moved them with [updateDistributorTransient] only.
   void updateDistributor(Distributor d) {
-    state = state.copyWith(distributor: d);
+    final placed = _placeDistributor(d);
     final dao = ref.read(heatingDaoProvider);
-    unawaited(upsertDistributor(dao, d));
+    unawaited(upsertDistributor(dao, placed));
+    for (final c in state.circuits) {
+      if (c.distributorId == placed.id) {
+        unawaited(upsertHeatingCircuit(dao, c));
+      }
+    }
     markProjectDirty();
   }
 
@@ -1648,8 +1672,15 @@ class EditorStateNotifier extends Notifier<EditorState>
   /// flight). Updates [state] only — no DAO write, no dirty marking.
   /// The interaction's commit (undo command or `onChangeEnd`, via the
   /// persisting [updateDistributor]) performs the single SQLite write.
-  void updateDistributorTransient(Distributor d) {
-    state = state.copyWith(distributor: d);
+  void updateDistributorTransient(Distributor d) => _placeDistributor(d);
+
+  /// Sets [d] as the distributor and moves the start of every circuit of
+  /// it to its outlet stub (ADR-044). Returns the distributor as stored —
+  /// its outlet count is raised if it has more circuits than outlets.
+  Distributor _placeDistributor(Distributor d) {
+    final r = withCircuitsOnOutlets(d, state.circuits);
+    state = state.copyWith(distributor: r.distributor, circuits: r.circuits);
+    return r.distributor;
   }
 
   /// Remove the distributor.

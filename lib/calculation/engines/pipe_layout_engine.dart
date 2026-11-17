@@ -34,6 +34,75 @@ class PipeLayoutEngine {
   static const double _tolMm = 1.0;
 
   // ──────────────────────────────────────────────────────────────────────
+  // Distributor outlets (ADR-044)
+  // ──────────────────────────────────────────────────────────────────────
+
+  /// Depth of the distributor body, square to its width, in mm.
+  static const double distributorBodyDepthMm = 240.0;
+
+  /// Length of an outlet stub, measured from the body's front face, in mm.
+  static const double distributorStubLengthMm = 120.0;
+
+  /// Tip of every outlet stub of a distributor — the point where the
+  /// connection pipes of one circuit attach (ADR-044).
+  ///
+  /// The [outletCount] stubs sit on the front face of the body (local
+  /// −y, "up" at 0°), equally spaced across [widthMm]: stub `i` is at
+  /// `(i + 0.5) · width / count` from the body's left end (local −x).
+  /// Supply and return of a circuit attach to the same stub — on site they
+  /// leave the manifold one above the other.
+  ///
+  /// [rotationDeg] turns the body clockwise about [center] (screen
+  /// coordinates, y down), exactly as the distributor painter does.
+  /// Returns an empty list when [outletCount] < 1 or [widthMm] is not
+  /// positive.
+  static List<Point2D> distributorOutletPoints({
+    required Point2D center,
+    required double widthMm,
+    required int rotationDeg,
+    required int outletCount,
+  }) {
+    if (outletCount < 1 || widthMm.isNaN || widthMm <= 0) {
+      return const [];
+    }
+    final rad = rotationDeg * math.pi / 180.0;
+    final cosA = math.cos(rad);
+    final sinA = math.sin(rad);
+    const ly = -(distributorBodyDepthMm / 2 + distributorStubLengthMm);
+    final pitch = widthMm / outletCount;
+    return [
+      for (var i = 0; i < outletCount; i++)
+        () {
+          final lx = -widthMm / 2 + (i + 0.5) * pitch;
+          return Point2D(
+            x: center.x + lx * cosA - ly * sinA,
+            y: center.y + lx * sinA + ly * cosA,
+          );
+        }(),
+    ];
+  }
+
+  /// Index of the outlet in [outlets] nearest to [point] that is not in
+  /// [occupied], or -1 when every outlet is occupied.
+  static int nearestFreeOutletIndex(
+    List<Point2D> outlets,
+    Point2D point, {
+    Set<int> occupied = const {},
+  }) {
+    var best = -1;
+    var bestDist = double.infinity;
+    for (var i = 0; i < outlets.length; i++) {
+      if (occupied.contains(i)) continue;
+      final d = GeometryEngine.distanceMm(point, outlets[i]);
+      if (d < bestDist - 1e-9) {
+        bestDist = d;
+        best = i;
+      }
+    }
+    return best;
+  }
+
+  // ──────────────────────────────────────────────────────────────────────
   // Zone entry / exit
   // ──────────────────────────────────────────────────────────────────────
 
@@ -1184,8 +1253,10 @@ class PipeLayoutEngine {
   ///
   /// The two pipes run [pipeSpacingMm] apart, half on each side of the
   /// centerline: supply on the left of the direction of travel, return on
-  /// the right — or the other way round with [supplyOnRight] (ADR-041). Both are tied to the distributor at the centerline's
-  /// first point, so `supply.first` and `back.last` are that point.
+  /// the right — or the other way round with [supplyOnRight] (ADR-041).
+  /// Both are tied to the distributor at the centerline's first point —
+  /// the circuit's outlet stub (ADR-044) — so `supply.first` and
+  /// `back.last` are that point.
   /// `supply` runs distributor → zone, `back` runs zone → distributor.
   ///
   /// Returns two empty lists when the centerline has fewer than 2

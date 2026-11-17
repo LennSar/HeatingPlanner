@@ -307,6 +307,7 @@ Distributor _distributorFromRow($db.Distributor row) {
     pumpCapacityPa: row.pumpCapacityPa,
     widthMm: row.widthMm,
     rotationDeg: row.rotationDeg,
+    outletCount: row.outletCount,
   );
 }
 
@@ -330,6 +331,7 @@ HeatingCircuit _circuitFromRow($db.HeatingCircuit row) {
     zoneClearanceMm: row.zoneClearanceMm,
     wallClearanceMm: row.wallClearanceMm,
     supplyOnRight: row.supplyOnRight,
+    outletIndex: row.outletIndex,
   );
 }
 
@@ -400,6 +402,7 @@ $db.DistributorsCompanion _distributorToCompanion(
     pumpCapacityPa: Value(distributor.pumpCapacityPa),
     widthMm: Value(distributor.widthMm),
     rotationDeg: Value(distributor.rotationDeg),
+    outletCount: Value(distributor.outletCount),
   );
 }
 
@@ -427,6 +430,7 @@ $db.HeatingCircuitsCompanion _circuitToCompanion(
     zoneClearanceMm: Value(circuit.zoneClearanceMm),
     wallClearanceMm: Value(circuit.wallClearanceMm),
     supplyOnRight: Value(circuit.supplyOnRight),
+    outletIndex: Value(circuit.outletIndex),
   );
 }
 
