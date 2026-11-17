@@ -116,6 +116,13 @@ enum DrawingTool {
   placeDistributor,
   routePipe,
   measure,
+
+  /// Edit the tube inside a floor heating zone: drag corners and runs,
+  /// add and remove corners (ADR-046).
+  editTube,
+
+  /// Draw the tube inside a floor heating zone by hand (ADR-046).
+  drawTube,
 }
 
 /// Boundary condition for a room's floor or ceiling slab.

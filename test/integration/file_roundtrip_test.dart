@@ -258,6 +258,33 @@ void main() {
       expect(other.supplyOnRight, isFalse);
     });
 
+    test('a manual tube path survives a save and re-import; an automatic '
+        'zone stays automatic (ADR-046)', () async {
+      const path =
+          '[{"x":100.0,"y":200.0},{"x":3000.0,"y":200.0},{"x":3000.0,"y":350.0}]';
+      final source = (await db.select(db.heatingZones).get()).first;
+      await (db.update(
+        db.heatingZones,
+      )..where((t) => t.id.equals(source.id))).write(
+        const $db.HeatingZonesCompanion(manualTubePathJson: Value(path)),
+      );
+
+      await container.read(saveStateProvider.notifier).saveAs(tempPath);
+      final snapshot = await _decodeHsp(tempPath);
+
+      final db2 = $db.AppDatabase.forTesting(NativeDatabase.memory());
+      addTearDown(db2.close);
+      await HspImporter(db2).importSnapshot(snapshot);
+
+      final zones = await db2.select(db2.heatingZones).get();
+      final paths = zones.map(
+        (z) => z.manualTubePathJson == null
+            ? null
+            : jsonDecode(z.manualTubePathJson!),
+      );
+      expect(paths, containsAll(<Object?>[jsonDecode(path), null]));
+    });
+
     test(
       'importing the same snapshot twice yields two separate projects',
       () async {

@@ -145,6 +145,35 @@ void main() {
     });
   });
 
+  group('drag snapping', () {
+    test('a dragged corner lines up with its neighbours', () {
+      final p = PipeLayoutEngine.snapTubeCorner(
+        path: _path,
+        index: 2,
+        raw: const Point2D(x: 3780, y: 410),
+        captureMm: 50,
+        gridMm: 100,
+      );
+      // x lines up with corner 1 (3800); y with no neighbour → grid.
+      expect(p, const Point2D(x: 3800, y: 400));
+    });
+
+    test('a dragged row moves across itself in whole spacings', () {
+      // Row 3 (y = 350) dragged down by 230 mm and sideways by 90 mm.
+      final o = PipeLayoutEngine.snapTubeRunOffset(
+        path: _path,
+        segment: 2,
+        dx: 90,
+        dy: 230,
+        spacingMm: 150,
+      );
+      expect(o.dx, 0);
+      // Nearest other row is y = 200: 580 → 200 + 3 × 150 = 650? No —
+      // the nearest lattice point to 580 is 200 + 2.53 → 3 spacings = 650.
+      expect(350 + o.dy, 650);
+    });
+  });
+
   group('manualTubePathIssues', () {
     test('a path inside the zone has no issues', () {
       final issues = PipeLayoutEngine.manualTubePathIssues(

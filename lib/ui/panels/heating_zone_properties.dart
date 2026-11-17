@@ -14,9 +14,12 @@ import '../../data/models/flooring_material.dart';
 import '../../data/models/heating_zone.dart';
 import '../../data/models/localized_catalog_row.dart';
 import '../../data/models/tube_type.dart';
+import '../../repositories/app_preferences.dart' show tubeSnapEnabledProvider;
 import '../../repositories/heating_repository.dart';
+import '../canvas/tools/tube_path_command.dart';
 import '../canvas/tools/undo_redo_service.dart';
 import '../providers/editor_state_provider.dart';
+import '../screens/editor_screen.dart' show selectedToolProvider;
 
 /// Properties panel shown when a [HeatingZone] is selected.
 ///
@@ -109,6 +112,18 @@ class _HeatingZonePropertiesState
             update: ref
                 .read(editorStateProvider.notifier)
                 .updateZone,
+          ),
+        );
+  }
+
+  /// Discards the zone's manual tube path (ADR-046) — one undo step.
+  void _resetTubePath(HeatingZone zone, AppLocalizations l10n) {
+    ref.read(undoRedoProvider).execute(
+          UpdateTubePathCommand(
+            oldZone: zone,
+            newZone: zone.copyWith(manualTubePath: null),
+            update: ref.read(editorStateProvider.notifier).updateZone,
+            label: l10n.undo_resetTubePath,
           ),
         );
   }
@@ -413,7 +428,12 @@ class _HeatingZonePropertiesState
               if (value == null || value == zone.layoutPattern) {
                 return;
               }
-              _commit(zone, zone.copyWith(layoutPattern: value));
+              // ADR-046: choosing a pattern lays the tube out
+              // automatically again.
+              _commit(
+                zone,
+                zone.copyWith(layoutPattern: value, manualTubePath: null),
+              );
             },
             child: Column(
               children: LayoutPattern.values
@@ -437,6 +457,65 @@ class _HeatingZonePropertiesState
                   .toList(),
             ),
           ),
+
+          // ── Tube path (ADR-046) ──────────────────────────────────
+          if (!isWallZone) ...[
+            if (zone.manualTubePath != null)
+              Text(
+                l10n.zoneTubePatternIgnored,
+                key: const Key('zone-tube-pattern-ignored'),
+                style: textTheme.bodySmall,
+              ),
+            const Divider(height: Spacing.lg),
+            Text(l10n.zoneTubePath, style: textTheme.bodyMedium),
+            const SizedBox(height: Spacing.xs),
+            Text(
+              zone.manualTubePath != null
+                  ? l10n.zoneTubePathManual
+                  : l10n.zoneTubePathAutomatic,
+              key: const Key('zone-tube-path-status'),
+              style: textTheme.bodySmall,
+            ),
+            const SizedBox(height: Spacing.sm),
+            Wrap(
+              spacing: Spacing.sm,
+              runSpacing: Spacing.xs,
+              children: [
+                OutlinedButton.icon(
+                  key: const Key('zone-tube-edit'),
+                  icon: const Icon(Icons.timeline),
+                  label: Text(l10n.zoneTubePathEdit),
+                  onPressed: () => ref
+                      .read(selectedToolProvider.notifier)
+                      .select(DrawingTool.editTube),
+                ),
+                OutlinedButton.icon(
+                  key: const Key('zone-tube-draw'),
+                  icon: const Icon(Icons.gesture),
+                  label: Text(l10n.zoneTubePathDraw),
+                  onPressed: () => ref
+                      .read(selectedToolProvider.notifier)
+                      .select(DrawingTool.drawTube),
+                ),
+                if (zone.manualTubePath != null)
+                  TextButton(
+                    key: const Key('zone-tube-reset'),
+                    onPressed: () => _resetTubePath(zone, l10n),
+                    child: Text(l10n.zoneTubePathReset),
+                  ),
+              ],
+            ),
+            SwitchListTile(
+              key: const Key('zone-tube-snap'),
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              title: Text(l10n.zoneTubeSnap, style: textTheme.bodyMedium),
+              subtitle: Text(l10n.zoneTubeSnapDesc, style: textTheme.bodySmall),
+              value: ref.watch(tubeSnapEnabledProvider).asData?.value ?? true,
+              onChanged: (v) =>
+                  ref.read(tubeSnapEnabledProvider.notifier).set(v),
+            ),
+          ],
 
           const Divider(height: Spacing.lg),
 

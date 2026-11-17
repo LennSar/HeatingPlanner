@@ -18,6 +18,7 @@ const _kCanvasPanX = 'canvasPanX';
 const _kCanvasPanY = 'canvasPanY';
 const _kGridSpacingMm = 'gridSpacingMm';
 const _kLanguageCode = 'languageCode';
+const _kTubeSnapEnabled = 'tubeSnapEnabled';
 const _kMaterialDbVersion = 'materialDbVersion';
 const _kCustomMaterialLibraryPath = 'customMaterialLibraryPath';
 const _kDefaultGridSpacingMm = 100;
@@ -199,6 +200,17 @@ class AppPreferences {
   Future<void> setGridSpacingMm(int spacingMm) =>
       _prefs.setInt(_kGridSpacingMm, spacingMm);
 
+  // ── tubeSnapEnabled ───────────────────────────────────────────────────────
+
+  /// Whether tube corners snap while a tube is edited or drawn by hand
+  /// (ADR-046). Defaults to true.
+  Future<bool> getTubeSnapEnabled() async =>
+      (await _prefs.getBool(_kTubeSnapEnabled)) ?? true;
+
+  /// Persists the tube snapping choice.
+  Future<void> setTubeSnapEnabled(bool enabled) =>
+      _prefs.setBool(_kTubeSnapEnabled, enabled);
+
   // ── languageCode ──────────────────────────────────────────────────────────
 
   /// Two-letter language code (`en`, `de`), or `null` to follow the
@@ -354,6 +366,29 @@ class GridSpacingMmNotifier extends AsyncNotifier<int> {
 final gridSpacingMmProvider =
     AsyncNotifierProvider<GridSpacingMmNotifier, int>(
   GridSpacingMmNotifier.new,
+);
+
+// ── tubeSnapEnabledProvider ───────────────────────────────────────────────────
+
+/// Notifier that persists the tube snapping choice to [AppPreferences].
+class TubeSnapEnabledNotifier extends AsyncNotifier<bool> {
+  @override
+  Future<bool> build() =>
+      ref.read(appPreferencesProvider).getTubeSnapEnabled();
+
+  /// Turns tube snapping on or off and persists the choice.
+  Future<void> set(bool enabled) async {
+    state = AsyncValue.data(enabled);
+    await ref.read(appPreferencesProvider).setTubeSnapEnabled(enabled);
+  }
+}
+
+/// Whether tube corners snap in the tube edit and draw tools (ADR-046):
+/// 0°/90° segments, rows a whole tube spacing apart, turns in line.
+/// Holding Alt places a single point freely either way.
+final tubeSnapEnabledProvider =
+    AsyncNotifierProvider<TubeSnapEnabledNotifier, bool>(
+  TubeSnapEnabledNotifier.new,
 );
 
 // ── languageCodeProvider ─────────────────────────────────────────────────────

@@ -34,9 +34,12 @@ import 'tools/editor_callbacks.dart';
 import 'tools/distributor_place_tool.dart';
 import 'tools/door_place_tool.dart';
 import 'tools/measure_tool.dart';
+import 'tools/modifier_draw_tool.dart';
 import 'tools/route_draw_tool.dart';
 import 'tools/select_tool.dart';
 import 'tools/tool_base.dart';
+import 'tools/tube_draw_tool.dart';
+import 'tools/tube_edit_tool.dart';
 import 'tools/undo_redo_service.dart';
 import 'tools/wall_draw_tool.dart';
 import 'tools/window_place_tool.dart';
@@ -400,6 +403,29 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
     _tools[DrawingTool.measure] = MeasureTool(
       callbacks: this,
       onStateChanged: onChanged,
+    );
+    // ADR-046: the tube tools read the drawn tube corners and the snap
+    // switch through providers rather than through EditorCallbacks.
+    List<Point2D>? tubeCorners(String zoneId) =>
+        ref.read(zoneTubeCornersProvider)[zoneId];
+    bool tubeSnap() =>
+        ref.read(tubeSnapEnabledProvider).asData?.value ?? true;
+    _tools[DrawingTool.editTube] = TubeEditTool(
+      callbacks: this,
+      onStateChanged: onChanged,
+      undoRedo: undoRedo,
+      tubeCorners: tubeCorners,
+      snapEnabled: tubeSnap,
+    );
+    _tools[DrawingTool.drawTube] = TubeDrawTool(
+      callbacks: this,
+      onStateChanged: onChanged,
+      undoRedo: undoRedo,
+      tubeCorners: tubeCorners,
+      bendRadiusMm: (zoneId) =>
+          ref.read(zoneBendRadiiMmProvider)[zoneId] ??
+          ref.read(defaultBendRadiusMmProvider),
+      snapEnabled: tubeSnap,
     );
   }
 
@@ -1025,6 +1051,13 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
     ref.listen<DrawingTool>(selectedToolProvider, (previous, next) {
       if (previous == null || previous == next) return;
       _tools[previous]?.cancel();
+      // ADR-046: the tube edit tool starts on the selected floor zone.
+      final editTube = _tools[DrawingTool.editTube];
+      if (next == DrawingTool.editTube && editTube is TubeEditTool) {
+        final selected = ref.read(selectedElementProvider);
+        editTube.zoneId = selected?.type == 'zone' ? selected!.id : null;
+        _setInteractionData(editTube.getInteractionData());
+      }
     });
 
     // React to cancel/delete signals after the build frame
@@ -1071,6 +1104,18 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
           shift: mods.orthoSnap,
           alt: mods.freePlacement,
         );
+      }
+      for (final tool in [
+        _tools[DrawingTool.editTube],
+        _tools[DrawingTool.drawTube],
+      ]) {
+        if (tool is ModifierDrawTool) {
+          tool.updateModifiers(
+            shift: mods.orthoSnap,
+            ctrl: mods.rectMode,
+            alt: mods.freePlacement,
+          );
+        }
       }
       final mt = _tools[DrawingTool.measure];
       if (mt is MeasureTool) {
@@ -1291,6 +1336,13 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
                         'Pipe length: '
                         '${lenM.toStringAsFixed(1)} m — '
                         'double-click inside a heating zone to connect';
+                  } else if (idata is TubePathData) {
+                    final l10n = AppLocalizations.of(context)!;
+                    hint = idata.drawing
+                        ? l10n.tube_drawHint(
+                            (idata.lengthMm / 1000.0).toStringAsFixed(1),
+                          )
+                        : l10n.tube_editHint;
                   } else if (idata is MeasureData) {
                     final lenMm = GeometryEngine.distanceMm(
                       idata.start,
@@ -1467,6 +1519,8 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
       DrawingTool.placeDistributor => SystemMouseCursors.precise,
       DrawingTool.routePipe => SystemMouseCursors.precise,
       DrawingTool.measure => SystemMouseCursors.precise,
+      DrawingTool.editTube => SystemMouseCursors.basic,
+      DrawingTool.drawTube => SystemMouseCursors.precise,
     };
   }
 

@@ -229,6 +229,30 @@ class InteractionPainter extends CustomPainter {
             currentPoint,
             hoveredZoneAlreadyConnected,
           );
+        case TubePathData(
+              :final corners,
+              :final handles,
+              :final activeHandleIndex,
+              :final selectedHandleIndex,
+              :final drawing,
+              :final bendRadiusMm,
+            ):
+          _drawTubePath(canvas, corners, drawing, bendRadiusMm);
+          if (handles.isNotEmpty) {
+            _drawWallHandles(canvas, handles, activeHandleIndex);
+            if (selectedHandleIndex != null &&
+                selectedHandleIndex < handles.length) {
+              final h = handles[selectedHandleIndex];
+              canvas.drawCircle(
+                Offset(h.x, h.y),
+                48.0,
+                Paint()
+                  ..color = selectionHighlightColor ?? Colors.blue
+                  ..style = PaintingStyle.stroke
+                  ..strokeWidth = 6.0,
+              );
+            }
+          }
         case MeasureData(
               :final start,
               :final end,
@@ -1134,6 +1158,48 @@ class InteractionPainter extends CustomPainter {
     // Warning when zone already has a circuit.
     if (hoveredZoneConnected && currentPoint != null) {
       _drawAlreadyConnectedWarning(canvas, currentPoint);
+    }
+  }
+
+  /// Draws the corners of a tube being edited or drawn (ADR-046) as a
+  /// dashed polyline; while [drawing], also the tube itself, rounded with
+  /// [bendRadiusMm].
+  void _drawTubePath(
+    Canvas canvas,
+    List<Point2D> corners,
+    bool drawing,
+    double bendRadiusMm,
+  ) {
+    if (corners.length < 2) return;
+    final color = selectionHighlightColor ?? Colors.blue;
+    if (drawing) {
+      final tube = PipeLayoutEngine.filletPolyline(corners, bendRadiusMm);
+      final path = Path()..moveTo(tube.first.x, tube.first.y);
+      for (final p in tube.skip(1)) {
+        path.lineTo(p.x, p.y);
+      }
+      canvas.drawPath(
+        path,
+        Paint()
+          ..color = color.withValues(alpha: 0.6)
+          ..strokeWidth = 8.0
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round,
+      );
+    }
+    final dash = Paint()
+      ..color = color
+      ..strokeWidth = 4.0
+      ..style = PaintingStyle.stroke;
+    for (var i = 0; i + 1 < corners.length; i++) {
+      _drawDashedLine(
+        canvas,
+        Offset(corners[i].x, corners[i].y),
+        Offset(corners[i + 1].x, corners[i + 1].y),
+        dash,
+        40.0,
+      );
     }
   }
 

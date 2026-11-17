@@ -1681,4 +1681,68 @@ class AppLocalizationsEn extends AppLocalizations {
   @override
   String get roomSummary_notes =>
       'Heat demand: EN 12831. Delivered heat: EN 1264-2 for the distributor\'s supply and return temperature, the room temperature, tube spacing, tube and floor covering, assuming 45 mm cement screed above the tube. Flow rate: delivered heat ÷ (4.186 kJ/(kg·K) × temperature spread). Pressure loss: Darcy–Weisbach for the tube\'s inner diameter over the tube in the room and both connection pipes, plus 40 % for bends and fittings.';
+
+  @override
+  String get toolEditTube => 'Edit tube';
+
+  @override
+  String get toolDrawTube => 'Draw tube';
+
+  @override
+  String get undo_editTubePath => 'Edit tube path';
+
+  @override
+  String get undo_drawTubePath => 'Draw tube path';
+
+  @override
+  String get undo_resetTubePath => 'Reset tube path';
+
+  @override
+  String get tube_clickFloorZoneToast => 'Click inside a floor heating zone.';
+
+  @override
+  String get tube_mustStayInZoneToast =>
+      'The tube must stay inside its heating zone.';
+
+  @override
+  String get tube_placeCornersToast =>
+      'Place at least one corner before finishing.';
+
+  @override
+  String tube_drawHint(String lengthM) {
+    return 'Tube length: $lengthM m — double-click to finish, Backspace removes the last corner, hold Alt to place freely';
+  }
+
+  @override
+  String get tube_editHint =>
+      'Drag a corner or a run · double-click a run to add a corner · select a corner and press Delete to remove it · hold Alt to place freely';
+
+  @override
+  String get zoneTubePath => 'Tube path';
+
+  @override
+  String get zoneTubePathAutomatic => 'Automatic — laid out from the pattern';
+
+  @override
+  String get zoneTubePathManual => 'Manual — edited or drawn by hand';
+
+  @override
+  String get zoneTubePathEdit => 'Edit';
+
+  @override
+  String get zoneTubePathDraw => 'Draw manually';
+
+  @override
+  String get zoneTubePathReset => 'Reset to automatic';
+
+  @override
+  String get zoneTubeSnap => 'Snap tube corners';
+
+  @override
+  String get zoneTubeSnapDesc =>
+      'Square segments, rows a whole spacing apart. Hold Alt to place a single corner freely.';
+
+  @override
+  String get zoneTubePatternIgnored =>
+      'The tube is drawn by hand, so the pattern is not applied. Choosing a pattern resets the tube to automatic.';
 }

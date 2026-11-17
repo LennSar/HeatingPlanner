@@ -480,6 +480,7 @@ agent handles presentation; the data model just stores the path.
 | borderDistanceMm | int | 50-300 | 100 |
 | layoutPattern | LayoutPattern | enum | meander |
 | circuitId | String? | FK → HeatingCircuit | null |
+| manualTubePath | List\<Point2D\>? | corner polyline, floor zones only; null = automatic layout (ADR-046) | null |
 
 **TubeType**
 | Field | Type | Constraint | Default |

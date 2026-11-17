@@ -1559,6 +1559,82 @@ class PipeLayoutEngine {
     return make(gridded(target));
   }
 
+  /// Snaps [raw], the new position of corner [index] of [path] while it
+  /// is dragged (ADR-046).
+  ///
+  /// Each axis lines up with the same axis of a neighbouring corner when
+  /// within [captureMm], so the two segments at the corner become
+  /// horizontal / vertical again; an axis that lines up with neither
+  /// snaps to [gridMm] (no grid when ≤ 0).
+  static Point2D snapTubeCorner({
+    required List<Point2D> path,
+    required int index,
+    required Point2D raw,
+    required double captureMm,
+    double gridMm = 0,
+  }) {
+    if (index <= 0 || index >= path.length - 1) return raw;
+    final neighbours = [path[index - 1], path[index + 1]];
+    double axis(double value, double Function(Point2D) of) {
+      double? best;
+      for (final n in neighbours) {
+        final d = (of(n) - value).abs();
+        if (d <= captureMm && (best == null || d < (best - value).abs())) {
+          best = of(n);
+        }
+      }
+      if (best != null) return best;
+      return gridMm > 0 ? (value / gridMm).roundToDouble() * gridMm : value;
+    }
+
+    return Point2D(x: axis(raw.x, (p) => p.x), y: axis(raw.y, (p) => p.y));
+  }
+
+  /// Snaps the offset ([dx], [dy]) by which run [segment] of [path] is
+  /// dragged (ADR-046).
+  ///
+  /// A horizontal or vertical run moves only across itself, and lands a
+  /// whole number of [spacingMm] from the nearest other run parallel to
+  /// it — so dragging a row keeps the rows evenly spaced. A sloping run
+  /// moves freely. Returns the snapped `(dx, dy)`.
+  static ({double dx, double dy}) snapTubeRunOffset({
+    required List<Point2D> path,
+    required int segment,
+    required double dx,
+    required double dy,
+    required double spacingMm,
+  }) {
+    if (segment < 0 || segment >= path.length - 1) return (dx: dx, dy: dy);
+    final a = path[segment];
+    final b = path[segment + 1];
+    final isH = (a.y - b.y).abs() <= _tolMm && (a.x - b.x).abs() > _tolMm;
+    final isV = (a.x - b.x).abs() <= _tolMm && (a.y - b.y).abs() > _tolMm;
+    if (!isH && !isV) return (dx: dx, dy: dy);
+
+    final current = isH ? a.y : a.x;
+    final target = current + (isH ? dy : dx);
+    final others = <double>[];
+    for (var i = 0; i + 1 < path.length; i++) {
+      if (i == segment) continue;
+      final p = path[i];
+      final q = path[i + 1];
+      final sameH = (p.y - q.y).abs() <= _tolMm && (p.x - q.x).abs() > _tolMm;
+      final sameV = (p.x - q.x).abs() <= _tolMm && (p.y - q.y).abs() > _tolMm;
+      if (isH && sameH) others.add(p.y);
+      if (isV && sameV) others.add(p.x);
+    }
+    var snapped = target;
+    if (spacingMm > 0 && others.isNotEmpty) {
+      final origin = others.reduce(
+        (u, v) => (u - target).abs() <= (v - target).abs() ? u : v,
+      );
+      snapped =
+          origin + ((target - origin) / spacingMm).roundToDouble() * spacingMm;
+    }
+    final offset = snapped - current;
+    return isH ? (dx: 0.0, dy: offset) : (dx: offset, dy: 0.0);
+  }
+
   /// [path] with corner [index] moved to [point]. The first and last
   /// point (attached to the connection pipes) do not move; an index out
   /// of range returns [path] unchanged.

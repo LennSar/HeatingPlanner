@@ -315,6 +315,16 @@ At viewport width < 600dp:
 - Cumulative length of both pipes is displayed in the status bar during routing.
 - When hovering over a zone that already has a circuit, show a "⚠ Already connected" indicator.
 
+### 5.5a Tube Path Editing and Drawing (ADR-046)
+
+**Trigger:** *Edit tube* (T) or *Draw tube* (Shift+T), or *Edit* / *Draw manually* in the zone panel's *Tube path* section. Full rules: `DECISIONS.md` ADR-046.
+
+- **Edit tube:** works on the selected floor zone (or the one clicked). Handles on every tube corner except the two ends, which follow the connection pipes. Drag a corner; drag a run to move it as a whole; double-click a run to add a corner; select a corner and press Delete to remove it. The first change stores the automatic layout as the zone's manual tube path; undo makes it automatic again.
+- **Draw tube:** click in a floor zone (a connected zone's tube starts at its supply entry), click corners, double-click to finish (it runs on to the return exit). Backspace removes the last corner, Escape discards. Corners outside the zone are refused.
+- **Snapping** (on by default; *Snap tube corners* switch in the zone panel): square segments, rows a whole tube spacing apart, turns in line. Alt places a single point freely.
+- **Panel:** status *Automatic* / *Manual*, *Reset to automatic*. With a manual path the pattern selector shows that the pattern is not applied; choosing a pattern resets the tube.
+- **Status bar:** the tube length while drawing; the editing gestures while editing. Warning TP-01 when a manual path leaves its zone, crosses another circuit's pipes or crosses itself.
+
 ### 5.6 Selection & Editing
 
 **Select tool behaviour:**
@@ -1105,6 +1115,8 @@ thickness changes."*
 | G | Distributor tool | Editor (G for "Gabelung"/manifold) |
 | R | Route pipe tool | Editor |
 | M | Measure tool | Editor |
+| T | Edit tube tool (ADR-046) | Editor |
+| Shift + T | Draw tube tool (ADR-046) | Editor |
 | Ctrl/Cmd + = | Zoom in | Editor |
 | Ctrl/Cmd + - | Zoom out | Editor |
 | Ctrl/Cmd + 0 | Zoom to fit | Editor |

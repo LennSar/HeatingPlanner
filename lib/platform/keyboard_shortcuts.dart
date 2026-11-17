@@ -192,6 +192,11 @@ final Map<ShortcutActivator, Intent> editorShortcuts = {
       const RotateOrRoutePipeIntent(),
   const SingleActivator(LogicalKeyboardKey.keyM):
       const SwitchToolIntent(DrawingTool.measure),
+  // ADR-046: edit / draw the tube inside a floor zone.
+  const SingleActivator(LogicalKeyboardKey.keyT):
+      const SwitchToolIntent(DrawingTool.editTube),
+  const SingleActivator(LogicalKeyboardKey.keyT, shift: true):
+      const SwitchToolIntent(DrawingTool.drawTube),
 
   // Zoom
   const SingleActivator(

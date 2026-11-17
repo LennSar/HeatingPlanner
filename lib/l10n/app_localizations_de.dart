@@ -1695,4 +1695,69 @@ class AppLocalizationsDe extends AppLocalizations {
   @override
   String get roomSummary_notes =>
       'Heizlast: EN 12831. Wärmeabgabe: EN 1264-2 für Vor- und Rücklauftemperatur des Verteilers, Raumtemperatur, Verlegeabstand, Rohr und Bodenbelag, bei angenommenen 45 mm Zementestrich über dem Rohr. Massenstrom: Wärmeabgabe ÷ (4,186 kJ/(kg·K) × Spreizung). Druckverlust: Darcy-Weisbach für den Rohrinnendurchmesser über das Rohr im Raum und beide Anbindeleitungen, zuzüglich 40 % für Bögen und Armaturen.';
+
+  @override
+  String get toolEditTube => 'Rohr bearbeiten';
+
+  @override
+  String get toolDrawTube => 'Rohr zeichnen';
+
+  @override
+  String get undo_editTubePath => 'Rohrverlauf bearbeiten';
+
+  @override
+  String get undo_drawTubePath => 'Rohrverlauf zeichnen';
+
+  @override
+  String get undo_resetTubePath => 'Rohrverlauf zurücksetzen';
+
+  @override
+  String get tube_clickFloorZoneToast => 'In eine Fußbodenheizzone klicken.';
+
+  @override
+  String get tube_mustStayInZoneToast =>
+      'Das Rohr muss innerhalb seiner Heizzone bleiben.';
+
+  @override
+  String get tube_placeCornersToast =>
+      'Vor dem Abschließen mindestens einen Eckpunkt setzen.';
+
+  @override
+  String tube_drawHint(String lengthM) {
+    return 'Rohrlänge: $lengthM m — Doppelklick zum Abschließen, Rücktaste entfernt den letzten Eckpunkt, Alt halten für freies Setzen';
+  }
+
+  @override
+  String get tube_editHint =>
+      'Eckpunkt oder Strang ziehen · Doppelklick auf einen Strang fügt einen Eckpunkt ein · Eckpunkt wählen und Entf drücken zum Entfernen · Alt halten für freies Setzen';
+
+  @override
+  String get zoneTubePath => 'Rohrverlauf';
+
+  @override
+  String get zoneTubePathAutomatic => 'Automatisch — aus dem Verlegemuster';
+
+  @override
+  String get zoneTubePathManual =>
+      'Manuell — bearbeitet oder von Hand gezeichnet';
+
+  @override
+  String get zoneTubePathEdit => 'Bearbeiten';
+
+  @override
+  String get zoneTubePathDraw => 'Manuell zeichnen';
+
+  @override
+  String get zoneTubePathReset => 'Auf automatisch zurücksetzen';
+
+  @override
+  String get zoneTubeSnap => 'Rohr-Eckpunkte fangen';
+
+  @override
+  String get zoneTubeSnapDesc =>
+      'Rechtwinklige Abschnitte, Stränge im ganzen Verlegeabstand. Alt halten, um einen einzelnen Eckpunkt frei zu setzen.';
+
+  @override
+  String get zoneTubePatternIgnored =>
+      'Das Rohr ist von Hand gezeichnet, das Verlegemuster wird nicht angewendet. Die Wahl eines Musters setzt das Rohr auf automatisch zurück.';
 }

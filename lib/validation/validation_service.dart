@@ -6,6 +6,8 @@ import '../calculation/engines/geometry_engine.dart';
 import '../calculation/providers/heat_demand_providers.dart';
 import '../calculation/providers/heat_output_providers.dart';
 import '../calculation/providers/hydraulic_balance_providers.dart';
+import '../calculation/providers/pipe_layout_providers.dart'
+    show manualTubePathIssuesProvider;
 import '../calculation/providers/tube_length_providers.dart';
 import '../core/constants/validation_limits.dart';
 import '../data/models/enums.dart';
@@ -41,6 +43,8 @@ import '../ui/providers/transient_warnings_provider.dart';
 ///   building total without a warning.
 /// - **GE-01** Two room-assigned wall segments are geometrically coincident
 ///   (overlapping walls).
+/// - **TP-01** A manual tube path (ADR-046) leaves its zone, runs through
+///   the connection pipes of another circuit, or crosses itself.
 final validationResultsProvider =
     Provider.family<List<ValidationResult>, String>(
   (ref, projectId) {
@@ -53,6 +57,7 @@ final validationResultsProvider =
     results.addAll(_disconnectedCircuitResults(ref));
     results.addAll(_uncomputableDemandResults(ref));
     results.addAll(_overlappingWallResults(ref));
+    results.addAll(_manualTubePathResults(ref));
     // ADR-017 Rule 8d: shared-wall promotion conflicts emitted by
     // EditorStateNotifier.addRoomFromDetection are picked up here so
     // they appear alongside derived rules without blocking promotion.
@@ -530,5 +535,37 @@ List<ValidationResult> _unconnectedZoneResults(Ref ref) {
     }
   }
 
+  return results;
+}
+
+// ── Rule TP-01: Manual tube path problems (ADR-046) ──────────────────────────
+
+/// Returns a warning for every floor zone whose manual tube path leaves
+/// the zone, runs through another circuit's connection pipes, or crosses
+/// itself. Zones laid out automatically are never reported.
+List<ValidationResult> _manualTubePathResults(Ref ref) {
+  final zones = ref.watch(editorStateProvider.select((s) => s.zones));
+  final results = <ValidationResult>[];
+  for (final zone in zones) {
+    if (zone.manualTubePath == null) continue;
+    final issues = ref.watch(manualTubePathIssuesProvider(zone.id));
+    final problems = [
+      if (issues.leavesZone) 'leaves the heating zone',
+      if (issues.crossesCorridor)
+        "runs through another circuit's connection pipes",
+      if (issues.selfCrossing) 'crosses itself',
+    ];
+    if (problems.isEmpty) continue;
+    results.add(
+      ValidationResult(
+        severity: WarningSeverity.warning,
+        elementId: zone.id,
+        elementType: 'zone',
+        message: 'The hand-drawn tube path ${problems.join(', ')}.',
+        suggestedFix: 'Edit the tube with the Edit tube tool, or reset it '
+            'to automatic in the zone panel.',
+      ),
+    );
+  }
   return results;
 }

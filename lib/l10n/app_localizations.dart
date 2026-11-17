@@ -3067,6 +3067,120 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Heat demand: EN 12831. Delivered heat: EN 1264-2 for the distributor\'s supply and return temperature, the room temperature, tube spacing, tube and floor covering, assuming 45 mm cement screed above the tube. Flow rate: delivered heat ÷ (4.186 kJ/(kg·K) × temperature spread). Pressure loss: Darcy–Weisbach for the tube\'s inner diameter over the tube in the room and both connection pipes, plus 40 % for bends and fittings.'**
   String get roomSummary_notes;
+
+  /// Toolbar tooltip and menu entry for the tube edit tool (ADR-046)
+  ///
+  /// In en, this message translates to:
+  /// **'Edit tube'**
+  String get toolEditTube;
+
+  /// Toolbar tooltip and menu entry for drawing a zone's tube by hand (ADR-046)
+  ///
+  /// In en, this message translates to:
+  /// **'Draw tube'**
+  String get toolDrawTube;
+
+  /// Undo label: a change made with the tube edit tool
+  ///
+  /// In en, this message translates to:
+  /// **'Edit tube path'**
+  String get undo_editTubePath;
+
+  /// Undo label: a tube drawn by hand
+  ///
+  /// In en, this message translates to:
+  /// **'Draw tube path'**
+  String get undo_drawTubePath;
+
+  /// Undo label: a manual tube path reset to the automatic layout
+  ///
+  /// In en, this message translates to:
+  /// **'Reset tube path'**
+  String get undo_resetTubePath;
+
+  /// Toast when the tube tools are used outside every floor zone
+  ///
+  /// In en, this message translates to:
+  /// **'Click inside a floor heating zone.'**
+  String get tube_clickFloorZoneToast;
+
+  /// Toast when a tube corner is placed outside its zone
+  ///
+  /// In en, this message translates to:
+  /// **'The tube must stay inside its heating zone.'**
+  String get tube_mustStayInZoneToast;
+
+  /// Toast when a hand-drawn tube is finished with no corners
+  ///
+  /// In en, this message translates to:
+  /// **'Place at least one corner before finishing.'**
+  String get tube_placeCornersToast;
+
+  /// Status bar while drawing a tube by hand
+  ///
+  /// In en, this message translates to:
+  /// **'Tube length: {lengthM} m — double-click to finish, Backspace removes the last corner, hold Alt to place freely'**
+  String tube_drawHint(String lengthM);
+
+  /// Status bar while the tube edit tool is active
+  ///
+  /// In en, this message translates to:
+  /// **'Drag a corner or a run · double-click a run to add a corner · select a corner and press Delete to remove it · hold Alt to place freely'**
+  String get tube_editHint;
+
+  /// Zone panel: heading of the tube path section (ADR-046)
+  ///
+  /// In en, this message translates to:
+  /// **'Tube path'**
+  String get zoneTubePath;
+
+  /// Zone panel: tube path status when generated
+  ///
+  /// In en, this message translates to:
+  /// **'Automatic — laid out from the pattern'**
+  String get zoneTubePathAutomatic;
+
+  /// Zone panel: tube path status when stored
+  ///
+  /// In en, this message translates to:
+  /// **'Manual — edited or drawn by hand'**
+  String get zoneTubePathManual;
+
+  /// Zone panel: switch to the tube edit tool for this zone
+  ///
+  /// In en, this message translates to:
+  /// **'Edit'**
+  String get zoneTubePathEdit;
+
+  /// Zone panel: switch to the tube draw tool
+  ///
+  /// In en, this message translates to:
+  /// **'Draw manually'**
+  String get zoneTubePathDraw;
+
+  /// Zone panel: discard the manual tube path
+  ///
+  /// In en, this message translates to:
+  /// **'Reset to automatic'**
+  String get zoneTubePathReset;
+
+  /// Zone panel: switch for snapping while editing or drawing the tube
+  ///
+  /// In en, this message translates to:
+  /// **'Snap tube corners'**
+  String get zoneTubeSnap;
+
+  /// Zone panel: explanation under the snap switch
+  ///
+  /// In en, this message translates to:
+  /// **'Square segments, rows a whole spacing apart. Hold Alt to place a single corner freely.'**
+  String get zoneTubeSnapDesc;
+
+  /// Zone panel: hint under the pattern selector for a manual tube path
+  ///
+  /// In en, this message translates to:
+  /// **'The tube is drawn by hand, so the pattern is not applied. Choosing a pattern resets the tube to automatic.'**
+  String get zoneTubePatternIgnored;
 }
 
 class _AppLocalizationsDelegate

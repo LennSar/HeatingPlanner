@@ -3426,3 +3426,102 @@ not distinguished.
 wall conversion, surface temperature);
 `test/unit/providers/room_summary_providers_test.dart`;
 `test/widget/dialogs/room_summary_dialog_test.dart`.
+
+---
+
+## ADR-046 — Manual tube paths: edit the automatic layout or draw the tube by hand
+
+**Decision.**
+A floor zone's tube can be corrected where the automatic layout (ADR-038,
+ADR-042, ADR-043) gets it wrong, or drawn entirely by hand. Both write one
+field, `HeatingZone.manualTubePath`. While it is `null` the zone is laid
+out automatically, exactly as before.
+
+**Why one stored polyline (freeze & edit).** The automatic layout is
+recomputed from scratch on every change. Edits stored as offsets on top of
+it would land in the wrong place as soon as the zone, the spacing or the
+entry changed. So the first edit stores the whole current layout and the
+zone stays manual until *Reset to automatic*. That is predictable, and the
+cost (later zone changes no longer re-lay the tube) is made visible by
+Rule 5.
+
+**Rules.**
+
+1. **Model.** `manualTubePath` is the corner polyline of the tube (no bend
+   arcs), supply end first. Schema v25 adds
+   `heating_zones.manual_tube_path_json`; `.hsp` export and import carry
+   it. Older files import as automatic.
+
+2. **Ends follow the pipes.** When drawn, the path's first and last points
+   are pulled to where the connection pipes currently enter and leave the
+   zone (`PipeLayoutEngine.attachManualPathEnds`), so moving a pipe never
+   disconnects the tube. All other corners stay where they were put. An
+   unconnected zone keeps both ends as drawn.
+
+3. **Edit tool (`DrawingTool.editTube`, key T).** Edits the selected floor
+   zone's tube, or the floor zone clicked. Every interior corner has a
+   handle; the two ends have none.
+   - Drag a corner: it lines up with a neighbouring corner per axis within
+     a third of the spacing (segments stay square), else the grid.
+   - Drag a run: it moves as a whole and its neighbours stretch. A
+     horizontal or vertical run moves only across itself, a whole number
+     of spacings from the nearest parallel run. Grabbing the first or last
+     run inserts a corner at the fixed end (as for connection pipes,
+     ADR-039).
+   - Double-click a run to add a corner. Click a handle and press Delete /
+     Backspace to remove it. A corner dropped onto its neighbour merges.
+   - Escape reverts a drag in progress. Every committed change is one undo
+     step; undoing the first change of an automatic zone makes it automatic
+     again.
+   It is a separate tool rather than part of the Select tool, so the tube
+   handles never compete with the zone-outline handles.
+
+4. **Draw tool (`DrawingTool.drawTube`, Shift+T).** Click inside a floor
+   zone; a connected zone's tube starts at its supply entry, an unconnected
+   one at the click. Click corners; double-click finishes, and a connected
+   zone's tube then runs on to its return exit. Corners outside the zone
+   are refused with a toast. Backspace removes the last corner; Escape
+   discards. The preview shows the tube with its bend radius; the status
+   bar shows its length. The result replaces any earlier tube (one undo
+   step).
+
+5. **Snapping** (`PipeLayoutEngine.snapTubePoint`) is on by default:
+   segments are horizontal or vertical; a segment's end lines up with the
+   end of an earlier parallel run within half a spacing (turns form a
+   column); otherwise it lies a whole number of spacings from the nearest
+   run across it (a step between rows is exactly one spacing); with
+   neither, it snaps to the grid. **Alt** places a single point freely, as
+   in the wall and zone tools (ADR-013). The zone panel switch *Snap tube
+   corners* turns snapping off for both tools; the choice is kept in the
+   app preferences.
+
+6. **Panel.** The floor zone panel has a *Tube path* section: status
+   (Automatic / Manual), *Edit*, *Draw manually*, *Reset to automatic* (only
+   when manual) and the snap switch. With a manual path a hint under the
+   pattern says it is not applied; choosing a pattern resets the tube to
+   automatic.
+
+7. **Validation TP-01** (warning on the zone): the manual path leaves the
+   zone, runs through another circuit's connection pipes (ADR-038 Rule 3
+   corridors), or crosses itself. Automatic layouts are never reported.
+
+8. **Calculations.** `zoneTubeCornersProvider` holds each zone's corner
+   polyline (manual, or the automatic layout); `zonePipeLayoutsProvider`
+   rounds it. Tube length, water volume, flow rate and pressure loss
+   therefore follow a manual path with no other change (ADR-042 Rule 4).
+   Heat output stays area-based.
+
+**Not covered.** Spacing between non-adjacent runs is not checked (only
+crossings are). A manual path is not re-fitted when the zone outline
+changes; TP-01 flags it when it no longer fits. The tools work on one zone
+at a time.
+
+**Verification.**
+`test/unit/engines/manual_tube_path_test.dart` (ends, snapping, edit
+operations, issues); `test/unit/providers/manual_tube_path_provider_test.dart`
+(override, ends follow, length, issues);
+`test/unit/repositories/manual_tube_path_persistence_test.dart` (DB, v24
+upgrade, JSON); `test/integration/file_roundtrip_test.dart` (.hsp);
+`test/widget/tools/tube_tools_test.dart` TE-1 … TE-8,
+TD-1 … TD-7; `test/unit/validation/manual_tube_path_validation_test.dart`;
+`test/widget/panels/heating_zone_tube_path_test.dart`.

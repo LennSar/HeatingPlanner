@@ -544,3 +544,46 @@ class OpeningSelectionData extends InteractionData {
   final int? activeHandleIndex;
 }
 
+
+/// The tube of a floor zone while it is edited or drawn by hand
+/// (ADR-046).
+///
+/// Produced by [TubeEditTool] and [TubeDrawTool]. [corners] is drawn as a
+/// dashed corner polyline; while drawing, the tube itself is previewed
+/// with its bend radius.
+@immutable
+class TubePathData extends InteractionData {
+  /// Creates [TubePathData].
+  const TubePathData({
+    required this.corners,
+    this.handles = const [],
+    this.activeHandleIndex,
+    this.selectedHandleIndex,
+    this.drawing = false,
+    this.bendRadiusMm = 0,
+    this.lengthMm = 0,
+  });
+
+  /// Corner points of the tube (world mm), supply end first.
+  final List<Point2D> corners;
+
+  /// Draggable corner handles (world mm). The two ends follow the
+  /// connection pipes and carry no handle.
+  final List<Point2D> handles;
+
+  /// Index within [handles] of the handle being dragged, or null.
+  final int? activeHandleIndex;
+
+  /// Index within [handles] of the handle Delete would remove, or null.
+  final int? selectedHandleIndex;
+
+  /// True while a tube is being drawn: [corners] is then also drawn as
+  /// the tube, rounded with [bendRadiusMm].
+  final bool drawing;
+
+  /// Bend radius of the tube preview (mm).
+  final double bendRadiusMm;
+
+  /// Length of the tube drawn so far, bends included (mm).
+  final double lengthMm;
+}
