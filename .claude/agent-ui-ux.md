@@ -323,6 +323,7 @@ At viewport width < 600dp:
 - **Draw tube:** click in a floor zone (a connected zone's tube starts at its supply entry), click corners, double-click to finish (it runs on to the return exit). Backspace removes the last corner, Escape discards. Corners outside the zone are refused.
 - **Snapping** (on by default; *Snap tube corners* switch in the zone panel): square segments, rows a whole tube spacing apart, turns in line. Alt places a single point freely.
 - **Panel:** status *Automatic* / *Manual*, *Reset to automatic*. With a manual path the pattern selector shows that the pattern is not applied; choosing a pattern resets the tube.
+- **Undo / redo:** while drawing, Ctrl/Cmd+Z takes back the last corner and Ctrl/Cmd+Y puts it back; a finished tube, and every committed edit, is one undo step. During an edit drag Ctrl+Z reverts the drag. The edit handles follow undo / redo immediately.
 - **Status bar:** the tube length while drawing; the editing gestures while editing. Warning TP-01 when a manual path leaves its zone, crosses another circuit's pipes or crosses itself.
 
 ### 5.6 Selection & Editing

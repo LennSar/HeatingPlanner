@@ -26,8 +26,10 @@ import 'undo_redo_service.dart';
 ///     where its return pipe leaves the zone. The tube is stored as the
 ///     zone's [HeatingZone.manualTubePath] — one undo step, replacing any
 ///     earlier manual or automatic tube.
-///  4. **Backspace / Delete** removes the last corner; **Escape** discards
-///     the tube.
+///  4. **Backspace / Delete** or **Ctrl/Cmd+Z** removes the last corner,
+///     **Ctrl/Cmd+Y** (or Ctrl+Shift+Z) puts it back; **Escape** discards
+///     the tube. Ctrl+Z on the starting point alone ends the drawing.
+///     Once finished, the whole tube is one entry on the undo stack.
 ///
 /// The preview shows the tube with its bend radius and its length.
 class TubeDrawTool extends CanvasTool with ModifierDrawTool {
@@ -56,6 +58,10 @@ class TubeDrawTool extends CanvasTool with ModifierDrawTool {
 
   String? _zoneId;
   final List<Point2D> _points = [];
+
+  /// Corners taken back with Ctrl+Z while drawing, most recent last —
+  /// what Ctrl+Y puts back. Cleared when a new corner is placed.
+  final List<Point2D> _undonePoints = [];
 
   /// Where a connected zone's return pipe leaves it; null otherwise.
   Point2D? _exit;
@@ -111,6 +117,7 @@ class TubeDrawTool extends CanvasTool with ModifierDrawTool {
     }
     if (GeometryEngine.distanceMm(point, _points.last) > 1.0) {
       _points.add(point);
+      _undonePoints.clear();
     }
     _cursor = worldPoint;
     onStateChanged();
@@ -136,6 +143,26 @@ class TubeDrawTool extends CanvasTool with ModifierDrawTool {
 
   @override
   void cancel() => _reset();
+
+  @override
+  bool undoInTool() {
+    if (!isDrawing) return false;
+    if (_points.length > 1) {
+      _undonePoints.add(_points.removeLast());
+      onStateChanged();
+    } else {
+      _reset();
+    }
+    return true;
+  }
+
+  @override
+  bool redoInTool() {
+    if (!isDrawing || _undonePoints.isEmpty) return false;
+    _points.add(_undonePoints.removeLast());
+    onStateChanged();
+    return true;
+  }
 
   @override
   InteractionData? getInteractionData() {
@@ -170,6 +197,7 @@ class TubeDrawTool extends CanvasTool with ModifierDrawTool {
     _zoneId = zone.id;
     final current = tubeCorners(zone.id) ?? const [];
     final connected = zone.circuitId != null && current.length >= 2;
+    _undonePoints.clear();
     _points
       ..clear()
       ..add(connected ? current.first : _snap(worldPoint, zone));
@@ -229,6 +257,7 @@ class TubeDrawTool extends CanvasTool with ModifierDrawTool {
 
   void _reset() {
     _points.clear();
+    _undonePoints.clear();
     _zoneId = null;
     _exit = null;
     _cursor = null;

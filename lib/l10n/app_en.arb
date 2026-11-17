@@ -1347,7 +1347,7 @@
   "@tube_mustStayInZoneToast": {"description": "Toast when a tube corner is placed outside its zone"},
   "tube_placeCornersToast": "Place at least one corner before finishing.",
   "@tube_placeCornersToast": {"description": "Toast when a hand-drawn tube is finished with no corners"},
-  "tube_drawHint": "Tube length: {lengthM} m — double-click to finish, Backspace removes the last corner, hold Alt to place freely",
+  "tube_drawHint": "Tube length: {lengthM} m — double-click to finish, Ctrl+Z / Backspace removes the last corner, Ctrl+Y puts it back, hold Alt to place freely",
   "@tube_drawHint": {"description": "Status bar while drawing a tube by hand", "placeholders": {"lengthM": {"type": "String"}}},
   "tube_editHint": "Drag a corner or a run · double-click a run to add a corner · select a corner and press Delete to remove it · hold Alt to place freely",
   "@tube_editHint": {"description": "Status bar while the tube edit tool is active"},

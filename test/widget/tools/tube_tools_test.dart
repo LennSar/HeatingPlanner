@@ -6,9 +6,13 @@
 //   TE-1 … TE-8   edit tool: freeze on first change, corner and run drags
 //                 with and without snapping, Alt, insert, delete, Escape,
 //                 zone pick
+//   TE-9, TE-10   edit tool: Ctrl+Z / Ctrl+Y of committed changes; Ctrl+Z
+//                 during a drag reverts the drag
 //   TD-1 … TD-7   draw tool: entry to exit, snapping, Alt and the switch,
 //                 refused corners, Backspace / Escape, unconnected zone,
 //                 no floor zone
+//   TD-8          draw tool: Ctrl+Z / Ctrl+Y per corner while drawing
+//   UR-1          the undo service gives the active tool the first chance
 
 import 'package:flutter/gestures.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,6 +27,12 @@ import 'package:heating_planner/ui/canvas/tools/modifier_draw_tool.dart';
 import 'package:heating_planner/ui/canvas/tools/tube_draw_tool.dart';
 import 'package:heating_planner/ui/canvas/tools/tube_edit_tool.dart';
 import 'package:heating_planner/ui/canvas/tools/undo_redo_service.dart';
+
+/// Wires [tool]'s in-tool undo / redo into [undo], as the canvas does.
+void _hook(UndoRedoService undo, dynamic tool) {
+  undo.toolUndo = () => tool.undoInTool() as bool;
+  undo.toolRedo = () => tool.redoInTool() as bool;
+}
 
 // ── Stub EditorCallbacks ─────────────────────────────────────────────────────
 
@@ -280,39 +290,95 @@ void main() {
       expect(tool.zoneId, _zone.id);
       expect(cb.selected, [_zone.id]);
     });
+
+    test('TE-9 Ctrl+Z / Ctrl+Y undo and redo a committed change; the '
+        'overlay follows', () {
+      final cb = _StubCallbacks([_zone]);
+      final undo = UndoRedoService();
+      final tool = _editTool(cb, undo);
+      _hook(undo, tool);
+
+      _drag(
+        tool,
+        const Point2D(x: 3800, y: 350),
+        const Point2D(x: 3510, y: 340),
+      );
+      _drag(
+        tool,
+        const Point2D(x: 2000, y: 350),
+        const Point2D(x: 2000, y: 650),
+      );
+      final second = cb.zone.manualTubePath!;
+
+      undo.undo(); // the run drag
+      expect(cb.zone.manualTubePath![2], const Point2D(x: 3500, y: 350));
+      expect(
+        (tool.getInteractionData()! as TubePathData).corners[2],
+        const Point2D(x: 3500, y: 350),
+      );
+      undo.undo(); // the corner drag — back to automatic
+      expect(cb.zone.manualTubePath, isNull);
+
+      undo.redo();
+      undo.redo();
+      expect(cb.zone.manualTubePath, second);
+    });
+
+    test('TE-10 Ctrl+Z during a drag reverts the drag only', () {
+      final cb = _StubCallbacks([_zone]);
+      final undo = UndoRedoService();
+      final tool = _editTool(cb, undo);
+      _hook(undo, tool);
+      _drag(
+        tool,
+        const Point2D(x: 3800, y: 350),
+        const Point2D(x: 3510, y: 340),
+      );
+      final committed = cb.zone.manualTubePath!;
+
+      tool.onPointerDown(const Point2D(x: 2000, y: 200), kPrimaryButton);
+      tool.onDragUpdate(const Point2D(x: 2000, y: 900));
+      undo.undo();
+
+      expect(cb.zone.manualTubePath, committed);
+      expect(undo.canUndo, isTrue); // the corner drag is still there
+    });
   });
 
   group('TubeDrawTool', () {
-    test('TD-1 a tube is drawn from the entry to the exit; one undo step', () async {
-      final cb = _StubCallbacks([_zone]);
-      final undo = UndoRedoService();
-      final tool = _drawTool(cb, undo);
+    test(
+      'TD-1 a tube is drawn from the entry to the exit; one undo step',
+      () async {
+        final cb = _StubCallbacks([_zone]);
+        final undo = UndoRedoService();
+        final tool = _drawTool(cb, undo);
 
-      tool.onTap(const Point2D(x: 100, y: 150), _mouse); // start at entry
-      // Row along y = 200 — the click is pulled onto the row.
-      tool.onTap(const Point2D(x: 3790, y: 260), _mouse);
-      // Step down one spacing — a separate click, not a double-click.
-      await Future<void>.delayed(const Duration(milliseconds: 350));
-      tool.onTap(const Point2D(x: 3800, y: 330), _mouse);
-      // Back along the second row, finished with a double-click.
-      _doubleTap(tool, const Point2D(x: 300, y: 350));
+        tool.onTap(const Point2D(x: 100, y: 150), _mouse); // start at entry
+        // Row along y = 200 — the click is pulled onto the row.
+        tool.onTap(const Point2D(x: 3790, y: 260), _mouse);
+        // Step down one spacing — a separate click, not a double-click.
+        await Future<void>.delayed(const Duration(milliseconds: 350));
+        tool.onTap(const Point2D(x: 3800, y: 330), _mouse);
+        // Back along the second row, finished with a double-click.
+        _doubleTap(tool, const Point2D(x: 300, y: 350));
 
-      final path = cb.zone.manualTubePath!;
-      expect(path, const [
-        Point2D(x: 0, y: 200), // entry
-        // No column yet: the row end snaps to the 100 mm grid.
-        Point2D(x: 3800, y: 200),
-        // One spacing below the row.
-        Point2D(x: 3800, y: 350),
-        // A whole number of spacings from the turn column.
-        Point2D(x: 350, y: 350),
-        Point2D(x: 0, y: 500), // exit
-      ]);
-      expect(tool.isDrawing, isFalse);
+        final path = cb.zone.manualTubePath!;
+        expect(path, const [
+          Point2D(x: 0, y: 200), // entry
+          // No column yet: the row end snaps to the 100 mm grid.
+          Point2D(x: 3800, y: 200),
+          // One spacing below the row.
+          Point2D(x: 3800, y: 350),
+          // A whole number of spacings from the turn column.
+          Point2D(x: 350, y: 350),
+          Point2D(x: 0, y: 500), // exit
+        ]);
+        expect(tool.isDrawing, isFalse);
 
-      undo.undo();
-      expect(cb.zone.manualTubePath, isNull);
-    });
+        undo.undo();
+        expect(cb.zone.manualTubePath, isNull);
+      },
+    );
 
     test('TD-2 Alt places a corner freely', () {
       final cb = _StubCallbacks([_zone]);
@@ -394,5 +460,85 @@ void main() {
       expect(tool.isDrawing, isFalse);
       expect(cb.toasts, [cb.l10n.tube_clickFloorZoneToast]);
     });
+    test('TD-8 Ctrl+Z takes back the last corner, Ctrl+Y puts it back; '
+        'a finished tube is one undo step', () async {
+      final cb = _StubCallbacks([_zone]);
+      final undo = UndoRedoService();
+      final tool = _drawTool(cb, undo, snap: false);
+      _hook(undo, tool);
+
+      tool.onTap(const Point2D(x: 100, y: 150), _mouse); // entry
+      tool.onTap(const Point2D(x: 1000, y: 200), _mouse);
+      tool.onTap(const Point2D(x: 1000, y: 800), _mouse);
+      tool.onPointerMove(const Point2D(x: 1000, y: 800));
+      int corners() =>
+          (tool.getInteractionData()! as TubePathData).corners.length;
+      expect(corners(), 4); // entry, 2 corners, cursor
+
+      undo.undo();
+      expect(corners(), 3);
+      undo.redo();
+      expect(corners(), 4);
+      expect(undo.canUndo, isFalse); // nothing went onto the stack
+
+      // A new corner clears what Ctrl+Y could put back.
+      undo.undo();
+      await Future<void>.delayed(const Duration(milliseconds: 350));
+      tool.onTap(const Point2D(x: 2000, y: 200), _mouse);
+      undo.redo();
+      expect(corners(), 4);
+
+      _doubleTap(tool, const Point2D(x: 2000, y: 1000));
+      expect(cb.zone.manualTubePath, isNotNull);
+      undo.undo(); // the whole tube
+      expect(cb.zone.manualTubePath, isNull);
+      undo.redo();
+      expect(cb.zone.manualTubePath, isNotNull);
+
+      // Ctrl+Z on the starting point alone ends the drawing.
+      tool.onTap(const Point2D(x: 100, y: 150), _mouse);
+      expect(tool.isDrawing, isTrue);
+      undo.undo();
+      expect(tool.isDrawing, isFalse);
+      expect(cb.zone.manualTubePath, isNotNull);
+    });
   });
+
+  group('UndoRedoService', () {
+    test('UR-1 the active tool gets the first chance; every change bumps '
+        'the revision', () {
+      final undo = UndoRedoService();
+      var toolTakes = true;
+      var toolCalls = 0;
+      undo.toolUndo = () {
+        toolCalls++;
+        return toolTakes;
+      };
+      final log = <String>[];
+      final revisions = <int>[];
+      undo.revision.addListener(() => revisions.add(undo.revision.value));
+      undo.execute(_LogCommand(log));
+
+      undo.undo();
+      expect(toolCalls, 1);
+      expect(log, ['do']); // the stack was left alone
+      toolTakes = false;
+      undo.undo();
+      expect(log, ['do', 'undo']);
+      undo.redo();
+      expect(log, ['do', 'undo', 'do']);
+      expect(revisions, [1, 2, 3, 4]);
+    });
+  });
+}
+
+class _LogCommand extends Command {
+  _LogCommand(this.log);
+  final List<String> log;
+  @override
+  String get label => 'log';
+  @override
+  void execute() => log.add('do');
+  @override
+  void undo() => log.add('undo');
 }

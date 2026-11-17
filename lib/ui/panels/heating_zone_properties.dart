@@ -743,7 +743,9 @@ Widget _readOnlyRow(
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(label, style: textTheme.bodyMedium),
+        // A long label in a narrow panel wraps instead of overflowing.
+        Flexible(child: Text(label, style: textTheme.bodyMedium)),
+        const SizedBox(width: Spacing.sm),
         valueWidget,
       ],
     ),

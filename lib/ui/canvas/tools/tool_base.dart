@@ -73,4 +73,13 @@ abstract class CanvasTool {
   /// Returns interaction data for the painter, or null
   /// if there is nothing to draw.
   InteractionData? getInteractionData();
+
+  /// Ctrl/Cmd+Z while this tool is active: undo a step of the tool's
+  /// own that is not on the undo stack yet (e.g. the last corner of a
+  /// tube being drawn). Returns true when handled; otherwise the undo
+  /// stack is undone as usual.
+  bool undoInTool() => false;
+
+  /// Ctrl/Cmd+Y / Ctrl+Shift+Z counterpart of [undoInTool].
+  bool redoInTool() => false;
 }

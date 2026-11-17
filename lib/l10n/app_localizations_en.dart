@@ -1710,7 +1710,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String tube_drawHint(String lengthM) {
-    return 'Tube length: $lengthM m — double-click to finish, Backspace removes the last corner, hold Alt to place freely';
+    return 'Tube length: $lengthM m — double-click to finish, Ctrl+Z / Backspace removes the last corner, Ctrl+Y puts it back, hold Alt to place freely';
   }
 
   @override

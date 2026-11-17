@@ -1,5 +1,6 @@
 import 'dart:collection';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Abstract command for the undo/redo system.
@@ -28,6 +29,19 @@ class UndoRedoService {
   final _undoStack = ListQueue<Command>();
   final _redoStack = ListQueue<Command>();
 
+  /// Lets the active tool take an undo for a step of its own that is not
+  /// on the stack yet — a corner of a tube still being drawn (ADR-046).
+  /// Returns true when the tool handled it; [undo] then leaves the stack
+  /// alone. Set by the canvas.
+  bool Function()? toolUndo;
+
+  /// Counterpart of [toolUndo] for [redo].
+  bool Function()? toolRedo;
+
+  /// Bumped after every [execute], [undo], [redo] and [clear], so views
+  /// that show derived state — the active tool's overlay — can refresh.
+  final ValueNotifier<int> revision = ValueNotifier<int>(0);
+
   /// Whether an undo operation is available.
   bool get canUndo => _undoStack.isNotEmpty;
 
@@ -45,28 +59,44 @@ class UndoRedoService {
     while (_undoStack.length > stackLimit) {
       _undoStack.removeFirst();
     }
+    revision.value++;
   }
 
   /// Undo the most recent command.
+  ///
+  /// The active tool gets the first chance through [toolUndo].
   void undo() {
+    if (toolUndo?.call() ?? false) {
+      revision.value++;
+      return;
+    }
     if (_undoStack.isEmpty) return;
     final command = _undoStack.removeLast();
     command.undo();
     _redoStack.addLast(command);
+    revision.value++;
   }
 
   /// Redo the most recently undone command.
+  ///
+  /// The active tool gets the first chance through [toolRedo].
   void redo() {
+    if (toolRedo?.call() ?? false) {
+      revision.value++;
+      return;
+    }
     if (_redoStack.isEmpty) return;
     final command = _redoStack.removeLast();
     command.execute();
     _undoStack.addLast(command);
+    revision.value++;
   }
 
   /// Clear both stacks.
   void clear() {
     _undoStack.clear();
     _redoStack.clear();
+    revision.value++;
   }
 }
 

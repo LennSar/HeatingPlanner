@@ -3119,7 +3119,7 @@ abstract class AppLocalizations {
   /// Status bar while drawing a tube by hand
   ///
   /// In en, this message translates to:
-  /// **'Tube length: {lengthM} m — double-click to finish, Backspace removes the last corner, hold Alt to place freely'**
+  /// **'Tube length: {lengthM} m — double-click to finish, Ctrl+Z / Backspace removes the last corner, Ctrl+Y puts it back, hold Alt to place freely'**
   String tube_drawHint(String lengthM);
 
   /// Status bar while the tube edit tool is active

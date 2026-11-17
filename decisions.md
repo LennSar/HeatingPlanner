@@ -3511,6 +3511,20 @@ Rule 5.
    therefore follow a manual path with no other change (ADR-042 Rule 4).
    Heat output stays area-based.
 
+9. **Undo / redo (Ctrl/Cmd+Z, Ctrl/Cmd+Y, Ctrl+Shift+Z).** The active tool
+   gets the first chance at an undo or redo (`CanvasTool.undoInTool` /
+   `redoInTool`, called from `UndoRedoService.toolUndo` / `toolRedo`, which
+   the canvas sets):
+   - *Draw tube*, while drawing: Ctrl+Z takes back the last corner, Ctrl+Y
+     puts it back; placing a new corner clears what Ctrl+Y could restore.
+     Ctrl+Z on the starting point alone ends the drawing. Corners are not
+     undo-stack entries; the finished tube is one.
+   - *Edit tube*: during a drag Ctrl+Z reverts the drag; otherwise the undo
+     stack is used as usual and the corner selection is dropped.
+   - The canvas refreshes the active tool's overlay after every undo / redo
+     (`UndoRedoService.revision`), so the edit handles follow the restored
+     tube at once instead of on the next pointer move.
+
 **Not covered.** Spacing between non-adjacent runs is not checked (only
 crossings are). A manual path is not re-fitted when the zone outline
 changes; TP-01 flags it when it no longer fits. The tools work on one zone
@@ -3522,6 +3536,7 @@ operations, issues); `test/unit/providers/manual_tube_path_provider_test.dart`
 (override, ends follow, length, issues);
 `test/unit/repositories/manual_tube_path_persistence_test.dart` (DB, v24
 upgrade, JSON); `test/integration/file_roundtrip_test.dart` (.hsp);
-`test/widget/tools/tube_tools_test.dart` TE-1 … TE-8,
-TD-1 … TD-7; `test/unit/validation/manual_tube_path_validation_test.dart`;
+`test/widget/tools/tube_tools_test.dart` TE-1 … TE-10,
+TD-1 … TD-8, UR-1; `test/integration/tube_undo_redo_test.dart` (keyboard,
+end to end); `test/unit/validation/manual_tube_path_validation_test.dart`;
 `test/widget/panels/heating_zone_tube_path_test.dart`.

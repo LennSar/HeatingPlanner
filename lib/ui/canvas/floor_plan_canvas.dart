@@ -334,10 +334,27 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
 
   @override
   void dispose() {
+    final undoRedo = _undoRedo;
+    if (undoRedo != null) {
+      undoRedo.revision.removeListener(_onUndoRedo);
+      undoRedo.toolUndo = null;
+      undoRedo.toolRedo = null;
+    }
     _interactionState.dispose();
     _pendingRoomHighlight.dispose();
     _canvasFocusNode.dispose();
     super.dispose();
+  }
+
+  /// Undo stack this canvas registered its tool hooks on.
+  UndoRedoService? _undoRedo;
+
+  /// Refreshes the active tool's overlay after an undo / redo, so e.g.
+  /// the tube edit handles follow the restored tube at once instead of
+  /// on the next pointer move.
+  void _onUndoRedo() {
+    if (!mounted) return;
+    _setInteractionData(_activeTool?.getInteractionData());
   }
 
   void _setInteractionData(InteractionData? data) {
@@ -360,6 +377,12 @@ class _FloorPlanCanvasState extends ConsumerState<FloorPlanCanvas>
     }
 
     final undoRedo = ref.read(undoRedoProvider);
+    // The active tool may take Ctrl+Z / Ctrl+Y for its own in-progress
+    // steps first, and its overlay follows every undo / redo (ADR-046).
+    _undoRedo = undoRedo;
+    undoRedo.toolUndo = () => _activeTool?.undoInTool() ?? false;
+    undoRedo.toolRedo = () => _activeTool?.redoInTool() ?? false;
+    undoRedo.revision.addListener(_onUndoRedo);
     _tools[DrawingTool.select] = SelectTool(
       callbacks: this,
       onStateChanged: onChanged,

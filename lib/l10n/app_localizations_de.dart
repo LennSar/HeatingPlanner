@@ -1724,7 +1724,7 @@ class AppLocalizationsDe extends AppLocalizations {
 
   @override
   String tube_drawHint(String lengthM) {
-    return 'Rohrlänge: $lengthM m — Doppelklick zum Abschließen, Rücktaste entfernt den letzten Eckpunkt, Alt halten für freies Setzen';
+    return 'Rohrlänge: $lengthM m — Doppelklick zum Abschließen, Strg+Z / Rücktaste entfernt den letzten Eckpunkt, Strg+Y stellt ihn wieder her, Alt halten für freies Setzen';
   }
 
   @override

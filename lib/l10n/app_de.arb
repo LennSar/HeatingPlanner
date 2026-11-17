@@ -542,7 +542,7 @@
   "tube_clickFloorZoneToast": "In eine Fußbodenheizzone klicken.",
   "tube_mustStayInZoneToast": "Das Rohr muss innerhalb seiner Heizzone bleiben.",
   "tube_placeCornersToast": "Vor dem Abschließen mindestens einen Eckpunkt setzen.",
-  "tube_drawHint": "Rohrlänge: {lengthM} m — Doppelklick zum Abschließen, Rücktaste entfernt den letzten Eckpunkt, Alt halten für freies Setzen",
+  "tube_drawHint": "Rohrlänge: {lengthM} m — Doppelklick zum Abschließen, Strg+Z / Rücktaste entfernt den letzten Eckpunkt, Strg+Y stellt ihn wieder her, Alt halten für freies Setzen",
   "tube_editHint": "Eckpunkt oder Strang ziehen · Doppelklick auf einen Strang fügt einen Eckpunkt ein · Eckpunkt wählen und Entf drücken zum Entfernen · Alt halten für freies Setzen",
   "zoneTubePath": "Rohrverlauf",
   "zoneTubePathAutomatic": "Automatisch — aus dem Verlegemuster",

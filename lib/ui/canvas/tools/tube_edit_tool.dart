@@ -24,6 +24,8 @@ import 'undo_redo_service.dart';
 /// - **Click a handle, then Delete / Backspace** to remove that corner.
 /// - **Alt** places freely for the current drag.
 /// - **Escape** cancels a drag in progress.
+/// - **Ctrl/Cmd+Z / Ctrl/Cmd+Y** undo and redo committed changes; the
+///   handles follow at once. During a drag, Ctrl+Z reverts the drag.
 ///
 /// The two ends of the tube follow the connection pipes and carry no
 /// handle. The first change to an automatically laid out zone stores
@@ -288,6 +290,27 @@ class TubeEditTool extends CanvasTool with ModifierDrawTool {
     _clearDrag();
     _selectedCorner = null;
     onStateChanged();
+  }
+
+  @override
+  bool undoInTool() {
+    // A drag not yet committed is reverted rather than undoing the
+    // previous change underneath it.
+    if (_dragOriginal != null && _dragMoved) {
+      cancel();
+      return true;
+    }
+    // The tube is about to change: a selected corner index would point
+    // at a different corner afterwards.
+    _selectedCorner = null;
+    return false;
+  }
+
+  @override
+  bool redoInTool() {
+    if (_dragOriginal != null && _dragMoved) return true;
+    _selectedCorner = null;
+    return false;
   }
 
   @override
